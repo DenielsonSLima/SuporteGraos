@@ -1,0 +1,106 @@
+
+import { AdvanceTransaction, PartnerAdvanceSummary } from '../types';
+import { purchaseService } from '../../../../services/purchaseService';
+import { Persistence } from '../../../../services/persistence';
+import { logService } from '../../../../services/logService';
+import { authService } from '../../../../services/authService';
+
+const manualDb = new Persistence<AdvanceTransaction>('manual_advances', []);
+
+const getLogInfo = () => {
+  const user = authService.getCurrentUser();
+  return { userId: user?.id || 'system', userName: user?.name || 'Sistema' };
+};
+
+export const advanceService = {
+  
+  getAllTransactions: (): AdvanceTransaction[] => {
+    const manual = manualDb.getAll();
+    const purchaseAdvances: AdvanceTransaction[] = [];
+    const orders = purchaseService.getAll();
+
+    orders.forEach(order => {
+      order.transactions.filter(t => t.type === 'advance').forEach(t => {
+        purchaseAdvances.push({
+          id: `po-adv-${t.id}`,
+          partnerId: order.partnerId,
+          partnerName: order.partnerName,
+          type: 'given',
+          date: t.date,
+          value: t.value,
+          description: `Adiantamento Pedido ${order.number}`,
+          status: 'active',
+          accountId: t.accountId,
+          accountName: t.accountName
+        });
+      });
+    });
+
+    return [...manual, ...purchaseAdvances].sort((a, b) => 
+      new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
+  },
+
+  getManualTransactions: () => manualDb.getAll(),
+
+  getSummaries: (): PartnerAdvanceSummary[] => {
+    const allTransactions = advanceService.getAllTransactions();
+    const map: Record<string, PartnerAdvanceSummary> = {};
+
+    allTransactions.forEach(t => {
+      if (!map[t.partnerId]) {
+        map[t.partnerId] = {
+          partnerId: t.partnerId,
+          partnerName: t.partnerName,
+          totalGiven: 0,
+          totalTaken: 0,
+          netBalance: 0,
+          lastTransactionDate: t.date
+        };
+      }
+
+      if (t.type === 'given') {
+        map[t.partnerId].totalGiven += t.value;
+      } else {
+        map[t.partnerId].totalTaken += t.value;
+      }
+
+      if (new Date(t.date) > new Date(map[t.partnerId].lastTransactionDate)) {
+        map[t.partnerId].lastTransactionDate = t.date;
+      }
+    });
+
+    return Object.values(map).map(summary => ({
+      ...summary,
+      netBalance: summary.totalGiven - summary.totalTaken
+    })).sort((a, b) => Math.abs(b.netBalance) - Math.abs(a.netBalance));
+  },
+
+  getTransactionsByPartner: (partnerId: string) => {
+    return advanceService.getAllTransactions()
+      .filter(t => t.partnerId === partnerId)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  },
+
+  addTransaction: (transaction: Omit<AdvanceTransaction, 'id' | 'status'>) => {
+    const newTx: AdvanceTransaction = {
+      ...transaction,
+      id: Math.random().toString(36).substr(2, 9),
+      status: 'active'
+    };
+    manualDb.add(newTx);
+    const { userId, userName } = getLogInfo();
+    logService.addLog({ userId, userName, action: 'create', module: 'Financeiro', description: `Registrou adiantamento manual para ${transaction.partnerName}` });
+  },
+
+  deleteTransaction: (id: string) => {
+    const tx = manualDb.getById(id);
+    manualDb.delete(id);
+    const { userId, userName } = getLogInfo();
+    logService.addLog({ userId, userName, action: 'delete', module: 'Financeiro', description: `Excluiu adiantamento de ${tx?.partnerName}` });
+  },
+
+  importData: (data: AdvanceTransaction[]) => {
+    manualDb.setAll(data);
+  }
+};

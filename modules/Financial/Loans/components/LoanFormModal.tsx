@@ -1,0 +1,203 @@
+
+import React, { useState, useEffect } from 'react';
+import { 
+  X, Save, Landmark, DollarSign, Calendar, 
+  Percent, ArrowDownLeft, ArrowUpRight, 
+  Wallet, CheckSquare, Square, Info, 
+  ChevronDown, Building2, ToggleLeft, ToggleRight
+} from 'lucide-react';
+import { BankAccount } from '../../types';
+import { financialService } from '../../../../services/financialService';
+
+interface Props {
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (loan: any) => void;
+  initialType?: 'taken' | 'granted';
+}
+
+const LoanFormModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialType = 'taken' }) => {
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [type, setType] = useState<'taken' | 'granted'>(initialType);
+  const [displayValue, setDisplayValue] = useState('');
+  const [numericValue, setNumericValue] = useState(0);
+  const [isHistorical, setIsHistorical] = useState(false);
+  const [isImmediateCash, setIsImmediateCash] = useState(false); // NOVO: Controla se dinheiro entra/sai hoje
+  const [accountId, setAccountId] = useState('');
+  
+  const [formData, setFormData] = useState({
+    entityName: '',
+    contractDate: new Date().toISOString().split('T')[0],
+    interestRate: '',
+    installments: '12',
+    nextDueDate: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0]
+  });
+
+  const formatBRL = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+
+  useEffect(() => {
+    if (isOpen) {
+      setType(initialType);
+      setDisplayValue('');
+      setNumericValue(0);
+      setIsHistorical(false);
+      setIsImmediateCash(false);
+      setAccountId('');
+      setFormData({
+        entityName: '',
+        contractDate: new Date().toISOString().split('T')[0],
+        interestRate: '',
+        installments: '12',
+        nextDueDate: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0]
+      });
+
+      const accounts = financialService.getBankAccounts().filter(acc => acc.active !== false).sort((a, b) => a.bankName.localeCompare(b.bankName));
+      setBankAccounts(accounts);
+    }
+  }, [isOpen, initialType]);
+
+  const handleValueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value.replace(/\D/g, '');
+    const num = Number(raw) / 100;
+    setNumericValue(num);
+    setDisplayValue(formatBRL(num));
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (numericValue <= 0) return alert('Valor deve ser maior que zero.');
+    if (isImmediateCash && !accountId) return alert('Selecione uma conta para movimentação imediata.');
+
+    const selectedAccount = bankAccounts.find(a => a.id === accountId);
+
+    onSave({
+      ...formData,
+      totalValue: numericValue,
+      interestRate: parseFloat(formData.interestRate || '0'),
+      installments: parseInt(formData.installments || '1'),
+      type,
+      isHistorical,
+      isImmediateCash,
+      accountId: (isHistorical || !isImmediateCash) ? undefined : accountId,
+      accountName: (isHistorical || !isImmediateCash) ? undefined : selectedAccount?.bankName
+    });
+    onClose();
+  };
+
+  if (!isOpen) return null;
+
+  const labelClass = 'block text-[10px] font-black text-slate-500 uppercase mb-1.5 tracking-widest ml-1';
+  const inputClass = 'w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold text-slate-900 bg-white placeholder:text-slate-300 focus:border-slate-800 outline-none transition-all text-sm shadow-sm';
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in">
+      <div className="w-full max-w-xl bg-white rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 border border-white/20">
+        
+        <div className={`px-8 py-6 flex justify-between items-center text-white ${type === 'taken' ? 'bg-rose-600' : 'bg-emerald-600'}`}>
+          <div className="flex items-center gap-4">
+             <div className="p-3 bg-white/20 rounded-2xl"><Landmark size={24} /></div>
+             <div>
+                <h3 className="font-black text-xl uppercase tracking-tighter italic leading-none">{type === 'taken' ? 'Novo Empréstimo Tomado' : 'Novo Empréstimo Concedido'}</h3>
+                <p className="text-[10px] font-black uppercase tracking-widest mt-1.5 opacity-80">Registro de Contrato Financeiro</p>
+             </div>
+          </div>
+          <button onClick={onClose} className="hover:bg-white/20 p-2 rounded-full transition-colors"><X size={28} /></button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-8 space-y-6 max-h-[75vh] overflow-y-auto bg-slate-50/30">
+          <div className="flex bg-slate-200 p-1 rounded-2xl shadow-inner">
+            <button type="button" onClick={() => setType('taken')} className={`flex-1 py-3 text-xs font-black uppercase rounded-xl transition-all flex items-center justify-center gap-2 ${type === 'taken' ? 'bg-white shadow text-rose-600' : 'text-slate-500 hover:text-slate-700'}`}><ArrowDownLeft size={16} /> Tomado</button>
+            <button type="button" onClick={() => setType('granted')} className={`flex-1 py-3 text-xs font-black uppercase rounded-xl transition-all flex items-center justify-center gap-2 ${type === 'granted' ? 'bg-white shadow text-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}><ArrowUpRight size={16} /> Concedido</button>
+          </div>
+
+          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+            <div>
+              <label className={labelClass}>Instituição Financeira / Parceiro</label>
+              <div className="relative">
+                <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                <input type="text" required className={`${inputClass} pl-12 uppercase`} placeholder="Ex: BANCO DO BRASIL..." value={formData.entityName} onChange={e => setFormData({...formData, entityName: e.target.value})} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className={labelClass}>Valor do Contrato</label>
+                <input type="text" required className={`${inputClass} text-slate-900 font-black text-lg`} value={displayValue} onChange={handleValueChange} placeholder="R$ 0,00" />
+              </div>
+              <div>
+                <label className={labelClass}>Taxa de Juros (% a.m.)</label>
+                <input type="number" step="0.01" required className={`${inputClass}`} value={formData.interestRate} onChange={e => setFormData({...formData, interestRate: e.target.value})} />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+            <div className="flex items-center justify-between border-b border-slate-50 pb-4">
+                <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2"><Info size={16} className="text-blue-500" /> Fluxo de Caixa</h3>
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <button type="button" onClick={() => setIsHistorical(!isHistorical)} className={`transition-all ${isHistorical ? 'text-blue-600' : 'text-slate-300'}`}>
+                        {isHistorical ? <CheckSquare size={22} /> : <Square size={22} />}
+                    </button>
+                    <span className="text-[10px] font-black text-slate-500 uppercase">Histórico (Apenas registro)</span>
+                </label>
+            </div>
+
+            {!isHistorical && (
+                <div className="space-y-6">
+                    <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                        <div>
+                            <p className="text-xs font-black text-slate-700 uppercase tracking-tight">Efetivar movimentação agora?</p>
+                            <p className="text-[9px] text-slate-500 font-bold uppercase">Se SIM, o saldo bancário será alterado hoje.</p>
+                        </div>
+                        <button type="button" onClick={() => setIsImmediateCash(!isImmediateCash)} className={`transition-all ${isImmediateCash ? 'text-emerald-500' : 'text-slate-300'}`}>
+                            {isImmediateCash ? <ToggleRight size={42} /> : <ToggleLeft size={42} />}
+                        </button>
+                    </div>
+
+                    {isImmediateCash && (
+                        <div className="animate-in slide-in-from-top-2">
+                            <label className={labelClass}>Conta Bancária para {type === 'taken' ? 'Entrada' : 'Saída'}</label>
+                            <div className="relative">
+                                <Wallet className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                                <select required className={`${inputClass} pl-12 appearance-none`} value={accountId} onChange={e => setAccountId(e.target.value)}>
+                                    <option value="">Selecione a conta...</option>
+                                    {bankAccounts.map(acc => <option key={acc.id} value={acc.id}>{acc.bankName} - {acc.owner}</option>)}
+                                </select>
+                                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" size={18} />
+                            </div>
+                        </div>
+                    )}
+                    
+                    {!isImmediateCash && (
+                        <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100 flex items-start gap-3">
+                            <Info className="text-blue-600 shrink-0" size={18} />
+                            <p className="text-[10px] text-blue-800 font-bold uppercase leading-relaxed">
+                                Este contrato será lançado como uma <strong>provisão futura</strong>. Ele aparecerá no seu Contas a Pagar/Receber, mas não afetará o saldo do banco até que você realize o pagamento da parcela.
+                            </p>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+                <div>
+                    <label className={labelClass}>Data do Contrato</label>
+                    <input type="date" required className={inputClass} value={formData.contractDate} onChange={e => setFormData({...formData, contractDate: e.target.value})} />
+                </div>
+                <div>
+                    <label className={labelClass}>Primeiro Vencimento</label>
+                    <input type="date" required className={inputClass} value={formData.nextDueDate} onChange={e => setFormData({...formData, nextDueDate: e.target.value})} />
+                </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">
+            <button type="button" onClick={onClose} className="px-8 py-4 border-2 border-slate-200 rounded-2xl text-slate-500 font-black uppercase text-xs">Cancelar</button>
+            <button type="submit" className={`px-10 py-4 rounded-2xl text-white font-black uppercase text-xs shadow-xl tracking-widest transition-all ${type === 'taken' ? 'bg-rose-600 hover:bg-rose-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}>Salvar Contrato</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+export default LoanFormModal;

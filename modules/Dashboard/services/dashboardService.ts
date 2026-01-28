@@ -1,0 +1,340 @@
+
+import { DashboardCache } from '../../../services/dashboardCache';
+
+export const dashboardService = {
+  getOperationalKPIs: () => {
+    // 1. Definição do Período (Últimos 30 dias para "Operacional Recente")
+    const today = new Date();
+    const thirtyDaysAgo = new Date(today.setDate(today.getDate() - 30));
+
+    // 📦 OTIMIZAÇÃO: Usa cache centralizado (1 leitura em vez de 4)
+    const cache = DashboardCache.load();
+    const allPurchases = cache.purchases;
+    const allSales = cache.sales;
+    const allLoadings = cache.loadings;
+    const allPayables = cache.payables;
+
+    // Filtros de Data
+    const recentPurchases = allPurchases.filter(p => new Date(p.date) >= thirtyDaysAgo && p.status !== 'canceled');
+    const recentSales = allSales.filter(s => new Date(s.date) >= thirtyDaysAgo && s.status !== 'canceled');
+    
+    // --- 1. VOLUME MOVIMENTADO (BASEADO EM CARGAS REAIS) ---
+    const validLoadings = allLoadings.filter(l => 
+      ['loaded', 'in_transit', 'completed', 'unloading', 'redirected'].includes(l.status) &&
+      new Date(l.date) >= thirtyDaysAgo
+    );
+    
+    const totalVolumeKg = validLoadings.reduce((acc, l) => acc + l.weightKg, 0);
+    const totalVolumeSc = totalVolumeKg / 60;
+    const totalVolumeTon = totalVolumeKg / 1000;
+    
+    const totalOrdersCount = recentPurchases.length + recentSales.length;
+
+    // --- 2. MÉDIAS FINANCEIRAS REAIS (BASEADO EM CARGAS) ---
+    // AQUI ESTAVA O ERRO: Usar loading.totalPurchaseValue garante que pegamos o custo real da carga
+    
+    const totalLoadedPurchaseValue = validLoadings.reduce((acc, l) => acc + (l.totalPurchaseValue || 0), 0);
+    const avgPurchasePrice = totalVolumeSc > 0 ? totalLoadedPurchaseValue / totalVolumeSc : 0;
+
+    const totalLoadedSalesValue = validLoadings.reduce((acc, l) => acc + (l.totalSalesValue || 0), 0);
+    const avgSalesPrice = totalVolumeSc > 0 ? totalLoadedSalesValue / totalVolumeSc : 0;
+
+    const totalLoadedFreightValue = validLoadings.reduce((acc, l) => acc + (l.totalFreightValue || 0), 0);
+    
+    // Média Frete por Tonelada
+    let freightSumPerTon = 0;
+    let freightCount = 0;
+    validLoadings.forEach(l => {
+      if (l.freightPricePerTon > 0) {
+        freightSumPerTon += l.freightPricePerTon;
+        freightCount++;
+      }
+    });
+    const avgFreightPriceTon = freightCount > 0 ? freightSumPerTon / freightCount : 0;
+
+    // --- 3. CUSTOS & LUCRO ESTIMADO ---
+    
+    // Despesas Administrativas do período (Rateio simples pelo volume operado não é exato, mas serve para estimativa)
+    const adminExpenses = allPayables
+      .filter(p => (p.subType === 'admin' || p.subType === 'commission') && new Date(p.issueDate) >= thirtyDaysAgo)
+      .reduce((acc, p) => acc + p.originalValue, 0);
+
+    // Custo Total da Operação = Custo Grão (Cargas) + Custo Frete (Cargas) + Despesas (Geral)
+    const totalOperationalCost = totalLoadedPurchaseValue + totalLoadedFreightValue + adminExpenses;
+    
+    // Base de divisão: Se não tiver volume carregado, usamos 1 para evitar div/0
+    const volumeBase = totalVolumeSc > 0 ? totalVolumeSc : 1;
+    
+    // Custo Médio por Saca (Grão + Frete + Despesas)
+    const avgCostPerSc = totalOperationalCost / volumeBase;
+    
+    // Lucro Médio por Saca = Preço Médio Venda - Custo Médio Total
+    // Se não houver venda registrada no período, o lucro aparece negativo (apenas custos)
+    const avgProfitPerSc = totalVolumeSc > 0 ? (avgSalesPrice - avgCostPerSc) : 0;
+
+    return {
+      ordersLast30Days: totalOrdersCount,
+      volumeSc: totalVolumeSc,
+      volumeTon: totalVolumeTon,
+      avgPurchasePrice,
+      avgSalesPrice,
+      avgFreightPriceTon,
+      avgCostPerSc,
+      avgProfitPerSc
+    };
+  },
+
+  getRecentActivity: () => {
+    // 📦 OTIMIZAÇÃO: Usa cache centralizado
+    const cache = DashboardCache.load();
+    
+    // Latest 5 of each
+    const freights = cache.loadings
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 5)
+      .map(l => ({
+        id: l.id,
+        desc: `Placa ${l.vehiclePlate}`,
+        sub: `${l.carrierName}`,
+        value: l.totalFreightValue,
+        date: l.date
+      }));
+
+    const orders = [...cache.purchases, ...cache.sales]
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 5)
+      .map(o => ({
+        id: o.id,
+        desc: 'customerName' in o ? (o as any).customerName : (o as any).partnerName,
+        sub: 'customerName' in o ? 'Venda' : 'Compra',
+        value: o.totalValue,
+        date: o.date
+      }));
+
+    // Payments (Paid records)
+    const payments = cache.payables
+      .filter(p => p.paidValue > 0)
+      .sort((a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime()) // sort by issue or payment date
+      .slice(0, 5)
+      .map(p => ({
+        id: p.id,
+        desc: p.description,
+        sub: p.entityName,
+        value: p.paidValue,
+        date: p.issueDate // Should be payment date ideally
+      }));
+
+    return { freights, orders, payments };
+  },
+
+  getFinancialPending: () => {
+    // 📦 OTIMIZAÇÃO: Usa cache centralizado
+    const cache = DashboardCache.load();
+    
+    // Helper to sort by due date ascending (urgency)
+    const sortByDate = (a: any, b: any) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+
+    // 1. Receivables (Vendas)
+    const receivables = cache.receivables
+      .filter(r => r.status !== 'paid')
+      .sort(sortByDate)
+      .slice(0, 5); // Top 5 urgency
+
+    // 2. Payables (Trade: Purchases & Freight)
+    const tradePayables = cache.payables
+      .filter(r => r.status !== 'paid' && (r.subType === 'purchase_order' || r.subType === 'freight'))
+      .sort(sortByDate)
+      .slice(0, 5);
+
+    // 3. Expenses (Admin & Commissions)
+    // We source from standalone records for purity of "Despesas"
+    const expenses = cache.standaloneRecords
+      .filter(r => r.status !== 'paid' && r.subType === 'admin')
+      .sort(sortByDate)
+      .slice(0, 5);
+
+    return {
+      receivables,
+      tradePayables,
+      expenses
+    };
+  },
+
+  getShareholderRanking: () => {
+    // 📦 OTIMIZAÇÃO: Usa cache centralizado
+    const cache = DashboardCache.load();
+    const purchases = cache.purchases;
+    
+    const ranking: Record<string, { name: string, total: number, count: number }> = {};
+
+    purchases.forEach(p => {
+      const consultant = p.consultantName || 'Não Informado';
+      if (!ranking[consultant]) {
+        ranking[consultant] = { name: consultant, total: 0, count: 0 };
+      }
+      ranking[consultant].total += p.totalValue;
+      ranking[consultant].count += 1;
+    });
+
+    return Object.values(ranking).sort((a, b) => b.total - a.total);
+  },
+
+  getChartData: () => {
+    // 📦 OTIMIZAÇÃO: Usa cache centralizado
+    const cache = DashboardCache.load();
+    
+    const today = new Date();
+    const months = [];
+    const monthNames = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
+    const purchases = cache.purchases;
+    const sales = cache.sales;
+    const loadings = cache.loadings;
+    // Standalone inclui: Despesas Adm, Retiradas de Sócio, Empréstimos, Venda de Ativos
+    const standaloneRecords = cache.standaloneRecords;
+
+    // Helper: Verificar se data está no mês/ano
+    const isInMonth = (dateStr: string, month: number, year: number) => {
+        const d = new Date(dateStr);
+        // Ajuste de fuso horário simples para garantir consistência
+        return d.getMonth() === month && d.getFullYear() === year;
+    };
+
+    // ⚡ OTIMIZAÇÃO CRÍTICA: Pre-processar TODOS os dados em UMA ÚNICA PASSADA
+    // Em vez de iterar 3x por mês (15 loops), iteramos 1x por dataset (4 loops totais)
+    const monthlyData = new Map<string, {
+      revenue: number;
+      expense: number;
+      purchaseValue: number;
+      purchaseSc: number;
+      salesValue: number;
+      salesSc: number;
+    }>();
+
+    // Inicializar estrutura para últimos 3 meses
+    for (let i = 2; i >= 0; i--) {
+      const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${d.getMonth()}`;
+      monthlyData.set(key, {
+        revenue: 0,
+        expense: 0,
+        purchaseValue: 0,
+        purchaseSc: 0,
+        salesValue: 0,
+        salesSc: 0
+      });
+    }
+
+    // Loop 1: Processar TODAS as vendas (transactions)
+    sales.forEach(s => {
+      if (s.transactions) {
+        s.transactions.forEach(t => {
+          if (t.type === 'receipt') {
+            const d = new Date(t.date);
+            const key = `${d.getFullYear()}-${d.getMonth()}`;
+            const month = monthlyData.get(key);
+            if (month) {
+              month.revenue += t.value;
+            }
+          }
+        });
+      }
+    });
+
+    // Loop 2: Processar TODAS as compras (transactions)
+    purchases.forEach(p => {
+      if (p.transactions) {
+        p.transactions.forEach(t => {
+          if (t.type === 'payment' || t.type === 'advance') {
+            const d = new Date(t.date);
+            const key = `${d.getFullYear()}-${d.getMonth()}`;
+            const month = monthlyData.get(key);
+            if (month) {
+              month.expense += t.value;
+            }
+          }
+        });
+      }
+    });
+
+    // Loop 3: Processar TODOS os loadings (transactions + preços médios)
+    loadings.forEach(l => {
+      if (l.status !== 'canceled') {
+        const d = new Date(l.date);
+        const key = `${d.getFullYear()}-${d.getMonth()}`;
+        const month = monthlyData.get(key);
+        
+        if (month) {
+          // Acumular valores para média
+          month.purchaseValue += l.totalPurchaseValue || 0;
+          month.purchaseSc += l.weightSc || 0;
+          month.salesValue += l.totalSalesValue || 0;
+          month.salesSc += l.weightSc || 0;
+        }
+      }
+
+      // Processar transactions de frete
+      if (l.transactions) {
+        l.transactions.forEach(t => {
+          if (t.type === 'payment' || t.type === 'advance') {
+            const d = new Date(t.date);
+            const key = `${d.getFullYear()}-${d.getMonth()}`;
+            const monthData = monthlyData.get(key);
+            if (monthData) {
+              monthData.expense += t.value;
+            }
+          }
+        });
+      }
+    });
+
+    // Loop 4: Processar standalone records (entradas/saídas)
+    standaloneRecords.forEach(r => {
+      if (r.status === 'paid') {
+        const d = new Date(r.issueDate);
+        const key = `${d.getFullYear()}-${d.getMonth()}`;
+        const month = monthlyData.get(key);
+        
+        if (month) {
+          // Entradas
+          const isEntry = 
+            r.subType === 'loan_taken' || 
+            r.category === 'Venda de Ativo' || 
+            r.subType === 'receipt';
+          
+          if (isEntry) {
+            month.revenue += r.paidValue;
+          }
+          
+          // Saídas
+          const isExit = 
+            r.subType === 'admin' || 
+            r.subType === 'shareholder' || 
+            r.subType === 'loan_granted' || 
+            r.subType === 'commission';
+          
+          if (isExit) {
+            month.expense += r.paidValue;
+          }
+        }
+      }
+    });
+
+    // Montar array de retorno
+    for (let i = 2; i >= 0; i--) {
+      const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${d.getMonth()}`;
+      const data = monthlyData.get(key)!;
+      
+      months.push({
+        name: monthNames[d.getMonth()],
+        revenue: data.revenue,
+        expense: data.expense,
+        avgPurchasePrice: data.purchaseSc > 0 ? data.purchaseValue / data.purchaseSc : 0,
+        avgSalesPrice: data.salesSc > 0 ? data.salesValue / data.salesSc : 0
+      });
+    }
+
+    return months;
+  }
+};
