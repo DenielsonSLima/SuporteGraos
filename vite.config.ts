@@ -65,21 +65,8 @@ export default defineConfig(({ mode }) => {
               // Não separa services e components compartilhados para evitar chunks circulares
               // Eles serão incluídos nos módulos que os usam
               
-              // Módulos principais da aplicação (apenas os grandes)
-              if (normalizedId.includes('/modules/Reports/')) {
-                return 'module-reports';
-              }
-              if (normalizedId.includes('/modules/Settings/')) {
-                return 'module-settings';
-              }
-              if (normalizedId.includes('/modules/Financial/')) {
-                return 'module-financial';
-              }
-              if (normalizedId.includes('/modules/Logistics/')) {
-                return 'module-logistics';
-              }
-              
-              // Outros módulos menores ficam no chunk principal ou são lazy loaded
+              // Módulos principais ficam no chunk principal para evitar dependências cíclicas
+              // Cada módulo será lazy loaded conforme necessário
             }
           }
         },
