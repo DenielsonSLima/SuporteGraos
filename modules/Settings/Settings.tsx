@@ -27,7 +27,6 @@ import ApiSettings from './Api/ApiSettings';
 import PartnerTypesSettings from './PartnerTypes/PartnerTypesSettings';
 import InitialBalanceSettings from './InitialBalance/InitialBalanceSettings';
 import BankAccountsSettings from './BankAccounts/BankAccountsSettings';
-import LogsSettings from './Logs/LogsSettings';
 import ExpenseTypesSettings from './ExpenseTypes/ExpenseTypesSettings';
 import BackupSettings from './Backup/BackupSettings';
 import LocationsSettings from './Locations/LocationsSettings';
@@ -107,14 +106,6 @@ const SETTINGS_MENU = [
     icon: Landmark,
     color: 'bg-cyan-500',
     component: BankAccountsSettings
-  },
-  { 
-    id: 'logs', 
-    title: 'Logs e Eventos', 
-    description: 'Auditoria de ações e histórico de alterações.', 
-    icon: ScrollText,
-    color: 'bg-orange-500',
-    component: LogsSettings
   },
   { 
     id: 'expense_types', 
