@@ -10,9 +10,7 @@ import { NotificationProvider } from './contexts/NotificationContext';
 import { WebSocketProvider } from './contexts/WebSocketContext';
 import { Loader2 } from 'lucide-react';
 import { initializeSupabaseData } from './services/supabaseInitService';
-
-// ⚠️ Desabilitar IA por enquanto (erros de tipo)
-const FloatingAssistantDisabled = () => null;
+import FloatingAssistantSimple from './components/ai/FloatingAssistantSimple';
 
 // Lazy Load Modules
 const Dashboard = React.lazy(() => import('./modules/Dashboard/Dashboard'));
@@ -188,7 +186,7 @@ const AppContent: React.FC = () => {
       </div>
 
       {/* ASSISTENTE FLUTUANTE GLOBAL */}
-      <FloatingAssistantDisabled />
+      <FloatingAssistantSimple />
       
     </div>
   );
