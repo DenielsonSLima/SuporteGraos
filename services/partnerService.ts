@@ -164,6 +164,8 @@ const transformPartnerToSupabase = (frontendPartner: Partner) => {
   return {
     id: frontendPartner.id,
     name: frontendPartner.name,
+    nickname: frontendPartner.nickname || null, // ✅ Apelido
+    trade_name: frontendPartner.tradeName || null, // ✅ Nome Fantasia
     document,
     type,
     partner_type_id: firstCategory, // Categories[0] → partner_type_id
@@ -194,6 +196,8 @@ const transformPartnerFromSupabase = (supabasePartner: any): Partner => {
     categories: supabasePartner.partner_type_id ? [supabasePartner.partner_type_id] : [],
     document,
     name: supabasePartner.name,
+    nickname: supabasePartner.nickname || undefined, // ✅ Apelido
+    tradeName: supabasePartner.trade_name || undefined, // ✅ Nome Fantasia
     email: supabasePartner.email,
     phone: supabasePartner.phone,
     active: supabasePartner.active,
