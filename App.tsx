@@ -9,11 +9,10 @@ import { ToastProvider } from './contexts/ToastContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { WebSocketProvider } from './contexts/WebSocketContext';
 import { Loader2 } from 'lucide-react';
-import FloatingAssistant from './components/ai/FloatingAssistant';
+import { initializeSupabaseData } from './services/supabaseInitService';
 
 // ⚠️ Desabilitar IA por enquanto (erros de tipo)
 const FloatingAssistantDisabled = () => null;
-import { initializeSupabaseData } from './services/supabaseInitService';
 
 // Lazy Load Modules
 const Dashboard = React.lazy(() => import('./modules/Dashboard/Dashboard'));
