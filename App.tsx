@@ -10,7 +10,7 @@ import { NotificationProvider } from './contexts/NotificationContext';
 import { WebSocketProvider } from './contexts/WebSocketContext';
 import { Loader2 } from 'lucide-react';
 import { initializeSupabaseData } from './services/supabaseInitService';
-import FloatingAssistantSimple from './components/ai/FloatingAssistantSimple';
+import FloatingAssistant from './components/ai/FloatingAssistant';
 
 // Lazy Load Modules
 const Dashboard = React.lazy(() => import('./modules/Dashboard/Dashboard'));
@@ -186,7 +186,7 @@ const AppContent: React.FC = () => {
       </div>
 
       {/* ASSISTENTE FLUTUANTE GLOBAL */}
-      <FloatingAssistantSimple />
+      <FloatingAssistant />
       
     </div>
   );
