@@ -391,5 +391,38 @@ export const purchaseService = {
         console.error('Erro inesperado ao importar pedidos no Supabase', err);
       }
     })();
+  },
+
+  // ✅ REALTIME: Inscrever em mudanças em tempo real
+  subscribeToUpdates: (callback: (order: PurchaseOrder) => void) => {
+    const channel = supabase.channel('purchase_orders_realtime');
+    
+    channel
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'purchase_orders' },
+        (payload: any) => {
+          const newData = payload.new;
+          if (newData) {
+            const order = mapOrderFromDb(newData);
+            // Atualizar cache local
+            if (payload.eventType === 'INSERT') {
+              db.add(order);
+            } else if (payload.eventType === 'UPDATE') {
+              db.update(order);
+            } else if (payload.eventType === 'DELETE') {
+              db.delete(order.id);
+            }
+            // Notificar subscribers
+            callback(order);
+          }
+        }
+      )
+      .subscribe();
+
+    // Retornar função para desinscrever
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }
 };

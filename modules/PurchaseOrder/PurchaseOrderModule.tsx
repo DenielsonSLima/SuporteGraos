@@ -58,6 +58,26 @@ const PurchaseOrderModule: React.FC = () => {
     setOrders(purchaseService.getAll());
     setShareholders(shareholderService.getAll().map(s => ({ id: s.id, name: s.name })));
 
+    // ✅ REALTIME: Subscribe para mudanças em purchase_orders
+    const subscription = purchaseService.subscribeToUpdates((updatedOrder) => {
+      setOrders(prev => {
+        const index = prev.findIndex(o => o.id === updatedOrder.id);
+        if (index >= 0) {
+          // Atualizar existente
+          const newOrders = [...prev];
+          newOrders[index] = updatedOrder;
+          return newOrders;
+        } else {
+          // Novo pedido adicionado por outro usuário
+          return [...prev, updatedOrder];
+        }
+      });
+      // Se está visualizando este pedido, atualizar também
+      if (selectedOrder?.id === updatedOrder.id) {
+        setSelectedOrder(updatedOrder);
+      }
+    });
+
     const handleNavigation = (e: any) => {
         if (e.detail?.moduleId === 'purchase_order' && e.detail?.orderId) {
             const order = purchaseService.getById(e.detail.orderId);
@@ -68,8 +88,11 @@ const PurchaseOrderModule: React.FC = () => {
         }
     };
     window.addEventListener('app:navigate', handleNavigation);
-    return () => window.removeEventListener('app:navigate', handleNavigation);
-  }, []); 
+    return () => {
+      window.removeEventListener('app:navigate', handleNavigation);
+      subscription?.(); // Limpar subscription
+    };
+  }, [selectedOrder?.id]); 
 
   const handleAddNew = () => {
     setSelectedOrder(undefined);
