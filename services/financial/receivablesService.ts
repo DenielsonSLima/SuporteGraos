@@ -1,5 +1,6 @@
 import { Persistence } from '../persistence';
 import { supabase } from '../supabase';
+import { supabaseWithRetry } from '../../utils/fetchWithRetry';
 import { invalidateDashboardCache } from '../dashboardCache';
 import { invalidateFinancialCache } from '../financialCache';
 import { auditService } from '../auditService';
@@ -66,12 +67,13 @@ const mapFromDb = (row: any): Receivable => ({
 
 const loadFromSupabase = async (): Promise<Receivable[]> => {
   try {
-    const { data, error } = await supabase
-      .from('receivables')
-      .select('*')
-      .order('due_date', { ascending: true });
+    const data = await supabaseWithRetry(() =>
+      supabase
+        .from('receivables')
+        .select('*')
+        .order('due_date', { ascending: true })
+    );
 
-    if (error) throw error;
     const mapped = (data || []).map(mapFromDb);
     db.setAll(mapped);
     isLoaded = true;
