@@ -75,4 +75,4 @@ const ExpenseStructure: React.FC<Props> = ({ data }) => {
   );
 };
 
-export default ExpenseStructure;
+export default React.memo(ExpenseStructure);

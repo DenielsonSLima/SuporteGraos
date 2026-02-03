@@ -37,4 +37,4 @@ const CostTrendChart: React.FC<{ data: MonthlyData[] }> = ({ data }) => {
   );
 };
 
-export default CostTrendChart;
+export default React.memo(CostTrendChart);

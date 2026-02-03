@@ -62,4 +62,4 @@ const GoalProgress: React.FC<Props> = ({ goals }) => {
   );
 };
 
-export default GoalProgress;
+export default React.memo(GoalProgress);

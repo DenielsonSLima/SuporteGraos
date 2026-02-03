@@ -91,4 +91,4 @@ const NetProfitChart: React.FC<Props> = ({ data }) => {
   );
 };
 
-export default NetProfitChart;
+export default React.memo(NetProfitChart);

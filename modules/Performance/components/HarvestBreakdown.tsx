@@ -60,4 +60,4 @@ const HarvestBreakdown: React.FC<Props> = ({ harvests }) => {
   );
 };
 
-export default HarvestBreakdown;
+export default React.memo(HarvestBreakdown);

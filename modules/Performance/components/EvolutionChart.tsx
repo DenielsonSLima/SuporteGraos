@@ -35,4 +35,4 @@ const EvolutionChart: React.FC<{ data: MonthlyData[] }> = ({ data }) => {
   );
 };
 
-export default EvolutionChart;
+export default React.memo(EvolutionChart);
