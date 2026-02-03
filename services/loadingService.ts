@@ -4,6 +4,7 @@ import { logService } from './logService';
 import { authService } from './authService';
 import { Persistence } from './persistence';
 import { supabase } from './supabase';
+import { supabaseWithRetry } from '../utils/fetchWithRetry';
 import { payablesService } from './financial/payablesService';
 import { DashboardCache } from './dashboardCache';
 import { purchaseService } from './purchaseService';
@@ -134,12 +135,13 @@ const mapLoadingFromDb = (row: any): Loading => {
 const loadFromSupabase = async () => {
   if (isLoaded) return;
   try {
-    const { data, error } = await supabase
-      .from('logistics_loadings')
-      .select('*')
-      .order('created_at', { ascending: false });
+    const data = await supabaseWithRetry(() =>
+      supabase
+        .from('logistics_loadings')
+        .select('*')
+        .order('created_at', { ascending: false })
+    );
 
-    if (error) throw error;
     const mapped = (data || []).map(mapLoadingFromDb);
     db.setAll(mapped);
     isLoaded = true;
