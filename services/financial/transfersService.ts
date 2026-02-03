@@ -1,5 +1,6 @@
 import { Persistence } from '../persistence';
 import { supabase } from '../supabase';
+import { supabaseWithRetry } from '../../utils/fetchWithRetry';
 import { invalidateDashboardCache } from '../dashboardCache';
 import { invalidateFinancialCache } from '../financialCache';
 import { auditService } from '../auditService';
@@ -51,12 +52,13 @@ const mapFromDb = (row: any): Transfer => ({
 
 const loadFromSupabase = async (): Promise<Transfer[]> => {
   try {
-    const { data, error } = await supabase
-      .from('transfers')
-      .select('*')
-      .order('transfer_date', { ascending: false });
+    const data = await supabaseWithRetry(() =>
+      supabase
+        .from('transfers')
+        .select('*')
+        .order('transfer_date', { ascending: false })
+    );
 
-    if (error) throw error;
     const mapped = (data || []).map(mapFromDb);
     db.setAll(mapped);
     isLoaded = true;

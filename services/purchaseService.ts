@@ -8,6 +8,7 @@ import { supabase } from './supabase';
 import { payablesService } from './financial/payablesService';
 import { DashboardCache, invalidateDashboardCache } from './dashboardCache';
 import { auditService } from './auditService';
+import { supabaseWithRetry } from '../utils/fetchWithRetry';
 
 const INITIAL_ORDERS: PurchaseOrder[] = [];
 const db = new Persistence<PurchaseOrder>('purchase_orders', INITIAL_ORDERS, { useStorage: false });
@@ -110,12 +111,13 @@ const mapOrderFromDb = (row: any): PurchaseOrder => {
 
 const loadFromSupabase = async (): Promise<PurchaseOrder[]> => {
   try {
-    const { data, error } = await supabase
-      .from('purchase_orders')
-      .select('*')
-      .order('date', { ascending: false });
+    const data = await supabaseWithRetry(() =>
+      supabase
+        .from('purchase_orders')
+        .select('*')
+        .order('date', { ascending: false })
+    );
 
-    if (error) throw error;
     const mapped = (data || []).map(mapOrderFromDb);
     db.setAll(mapped);
     console.log('🔄 Pedidos de compra sincronizando em tempo real...');

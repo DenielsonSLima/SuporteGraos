@@ -2,6 +2,7 @@ import React from 'react';
 import { Document, Page, View, Text, Image, StyleSheet } from '@react-pdf/renderer';
 import { PerformanceReport } from '../types';
 import { settingsService } from '../../../services/settingsService';
+import { formatMoney, formatDecimal } from '../../../utils/formatters';
 
 interface Props {
   data: PerformanceReport;
@@ -174,12 +175,6 @@ const PerformancePdfDocument: React.FC<Props> = ({ data, periodLabel }) => {
   const company = settingsService.getCompanyData();
   const watermark = settingsService.getWatermark();
 
-  const currency = (val: number) =>
-    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
-
-  const number = (val: number, dec = 2) =>
-    new Intl.NumberFormat('pt-BR', { minimumFractionDigits: dec, maximumFractionDigits: dec }).format(val || 0);
-
   return (
     <Document>
       <Page size="A4" orientation="landscape" style={styles.page}>
@@ -206,23 +201,23 @@ const PerformancePdfDocument: React.FC<Props> = ({ data, periodLabel }) => {
           <View style={styles.kpiRow}>
             <View style={styles.kpiCard}>
               <Text style={styles.kpiLabel}>Faturamento</Text>
-              <Text style={styles.kpiValue}>{currency(data.totalRevenue)}</Text>
+              <Text style={styles.kpiValue}>{formatMoney(data.totalRevenue)}</Text>
             </View>
             <View style={styles.kpiCard}>
               <Text style={styles.kpiLabel}>Débitos Totais</Text>
-              <Text style={styles.kpiValue}>{currency(data.totalDebits)}</Text>
+              <Text style={styles.kpiValue}>{formatMoney(data.totalDebits)}</Text>
             </View>
             <View style={styles.kpiCard}>
               <Text style={styles.kpiLabel}>Saldo</Text>
-              <Text style={styles.kpiValue}>{currency(data.balance)}</Text>
+              <Text style={styles.kpiValue}>{formatMoney(data.balance)}</Text>
             </View>
             <View style={styles.kpiCard}>
               <Text style={styles.kpiLabel}>Lucro Médio/SC</Text>
-              <Text style={styles.kpiValue}>{currency(data.avgProfitPerSc)}</Text>
+              <Text style={styles.kpiValue}>{formatMoney(data.avgProfitPerSc)}</Text>
             </View>
             <View style={styles.kpiCard}>
               <Text style={styles.kpiLabel}>Margem Global</Text>
-              <Text style={styles.kpiValue}>{number(data.globalMarginPercent)}%</Text>
+              <Text style={styles.kpiValue}>{formatDecimal(data.globalMarginPercent)}%</Text>
             </View>
           </View>
         </View>
@@ -232,39 +227,39 @@ const PerformancePdfDocument: React.FC<Props> = ({ data, periodLabel }) => {
           <View style={styles.infoGrid}>
             <View style={styles.infoItem}>
               <Text style={styles.infoLabel}>Volume (Ton)</Text>
-              <Text style={styles.infoValue}>{number(data.totalVolumeTon)}</Text>
+              <Text style={styles.infoValue}>{formatDecimal(data.totalVolumeTon)}</Text>
             </View>
             <View style={styles.infoItem}>
               <Text style={styles.infoLabel}>Volume (SC)</Text>
-              <Text style={styles.infoValue}>{number(data.totalVolumeSc)}</Text>
+              <Text style={styles.infoValue}>{formatDecimal(data.totalVolumeSc)}</Text>
             </View>
             <View style={styles.infoItem}>
               <Text style={styles.infoLabel}>Preço Médio Compra</Text>
-              <Text style={styles.infoValue}>{currency(data.avgPurchasePrice)}</Text>
+              <Text style={styles.infoValue}>{formatMoney(data.avgPurchasePrice)}</Text>
             </View>
             <View style={styles.infoItem}>
               <Text style={styles.infoLabel}>Preço Médio Venda</Text>
-              <Text style={styles.infoValue}>{currency(data.avgSalesPrice)}</Text>
+              <Text style={styles.infoValue}>{formatMoney(data.avgSalesPrice)}</Text>
             </View>
             <View style={styles.infoItem}>
               <Text style={styles.infoLabel}>Frete Médio/Ton</Text>
-              <Text style={styles.infoValue}>{currency(data.avgFreightPriceTon)}</Text>
+              <Text style={styles.infoValue}>{formatMoney(data.avgFreightPriceTon)}</Text>
             </View>
             <View style={styles.infoItem}>
               <Text style={styles.infoLabel}>Custo Total/SC</Text>
-              <Text style={styles.infoValue}>{currency(data.avgTotalCostPerSc)}</Text>
+              <Text style={styles.infoValue}>{formatMoney(data.avgTotalCostPerSc)}</Text>
             </View>
             <View style={styles.infoItem}>
               <Text style={styles.infoLabel}>Frete/SC</Text>
-              <Text style={styles.infoValue}>{currency(data.avgFreightCostSc)}</Text>
+              <Text style={styles.infoValue}>{formatMoney(data.avgFreightCostSc)}</Text>
             </View>
             <View style={styles.infoItem}>
               <Text style={styles.infoLabel}>Adm/Fixo/SC</Text>
-              <Text style={styles.infoValue}>{currency(data.avgPureOpCostSc)}</Text>
+              <Text style={styles.infoValue}>{formatMoney(data.avgPureOpCostSc)}</Text>
             </View>
             <View style={styles.infoItem}>
               <Text style={styles.infoLabel}>Desp. Mensais</Text>
-              <Text style={styles.infoValue}>{currency(data.avgOtherExpensesMonthly)}</Text>
+              <Text style={styles.infoValue}>{formatMoney(data.avgOtherExpensesMonthly)}</Text>
             </View>
           </View>
         </View>
@@ -282,10 +277,10 @@ const PerformancePdfDocument: React.FC<Props> = ({ data, periodLabel }) => {
             {data.monthlyHistory.map((m) => (
               <View key={m.fullDate} style={styles.tableRow}>
                 <Text style={[styles.tableCell, { width: '20%' }]}>{m.name} {m.fullDate.split('-')[0]}</Text>
-                <Text style={[styles.tableCell, { width: '20%', textAlign: 'right', color: '#047857' }]}>{currency(m.revenue)}</Text>
-                <Text style={[styles.tableCell, { width: '20%', textAlign: 'right', color: '#b91c1c' }]}>{currency(m.purchaseCost + m.freightCost)}</Text>
-                <Text style={[styles.tableCell, { width: '20%', textAlign: 'right', color: m.netResult >= 0 ? '#1d4ed8' : '#b91c1c' }]}>{currency(m.netResult)}</Text>
-                <Text style={[styles.tableCell, { width: '20%', textAlign: 'right' }]}>{number(m.totalQuantitySc)}</Text>
+                <Text style={[styles.tableCell, { width: '20%', textAlign: 'right', color: '#047857' }]}>{formatMoney(m.revenue)}</Text>
+                <Text style={[styles.tableCell, { width: '20%', textAlign: 'right', color: '#b91c1c' }]}>{formatMoney(m.purchaseCost + m.freightCost)}</Text>
+                <Text style={[styles.tableCell, { width: '20%', textAlign: 'right', color: m.netResult >= 0 ? '#1d4ed8' : '#b91c1c' }]}>{formatMoney(m.netResult)}</Text>
+                <Text style={[styles.tableCell, { width: '20%', textAlign: 'right' }]}>{formatDecimal(m.totalQuantitySc)}</Text>
               </View>
             ))}
           </View>
@@ -295,10 +290,10 @@ const PerformancePdfDocument: React.FC<Props> = ({ data, periodLabel }) => {
           <Text style={styles.sectionTitle}>Breakdown de Despesas</Text>
           {data.expenseBreakdown.map((cat) => (
             <View key={cat.label} style={{ marginBottom: 6 }}>
-              <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold' }}>{cat.label} — {currency(cat.total)}</Text>
+              <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold' }}>{cat.label} — {formatMoney(cat.total)}</Text>
               {cat.items.map((item) => (
                 <Text key={item.name} style={{ fontSize: 7, color: '#64748b', marginLeft: 6 }}>
-                  {item.name}: {currency(item.value)} ({number(item.percentage)}%)
+                  {item.name}: {formatMoney(item.value)} ({formatDecimal(item.percentage)}%)
                 </Text>
               ))}
             </View>
@@ -319,11 +314,11 @@ const PerformancePdfDocument: React.FC<Props> = ({ data, periodLabel }) => {
             {data.harvests.map((h) => (
               <View key={`${h.uf}-${h.totalSales}`} style={styles.tableRow}>
                 <Text style={[styles.tableCell, { width: '12%' }]}>{h.uf}</Text>
-                <Text style={[styles.tableCell, { width: '18%', textAlign: 'right' }]}>{number(h.volumeSc)}</Text>
-                <Text style={[styles.tableCell, { width: '18%', textAlign: 'right' }]}>{currency(h.avgPurchasePrice)}</Text>
-                <Text style={[styles.tableCell, { width: '18%', textAlign: 'right' }]}>{currency(h.avgSalesPrice)}</Text>
-                <Text style={[styles.tableCell, { width: '18%', textAlign: 'right' }]}>{currency(h.avgFreightPrice)}</Text>
-                <Text style={[styles.tableCell, { width: '16%', textAlign: 'right' }]}>{currency(h.totalSales)}</Text>
+                <Text style={[styles.tableCell, { width: '18%', textAlign: 'right' }]}>{formatDecimal(h.volumeSc)}</Text>
+                <Text style={[styles.tableCell, { width: '18%', textAlign: 'right' }]}>{formatMoney(h.avgPurchasePrice)}</Text>
+                <Text style={[styles.tableCell, { width: '18%', textAlign: 'right' }]}>{formatMoney(h.avgSalesPrice)}</Text>
+                <Text style={[styles.tableCell, { width: '18%', textAlign: 'right' }]}>{formatMoney(h.avgFreightPrice)}</Text>
+                <Text style={[styles.tableCell, { width: '16%', textAlign: 'right' }]}>{formatMoney(h.totalSales)}</Text>
               </View>
             ))}
           </View>

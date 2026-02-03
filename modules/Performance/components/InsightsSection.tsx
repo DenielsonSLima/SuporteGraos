@@ -2,14 +2,13 @@
 import React from 'react';
 import { ArrowUpRight, ArrowDownRight, Calendar, AlertCircle, Award } from 'lucide-react';
 import { PerformanceReport } from '../types';
+import { formatMoney } from '../../../utils/formatters';
 
 interface Props {
   data: PerformanceReport;
 }
 
 const InsightsSection: React.FC<Props> = ({ data }) => {
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
-
   const OrderCard = ({ order, type }: any) => (
     <div className="flex items-center justify-between p-3 bg-white border border-slate-100 rounded-lg hover:bg-slate-50 transition-colors">
       <div>
@@ -18,7 +17,7 @@ const InsightsSection: React.FC<Props> = ({ data }) => {
       </div>
       <div className="text-right">
         <p className={`font-bold ${type === 'profit' ? 'text-emerald-600' : 'text-rose-600'}`}>
-          {type === 'profit' ? '+' : ''}{currency(order.profit)}
+          {type === 'profit' ? '+' : ''}{formatMoney(order.profit)}
         </p>
         <p className="text-[10px] text-slate-400">{order.margin.toFixed(1)}% Margem</p>
       </div>
@@ -32,7 +31,7 @@ const InsightsSection: React.FC<Props> = ({ data }) => {
         <p className="font-bold text-slate-700">{month.name}</p>
       </div>
       <p className={`font-bold ${type === 'profit' ? 'text-emerald-600' : 'text-rose-600'}`}>
-        {currency(month.netResult)}
+        {formatMoney(month.netResult)}
       </p>
     </div>
   );

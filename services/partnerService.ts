@@ -8,6 +8,7 @@ import { supabase } from './supabase';
 import { partnerSupabaseSync } from './partner/supabaseSyncService';
 import { locationService } from './locationService';
 import { auditService } from './auditService';
+import { supabaseWithRetry } from '../utils/fetchWithRetry';
 
 // Initial Data - System starts empty
 const INITIAL_PARTNERS: Partner[] = [];
@@ -25,20 +26,22 @@ let isLoaded = false;
 const loadFromSupabase = async () => {
   if (isLoaded) return;
   try {
-    // Carrega parceiros
-    const { data: partners, error } = await supabase
-      .from('partners')
-      .select('*')
-      .order('name');
-    if (error) throw error;
+    // Carrega parceiros com retry
+    const partners = await supabaseWithRetry(() =>
+      supabase
+        .from('partners')
+        .select('*')
+        .order('name')
+    );
 
     // Carrega endereços (com join para nome da cidade/UF) e monta mapa do endereço principal
-    const { data: addresses, error: addrErr } = await supabase
-      .from('partner_addresses')
-      .select(`*, city:cities(name), state:ufs(uf, name)`) // join para trazer nomes
-      .order('is_primary', { ascending: false })
-      .order('created_at');
-    if (addrErr) throw addrErr;
+    const addresses = await supabaseWithRetry(() =>
+      supabase
+        .from('partner_addresses')
+        .select(`*, city:cities(name), state:ufs(uf, name)`) // join para trazer nomes
+        .order('is_primary', { ascending: false })
+        .order('created_at')
+    );
 
     const primaryMap: Record<string, any> = {};
     (addresses || []).forEach((a) => {

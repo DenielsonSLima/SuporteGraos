@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, LayoutDashboard, Table, PieChart, Printer } from 'lucide-react';
 import { performanceService } from './services/performanceService';
 import { PerformanceReport } from './types';
+import { formatMoney } from '../../utils/formatters';
 import FinancialKPIs from './components/FinancialKPIs';
 import OperationalStats from './components/OperationalStats';
 import EvolutionChart from './components/EvolutionChart';
@@ -138,10 +139,10 @@ const PerformanceModule: React.FC = () => {
                     {data.monthlyHistory.map(m => (
                         <tr key={m.fullDate} className="hover:bg-slate-50">
                             <td className="px-6 py-3 font-black text-slate-700 capitalize">{m.name} {m.fullDate.split('-')[0]}</td>
-                            <td className="px-6 py-3 text-right font-bold text-emerald-600">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(m.revenue)}</td>
-                            <td className="px-6 py-3 text-right font-bold text-rose-600">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(m.purchaseCost + m.freightCost)}</td>
-                            <td className="px-6 py-3 text-right text-slate-500">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(m.otherExpenses)}</td>
-                            <td className={`px-6 py-3 text-right font-black ${m.netResult >= 0 ? 'text-blue-600' : 'text-rose-700'}`}>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(m.netResult)}</td>
+                            <td className="px-6 py-3 text-right font-bold text-emerald-600">{formatMoney(m.revenue)}</td>
+                            <td className="px-6 py-3 text-right font-bold text-rose-600">{formatMoney(m.purchaseCost + m.freightCost)}</td>
+                            <td className="px-6 py-3 text-right text-slate-500">{formatMoney(m.otherExpenses)}</td>
+                            <td className={`px-6 py-3 text-right font-black ${m.netResult >= 0 ? 'text-blue-600' : 'text-rose-700'}`}>{formatMoney(m.netResult)}</td>
                         </tr>
                     ))}
                 </tbody>

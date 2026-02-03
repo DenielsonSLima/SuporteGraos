@@ -11,14 +11,13 @@ import {
   ReferenceLine
 } from 'recharts';
 import { MonthlyData } from '../types';
+import { formatCurrency } from '../../../utils/formatters';
 
 interface Props {
   data: MonthlyData[];
 }
 
 const NetProfitChart: React.FC<Props> = ({ data }) => {
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(val);
-
   // Custom Dot para pintar de vermelho se for prejuízo
   const CustomizedDot = (props: any) => {
     const { cx, cy, payload } = props;
@@ -66,7 +65,7 @@ const NetProfitChart: React.FC<Props> = ({ data }) => {
               cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }}
               contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontWeight: 'bold' }}
               formatter={(value: number) => [
-                <span className={value >= 0 ? "text-emerald-600" : "text-rose-600"}>{currency(value)}</span>, 
+                <span className={value >= 0 ? "text-emerald-600" : "text-rose-600"}>{formatCurrency(value)}</span>, 
                 'Resultado'
               ]}
             />
@@ -92,4 +91,4 @@ const NetProfitChart: React.FC<Props> = ({ data }) => {
   );
 };
 
-export default NetProfitChart;
+export default React.memo(NetProfitChart);
