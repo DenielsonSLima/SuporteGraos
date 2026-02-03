@@ -2,14 +2,13 @@
 import React from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { ProductMix } from '../types';
+import { formatCurrency } from '../../../utils/formatters';
 
 interface Props {
   data: ProductMix[];
 }
 
 const ProductMixChart: React.FC<Props> = ({ data }) => {
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(val);
-
   if (data.length === 0) {
     return (
       <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm h-full flex flex-col items-center justify-center text-slate-400">
@@ -38,7 +37,7 @@ const ProductMixChart: React.FC<Props> = ({ data }) => {
               ))}
             </Pie>
             <Tooltip 
-              formatter={(value: number) => currency(value)}
+              formatter={(value: number) => formatCurrency(value)}
               contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
             />
             <Legend 

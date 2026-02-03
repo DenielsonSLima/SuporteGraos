@@ -2,9 +2,9 @@
 import React from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { MonthlyData } from '../types';
+import { formatMoney } from '../../../utils/formatters';
 
 const CostTrendChart: React.FC<{ data: MonthlyData[] }> = ({ data }) => {
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 2 }).format(val);
 
   const filteredData = data.filter(d => d.totalQuantitySc > 0);
 

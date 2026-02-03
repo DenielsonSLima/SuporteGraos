@@ -2,13 +2,13 @@
 import React from 'react';
 import { Anchor, TrendingUp, Briefcase, ChevronRight } from 'lucide-react';
 import { ExpenseCategorySummary } from '../types';
+import { formatMoney } from '../../../utils/formatters';
 
 interface Props {
   data: ExpenseCategorySummary[];
 }
 
 const ExpenseStructure: React.FC<Props> = ({ data }) => {
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
 
   const getStyle = (type: string) => {
     switch (type) {
@@ -34,7 +34,7 @@ const ExpenseStructure: React.FC<Props> = ({ data }) => {
                 </div>
                 <h3 className="font-black text-slate-800 uppercase text-xs tracking-widest">{category.label}</h3>
               </div>
-              <span className="font-black text-slate-900">{currency(category.total)}</span>
+              <span className="font-black text-slate-900">{formatMoney(category.total)}</span>
             </div>
 
             {/* List */}
@@ -47,7 +47,7 @@ const ExpenseStructure: React.FC<Props> = ({ data }) => {
                     <div className="flex justify-between items-end">
                       <span className="text-xs font-bold text-slate-600 truncate mr-2">{item.name}</span>
                       <div className="text-right shrink-0">
-                        <span className="text-[10px] font-black text-slate-900 block leading-none">{currency(item.value)}</span>
+                        <span className="text-[10px] font-black text-slate-900 block leading-none">{formatMoney(item.value)}</span>
                         <span className="text-[9px] font-black text-slate-400 uppercase">{item.percentage.toFixed(1)}%</span>
                       </div>
                     </div>

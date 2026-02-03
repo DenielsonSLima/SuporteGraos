@@ -11,14 +11,13 @@ import {
   ResponsiveContainer
 } from 'recharts';
 import { PriceTrendData } from '../types';
+import { formatMoney } from '../../../utils/formatters';
 
 interface Props {
   data: PriceTrendData[];
 }
 
 const PriceTrendChart: React.FC<Props> = ({ data }) => {
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
-
   const filteredData = data.filter(d => d.avgPurchasePrice > 0 || d.avgSalesPrice > 0);
 
   return (
@@ -38,7 +37,7 @@ const PriceTrendChart: React.FC<Props> = ({ data }) => {
             <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10}} domain={['auto', 'auto']} />
             <Tooltip 
               contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontWeight: 'bold' }}
-              formatter={(value: number) => [currency(value), '']}
+              formatter={(value: number) => [formatMoney(value), '']}
             />
             <Legend verticalAlign="top" height={36} iconType="circle" />
             

@@ -2,15 +2,13 @@
 import React from 'react';
 import { MapPin, ArrowRightLeft } from 'lucide-react';
 import { HarvestData } from '../types';
+import { formatMoney, formatInteger } from '../../../utils/formatters';
 
 interface Props {
   harvests: HarvestData[];
 }
 
 const HarvestBreakdown: React.FC<Props> = ({ harvests }) => {
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
-  const number = (val: number) => new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 }).format(val);
-
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
       <div className="bg-slate-900 px-6 py-4 flex items-center justify-between text-white">
@@ -45,13 +43,13 @@ const HarvestBreakdown: React.FC<Props> = ({ harvests }) => {
                         <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-900 font-black">{h.uf}</div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-right text-slate-900">{number(h.volumeSc)}</td>
-                  <td className="px-6 py-4 text-right text-slate-500">{number(h.volumeTon)}</td>
-                  <td className="px-6 py-4 text-right text-rose-700">{currency(h.avgPurchasePrice)}</td>
-                  <td className="px-6 py-4 text-right text-emerald-700">{currency(h.avgSalesPrice)}</td>
-                  <td className="px-6 py-4 text-right text-amber-600">{currency(h.avgFreightPrice)}</td>
-                  <td className="px-6 py-4 text-right text-emerald-600">{currency(h.totalSales)}</td>
-                  <td className="px-6 py-4 text-right text-rose-600">{currency(h.totalPurchase)}</td>
+                  <td className="px-6 py-4 text-right text-slate-900">{formatInteger(h.volumeSc)}</td>
+                  <td className="px-6 py-4 text-right text-slate-500">{formatInteger(h.volumeTon)}</td>
+                  <td className="px-6 py-4 text-right text-rose-700">{formatMoney(h.avgPurchasePrice)}</td>
+                  <td className="px-6 py-4 text-right text-emerald-700">{formatMoney(h.avgSalesPrice)}</td>
+                  <td className="px-6 py-4 text-right text-amber-600">{formatMoney(h.avgFreightPrice)}</td>
+                  <td className="px-6 py-4 text-right text-emerald-600">{formatMoney(h.totalSales)}</td>
+                  <td className="px-6 py-4 text-right text-rose-600">{formatMoney(h.totalPurchase)}</td>
                 </tr>
               ))
             )}

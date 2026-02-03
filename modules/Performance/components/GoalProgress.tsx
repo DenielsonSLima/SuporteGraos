@@ -2,14 +2,13 @@
 import React from 'react';
 import { Target, TrendingUp } from 'lucide-react';
 import { GoalMetric } from '../types';
+import { formatCurrency, formatInteger } from '../../../utils/formatters';
 
 interface Props {
   goals: GoalMetric[];
 }
 
 const GoalProgress: React.FC<Props> = ({ goals }) => {
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(val);
-  const number = (val: number) => new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 }).format(val);
 
   return (
     <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm h-full flex flex-col justify-center">

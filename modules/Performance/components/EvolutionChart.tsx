@@ -2,9 +2,9 @@
 import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { MonthlyData } from '../types';
+import { formatCurrency } from '../../../utils/formatters';
 
 const EvolutionChart: React.FC<{ data: MonthlyData[] }> = ({ data }) => {
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(val);
 
   return (
     <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
@@ -20,7 +20,7 @@ const EvolutionChart: React.FC<{ data: MonthlyData[] }> = ({ data }) => {
             <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10}} tickFormatter={(val) => `R$${val/1000}k`} />
             <Tooltip 
               contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-              formatter={(value: number) => [currency(value), '']}
+              formatter={(value: number) => [formatCurrency(value), '']}
             />
             <Legend verticalAlign="top" height={36} iconType="circle" />
             
