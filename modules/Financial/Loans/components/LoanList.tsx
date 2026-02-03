@@ -11,6 +11,11 @@ interface Props {
 const LoanList: React.FC<Props> = ({ loans, onSelect }) => {
   const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
 
+  // Ordenar empréstimos alfabeticamente por nome da entidade
+  const sortedLoans = [...loans].sort((a, b) => 
+    a.entityName.localeCompare(b.entityName, 'pt-BR')
+  );
+
   if (loans.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
@@ -22,7 +27,7 @@ const LoanList: React.FC<Props> = ({ loans, onSelect }) => {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {loans.map(loan => (
+      {sortedLoans.map(loan => (
         <div 
           key={loan.id} 
           onClick={() => onSelect(loan.id)}
