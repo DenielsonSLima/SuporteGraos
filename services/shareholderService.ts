@@ -16,7 +16,7 @@ export type { Shareholder, ShareholderTransaction, ShareholderRecurrence } from 
 // Initial Mock Data
 let _shareholders: Shareholder[] = [];
 let _isSupabaseLoaded = false;
-const _shareholdersDb = new Persistence<Shareholder>('shareholders', [], { useStorage: true });
+const _shareholdersDb = new Persistence<Shareholder>('shareholders', [], { useStorage: false });
 let shareholdersChannel: ReturnType<typeof supabase.channel> | null = null;
 let transactionsChannel: ReturnType<typeof supabase.channel> | null = null;
 let _realtimeStarted = false;
