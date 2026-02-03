@@ -6,14 +6,16 @@ export class Persistence<T extends { id: string }> {
   private key: string;
   private inMemoryData: T[];
   private listeners: Array<(items: T[]) => void> = [];
+  private useStorage: boolean;
 
-  constructor(key: string, initialData: T[] = []) {
+  constructor(key: string, initialData: T[] = [], options?: { useStorage?: boolean }) {
     this.key = `sg_erp_${key}`;
     this.inMemoryData = initialData;
+    this.useStorage = options?.useStorage ?? true;
     this.load();
 
     // Sincronização entre abas: ouvir eventos de storage
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && this.useStorage) {
       window.addEventListener('storage', (e: StorageEvent) => {
         try {
           if (e.key === this.key) {
@@ -29,6 +31,7 @@ export class Persistence<T extends { id: string }> {
 
   private load() {
     try {
+      if (!this.useStorage) return;
       const stored = localStorage.getItem(this.key);
       if (stored) {
         this.inMemoryData = JSON.parse(stored);
@@ -43,8 +46,10 @@ export class Persistence<T extends { id: string }> {
 
   private save() {
     try {
-      // Limit check for localStorage (approx 5MB)
-      localStorage.setItem(this.key, JSON.stringify(this.inMemoryData));
+      if (this.useStorage) {
+        // Limit check for localStorage (approx 5MB)
+        localStorage.setItem(this.key, JSON.stringify(this.inMemoryData));
+      }
       this.notify();
     } catch (e) {
       console.error(`Error saving ${this.key}. LocalStorage might be full.`, e);

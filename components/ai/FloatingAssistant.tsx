@@ -93,7 +93,7 @@ const FloatingAssistant: React.FC = () => {
         model: 'gemini-3-flash-preview',
         contents: historyContents,
         config: {
-           systemInstruction: `Você é a Daitec AI, inteligência central do ERP Suporte Grãos.
+           systemInstruction: `Você é a DLABS AI, inteligência central do ERP Suporte Grãos.
            
  CONTEXTO RÁPIDO:
  ${contextData}
@@ -255,7 +255,7 @@ const FloatingAssistant: React.FC = () => {
                       <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-emerald-500 rounded-full border border-slate-900 animate-pulse"></span>
                   </div>
                   <div>
-                      <h3 className="text-sm font-bold text-white leading-none">Daitec AI</h3>
+                      <h3 className="text-sm font-bold text-white leading-none">DLABS AI</h3>
                       <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">v2.2 Chat</p>
                   </div>
               </div>

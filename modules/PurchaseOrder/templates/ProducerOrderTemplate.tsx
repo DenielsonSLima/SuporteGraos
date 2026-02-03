@@ -84,7 +84,7 @@ const ProducerOrderTemplate: React.FC<Props> = ({ order, loadings }) => {
       <div className="relative z-10 flex-1 flex flex-col">
         
         {/* HEADER MODERNO */}
-        <div className="flex justify-between items-start border-b-2 border-slate-900 pb-6 mb-8">
+        <div className="flex justify-between items-start border-b-2 border-slate-900 pb-3 mb-4">
           <div className="flex gap-6 items-start">
             <div className="h-24 w-auto flex items-center shrink-0 overflow-hidden">
                {company.logoUrl ? (
@@ -118,26 +118,26 @@ const ProducerOrderTemplate: React.FC<Props> = ({ order, loadings }) => {
         </div>
 
         {/* DASHBOARD DE SALDOS (Tamanhos ajustados para não transbordar) */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-10">
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative overflow-visible group">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
+            <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm relative overflow-visible group">
                 <div className="absolute right-0 top-0 p-2 opacity-5 group-hover:opacity-10 transition-opacity"><Scale size={40}/></div>
-                <span className="text-[7px] font-black text-slate-400 uppercase tracking-widest block mb-2">Total Carregado</span>
-                <p className="text-base font-black text-slate-900 leading-tight break-words">{currency(stats.totalLoadedValue)}</p>
-                <div className="h-0.5 w-8 bg-blue-500 rounded-full mt-2"></div>
+                <span className="text-[6px] font-black text-slate-400 uppercase tracking-widest block mb-1">Total Carregado</span>
+                <p className="text-sm font-black text-slate-900 leading-tight break-words">{currency(stats.totalLoadedValue)}</p>
+                <div className="h-0.5 w-8 bg-blue-500 rounded-full mt-1"></div>
             </div>
             
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative overflow-visible group">
+            <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm relative overflow-visible group">
                 <div className="absolute right-0 top-0 p-2 opacity-5 group-hover:opacity-10 transition-opacity"><CheckCircle2 size={40}/></div>
-                <span className="text-[7px] font-black text-emerald-600 uppercase tracking-widest block mb-2">Total Liquidado</span>
-                <p className="text-base font-black text-emerald-700 leading-tight break-words">{currency(stats.totalPaid)}</p>
-                <div className="h-0.5 w-8 bg-emerald-500 rounded-full mt-2"></div>
+                <span className="text-[6px] font-black text-emerald-600 uppercase tracking-widest block mb-1">Total Liquidado</span>
+                <p className="text-sm font-black text-emerald-700 leading-tight break-words">{currency(stats.totalPaid)}</p>
+                <div className="h-0.5 w-8 bg-emerald-500 rounded-full mt-1"></div>
             </div>
 
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm relative overflow-visible group">
+            <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm relative overflow-visible group">
                 <div className="absolute right-0 top-0 p-2 opacity-5 group-hover:opacity-10 transition-opacity"><AlertCircle size={40}/></div>
-                <span className="text-[7px] font-black text-amber-600 uppercase tracking-widest block mb-2">Retenções/Taxas</span>
-                <p className="text-base font-black text-amber-700 leading-tight break-words">{currency(stats.totalDebited)}</p>
-                <div className="h-0.5 w-8 bg-amber-500 rounded-full mt-2"></div>
+                <span className="text-[6px] font-black text-amber-600 uppercase tracking-widest block mb-1">Retenções/Taxas</span>
+                <p className="text-sm font-black text-amber-700 leading-tight break-words">{currency(stats.totalDebited)}</p>
+                <div className="h-0.5 w-8 bg-amber-500 rounded-full mt-1"></div>
             </div>
 
             <div className={`p-4 rounded-2xl shadow-lg flex flex-col justify-center border-2 ${stats.balance <= 0.05 ? 'bg-emerald-600 border-emerald-500' : 'bg-rose-600 border-rose-500'} text-white relative overflow-visible`}>
@@ -151,7 +151,7 @@ const ProducerOrderTemplate: React.FC<Props> = ({ order, loadings }) => {
         </div>
 
         {/* INFORMAÇÕES DAS PARTES */}
-        <div className="grid grid-cols-2 gap-8 mb-10">
+        <div className="grid grid-cols-2 gap-5 mb-4">
             <div className="space-y-4">
                 <div className="flex items-center gap-3 border-b border-slate-100 pb-2">
                     <div className="p-2 bg-slate-900 text-white rounded-xl shadow-sm"><User size={14}/></div>
@@ -203,7 +203,7 @@ const ProducerOrderTemplate: React.FC<Props> = ({ order, loadings }) => {
         </div>
 
         {/* TABELA DE ROMANEIOS (ESTILO TABELADO MODERNO) */}
-        <div className="mb-8 flex-1">
+        <div className="mb-4 flex-1">
             <div className="flex items-center justify-between mb-3 px-2">
                 <h3 className="font-black text-[10px] uppercase text-slate-900 flex items-center gap-2">
                     <Truck size={14} className="text-blue-600" /> Histórico Analítico de Carregamentos
@@ -259,7 +259,7 @@ const ProducerOrderTemplate: React.FC<Props> = ({ order, loadings }) => {
         </div>
 
         {/* FINANCEIRO DETALHADO (ABAIXO DA DOBRA) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10 break-inside-avoid">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 break-inside-avoid">
             {/* Pagamentos */}
             <div className="space-y-3">
                 <h3 className="font-black text-[9px] uppercase text-emerald-800 flex items-center gap-2 border-b-2 border-emerald-600 pb-1">
@@ -312,8 +312,8 @@ const ProducerOrderTemplate: React.FC<Props> = ({ order, loadings }) => {
         </div>
 
         {/* TERMOS E ASSINATURAS */}
-        <div className="mt-auto pt-8 border-t-2 border-slate-900 break-inside-avoid">
-            <div className="grid grid-cols-2 gap-16 mb-12">
+        <div className="mt-auto pt-4 border-t-2 border-slate-900 break-inside-avoid">
+            <div className="grid grid-cols-2 gap-12 mb-5">
                 <div className="text-center">
                     <div className="h-14 border-b border-slate-300 mb-2"></div>
                     <p className="font-black text-slate-900 uppercase text-[10px]">{company.razaoSocial}</p>

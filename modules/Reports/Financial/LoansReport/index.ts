@@ -3,6 +3,7 @@ import { Landmark } from 'lucide-react';
 import { ReportModule } from '../../types';
 import { reportsCache } from '../../../../services/reportsCache';
 import Template from './Template';
+import PdfDocument from './PdfDocument';
 
 // No complex filters needed for now, listing all active/history
 const loansReport: ReportModule = {
@@ -47,7 +48,8 @@ const loansReport: ReportModule = {
       ]
     };
   },
-  Template: Template
+  Template: Template,
+  PdfDocument: PdfDocument
 };
 
 export default loansReport;

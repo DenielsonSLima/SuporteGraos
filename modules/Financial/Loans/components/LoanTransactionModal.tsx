@@ -2,17 +2,22 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, Calendar, DollarSign, Wallet, FileText, ArrowDown, CheckSquare, Square, MinusCircle, HelpCircle } from 'lucide-react';
 import { financialService } from '../../../../services/financialService';
+import { useToast } from '../../../../contexts/ToastContext';
 import { BankAccount, LoanTransaction } from '../../types';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (tx: Omit<LoanTransaction, 'id'>) => void;
+   onSave: (tx: Omit<LoanTransaction, 'id'> & { id?: string }) => void;
   loanType: 'taken' | 'granted';
+   initialTx?: (Omit<LoanTransaction, 'id'> & { id?: string });
 }
 
-const LoanTransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, loanType }) => {
-  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+type BankAccountWithBalance = BankAccount & { currentBalance: number };
+
+const LoanTransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, loanType, initialTx }) => {
+   const [bankAccounts, setBankAccounts] = useState<BankAccountWithBalance[]>([]);
+   const { addToast } = useToast();
   const [type, setType] = useState<'increase' | 'decrease'>('decrease');
   const [isAdjustment, setIsAdjustment] = useState(false); // NOVO: Flag para Desconto/Ajuste
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -21,34 +26,64 @@ const LoanTransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, loanTy
   const [accountId, setAccountId] = useState('');
   const [isHistorical, setIsHistorical] = useState(false);
 
-  useEffect(() => {
-    if (isOpen) {
-      setBankAccounts(financialService.getBankAccounts().filter(a => a.active !== false));
-      setType('decrease');
-      setIsAdjustment(false);
-      setValue('');
-      setDescription('');
-      setAccountId('');
-      setIsHistorical(false);
-    }
-  }, [isOpen]);
+   const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+
+   const formatCurrencyInput = (val: string) => {
+      const raw = val.replace(/\D/g, '');
+      if (!raw) return '';
+      const num = Number(raw) / 100;
+      return num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+   };
+
+   const parseCurrencyInput = (val: string) => {
+      const normalized = val.replace(/\./g, '').replace(',', '.');
+      const num = parseFloat(normalized);
+      return Number.isNaN(num) ? 0 : num;
+   };
+
+   useEffect(() => {
+      if (isOpen) {
+         setBankAccounts(financialService.getBankAccountsWithBalances().filter(a => a.active !== false));
+         if (initialTx) {
+            setType(initialTx.type);
+            setIsAdjustment(!!initialTx.isHistorical);
+            setValue(formatCurrencyInput(String(initialTx.value ?? '')));
+            setDescription(initialTx.description || '');
+            setAccountId(initialTx.accountId || '');
+            setIsHistorical(!!initialTx.isHistorical);
+            setDate(initialTx.date || new Date().toISOString().split('T')[0]);
+         } else {
+            setType('decrease');
+            setIsAdjustment(false);
+            setValue('');
+            setDescription('');
+            setAccountId('');
+            setIsHistorical(false);
+            setDate(new Date().toISOString().split('T')[0]);
+         }
+      }
+   }, [isOpen, initialTx]);
 
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const val = parseFloat(value);
-    if (!val || val <= 0) return;
+      const val = parseCurrencyInput(value);
+      if (!val || val <= 0) {
+         addToast('warning', 'Valor inválido');
+         return;
+      }
     
     // Se não for ajuste e não for histórico, exige banco
-    if (!isAdjustment && !isHistorical && !accountId) {
-        alert('Selecione a conta bancária para movimentações financeiras.');
-        return;
-    }
+   if (!isAdjustment && !isHistorical && !accountId) {
+      addToast('warning', 'Conta bancária obrigatória');
+      return;
+   }
 
     const account = bankAccounts.find(a => a.id === accountId);
 
-    onSave({
+      onSave({
+         id: initialTx?.id,
       date,
       type,
       value: val,
@@ -104,7 +139,7 @@ const LoanTransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, loanTy
              </div>
              <div>
                 <label className={labelClass}>Valor (R$)</label>
-                <input type="number" step="0.01" required value={value} onChange={e => setValue(e.target.value)} className={`${inputClass} ${isAdjustment ? 'text-amber-600' : 'text-slate-900'}`} placeholder="0,00" />
+                <input type="text" inputMode="decimal" required value={value} onChange={e => setValue(formatCurrencyInput(e.target.value))} className={`${inputClass} ${isAdjustment ? 'text-amber-600' : 'text-slate-900'}`} placeholder="0,00" />
              </div>
           </div>
 
@@ -128,10 +163,14 @@ const LoanTransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, loanTy
                {!isHistorical && (
                   <div>
                       <label className={labelClass}>{type === 'decrease' ? (loanType === 'taken' ? 'Conta de Saída' : 'Conta de Entrada') : (loanType === 'taken' ? 'Conta de Entrada' : 'Conta de Saída')}</label>
-                      <select required value={accountId} onChange={e => setAccountId(e.target.value)} className={`${inputClass} appearance-none`}>
-                          <option value="">Selecione a conta ativa...</option>
-                          {bankAccounts.map(acc => <option key={acc.id} value={acc.id}>{acc.bankName} - {acc.owner}</option>)}
-                      </select>
+                                 <select required value={accountId} onChange={e => setAccountId(e.target.value)} className={`${inputClass} appearance-none`}>
+                                       <option value="">Selecione a conta ativa...</option>
+                                       {bankAccounts.map(acc => (
+                                          <option key={acc.id} value={acc.id}>
+                                             {acc.bankName} - {acc.owner} (Saldo: {currency(acc.currentBalance || 0)})
+                                          </option>
+                                       ))}
+                                 </select>
                   </div>
                )}
             </div>

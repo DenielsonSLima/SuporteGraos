@@ -18,7 +18,11 @@ const CashierReportTemplate: React.FC<Props> = ({ report, title }) => {
   const company = settingsService.getCompanyData();
   const watermark = settingsService.getWatermark();
 
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
+  const currency = (val: number) => {
+    // Ignora o sinal de negativo se o valor for próximo de zero
+    const cleanValue = Math.abs(val || 0) < 0.01 ? 0 : (val || 0);
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cleanValue);
+  };
   const dateTime = (val: string) => new Date(val).toLocaleString('pt-BR');
 
   const cellStyle = 'border border-slate-400 px-2 py-1.5 text-black font-bold uppercase text-[8px] leading-tight';

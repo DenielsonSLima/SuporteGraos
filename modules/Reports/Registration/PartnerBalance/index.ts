@@ -4,6 +4,7 @@ import { ReportModule } from '../../types';
 import { financialIntegrationService } from '../../../../services/financialIntegrationService';
 import { advanceService } from '../../../Financial/Advances/services/advanceService';
 import Template from './Template';
+import PdfDocument from './PdfDocument';
 import Filters from '../PartnerReceivables/Filters';
 
 const partnerBalanceReport: ReportModule = {
@@ -82,7 +83,8 @@ const partnerBalanceReport: ReportModule = {
       ]
     };
   },
-  Template: Template
+  Template: Template,
+  PdfDocument: PdfDocument
 };
 
 export default partnerBalanceReport;

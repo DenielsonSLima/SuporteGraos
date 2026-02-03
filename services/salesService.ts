@@ -5,9 +5,11 @@ import { logService } from './logService';
 import { authService } from './authService';
 import { supabase } from './supabase';
 import { receivablesService } from './financial/receivablesService';
+import { DashboardCache, invalidateDashboardCache } from './dashboardCache';
+import { auditService } from './auditService';
 
 const INITIAL_SALES: SalesOrder[] = [];
-const db = new Persistence<SalesOrder>('sales_orders', INITIAL_SALES);
+const db = new Persistence<SalesOrder>('sales_orders', INITIAL_SALES, { useStorage: false });
 let realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
 
 type DbStatus = 'pending' | 'approved' | 'shipped' | 'delivered' | 'cancelled';
@@ -90,6 +92,30 @@ const mapOrderFromDb = (row: any): SalesOrder => {
     notes: row?.notes ?? base.notes
   };
 };
+
+// ============================================================================
+// CARREGAMENTO INICIAL (SUPABASE)
+// ============================================================================
+
+const loadFromSupabase = async (): Promise<SalesOrder[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('sales_orders')
+      .select('*')
+      .order('date', { ascending: false });
+
+    if (error) throw error;
+    const mapped = (data || []).map(mapOrderFromDb);
+    db.setAll(mapped);
+    console.log('🔄 Pedidos de venda sincronizando em tempo real...');
+    return mapped;
+  } catch (error) {
+    console.error('❌ Erro ao carregar pedidos de venda:', error);
+    return [];
+  }
+};
+
+void loadFromSupabase();
 
 const persistUpsert = async (order: SalesOrder) => {
   try {
@@ -216,6 +242,15 @@ export const salesService = {
       description: `Criou Pedido de Venda ${sale.number} para ${sale.customerName}`,
       entityId: sale.id
     });
+    
+    // Audit Log
+    void auditService.logAction('create', 'Vendas', `Pedido de venda criado: #${sale.number} - ${sale.customerName} - R$ ${sale.totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, {
+      entityType: 'SalesOrder',
+      entityId: sale.id,
+      metadata: { customerId: sale.customerId, totalValue: sale.totalValue, status: sale.status }
+    });
+    
+      invalidateDashboardCache();
   },
 
   update: (updatedSale: SalesOrder) => {
@@ -245,6 +280,15 @@ export const salesService = {
       description: desc,
       entityId: updatedSale.id
     });
+    
+    // Audit Log
+    void auditService.logAction(action as any, 'Vendas', `Pedido de venda: #${updatedSale.number} - ${desc}`, {
+      entityType: 'SalesOrder',
+      entityId: updatedSale.id,
+      metadata: { status: updatedSale.status, totalValue: updatedSale.totalValue, paidValue: updatedSale.paidValue }
+    });
+    
+      invalidateDashboardCache();
   },
 
   updateTransaction: (orderId: string, updatedTx: SalesTransaction) => {
@@ -257,6 +301,7 @@ export const salesService = {
     void persistUpsert(updated);
     const { userId, userName } = getLogInfo();
     logService.addLog({ userId, userName, action: 'update', module: 'Financeiro', description: `Editou recebimento na Venda ${order.number}`, entityId: orderId });
+      invalidateDashboardCache();
   },
 
   deleteTransaction: (orderId: string, txId: string) => {
@@ -271,12 +316,41 @@ export const salesService = {
     logService.addLog({ userId, userName, action: 'delete', module: 'Financeiro', description: `Estornou recebimento da Venda ${order.number}`, entityId: orderId });
   },
 
-  delete: (id: string) => {
+  delete: async (id: string) => {
     const order = db.getById(id);
-    if (!order) return;
+    if (!order) {
+      console.warn('⚠️ Pedido de venda não encontrado para exclusão:', id);
+      return { success: false, error: 'Pedido não encontrado' };
+    }
+    
+    // ✅ Apagar receivables vinculados ao pedido de venda
+    const allReceivables = receivablesService.getAll();
+    const linkedReceivables = allReceivables.filter(r => r.salesOrderId === id);
+    
+    console.log(`🗑️ Apagando ${linkedReceivables.length} receivables vinculados ao pedido ${order.number}`);
+    linkedReceivables.forEach(r => {
+      receivablesService.delete(r.id);
+    });
+    
+    // ✅ Apagar do cache local
     db.delete(id);
-    void persistDelete(id);
+    
+    // ✅ Apagar do Supabase e aguardar resultado
+    try {
+      const { error } = await supabase.from('sales_orders').delete().eq('id', id);
+      if (error) {
+        console.error('❌ Erro ao excluir pedido de venda no Supabase:', error);
+        // Reverter exclusão local se falhar no Supabase
+        db.add(order);
+        return { success: false, error: error.message };
+      }
+    } catch (err: any) {
+      console.error('❌ Erro inesperado ao excluir pedido de venda:', err);
+      db.add(order);
+      return { success: false, error: err.message };
+    }
 
+    // ✅ Log de auditoria
     const { userId, userName } = getLogInfo();
     logService.addLog({
       userId,
@@ -286,6 +360,21 @@ export const salesService = {
       description: `Excluiu Pedido de Venda ${order.number}`,
       entityId: id
     });
+    
+    // Audit Log
+    void auditService.logAction('delete', 'Vendas', `Pedido de venda excluído: #${order.number} - ${order.customerName}`, {
+      entityType: 'SalesOrder',
+      entityId: id,
+      metadata: { totalValue: order.totalValue, status: order.status, linkedReceivables: linkedReceivables.length }
+    });
+    
+    console.log('✅ Pedido de venda excluído com sucesso:', order.number);
+    
+    // 🎯 LIMPAR CACHE DO DASHBOARD IMEDIATAMENTE
+    DashboardCache.clearAll();
+    invalidateDashboardCache();
+    
+    return { success: true };
   },
 
   importData: (data: SalesOrder[]) => {

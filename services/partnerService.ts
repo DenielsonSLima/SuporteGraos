@@ -7,12 +7,13 @@ import { authService } from './authService';
 import { supabase } from './supabase';
 import { partnerSupabaseSync } from './partner/supabaseSyncService';
 import { locationService } from './locationService';
+import { auditService } from './auditService';
 
 // Initial Data - System starts empty
 const INITIAL_PARTNERS: Partner[] = [];
 
-// Initialize Persistence
-const db = new Persistence<Partner>('partners', INITIAL_PARTNERS);
+// Initialize Persistence (sem localStorage, apenas Supabase + memoria)
+const db = new Persistence<Partner>('partners', INITIAL_PARTNERS, { useStorage: false });
 
 let realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
 let isLoaded = false;
@@ -243,6 +244,13 @@ export const partnerService = {
       description: `Cadastrou novo parceiro: ${partner.name}`,
       entityId: partner.id
     });
+    
+    // Audit Log
+    void auditService.logAction('create', 'Parceiros', `Parceiro cadastrado: ${partner.name}`, {
+      entityType: 'Partner',
+      entityId: partner.id,
+      metadata: { category: partner.category, document: partner.document }
+    });
 
     // Transformar para formato Supabase e salvar
     try {
@@ -279,6 +287,13 @@ export const partnerService = {
       description: `Atualizou dados do parceiro: ${updatedPartner.name}`,
       entityId: updatedPartner.id
     });
+    
+    // Audit Log
+    void auditService.logAction('update', 'Parceiros', `Parceiro atualizado: ${updatedPartner.name}`, {
+      entityType: 'Partner',
+      entityId: updatedPartner.id,
+      metadata: { category: updatedPartner.category }
+    });
 
     // Transformar para formato Supabase e atualizar
     try {
@@ -307,6 +322,13 @@ export const partnerService = {
       module: 'Parceiros',
       description: `Removeu o parceiro: ${partner.name}`,
       entityId: id
+    });
+    
+    // Audit Log
+    void auditService.logAction('delete', 'Parceiros', `Parceiro removido: ${partner.name}`, {
+      entityType: 'Partner',
+      entityId: id,
+      metadata: { category: partner.category, document: partner.document }
     });
 
     // Deletar do Supabase

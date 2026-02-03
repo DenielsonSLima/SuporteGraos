@@ -258,14 +258,14 @@ const ReportScreen: React.FC<Props> = ({ reportModule, onBack }) => {
         </div>
       </div>
 
-      {/* Modal de Pré-visualização do PDF (Padrão Patrimônio/Pedidos) */}
+      {/* Modal de Pré-visualização do PDF */}
       {isPdfModalOpen && data && (
         <ReportPdfPreviewModal 
           isOpen={isPdfModalOpen}
           onClose={() => setIsPdfModalOpen(false)}
           reportId={reportModule.metadata.id}
           reportTitle={reportModule.metadata.title}
-          Template={reportModule.Template}
+          PdfDocument={reportModule.PdfDocument || reportModule.Template}
           data={data}
         />
       )}

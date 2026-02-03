@@ -5,6 +5,7 @@ import { financialIntegrationService } from '../../../../services/financialInteg
 import { advanceService } from '../../../Financial/Advances/services/advanceService';
 import UniversalReportTemplate from '../../templates/UniversalReportTemplate'; // Reusing Universal Template
 import Filters from './Filters';
+import PdfDocument from './PdfDocument';
 
 const partnerReceivablesReport: ReportModule = {
   metadata: {
@@ -72,7 +73,8 @@ const partnerReceivablesReport: ReportModule = {
       summary: [{ label: 'Total a Receber', value: total, format: 'currency' }]
     };
   },
-  Template: UniversalReportTemplate
+  Template: UniversalReportTemplate,
+  PdfDocument: PdfDocument
 };
 
 export default partnerReceivablesReport;

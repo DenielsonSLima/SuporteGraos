@@ -5,6 +5,7 @@ import { financialService } from '../../../../services/financialService';
 import { financialActionService } from '../../../../services/financialActionService';
 import { reportsCache } from '../../../../services/reportsCache';
 import Template from './Template';
+import PdfDocument from './PdfDocument';
 import Filters from './Filters';
 
 const accountStatementReport: ReportModule = {
@@ -105,7 +106,8 @@ const accountStatementReport: ReportModule = {
       ]
     };
   },
-  Template: Template
+  Template: Template,
+  PdfDocument: PdfDocument
 };
 
 const dateStr = (v: string) => new Date(v).toLocaleDateString('pt-BR');

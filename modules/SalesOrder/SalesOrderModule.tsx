@@ -106,28 +106,63 @@ const SalesOrderModule: React.FC = () => {
 
   const handleDeleteRequest = (order: SalesOrder) => {
     const linkedLoadings = loadingService.getBySalesOrder(order.id);
+    
+    // ⛔ BLOQUEAR exclusão se houver carregamentos vinculados
+    if (linkedLoadings.length > 0) {
+      setActionModal({
+        isOpen: true,
+        type: 'warning',
+        title: 'Exclusão Bloqueada',
+        description: (
+          <div className="text-left space-y-3">
+            <p className="text-slate-700">Carregamentos Vinculados</p>
+            <p className="text-sm text-slate-600">
+              Este pedido possui <strong>{linkedLoadings.length} carregamento(s)</strong> associado(s).
+            </p>
+            <p className="text-sm text-slate-600">
+              Para excluir esta venda, abra a aba <strong>Carregamentos</strong> dentro deste pedido e exclua os carregamentos lá.
+            </p>
+          </div>
+        ),
+        onConfirm: () => {
+          setActionModal(prev => ({ ...prev, isOpen: false }));
+        }
+      });
+      return;
+    }
+
+    // ✅ Permitir exclusão se não houver carregamentos
     const warningMessage = (
       <div className="text-left space-y-3">
-        <p className="text-slate-600">Deseja excluir a Venda <strong>{order.number}</strong>?</p>
-        {linkedLoadings.length > 0 && (
-          <div className="bg-red-50 p-4 rounded-lg border border-red-100 text-sm text-red-800">
-            <p className="font-bold mb-2">Atenção!</p>
-            <p>Serão excluídas <strong>{linkedLoadings.length} cargas</strong> vinculadas.</p>
+        <p className="text-slate-700">Ao confirmar, o seguinte será permanentemente excluído:</p>
+        {order.paidValue > 0 && (
+          <div className="space-y-2">
+            <p className="text-sm font-bold text-slate-900 uppercase tracking-wide">Recebimentos</p>
+            <p className="text-sm text-slate-600">
+              Os recebimentos associados (R$ {order.paidValue.toFixed(2)}) serão removidos do sistema.
+            </p>
           </div>
         )}
       </div>
     );
+    
     setActionModal({
       isOpen: true,
       type: 'danger',
-      title: 'Excluir Venda',
+      title: `Excluir Venda ${order.number}?`,
       description: warningMessage,
-      onConfirm: () => {
-        linkedLoadings.forEach(l => loadingService.delete(l.id));
-        salesService.delete(order.id);
-        addToast('success', 'Venda Excluída');
-        setSales(prev => prev.filter(s => s.id !== order.id));
-        if (viewMode === 'details') setViewMode('list');
+      onConfirm: async () => {
+        const result = await salesService.delete(order.id);
+        
+        if (result?.success) {
+          addToast('success', 'Venda Excluída', 'Pedido e recebimentos removidos com sucesso.');
+          setSales(prev => prev.filter(s => s.id !== order.id));
+          if (viewMode === 'details') setViewMode('list');
+        } else {
+          addToast('error', 'Erro ao Excluir', result?.error || 'Falha ao excluir pedido no banco de dados.');
+        }
+        
+        setActionModal(prev => ({ ...prev, isOpen: false }));
       }
     });
   };

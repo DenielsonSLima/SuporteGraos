@@ -1,9 +1,10 @@
 
-import React, { useRef, useState } from 'react';
-import { X, Download, Loader2, FileText, Printer } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Download, Loader2, FileText } from 'lucide-react';
 import { CashierReport } from '../../types';
-import CashierReportTemplate from '../../templates/CashierReportTemplate';
-import html2pdf from 'html2pdf.js';
+import { pdf } from '@react-pdf/renderer';
+import { saveAs } from 'file-saver';
+import CashierPdfDocument from './CashierPdfDocument';
 
 interface Props {
   isOpen: boolean;
@@ -13,38 +14,41 @@ interface Props {
 }
 
 const CashierPdfPreviewModal: React.FC<Props> = ({ isOpen, onClose, report, title }) => {
-  const contentRef = useRef<HTMLDivElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let url: string | null = null;
+
+    const generatePreview = async () => {
+      if (isOpen && report) {
+        try {
+          const blob = await pdf(<CashierPdfDocument report={report} title={title} />).toBlob();
+          url = URL.createObjectURL(blob);
+          setPdfUrl(url);
+        } catch (error) {
+          console.error('Erro ao gerar preview:', error);
+        }
+      }
+    };
+
+    generatePreview();
+
+    return () => {
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [isOpen, report, title]);
 
   if (!isOpen) return null;
 
   const handleDownload = async () => {
-    const content = contentRef.current;
-    if (!content) return;
-
     setIsGenerating(true);
 
-    // Configuração otimizada para A4 sem quebra de fontes
-    const options = {
-      margin: 8,
-      filename: `Fechamento_Caixa_${title.replace(/\s+/g, '_')}.pdf`,
-      image: { type: 'jpeg', quality: 1.0 },
-      html2canvas: { 
-        scale: 2, 
-        useCORS: true, 
-        letterRendering: true,
-        scrollX: 0,
-        scrollY: 0,
-        windowWidth: 800, // Largura padrão para match com template
-        width: 800,
-      },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true },
-      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-    };
+    const filename = `Fechamento_Caixa_${title.replace(/\s+/g, '_')}.pdf`;
 
     try {
-      await new Promise(r => setTimeout(r, 400));
-      await html2pdf().set(options).from(content).save();
+      const blob = await pdf(<CashierPdfDocument report={report} title={title} />).toBlob();
+      saveAs(blob, filename);
     } catch (error) {
       console.error('Erro ao gerar PDF:', error);
       alert("Ocorreu um erro técnico ao processar o arquivo.");
@@ -84,20 +88,23 @@ const CashierPdfPreviewModal: React.FC<Props> = ({ isOpen, onClose, report, titl
           </div>
         </div>
 
-        {/* Área de Preview com Scale dinâmico para evitar scroll horizontal */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-10 flex justify-center bg-slate-400/30">
-          <div 
-            className="bg-white shadow-2xl origin-top transition-all duration-500 overflow-hidden sm:scale-100 scale-75" 
-            style={{ width: '210mm', minHeight: '297mm' }} 
-          >
-            <div ref={contentRef} style={{ width: '800px', margin: '0 auto', backgroundColor: 'white' }}>
-              <CashierReportTemplate report={report} title={title} />
+        {/* Preview */}
+        <div className="flex-1 overflow-auto p-4 sm:p-10 flex justify-center bg-slate-400/30">
+          {pdfUrl ? (
+            <iframe
+              src={pdfUrl}
+              className="w-full h-full bg-white shadow-2xl"
+              title="PDF Preview"
+            />
+          ) : (
+            <div className="flex items-center justify-center h-full">
+              <Loader2 className="animate-spin text-slate-500" size={48} />
             </div>
-          </div>
+          )}
         </div>
 
         <div className="bg-white border-t border-slate-300 px-6 py-2 text-[9px] font-black text-slate-400 uppercase tracking-widest text-center shrink-0">
-            Impressão Oficial v1.8 • Proporções de página garantidas para Papel A4
+            PDF Pesquisável • React-PDF v3.x
         </div>
       </div>
     </div>

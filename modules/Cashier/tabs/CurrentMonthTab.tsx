@@ -17,6 +17,22 @@ const CurrentMonthTab: React.FC = () => {
       setLoading(false);
     };
     fetchReport();
+
+    const handleRefresh = () => {
+      setReport(CashierCache.getCurrentMonthReport());
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('financial:updated', handleRefresh);
+      window.addEventListener('data:updated', handleRefresh);
+    }
+
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('financial:updated', handleRefresh);
+        window.removeEventListener('data:updated', handleRefresh);
+      }
+    };
   }, []);
 
   if (loading) {

@@ -80,18 +80,18 @@ const UnifiedPayableManager: React.FC<Props> = ({ records, onRefresh, type }) =>
     .filter(r => selectedIds.includes(r.id))
     .reduce((acc, r) => acc + (r.originalValue - r.paidValue - (r.discountValue || 0)), 0);
 
-  const handleConfirmPayment = (data: any) => {
+  const handleConfirmPayment = async (data: any) => {
     if (selectedRecordForSinglePay) {
-      financialActionService.processRecord(selectedRecordForSinglePay.id, data, selectedRecordForSinglePay.subType);
+      await financialActionService.processRecord(selectedRecordForSinglePay.id, data, selectedRecordForSinglePay.subType);
     } else {
       // Lógica de lote simplificada para protótipo
-      selectedIds.forEach(id => {
+      for (const id of selectedIds) {
         const record = records.find(r => r.id === id);
         if (record) {
            const balance = record.originalValue - record.paidValue - (record.discountValue || 0);
-           financialActionService.processRecord(id, { ...data, amount: balance, discount: 0 }, record.subType);
+           await financialActionService.processRecord(id, { ...data, amount: balance, discount: 0 }, record.subType);
         }
-      });
+      }
     }
     setModalType(null);
     setSelectedIds([]);

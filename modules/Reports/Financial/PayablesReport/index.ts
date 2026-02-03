@@ -3,6 +3,7 @@ import { DollarSign } from 'lucide-react';
 import { ReportModule } from '../../types';
 import { reportsCache } from '../../../../services/reportsCache';
 import Template from './Template';
+import PdfDocument from './PdfDocument';
 import DefaultFilters from '../../components/DefaultFilters';
 
 const payablesReport: ReportModule = {
@@ -46,7 +47,8 @@ const payablesReport: ReportModule = {
       summary: [{ label: 'Total a Pagar', value: pendingTotal, format: 'currency' }]
     };
   },
-  Template: Template
+  Template: Template,
+  PdfDocument: PdfDocument
 };
 
 export default payablesReport;

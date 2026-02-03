@@ -16,6 +16,12 @@ export interface CashierReport {
   referenceDate: string; // ISO Date
   isClosed: boolean;
 
+  // --- SNAPSHOT / HISTÓRICO ---
+  isSnapshot?: boolean; // É um snapshot congelado?
+  snapshotClosedDate?: string; // Quando foi finalizado (ISO Date)
+  snapshotClosedBy?: string; // Quem finalizou (email/nome)
+  generatedAt?: string; // Quando foi gerado/calculado (ISO Date)
+
   // --- RECEITAS E DIREITOS (ATIVOS) ---
   bankBalances: BankBalance[];
   totalBankBalance: number;

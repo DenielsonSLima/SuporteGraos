@@ -3,6 +3,7 @@ import { Users } from 'lucide-react';
 import { ReportModule } from '../../types';
 import { shareholderService } from '../../../../services/shareholderService';
 import Template from './Template';
+import PdfDocument from './PdfDocument';
 
 const shareholdersReport: ReportModule = {
   metadata: {
@@ -40,7 +41,8 @@ const shareholdersReport: ReportModule = {
       ]
     };
   },
-  Template: Template
+  Template: Template,
+  PdfDocument: PdfDocument
 };
 
 export default shareholdersReport;

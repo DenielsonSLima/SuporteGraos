@@ -5,6 +5,7 @@ import { loadingService } from '../../../../services/loadingService';
 import { financialActionService } from '../../../../services/financialActionService';
 import { financialService } from '../../../../services/financialService';
 import Template from './Template';
+import PdfDocument from './PdfDocument';
 import DefaultFilters from '../../components/DefaultFilters';
 
 const dreReport: ReportModule = {
@@ -71,7 +72,8 @@ const dreReport: ReportModule = {
       ]
     };
   },
-  Template: Template
+  Template: Template,
+  PdfDocument: PdfDocument
 };
 
 export default dreReport;

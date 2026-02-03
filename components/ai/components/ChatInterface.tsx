@@ -156,7 +156,7 @@ const ChatInterface: React.FC<Props> = ({
             </button>
         </div>
         <div className="text-[9px] text-slate-600 text-center mt-2 font-medium">
-            Daitec AI pode cometer erros. Verifique informações críticas.
+            DLABS AI pode cometer erros. Verifique informações críticas.
         </div>
       </div>
     </>

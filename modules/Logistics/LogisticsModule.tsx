@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Truck, ArrowRightLeft, DollarSign, Calendar, X, Filter, BarChart3 } from 'lucide-react';
+import { Search, Truck, ArrowRightLeft, DollarSign, Calendar, X, Filter, BarChart3, Loader2 } from 'lucide-react';
 import { Freight } from './types';
 import { Loading } from '../Loadings/types';
 import OpenFreights from './tabs/OpenFreights';
@@ -12,8 +12,10 @@ import { loadingService } from '../../services/loadingService';
 import { LoadingCache, invalidateLoadingCache } from '../../services/loadingCache';
 import { partnerService } from '../../services/partnerService';
 import { PARTNER_CATEGORY_IDS } from '../../constants';
+import { waitForInit } from '../../services/supabaseInitService';
 
 const LogisticsModule: React.FC = () => {
+  const [loading, setLoading] = useState(true);
   const [freights, setFreights] = useState<Freight[]>([]);
   const [carriers, setCarriers] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'open' | 'all' | 'financial'>('open');
@@ -61,8 +63,13 @@ const LogisticsModule: React.FC = () => {
   };
 
   useEffect(() => {
-    refreshFreights();
-    setCarriers(partnerService.getAll().filter(p => p.categories.includes(PARTNER_CATEGORY_IDS.CARRIER)).map(p => p.name).sort());
+    const initModule = async () => {
+      await waitForInit();
+      refreshFreights();
+      setCarriers(partnerService.getAll().filter(p => p.categories.includes(PARTNER_CATEGORY_IDS.CARRIER)).map(p => p.name).sort());
+      setLoading(false);
+    };
+    initModule();
 
     const handleGlobalNav = (e: any) => {
         if (e.detail?.moduleId === 'logistics' && e.detail?.loadingId) {
@@ -114,6 +121,17 @@ const LogisticsModule: React.FC = () => {
       return matchesSearch && matchesCarrier && matchesDate && matchesTab;
     });
   }, [freights, searchTerm, carrierFilter, startDate, endDate, activeTab]);
+
+  if (loading) {
+    return (
+      <div className="flex h-96 items-center justify-center">
+        <div className="text-center">
+          <Loader2 size={40} className="animate-spin text-primary-600 mx-auto mb-4" />
+          <p className="text-slate-500 font-medium">Carregando logística...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">

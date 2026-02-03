@@ -17,69 +17,23 @@ interface CachedData {
   timestamp: number;
 }
 
-interface PersistedCacheData extends CachedData {
-  version: number;
-}
-
-const CACHE_STORAGE_KEY = 'dashboard_cache_persisted';
-const CACHE_VERSION = 1;
 
 /**
  * 📦 Dashboard Cache - Singleton para otimizar carregamento de dados
  * 
- * Centraliza leituras do LocalStorage em um único ponto, reduzindo:
+ * Centraliza leituras em um único ponto, reduzindo:
  * - De 15-20 operações de I/O → para 5-7 operações
  * - De ~800ms → para ~250ms no carregamento (100 pedidos)
  * 
- * TTL (Time To Live): 60 segundos
+ * TTL (Time To Live): 10 segundos
  * Invalidação: Automática por evento 'data:updated'
- * 
- * 🆕 Persistência: Mantém último estado válido mesmo após reload
  */
 export class DashboardCache {
   private static instance: CachedData | null = null;
-  private static readonly TTL = 60000; // 1 minuto em milissegundos
+  private static readonly TTL = 10000; // 10 segundos
 
   /**
-   * 💾 Salva dados no sessionStorage para persistência entre reloads
-   */
-  private static persistCache(data: CachedData): void {
-    try {
-      const persistedData: PersistedCacheData = {
-        ...data,
-        version: CACHE_VERSION
-      };
-      sessionStorage.setItem(CACHE_STORAGE_KEY, JSON.stringify(persistedData));
-    } catch (error) {
-      console.warn('Failed to persist cache:', error);
-    }
-  }
-
-  /**
-   * 📂 Carrega dados persistidos do sessionStorage
-   */
-  private static loadPersistedCache(): CachedData | null {
-    try {
-      const stored = sessionStorage.getItem(CACHE_STORAGE_KEY);
-      if (!stored) return null;
-
-      const parsed: PersistedCacheData = JSON.parse(stored);
-      
-      // Verificar versão
-      if (parsed.version !== CACHE_VERSION) {
-        sessionStorage.removeItem(CACHE_STORAGE_KEY);
-        return null;
-      }
-
-      return parsed;
-    } catch (error) {
-      console.warn('Failed to load persisted cache:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Carrega dados do cache ou do LocalStorage
+   * Carrega dados do cache em memória
    * @returns Dados cacheados com timestamp
    */
   static load(): CachedData {
@@ -90,27 +44,12 @@ export class DashboardCache {
       return this.instance;
     }
 
-    // Cache MISS ou expirado - tentar carregar último estado válido
-    const persistedCache = this.loadPersistedCache();
-    
-    // 🚀 Se tem cache persistido, usar como fallback enquanto carrega dados frescos
-    if (persistedCache) {
-      this.instance = persistedCache;
-      
-      // ⚡ Atualizar assincronamente em background
-      setTimeout(() => {
-        this.refreshCache();
-      }, 100);
-      
-      return persistedCache;
-    }
-
-    // 🔄 Primeira carga ou cache limpo - carregar do zero
+    // 🔄 Cache MISS ou expirado - carregar do zero
     return this.refreshCache();
   }
 
   /**
-   * 🔄 Atualiza cache com dados frescos do LocalStorage
+   * 🔄 Atualiza cache com dados frescos
    */
   private static refreshCache(): CachedData {
     const now = Date.now();
@@ -134,9 +73,6 @@ export class DashboardCache {
       timestamp: now
     };
 
-    // 💾 Persistir para próximos reloads
-    this.persistCache(this.instance);
-
     return this.instance;
   }
 
@@ -145,19 +81,13 @@ export class DashboardCache {
    */
   static invalidate(): void {
     this.instance = null;
-    // Não remove cache persistido - mantém último estado válido
   }
 
   /**
-   * 🧹 Limpa completamente cache (incluindo persistido)
+   * 🎯 Limpa cache completamente
    */
   static clearAll(): void {
     this.instance = null;
-    try {
-      sessionStorage.removeItem(CACHE_STORAGE_KEY);
-    } catch (error) {
-      console.warn('Failed to clear persisted cache:', error);
-    }
   }
 
   /**

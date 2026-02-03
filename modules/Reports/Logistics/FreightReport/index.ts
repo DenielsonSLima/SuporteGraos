@@ -3,6 +3,7 @@ import { Truck } from 'lucide-react';
 import { ReportModule } from '../../types';
 import { loadingService } from '../../../../services/loadingService';
 import Template from './Template';
+import PdfDocument from './PdfDocument';
 import Filters from './Filters';
 
 const freightReport: ReportModule = {
@@ -69,7 +70,8 @@ const freightReport: ReportModule = {
       ]
     };
   },
-  Template: Template
+  Template: Template,
+  PdfDocument: PdfDocument
 };
 
 export default freightReport;

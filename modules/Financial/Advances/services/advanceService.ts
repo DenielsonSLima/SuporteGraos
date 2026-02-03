@@ -4,8 +4,10 @@ import { purchaseService } from '../../../../services/purchaseService';
 import { Persistence } from '../../../../services/persistence';
 import { logService } from '../../../../services/logService';
 import { authService } from '../../../../services/authService';
+import { invalidateDashboardCache } from '../../../../services/dashboardCache';
+import { invalidateFinancialCache } from '../../../../services/financialCache';
 
-const manualDb = new Persistence<AdvanceTransaction>('manual_advances', []);
+const manualDb = new Persistence<AdvanceTransaction>('manual_advances', [], { useStorage: false });
 
 const getLogInfo = () => {
   const user = authService.getCurrentUser();
@@ -91,6 +93,8 @@ export const advanceService = {
     manualDb.add(newTx);
     const { userId, userName } = getLogInfo();
     logService.addLog({ userId, userName, action: 'create', module: 'Financeiro', description: `Registrou adiantamento manual para ${transaction.partnerName}` });
+    invalidateFinancialCache();
+    invalidateDashboardCache();
   },
 
   deleteTransaction: (id: string) => {
@@ -98,9 +102,13 @@ export const advanceService = {
     manualDb.delete(id);
     const { userId, userName } = getLogInfo();
     logService.addLog({ userId, userName, action: 'delete', module: 'Financeiro', description: `Excluiu adiantamento de ${tx?.partnerName}` });
+    invalidateFinancialCache();
+    invalidateDashboardCache();
   },
 
   importData: (data: AdvanceTransaction[]) => {
     manualDb.setAll(data);
+    invalidateFinancialCache();
+    invalidateDashboardCache();
   }
 };

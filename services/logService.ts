@@ -19,10 +19,9 @@ export interface LogEntry {
 
 // Dados iniciais zerados conforme solicitado
 const INITIAL_LOGS: LogEntry[] = [];
-const SYSTEM_UUID = '00000000-0000-0000-0000-000000000000';
 const isValidUuid = (value?: string) => !!value && /^[0-9a-fA-F-]{36}$/.test(value);
 
-const db = new Persistence<LogEntry>('system_logs', INITIAL_LOGS);
+const db = new Persistence<LogEntry>('system_logs', INITIAL_LOGS, { useStorage: false });
 let logChannel: ReturnType<typeof supabase.channel> | null = null;
 let _realtimeStarted = false;
 
@@ -44,7 +43,7 @@ const mapLogFromDb = (record: any): LogEntry => ({
 
 const mapLogToDb = (log: LogEntry) => ({
   id: log.id,
-  user_id: isValidUuid(log.userId) ? log.userId : SYSTEM_UUID,
+  user_id: isValidUuid(log.userId) ? log.userId : null,  // NULL em vez de string inválida
   user_name: log.userName,
   action: log.action,
   module: log.module,

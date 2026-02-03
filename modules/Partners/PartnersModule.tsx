@@ -5,12 +5,14 @@ import {
   Search, 
   Users,
   Printer,
-  X
+  X,
+  Loader2
 } from 'lucide-react';
 import PartnerCard from './components/PartnerCard';
 import PartnerForm from './components/PartnerForm';
 import PartnerPdfModal from './components/modals/PartnerPdfModal';
 import AllPartnersPdfModal from './components/modals/AllPartnersPdfModal';
+import PartnerDeleteModal from './components/modals/PartnerDeleteModal';
 import CarrierDetails from './submodules/Carriers/CarrierDetails';
 import BrokerDetails from './submodules/Brokers/BrokerDetails';
 import ActionConfirmationModal from '../../components/ui/ActionConfirmationModal';
@@ -23,10 +25,13 @@ import { financialIntegrationService } from '../../services/financialIntegration
 import { advanceService } from '../Financial/Advances/services/advanceService';
 import { useToast } from '../../contexts/ToastContext';
 import { supabase } from '../../services/supabase';
+import { waitForInit } from '../../services/supabaseInitService';
 
 const PartnersModule: React.FC = () => {
   const { addToast } = useToast();
+  const [loading, setLoading] = useState(true);
   const [partners, setPartners] = useState<Partner[]>([]);
+  const [balancesTick, setBalancesTick] = useState(0);
   const [viewMode, setViewMode] = useState<'list' | 'form' | 'details'>('list');
   const [activeTab, setActiveTab] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -41,7 +46,14 @@ const PartnersModule: React.FC = () => {
   const [partnerToDelete, setPartnerToDelete] = useState<Partner | null>(null);
 
   useEffect(() => {
-    refreshPartners();
+    const initModule = async () => {
+      setLoading(true);
+      await waitForInit();
+      refreshPartners();
+      setLoading(false);
+    };
+
+    initModule();
     // Assinar mudanças reativas do cache de parceiros
     const unsubscribeDb = partnerService.subscribe(items => setPartners(items));
 
@@ -117,6 +129,20 @@ const PartnersModule: React.FC = () => {
     };
   }, []);
 
+  useEffect(() => {
+    const handleFinancialUpdate = () => {
+      setBalancesTick((prev) => prev + 1);
+    };
+
+    window.addEventListener('financial:updated', handleFinancialUpdate);
+    window.addEventListener('data:updated', handleFinancialUpdate);
+
+    return () => {
+      window.removeEventListener('financial:updated', handleFinancialUpdate);
+      window.removeEventListener('data:updated', handleFinancialUpdate);
+    };
+  }, []);
+
   const refreshPartners = () => {
     setPartners(partnerService.getAll());
   };
@@ -156,7 +182,7 @@ const PartnersModule: React.FC = () => {
     });
 
     return balanceMap;
-  }, [partners]);
+  }, [partners, balancesTick]);
 
   const handleAddNew = () => {
     setEditingPartner(undefined);
@@ -287,6 +313,17 @@ const PartnersModule: React.FC = () => {
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [partners, activeTab, searchTerm]);
 
+  if (loading) {
+    return (
+      <div className="flex h-96 items-center justify-center">
+        <div className="text-center">
+          <Loader2 size={40} className="animate-spin text-primary-600 mx-auto mb-4" />
+          <p className="text-slate-500 font-medium">Carregando parceiros...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (viewMode === 'form') {
     return <PartnerForm initialData={editingPartner} categories={DEFAULT_PARTNER_CATEGORIES} onSave={handleSave} onCancel={() => setViewMode('list')} />;
   }
@@ -371,22 +408,21 @@ const PartnersModule: React.FC = () => {
 
       {/* MODAIS */}
       {partnerToDelete && (
-        <ActionConfirmationModal 
+        <PartnerDeleteModal 
             isOpen={!!partnerToDelete} 
+            partner={partnerToDelete}
             onClose={() => setPartnerToDelete(null)} 
             onConfirm={async () => {
               try {
                 await partnerService.delete(partnerToDelete.id);
                 refreshPartners();
                 setPartnerToDelete(null);
-                addToast('success', 'Removido');
+                addToast('success', 'Parceiro removido com sucesso');
               } catch (error) {
                 console.error('❌ Erro ao deletar parceiro:', error);
-                addToast('error', 'Erro', 'Falha ao remover parceiro do Supabase');
+                addToast('error', 'Erro', 'Falha ao remover parceiro');
               }
             }}
-            title="Excluir Parceiro?"
-            description={`Deseja remover permanentemente ${partnerToDelete.name}?`}
         />
       )}
 

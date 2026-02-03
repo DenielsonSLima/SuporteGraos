@@ -125,7 +125,7 @@ export const driverService = {
 
   getByState: (stateId: string): Driver[] => db.find(d => d.state_id === stateId && d.active),
 
-  getByPartner: (partnerId: string): Driver[] => db.find(d => d.partner_id === partnerId && d.active),
+  getByPartner: (partnerId: string): Driver[] => db.find(d => d.partner_id === partnerId && d.active).sort((a, b) => a.name.localeCompare(b.name)),
 
   subscribe: (callback: (items: Driver[]) => void) => db.subscribe(callback),
 

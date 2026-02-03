@@ -1,5 +1,8 @@
 
 import { DashboardCache } from '../../../services/dashboardCache';
+import { CashierCache } from '../../../services/cashierCache';
+import { assetService } from '../../../services/assetService';
+import { initialBalanceService } from '../../../services/initialBalanceService';
 
 export const dashboardService = {
   getOperationalKPIs: () => {
@@ -336,5 +339,140 @@ export const dashboardService = {
     }
 
     return months;
+  },
+
+  getNetWorthHistory: () => {
+    const cache = DashboardCache.load();
+    const today = new Date();
+    const monthNames = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+    
+    // Forçar atualização do cache do Cashier (garantir dados frescos)
+    CashierCache.invalidate();
+    const currentReport = cache.cashierReport;
+    
+    const history: Array<{
+      name: string;
+      netWorth: number;
+      assets: number;
+      liabilities: number;
+      monthlyChange: number;
+    }> = [];
+
+    // Calcular patrimônio líquido dos últimos 6 meses (ACUMULADO até cada mês)
+    for (let i = 5; i >= 0; i--) {
+      const targetDate = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      const month = targetDate.getMonth();
+      const year = targetDate.getFullYear();
+      
+      // Fim do mês para snapshot acumulado
+      const endOfMonth = new Date(year, month + 1, 0, 23, 59, 59);
+      const isCurrentMonth = i === 0;
+      
+      let totalAssets = 0;
+      let liabilities = 0;
+      
+      if (isCurrentMonth) {
+        // Mês atual: usar dados reais do CashierReport
+        totalAssets = currentReport?.totalAssets || 0;
+        liabilities = currentReport?.totalLiabilities || 0;
+      } else {
+        // Meses anteriores: calcular baseado em histórico acumulado
+        
+        // 1. Saldo bancário inicial (configurado manualmente em cada mês)
+        const initialBalances = initialBalanceService
+          .getInitialBalances()
+          .filter(b => new Date(b.date) <= endOfMonth)
+          .reduce((acc, b) => acc + (b.value || 0), 0);
+        
+        // 2. Contas a receber pendentes (emitidas até o mês, não recebidas)
+        const salesReceivables = cache.receivables
+          .filter(r => new Date(r.createdAt) <= endOfMonth)
+          .reduce((acc, r) => acc + Math.max(0, r.amount - r.receivedAmount), 0);
+        
+        // 3. Mercadorias em trânsito (carregadas até o mês, ainda em trânsito)
+        const merchandiseValue = cache.loadings
+          .filter(l => {
+            const loadDate = new Date(l.date);
+            return loadDate <= endOfMonth && ['loaded', 'in_transit'].includes(l.status);
+          })
+          .reduce((acc, l) => acc + (l.totalPurchaseValue || 0), 0);
+        
+        // 4. Caixa acumulado: Receitas recebidas - Despesas pagas (até o mês)
+        const revenuesReceived = cache.sales
+          .filter(s => s.transactions && s.transactions.length > 0)
+          .flatMap(s => s.transactions || [])
+          .filter(t => {
+            if (t.type !== 'receipt') return false;
+            const txDate = new Date(t.date);
+            return txDate <= endOfMonth;
+          })
+          .reduce((acc, t) => acc + t.value, 0);
+        
+        const expensesPaid = cache.purchases
+          .filter(p => p.transactions && p.transactions.length > 0)
+          .flatMap(p => p.transactions || [])
+          .filter(t => {
+            if (t.type !== 'payment' && t.type !== 'advance') return false;
+            const txDate = new Date(t.date);
+            return txDate <= endOfMonth;
+          })
+          .reduce((acc, t) => acc + t.value, 0);
+        
+        const cashFlow = revenuesReceived - expensesPaid;
+
+        // 5. Patrimônio (ativos fixos) acumulado até o mês
+        const fixedAssetsValue = assetService.getAll()
+          .filter(a => {
+            const acquisitionDate = new Date(a.acquisitionDate);
+            if (acquisitionDate > endOfMonth) return false;
+
+            if (a.status === 'active') return true;
+            if (a.status === 'sold') {
+              if (!a.saleDate) return false;
+              return new Date(a.saleDate) > endOfMonth;
+            }
+            if (a.status === 'write_off') {
+              if (!a.writeOffDate) return false;
+              return new Date(a.writeOffDate) > endOfMonth;
+            }
+            return false;
+          })
+          .reduce((acc, a) => acc + (a.acquisitionValue || 0), 0);
+        
+        totalAssets = initialBalances + cashFlow + salesReceivables + merchandiseValue + fixedAssetsValue;
+        
+        // PASSIVOS ACUMULADOS até o fim do mês
+        liabilities = cache.payables
+          .filter(p => new Date(p.createdAt) <= endOfMonth)
+          .reduce((acc, p) => acc + Math.max(0, p.amount - p.paidAmount), 0);
+      }
+      
+      const netWorth = totalAssets - liabilities;
+      
+      history.push({
+        name: monthNames[month],
+        netWorth,
+        assets: totalAssets,
+        liabilities,
+        monthlyChange: 0 // Será calculado depois
+      });
+    }
+    
+    // Calcular variação mês a mês
+    for (let i = 1; i < history.length; i++) {
+      const current = history[i].netWorth;
+      const previous = history[i - 1].netWorth;
+      history[i].monthlyChange = previous !== 0 ? ((current - previous) / Math.abs(previous)) * 100 : 0;
+    }
+    
+    // Calcular crescimento total (último mês vs primeiro mês)
+    const firstMonth = history[0]?.netWorth || 0;
+    const lastMonth = history[history.length - 1]?.netWorth || 0;
+    const growthPercent = firstMonth !== 0 ? ((lastMonth - firstMonth) / Math.abs(firstMonth)) * 100 : 0;
+    
+    return {
+      history,
+      growthPercent
+    };
   }
 };

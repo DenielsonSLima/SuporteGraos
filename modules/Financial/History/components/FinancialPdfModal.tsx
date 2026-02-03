@@ -1,8 +1,10 @@
 
-import React, { useRef } from 'react';
-import { X, Printer } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { X, Download, Loader2 } from 'lucide-react';
 import { FinancialRecord } from '../../types';
-import FinancialHistoryTemplate from '../templates/FinancialHistoryTemplate';
+import { pdf } from '@react-pdf/renderer';
+import { saveAs } from 'file-saver';
+import FinancialHistoryPdfDocument from './FinancialHistoryPdfDocument';
 
 interface Props {
   isOpen: boolean;
@@ -18,38 +20,49 @@ interface Props {
 }
 
 const FinancialPdfModal: React.FC<Props> = ({ isOpen, onClose, records, groupBy, filters }) => {
-  const contentRef = useRef<HTMLDivElement>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let url: string | null = null;
+
+    const generatePreview = async () => {
+      if (isOpen) {
+        try {
+          const blob = await pdf(
+            <FinancialHistoryPdfDocument records={records} groupBy={groupBy} filters={filters} />
+          ).toBlob();
+          url = URL.createObjectURL(blob);
+          setPdfUrl(url);
+        } catch (error) {
+          console.error('Erro ao gerar preview:', error);
+        }
+      }
+    };
+
+    generatePreview();
+
+    return () => {
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [isOpen, records, groupBy, filters]);
 
   if (!isOpen) return null;
 
-  const handlePrint = () => {
-    const content = contentRef.current;
-    if (!content) return;
+  const handleDownload = async () => {
+    setIsGenerating(true);
+    const filename = `Relatorio_Financeiro_${new Date().toISOString().slice(0, 10)}.pdf`;
 
-    const printWindow = window.open('', '', 'width=800,height=900');
-    if (printWindow) {
-      printWindow.document.write(`
-        <html>
-          <head>
-            <title>Relatório Financeiro</title>
-            <script src="https://cdn.tailwindcss.com"></script>
-            <style>
-              @page { size: A4 portrait; margin: 0; }
-              body { margin: 0; padding: 0; -webkit-print-color-adjust: exact; }
-            </style>
-          </head>
-          <body>
-            ${content.innerHTML}
-            <script>
-              setTimeout(() => {
-                window.print();
-                window.close();
-              }, 500);
-            </script>
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
+    try {
+      const blob = await pdf(
+        <FinancialHistoryPdfDocument records={records} groupBy={groupBy} filters={filters} />
+      ).toBlob();
+      saveAs(blob, filename);
+    } catch (error) {
+      console.error('Erro ao gerar PDF:', error);
+      alert('Erro ao gerar arquivo.');
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -66,10 +79,11 @@ const FinancialPdfModal: React.FC<Props> = ({ isOpen, onClose, records, groupBy,
           </div>
           <div className="flex gap-2">
             <button 
-              onClick={handlePrint}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm"
+              onClick={handleDownload}
+              disabled={isGenerating}
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm disabled:opacity-50"
             >
-              <Printer size={18} /> Imprimir / PDF
+              {isGenerating ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />} Baixar PDF
             </button>
             <button onClick={onClose} className="hover:bg-white/20 p-2 rounded-full transition-colors text-slate-300 hover:text-white">
               <X size={24} />
@@ -77,15 +91,18 @@ const FinancialPdfModal: React.FC<Props> = ({ isOpen, onClose, records, groupBy,
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-8 flex justify-center bg-slate-500/50">
-          <div 
-            className="bg-white shadow-2xl transform transition-transform origin-top scale-95" 
-            style={{ width: '210mm', minHeight: '297mm' }} 
-          >
-            <div ref={contentRef}>
-              <FinancialHistoryTemplate records={records} groupBy={groupBy} filters={filters} />
+        <div className="flex-1 overflow-auto p-8 flex justify-center bg-slate-500/50">
+          {pdfUrl ? (
+            <iframe
+              src={pdfUrl}
+              className="w-full h-full bg-white shadow-2xl rounded-lg"
+              title="PDF Preview"
+            />
+          ) : (
+            <div className="flex items-center justify-center h-full">
+              <Loader2 size={48} className="animate-spin text-slate-400" />
             </div>
-          </div>
+          )}
         </div>
 
       </div>

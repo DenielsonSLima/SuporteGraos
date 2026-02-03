@@ -240,55 +240,73 @@ const ShareholderDetails: React.FC<Props> = ({ shareholder, onBack, onGeneratePd
             <table className="w-full text-left text-sm text-slate-600">
               <thead className="bg-white text-xs uppercase font-semibold text-slate-500 border-b border-slate-100">
                 <tr>
-                  <th className="px-6 py-3 w-32">Data</th>
-                  <th className="px-6 py-3 w-32 text-center">Tipo</th>
-                  <th className="px-6 py-3">Histórico / Descrição</th>
-                  <th className="px-6 py-3 text-right">Valor</th>
+                  <th className="px-6 py-3 w-28">Data</th>
+                  <th className="px-6 py-3 w-28 text-center">Tipo</th>
+                  <th className="px-6 py-3">Descrição / Detalhes</th>
+                  <th className="px-6 py-3 text-right w-32">Valor</th>
+                  <th className="px-6 py-3 text-right w-32">Saldo</th>
                   <th className="px-6 py-3 text-center w-24">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {shareholder.financial.history.map((t) => (
-                  <tr key={t.id} className="hover:bg-slate-50 group transition-colors">
-                    <td className="px-6 py-4 flex items-center gap-2">
-                      <Calendar size={14} className="text-slate-400" />
-                      {dateStr(t.date)}
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      {t.type === 'credit' ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-100 uppercase tracking-wide">
-                          <ArrowUpCircle size={10} /> Crédito
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-rose-50 text-rose-700 text-[10px] font-bold border border-rose-100 uppercase tracking-wide">
-                          <ArrowDownCircle size={10} /> Débito
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 font-medium text-slate-700">
-                      {t.description}
-                      {t.accountId && (
-                        <span className="block text-[10px] font-normal text-slate-400 mt-0.5 flex items-center gap-1">
-                          <Landmark size={10} />
-                          Pago via: {t.accountId}
-                        </span>
-                      )}
-                    </td>
-                    <td className={`px-6 py-4 text-right font-mono font-bold text-base ${t.type === 'credit' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                      {t.type === 'debit' ? '-' : '+'}{currency(t.value)}
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                       <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => handleEditClick(t)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Editar">
-                             <Pencil size={14} />
-                          </button>
-                          <button onClick={() => setDeletingTx(t)} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors" title="Excluir">
-                             <Trash2 size={14} />
-                          </button>
-                       </div>
-                    </td>
-                  </tr>
-                ))}
+                {shareholder.financial.history
+                  .slice()
+                  .reverse()
+                  .map((t, idx) => {
+                    // Calcula saldo acumulado até este ponto
+                    const allTransactions = shareholder.financial.history.slice().reverse();
+                    let accumulatedBalance = 0;
+                    for (let i = 0; i <= idx; i++) {
+                      accumulatedBalance += allTransactions[i].type === 'credit' ? allTransactions[i].value : -allTransactions[i].value;
+                    }
+                    
+                    return (
+                      <tr key={t.id} className="hover:bg-slate-50 group transition-colors">
+                        <td className="px-6 py-4 flex items-center gap-2 font-bold text-slate-700">
+                          <Calendar size={14} className="text-slate-400" />
+                          {dateStr(t.date)}
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          {t.type === 'credit' ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-100 uppercase tracking-wide">
+                              <ArrowUpCircle size={10} /> Crédito
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-rose-50 text-rose-700 text-[10px] font-bold border border-rose-100 uppercase tracking-wide">
+                              <ArrowDownCircle size={10} /> Débito
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 font-medium text-slate-700">
+                          <div className="flex flex-col gap-1">
+                            <span>{t.description}</span>
+                            {t.accountId && (
+                              <span className="text-[10px] font-normal text-slate-400 flex items-center gap-1">
+                                <Landmark size={10} />
+                                Conta: {t.accountId}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className={`px-6 py-4 text-right font-mono font-bold text-base ${t.type === 'credit' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                          {t.type === 'credit' ? '+' : '-'}{currency(t.value)}
+                        </td>
+                        <td className={`px-6 py-4 text-right font-mono font-bold text-base ${accumulatedBalance >= 0 ? 'text-indigo-600' : 'text-rose-600'}`}>
+                          {currency(accumulatedBalance)}
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                           <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button onClick={() => handleEditClick(t)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Editar">
+                                 <Pencil size={14} />
+                              </button>
+                              <button onClick={() => setDeletingTx(t)} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors" title="Excluir">
+                                 <Trash2 size={14} />
+                              </button>
+                           </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
               </tbody>
             </table>
           </div>

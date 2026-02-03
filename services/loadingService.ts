@@ -5,11 +5,13 @@ import { authService } from './authService';
 import { Persistence } from './persistence';
 import { supabase } from './supabase';
 import { payablesService } from './financial/payablesService';
+import { DashboardCache } from './dashboardCache';
 import { purchaseService } from './purchaseService';
 import { receivablesService, Receivable } from './financial/receivablesService';
 import { salesService } from './salesService';
+import { auditService } from './auditService';
 
-const db = new Persistence<Loading>('logistics_loadings', []);
+const db = new Persistence<Loading>('logistics_loadings', [], { useStorage: false });
 let realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
 let isLoaded = false;
 let toastCallback: ((type: 'success' | 'error' | 'info', title: string, message?: string) => void) | null = null;
@@ -278,7 +280,6 @@ export const loadingService = {
           totalCargas: allLoadingsFromOrder.length,
           purchaseAmount: totalPurchaseAmount,
           purchasePaidAmount: totalPurchasePaid,
-          status: totalPurchasePaid >= totalPurchaseAmount ? 'paid' : 'pending'
         });
 
         console.log('🏭 Criando/Atualizando payable do FORNECEDOR:', {
@@ -297,6 +298,7 @@ export const loadingService = {
           p.purchaseOrderId === loading.purchaseOrderId && 
           p.subType === 'purchase_order'
         );
+              invalidateDashboardCache();
         console.log('🔍 Payable existente para este pedido?', existingPayable ? 'SIM' : 'NÃO');
 
         if (existingPayable) {
@@ -337,6 +339,7 @@ export const loadingService = {
     }
 
     const { userId, userName } = getLogInfo();
+              invalidateDashboardCache();
     logService.addLog({
       userId,
       userName,
@@ -344,6 +347,21 @@ export const loadingService = {
       module: 'Logística',
       description: `Registrou carregamento: Placa ${loading.vehiclePlate} (${loading.weightKg}kg)`,
       entityId: loading.id
+    });
+    
+    // Audit Log
+    void auditService.logAction('create', 'Logística', `Carregamento criado: ${loading.vehiclePlate} - ${loading.weightKg}kg - ${loading.product}`, {
+      entityType: 'Loading',
+      entityId: loading.id,
+      metadata: { 
+        vehiclePlate: loading.vehiclePlate, 
+        weightKg: loading.weightKg, 
+        product: loading.product,
+        purchaseOrderId: loading.purchaseOrderId,
+        salesOrderId: loading.salesOrderId,
+        totalFreightValue: loading.totalFreightValue,
+        totalPurchaseValue: loading.totalPurchaseValue
+      }
     });
   },
 
@@ -431,6 +449,23 @@ export const loadingService = {
       description,
       entityId: updatedLoading.id
     });
+    
+    // Audit Log (detecta peso de descarrego)
+    const isUnloadWeight = updatedLoading.unloadWeightKg && (!oldLoading || oldLoading.unloadWeightKg !== updatedLoading.unloadWeightKg);
+    const auditDesc = isUnloadWeight
+      ? `Peso de descarrego registrado: ${updatedLoading.vehiclePlate} - ${updatedLoading.unloadWeightKg}kg destino`
+      : description;
+    
+    void auditService.logAction('update', 'Logística', auditDesc, {
+      entityType: 'Loading',
+      entityId: updatedLoading.id,
+      metadata: { 
+        status: updatedLoading.status,
+        weightKg: updatedLoading.weightKg,
+        unloadWeightKg: updatedLoading.unloadWeightKg,
+        vehiclePlate: updatedLoading.vehiclePlate
+      }
+    });
   },
 
   delete: (id: string) => {
@@ -463,6 +498,22 @@ export const loadingService = {
       description: `Excluiu carregamento: Placa ${loading?.vehiclePlate || 'Desconhecida'}`,
       entityId: id
     });
+    
+    // Audit Log
+    void auditService.logAction('delete', 'Logística', `Carregamento excluído: ${loading?.vehiclePlate || 'Desconhecida'} - ${loading?.weightKg || 0}kg`, {
+      entityType: 'Loading',
+      entityId: id,
+      metadata: { 
+        vehiclePlate: loading?.vehiclePlate,
+        weightKg: loading?.weightKg,
+        unloadWeightKg: loading?.unloadWeightKg,
+        totalFreightValue: loading?.totalFreightValue
+      }
+    });
+    
+    // 🎯 LIMPAR CACHE DO DASHBOARD IMEDIATAMENTE
+    DashboardCache.clearAll();
+    invalidateDashboardCache();
   },
 
   importData: (data: Loading[]) => {

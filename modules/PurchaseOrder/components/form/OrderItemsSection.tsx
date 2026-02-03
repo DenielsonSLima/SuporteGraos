@@ -1,14 +1,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Trash2, Package, Calculator } from 'lucide-react';
-import { OrderItem, ProductUnit } from '../../types';
-
-const REGISTERED_PRODUCTS = [
-  { id: '1', name: 'Milho em Grãos' },
-  { id: '2', name: 'Soja em Grãos' },
-  { id: '3', name: 'Sorgo' },
-  { id: '4', name: 'Caroço de Algodão' }
-];
+import { Plus, Trash2 } from 'lucide-react';
+import { OrderItem } from '../../types';
+import { classificationService } from '../../../../services/classificationService';
 
 interface Props {
   items: OrderItem[];
@@ -16,8 +10,18 @@ interface Props {
 }
 
 const OrderItemsSection: React.FC<Props> = ({ items, onChange }) => {
-  const [newItem, setNewItem] = useState<Partial<OrderItem>>({ productName: 'Milho em Grãos', quantity: 0, unit: 'SC', unitPrice: 0 });
+  const [products, setProducts] = useState<any[]>([]);
+  const [newItem, setNewItem] = useState<Partial<OrderItem>>({ productName: '', quantity: 0, unit: 'SC', unitPrice: 0 });
   const [displayPrice, setDisplayPrice] = useState('');
+
+  useEffect(() => {
+    // Carregar produtos do sistema
+    const allProducts = classificationService.getProductTypes();
+    setProducts(allProducts);
+    if (allProducts.length > 0) {
+      setNewItem({ ...newItem, productName: allProducts[0].name });
+    }
+  }, []);
 
   const formatBRL = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
 
@@ -42,7 +46,11 @@ const OrderItemsSection: React.FC<Props> = ({ items, onChange }) => {
     };
     const updated = [...items, item];
     onChange(updated, updated.reduce((acc, i) => acc + i.total, 0));
-    setNewItem({ productName: 'Milho em Grãos', quantity: 0, unit: 'SC', unitPrice: 0 });
+    if (products.length > 0) {
+      setNewItem({ productName: products[0].name, quantity: 0, unit: 'SC', unitPrice: 0 });
+    } else {
+      setNewItem({ productName: '', quantity: 0, unit: 'SC', unitPrice: 0 });
+    }
     setDisplayPrice('');
   };
 
@@ -60,7 +68,8 @@ const OrderItemsSection: React.FC<Props> = ({ items, onChange }) => {
         <div className="flex-1">
           <label className={labelClass}>Produto</label>
           <select className={inputClass} value={newItem.productName} onChange={e => setNewItem({...newItem, productName: e.target.value})}>
-            {REGISTERED_PRODUCTS.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+            <option value="">Selecione um produto</option>
+            {products.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
           </select>
         </div>
 

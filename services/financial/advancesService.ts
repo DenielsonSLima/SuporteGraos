@@ -1,5 +1,7 @@
 import { Persistence } from '../persistence';
 import { supabase } from '../supabase';
+import { invalidateDashboardCache } from '../dashboardCache';
+import { invalidateFinancialCache } from '../financialCache';
 
 export interface Advance {
   id: string;
@@ -15,7 +17,7 @@ export interface Advance {
   companyId?: string;
 }
 
-const db = new Persistence<Advance>('advances', []);
+const db = new Persistence<Advance>('advances', [], { useStorage: false });
 let realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
 let isLoaded = false;
 
@@ -96,7 +98,8 @@ const startRealtime = () => {
         db.delete(rec.id);
       }
 
-      // silencioso
+      invalidateFinancialCache();
+      invalidateDashboardCache();
     })
     .subscribe();
 };
@@ -144,15 +147,21 @@ export const advancesService = {
   add: (item: Advance) => {
     db.add(item);
     void persistUpsert(item);
+    invalidateFinancialCache();
+    invalidateDashboardCache();
   },
 
   update: (item: Advance) => {
     db.update(item);
     void persistUpsert(item);
+    invalidateFinancialCache();
+    invalidateDashboardCache();
   },
 
   delete: (id: string) => {
     db.delete(id);
     void persistDelete(id);
+    invalidateFinancialCache();
+    invalidateDashboardCache();
   }
 };

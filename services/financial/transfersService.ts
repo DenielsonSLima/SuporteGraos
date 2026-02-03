@@ -1,5 +1,8 @@
 import { Persistence } from '../persistence';
 import { supabase } from '../supabase';
+import { invalidateDashboardCache } from '../dashboardCache';
+import { invalidateFinancialCache } from '../financialCache';
+import { auditService } from '../auditService';
 
 export interface Transfer {
   id: string;
@@ -12,7 +15,7 @@ export interface Transfer {
   companyId?: string;
 }
 
-const db = new Persistence<Transfer>('transfers', []);
+const db = new Persistence<Transfer>('transfers', [], { useStorage: false });
 let realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
 let isLoaded = false;
 
@@ -88,7 +91,11 @@ const startRealtime = () => {
         db.delete(rec.id);
       }
 
-      console.log(`🔔 Realtime transfers: ${payload.eventType}`);
+      invalidateFinancialCache();
+      invalidateDashboardCache();
+      
+      // Disparar evento para o histórico atualizar
+      window.dispatchEvent(new Event('financial:updated'));
     })
     .subscribe();
 };
@@ -136,15 +143,48 @@ export const transfersService = {
   add: (item: Transfer) => {
     db.add(item);
     void persistUpsert(item);
+    invalidateFinancialCache();
+    invalidateDashboardCache();
+    window.dispatchEvent(new Event('financial:updated'));
+    
+    // Audit Log
+    void auditService.logAction('create', 'Financeiro', `Transferência criada: R$ ${item.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} - ${item.description}`, {
+      entityType: 'Transfer',
+      entityId: item.id,
+      metadata: { amount: item.amount, fromAccountId: item.fromAccountId, toAccountId: item.toAccountId }
+    });
   },
 
   update: (item: Transfer) => {
     db.update(item);
     void persistUpsert(item);
+    invalidateFinancialCache();
+    invalidateDashboardCache();
+    window.dispatchEvent(new Event('financial:updated'));
+    
+    // Audit Log
+    void auditService.logAction('update', 'Financeiro', `Transferência alterada: R$ ${item.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} - ${item.description}`, {
+      entityType: 'Transfer',
+      entityId: item.id,
+      metadata: { amount: item.amount }
+    });
   },
 
   delete: (id: string) => {
+    const item = db.getById(id);
     db.delete(id);
     void persistDelete(id);
+    invalidateFinancialCache();
+    invalidateDashboardCache();
+    window.dispatchEvent(new Event('financial:updated'));
+    
+    // Audit Log
+    if (item) {
+      void auditService.logAction('delete', 'Financeiro', `Transferência excluída: R$ ${item.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} - ${item.description}`, {
+        entityType: 'Transfer',
+        entityId: id,
+        metadata: { amount: item.amount }
+      });
+    }
   }
 };

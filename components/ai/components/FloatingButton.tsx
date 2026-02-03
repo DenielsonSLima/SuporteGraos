@@ -16,7 +16,7 @@ const FloatingButton: React.FC<Props> = ({ onClick }) => {
       <div className="absolute top-0 bottom-0 left-0 w-[2px] bg-gradient-to-b from-transparent via-emerald-500 to-transparent opacity-50 group-hover:opacity-100 transition-opacity"></div>
       <BrainCircuit size={20} className="text-emerald-400 group-hover:scale-110 transition-transform" />
       <span className="[writing-mode:vertical-rl] rotate-180 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 group-hover:text-white transition-colors whitespace-nowrap">
-        Daitec AI
+        DLABS AI
       </span>
       <ChevronLeft size={14} className="text-emerald-500/50 group-hover:-translate-x-1 transition-transform" />
     </button>

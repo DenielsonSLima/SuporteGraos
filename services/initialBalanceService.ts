@@ -8,7 +8,7 @@ import { InitialBalanceRecord, initialBalanceSupabaseSync } from './initialBalan
 
 export type { InitialBalanceRecord } from './initialBalance/supabaseSyncService';
 
-const balancesDb = new Persistence<InitialBalanceRecord>('initial_balances', []);
+const balancesDb = new Persistence<InitialBalanceRecord>('initial_balances', [], { useStorage: false });
 let initialBalancesChannel: ReturnType<typeof supabase.channel> | null = null;
 let _realtimeStarted = false;
 

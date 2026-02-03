@@ -79,18 +79,18 @@ const UnifiedReceivableManager: React.FC<Props> = ({ records, onRefresh, viewMod
         return acc + (bal < 0.01 ? 0 : bal);
     }, 0);
 
-  const handleConfirmPayment = (data: PaymentData) => {
+  const handleConfirmPayment = async (data: PaymentData) => {
     if (selectedRecordForSinglePay) {
-      financialActionService.processRecord(selectedRecordForSinglePay.id, data, selectedRecordForSinglePay.subType);
+      await financialActionService.processRecord(selectedRecordForSinglePay.id, data, selectedRecordForSinglePay.subType);
     } else {
-      selectedIds.forEach(id => {
+      for (const id of selectedIds) {
         const record = records.find(r => r.id === id);
         if (record) {
            const rawBalance = record.originalValue - record.paidValue - (record.discountValue || 0);
            const balance = rawBalance < 0.01 ? 0 : rawBalance;
-           financialActionService.processRecord(id, { ...data, amount: balance, discount: 0 }, record.subType);
+           await financialActionService.processRecord(id, { ...data, amount: balance, discount: 0 }, record.subType);
         }
-      });
+      }
     }
     setIsPayModalOpen(false);
     setSelectedIds([]);

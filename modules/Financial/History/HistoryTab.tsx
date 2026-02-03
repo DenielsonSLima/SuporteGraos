@@ -19,8 +19,13 @@ import { FinancialRecord } from '../types';
 import { financialHistoryService } from '../../../services/financial/financialHistoryService';
 import { payablesService } from '../../../services/financial/payablesService';
 import { receivablesService } from '../../../services/financial/receivablesService';
+import { transfersService } from '../../../services/financial/transfersService';
+import { loansService } from '../../../services/financial/loansService';
 import { financialService } from '../../../services/financialService';
 import { partnerService } from '../../../services/partnerService';
+import { shareholderService } from '../../../services/shareholderService';
+import { waitForInit } from '../../../services/supabaseInitService';
+import { standaloneRecordsService } from '../../../services/standaloneRecordsService';
 
 const HistoryTab: React.FC = () => {
   const [records, setRecords] = useState<FinancialRecord[]>([]);
@@ -43,6 +48,11 @@ const HistoryTab: React.FC = () => {
   const [isPdfOpen, setIsPdfOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<FinancialRecord | null>(null);
 
+  // ✅ Log quando o componente monta
+  useEffect(() => {
+    console.log('📋 HistoryTab montado - aguardando dados...');
+  }, []);
+
   // --- CARREGAMENTO DE DADOS CONSOLIDADO COM DEBOUNCE ---
   const loadRealData = useCallback(async () => {
     // ✅ EVITAR múltiplas chamadas simultâneas
@@ -55,12 +65,8 @@ const HistoryTab: React.FC = () => {
     setIsLoading(true);
 
     try {
-      // 1. Todos os Títulos (Pagos e Pendentes - O HISTÓRICO MOSTRA TUDO!)
-      const payablesRaw = await payablesService.loadFromSupabase();
-      const receivablesRaw = await receivablesService.loadFromSupabase();
-      
-      // ✅ CONVERTER Payables para FinancialRecord
-      const payables: FinancialRecord[] = payablesRaw.map(p => ({
+      await standaloneRecordsService.initialize();
+      const mapPayables = (payablesRaw: any[]): FinancialRecord[] => payablesRaw.map(p => ({
         id: p.id,
         description: p.description,
         entityName: p.partnerName || 'Parceiro',
@@ -74,9 +80,8 @@ const HistoryTab: React.FC = () => {
         notes: p.notes,
         bankAccount: p.paymentMethod
       }));
-      
-      // ✅ CONVERTER Receivables para FinancialRecord  
-      const receivables: FinancialRecord[] = receivablesRaw.map(r => {
+
+      const mapReceivables = (receivablesRaw: any[]): FinancialRecord[] => receivablesRaw.map(r => {
         const partner = partnerService.getById(r.partnerId);
         const subType = r.salesOrderId ? 'sales_order' : 'receipt';
         return {
@@ -94,12 +99,8 @@ const HistoryTab: React.FC = () => {
           bankAccount: r.paymentMethod
         };
       });
-      
-      // 2. Movimentações Reais (Baixas, Despesas Diretas, etc.)
-      const standalone = await financialHistoryService.loadFromSupabase();
 
-      // 3. Saldos Iniciais (Aportes)
-      const initialBalances = financialService.getInitialBalances().map(b => ({
+      const mapInitialBalances = (balances: any[]): FinancialRecord[] => balances.map(b => ({
         id: `init-${b.id}`,
         description: 'SALDO INICIAL DE CONTA',
         entityName: 'SISTEMA',
@@ -114,11 +115,276 @@ const HistoryTab: React.FC = () => {
         notes: 'Lançamento de abertura de conta'
       }));
 
+      const mapTransferRecords = (transfers: any[]): FinancialRecord[] => {
+        const records: FinancialRecord[] = [];
+        
+        console.log(`🔄 mapTransferRecords chamada com ${transfers.length} transferências`);
+        
+        transfers.forEach(t => {
+          const fromAccount = financialService.getBankAccountsWithBalances().find(a => a.id === t.fromAccountId);
+          const toAccount = financialService.getBankAccountsWithBalances().find(a => a.id === t.toAccountId);
+          
+          // DÉBITO: saída da conta de origem
+          records.push({
+            id: `transfer-debit-${t.id}`,
+            description: t.description,
+            entityName: toAccount?.bankName || 'Conta Destino',
+            category: 'Transferências',
+            issueDate: t.transferDate,
+            dueDate: t.transferDate,
+            originalValue: t.amount,
+            paidValue: t.amount,
+            status: 'paid' as const,
+            subType: 'transfer' as const,
+            bankAccount: fromAccount?.bankName,
+            notes: `Saída: ${fromAccount?.bankName || 'Conta'} → ${toAccount?.bankName || 'Conta'}`
+          });
+          
+          // CRÉDITO: entrada na conta de destino
+          records.push({
+            id: `transfer-credit-${t.id}`,
+            description: t.description,
+            entityName: fromAccount?.bankName || 'Conta Origem',
+            category: 'Transferências',
+            issueDate: t.transferDate,
+            dueDate: t.transferDate,
+            originalValue: t.amount,
+            paidValue: t.amount,
+            status: 'paid' as const,
+            subType: 'transfer' as const,
+            bankAccount: toAccount?.bankName,
+            notes: `Entrada: ${fromAccount?.bankName || 'Conta'} → ${toAccount?.bankName || 'Conta'}`
+          });
+        });
+        
+        console.log(`✅ mapTransferRecords criou ${records.length} registros (${records.filter(r => r.notes?.startsWith('Saída:')).length} saídas, ${records.filter(r => r.notes?.startsWith('Entrada:')).length} entradas)`);
+        return records;
+      };
+
+      const mapShareholderRecords = () => {
+        const shareholders = shareholderService.getAll();
+        return shareholders.flatMap(s => {
+          const mapped = s.financial.history.map(t => {
+            const isCredit = t.type === 'credit';
+            return {
+              id: `shareholder-${t.id}`,
+              description: t.description,
+              entityName: s.name,
+              category: 'Sócios',
+              issueDate: t.date,
+              dueDate: t.date,
+              originalValue: t.value,
+              paidValue: isCredit ? 0 : t.value,
+              status: isCredit ? 'pending' : 'paid',
+              subType: 'shareholder' as const,
+              bankAccount: t.accountId,
+              notes: isCredit ? 'Saldo de sócio (a pagar)' : 'Pagamento ao sócio'
+            };
+          });
+
+          const totalCredits = s.financial.history
+            .filter(t => t.type === 'credit')
+            .reduce((acc, t) => acc + t.value, 0);
+          const totalDebits = s.financial.history
+            .filter(t => t.type === 'debit')
+            .reduce((acc, t) => acc + t.value, 0);
+          const netFromHistory = totalCredits - totalDebits;
+          const diff = (s.financial.currentBalance || 0) - netFromHistory;
+
+          if (Math.abs(diff) > 0.01) {
+            const issueDate = s.financial.lastProLaboreDate || new Date().toISOString().split('T')[0];
+            mapped.unshift({
+              id: `shareholder-balance-${s.id}`,
+              description: 'Saldo atual do sócio (ajuste)',
+              entityName: s.name,
+              category: 'Sócios',
+              issueDate,
+              dueDate: issueDate,
+              originalValue: Math.abs(diff),
+              paidValue: 0,
+              status: 'pending' as const,
+              subType: 'shareholder' as const,
+              bankAccount: undefined,
+              notes: 'Ajuste para refletir saldo atual'
+            });
+          }
+
+          return mapped;
+        });
+      };
+
+      const mapLoans = (loans: any[]): FinancialRecord[] => {
+        const records: FinancialRecord[] = [];
+        
+        loans.forEach(loan => {
+          // Empréstimo TOMADO: cria CRÉDITO (entrada) + DÉBITO (obrigação)
+          if (loan.subType === 'loan_taken') {
+            // CRÉDITO: Valor que entrou na conta
+            records.push({
+              id: `${loan.id}-credit`,
+              description: `CRÉDITO DE EMPRÉSTIMO: ${loan.entityName}`,
+              entityName: loan.entityName || 'N/A',
+              category: 'Crédito de Empréstimo',
+              issueDate: loan.issueDate,
+              dueDate: loan.issueDate,
+              originalValue: loan.originalValue || 0,
+              paidValue: loan.originalValue || 0, // Já foi creditado
+              status: 'paid' as const,
+              subType: 'receipt' as const,
+              bankAccount: loan.bankAccount,
+              notes: 'Crédito do empréstimo tomado'
+            });
+            
+            // DÉBITO: Obrigação de pagamento (valor pendente) - SEM conta bancária
+            const remaining = (loan.originalValue || 0) - (loan.paidValue || 0);
+            records.push({
+              id: `${loan.id}-debit`,
+              description: `OBRIGAÇÃO - AMORTIZAR: ${loan.entityName}`,
+              entityName: loan.entityName || 'N/A',
+              category: 'Obrigação de Empréstimo',
+              issueDate: loan.issueDate,
+              dueDate: loan.dueDate || loan.issueDate,
+              originalValue: loan.originalValue || 0,
+              paidValue: loan.paidValue || 0, // Quanto já foi pago
+              status: remaining <= 0.01 ? 'paid' : (loan.paidValue || 0) > 0 ? 'partial' : 'pending',
+              subType: 'admin' as const,
+              bankAccount: undefined, // SEM conta - é uma obrigação, não transação real
+              notes: remaining <= 0.01 ? 'Empréstimo quitado' : `Pendente para amortizar: R$ ${remaining.toFixed(2)}`
+            });
+          }
+          // Empréstimo CONCEDIDO: cria DÉBITO (saída) + CRÉDITO (a receber)
+          else if (loan.subType === 'loan_granted') {
+            // DÉBITO: Valor que saiu da conta
+            records.push({
+              id: `${loan.id}-debit`,
+              description: `DÉBITO DE EMPRÉSTIMO CONCEDIDO: ${loan.entityName}`,
+              entityName: loan.entityName || 'N/A',
+              category: 'Débito de Empréstimo',
+              issueDate: loan.issueDate,
+              dueDate: loan.issueDate,
+              originalValue: loan.originalValue || 0,
+              paidValue: loan.originalValue || 0, // Já foi debitado
+              status: 'paid' as const,
+              subType: 'admin' as const,
+              bankAccount: loan.bankAccount,
+              notes: 'Débito do empréstimo concedido'
+            });
+            
+            // CRÉDITO: Direito de recebimento (valor a receber) - SEM conta
+            const remainingReceive = (loan.originalValue || 0) - (loan.paidValue || 0);
+            records.push({
+              id: `${loan.id}-credit`,
+              description: `DIREITO DE RECEBER: ${loan.entityName}`,
+              entityName: loan.entityName || 'N/A',
+              category: 'Direito de Recebimento',
+              issueDate: loan.issueDate,
+              dueDate: loan.dueDate || loan.issueDate,
+              originalValue: loan.originalValue || 0,
+              paidValue: loan.paidValue || 0, // Quanto já foi recebido
+              status: remainingReceive <= 0.01 ? 'paid' : (loan.paidValue || 0) > 0 ? 'partial' : 'pending',
+              subType: 'receipt' as const,
+              bankAccount: undefined, // SEM conta - é um direito, não transação real
+              notes: remainingReceive <= 0.01 ? 'Empréstimo recebido' : `Pendente para receber: R$ ${remainingReceive.toFixed(2)}`
+            });
+          }
+        });
+        
+        return records;
+      };
+
+      // ✅ Mostra dados em cache imediatamente (evita tela zerada)
+      const cachedPayables = mapPayables(payablesService.getAll());
+      const cachedReceivables = mapReceivables(receivablesService.getAll());
+      const cachedStandalone = financialHistoryService.getAll() as unknown as FinancialRecord[];
+      const cachedStandaloneRecords = standaloneRecordsService.getAll();
+      const cachedInitialBalances = mapInitialBalances(financialService.getInitialBalances());
+      const cachedTransfers = mapTransferRecords(transfersService.getAll());
+      const cachedLoans = mapLoans(loansService.getAll());
+      const cachedShareholders = mapShareholderRecords();
+
+      const cachedAll: FinancialRecord[] = [
+        ...cachedPayables,
+        ...cachedReceivables,
+        ...cachedStandalone,
+        ...cachedStandaloneRecords,
+        ...cachedInitialBalances,
+        ...cachedTransfers,
+        ...cachedLoans,
+        ...cachedShareholders
+      ];
+
+      if (cachedAll.length > 0) {
+        console.log(`✅ CACHE LOCAL: ${cachedAll.length} registros (${cachedTransfers.length} transferências, ${cachedLoans.length} empréstimos)`);
+        const sortedCache = cachedAll.sort((a, b) => {
+          const dateA = new Date(a.issueDate || '').getTime();
+          const dateB = new Date(b.issueDate || '').getTime();
+          const dateCompare = dateB - dateA; // DESC (mais recente primeiro)
+          // Se datas são iguais, usar ID como tiebreaker para estabilidade
+          return dateCompare !== 0 ? dateCompare : b.id.localeCompare(a.id);
+        });
+        setRecords(sortedCache);
+      }
+
+      // 1. Todos os Títulos (Pagos e Pendentes - O HISTÓRICO MOSTRA TUDO!)
+      const payablesRaw = await payablesService.loadFromSupabase();
+      const receivablesRaw = await receivablesService.loadFromSupabase();
+
+      // 2. Movimentações Reais (Baixas, Despesas Diretas, etc.)
+      const standalone = await financialHistoryService.loadFromSupabase();
+      const standaloneRecords = standaloneRecordsService.getAll();
+
+      // 3. Transferências entre contas
+      const transfersRaw = await transfersService.loadFromSupabase();
+
+      // 4. Empréstimos
+      const loansRaw = await loansService.loadFromSupabase();
+
+      // 5. Saldos Iniciais (Aportes)
+      const initialBalances = mapInitialBalances(financialService.getInitialBalances());
+
+      // 6. Sócios (aguarda init para garantir carga)
+      await waitForInit();
+      const shareholderRecords = mapShareholderRecords();
+
       // Consolida tudo
-      const all: FinancialRecord[] = [...payables, ...receivables, ...standalone, ...initialBalances];
+      const all: FinancialRecord[] = [
+        ...mapPayables(payablesRaw),
+        ...mapReceivables(receivablesRaw),
+        ...standalone as unknown as FinancialRecord[],
+        ...standaloneRecords,
+        ...mapTransferRecords(transfersRaw),
+        ...mapLoans(loansRaw),
+        ...initialBalances,
+        ...shareholderRecords
+      ];
       
-      // Ordena por data de lançamento decrescente
-      setRecords(all.sort((a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime()));
+      console.log(`✅ SUPABASE LOAD: ${all.length} registros (${mapTransferRecords(transfersRaw).length} transferências, ${mapLoans(loansRaw).length} empréstimos)`);
+      
+      // Pequeno delay para garantir que os dados estão prontos para renderizar
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Ordena por data de lançamento decrescente (com tiebreaker de ID para estabilidade)
+      const sortedRecords = all.sort((a, b) => {
+        const dateA = new Date(a.issueDate || '').getTime();
+        const dateB = new Date(b.issueDate || '').getTime();
+        const dateCompare = dateB - dateA; // DESC (mais recente primeiro)
+        // Se datas são iguais, usar ID como tiebreaker
+        return dateCompare !== 0 ? dateCompare : b.id.localeCompare(a.id);
+      });
+      
+      // Só atualiza se os dados realmente mudaram
+      // Usar comparação mais robusta: comparar quantidade e IDs na ordem
+      const recordsChanged = records.length !== sortedRecords.length || 
+        records.some((r, i) => r.id !== sortedRecords[i]?.id);
+      
+      if (recordsChanged) {
+        console.log(`📊 Registros mudaram (${records.length} → ${sortedRecords.length}), atualizando com ordenação DESC por data...`);
+        setRecords(sortedRecords);
+      } else {
+        console.log('✅ Registros não mudaram, mantendo ordem estável...');
+        // Apenas desativa o loading mesmo que não tenha mudado
+        setIsLoading(false);
+      }
     } finally {
       loadingRef.current = false;
       setIsLoading(false);
@@ -132,9 +398,9 @@ const HistoryTab: React.FC = () => {
     const debouncedLoad = () => {
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
       debounceTimerRef.current = setTimeout(() => {
-        console.log('🔄 Atualizando após debounce...');
+        console.log('🔄 Atualizando histórico...');
         loadRealData();
-      }, 1000); // Aguarda 1 segundo de inatividade
+      }, 2000); // 2 segundos para evitar recargas desnecessárias
     };
     
     // Subscribe to real-time updates for all financial types
@@ -150,23 +416,63 @@ const HistoryTab: React.FC = () => {
       console.log('🔔 REALTIME: Financial History atualizado!');
       debouncedLoad();
     });
+    const unsubTransfers = transfersService.subscribe(() => {
+      console.log('🔔 REALTIME: Transfers atualizado!');
+      debouncedLoad();
+    });
+    const unsubLoans = loansService.subscribe(() => {
+      console.log('🔔 REALTIME: Loans atualizado!');
+      debouncedLoad();
+    });
+    const unsubShareholders = shareholderService.subscribe(() => {
+      console.log('🔔 REALTIME: Shareholders atualizado!');
+      debouncedLoad();
+    });
 
     return () => {
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
       unsubPayables();
       unsubReceivables();
       unsubHistory();
+      unsubTransfers();
+      unsubLoans();
+      unsubShareholders();
+    };
+  }, [loadRealData]);
+
+  // ✅ ESCUTA eventos do window para sincronização de transferências
+  useEffect(() => {
+    const handleFinancialUpdate = () => {
+      console.log('💰 Evento financeiro disparado - recarregando...');
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = setTimeout(() => {
+        loadRealData();
+      }, 2000); // Aumentado para 2s para evitar recargas muito frequentes
+    };
+
+    window.addEventListener('financial:updated', handleFinancialUpdate);
+    window.addEventListener('data:updated', handleFinancialUpdate);
+
+    return () => {
+      window.removeEventListener('financial:updated', handleFinancialUpdate);
+      window.removeEventListener('data:updated', handleFinancialUpdate);
     };
   }, [loadRealData]);
 
   const filteredRecords = useMemo(() => {
-    return records.filter(record => {
+    const filtered = records.filter(record => {
       // 1. Tab Filter
       if (filterType === 'payable') {
-        const isDebit = ['purchase_order', 'freight', 'commission', 'admin', 'loan_taken', 'shareholder'].includes(record.subType || '');
+        // DÉBITOS: saídas de dinheiro
+        const isDebit = ['purchase_order', 'freight', 'commission', 'admin', 'loan_taken', 'shareholder'].includes(record.subType || '') 
+          || (record.subType === 'transfer' && record.notes?.startsWith('Saída:'));
         if (!isDebit) return false;
       } else if (filterType === 'receivable') {
-        const isCredit = ['sales_order', 'loan_granted', 'receipt'].includes(record.subType || '') || record.category === 'Saldo Inicial' || record.category === 'Venda de Ativo';
+        // CRÉDITOS: entradas de dinheiro
+        const isCredit = ['sales_order', 'loan_granted', 'receipt'].includes(record.subType || '') 
+          || record.category === 'Saldo Inicial' 
+          || record.category === 'Venda de Ativo'
+          || (record.subType === 'transfer' && record.notes?.startsWith('Entrada:'));
         if (!isCredit) return false;
       }
 
@@ -187,6 +493,13 @@ const HistoryTab: React.FC = () => {
 
       return textMatch;
     });
+    
+    if (filterType !== 'all') {
+      const transferCount = filtered.filter(r => r.subType === 'transfer').length;
+      console.log(`📊 FILTERED (${filterType}): ${filtered.length} registros (${transferCount} transferências)`);
+    }
+    
+    return filtered;
   }, [records, filterType, searchText, startDate, endDate, selectedCategory, selectedBank]);
 
   const availableCategories = useMemo(() => 
@@ -291,8 +604,17 @@ const HistoryTab: React.FC = () => {
         </div>
       </div>
 
-      <div className="min-h-[400px]">
-        {filteredRecords.length === 0 ? (
+      <div className="min-h-[400px] relative">
+        {isLoading && filteredRecords.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-20 bg-white border-2 border-slate-200 rounded-2xl">
+            <div className="animate-spin">
+              <RefreshCw className="text-slate-400" size={24} />
+            </div>
+            <p className="mt-4 text-slate-500 font-medium">Carregando histórico...</p>
+          </div>
+        )}
+        
+        {!isLoading && filteredRecords.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 bg-white border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 italic font-bold uppercase tracking-widest text-center">
                 Nenhum lançamento financeiro encontrado.<br/>
                 <span className="text-xs font-normal mt-2">Os saldos iniciais de conta aparecerão aqui conforme cadastrados.</span>

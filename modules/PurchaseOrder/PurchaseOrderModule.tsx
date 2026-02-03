@@ -142,13 +142,19 @@ const PurchaseOrderModule: React.FC = () => {
     setOrderToDelete(order);
   };
 
-  const executeDelete = () => {
-    if (orderToDelete) {
-      purchaseService.delete(orderToDelete.id);
-      addToast('success', 'Exclusão Completa Realizada');
+  const executeDelete = async () => {
+    if (!orderToDelete) return;
+    
+    const result = await purchaseService.delete(orderToDelete.id);
+    
+    if (result?.success) {
+      addToast('success', 'Pedido Excluído', 'Pedido, pagamentos e contas a pagar removidos com sucesso.');
       setOrders(prev => prev.filter(o => o.id !== orderToDelete.id));
       setOrderToDelete(null);
       if (viewMode === 'details') setViewMode('list');
+    } else {
+      addToast('error', 'Erro ao Excluir', result?.error || 'Falha ao excluir pedido no banco de dados.');
+      setOrderToDelete(null);
     }
   };
 

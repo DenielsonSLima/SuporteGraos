@@ -1,18 +1,11 @@
 
-import React, { useRef, useState, useEffect } from 'react';
-import { X, Printer, Download, Loader2, UserCheck, ShieldCheck } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Download, Loader2, UserCheck, ShieldCheck } from 'lucide-react';
 import { Loading } from '../../../Loadings/types';
 import { LoadingCache } from '../../../../services/loadingCache';
-
-// Purchase Templates (Pastas Organizadas)
-import ProducerOrderTemplate from '../../templates/ProducerOrderTemplate';
-import InternalOrderTemplate from '../../templates/InternalOrderTemplate';
-
-// Sales Templates (Pastas Organizadas)
-import CustomerSalesTemplate from '../../../SalesOrder/templates/CustomerSalesTemplate';
-import InternalSalesTemplate from '../../../SalesOrder/templates/InternalSalesTemplate';
-
-import html2pdf from 'html2pdf.js';
+import { pdf } from '@react-pdf/renderer';
+import { saveAs } from 'file-saver';
+import PdfDocument from './PdfDocument';
 
 export type PdfVariant = 'producer' | 'internal';
 
@@ -24,9 +17,9 @@ interface Props {
 }
 
 const PdfPreviewModal: React.FC<Props> = ({ isOpen, onClose, order, variant }) => {
-  const contentRef = useRef<HTMLDivElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [loadings, setLoadings] = useState<Loading[]>([]);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen && order.id) {
@@ -38,63 +31,48 @@ const PdfPreviewModal: React.FC<Props> = ({ isOpen, onClose, order, variant }) =
     }
   }, [isOpen, order.id]);
 
+  useEffect(() => {
+    let url: string | null = null;
+
+    const generatePreview = async () => {
+      if (isOpen && loadings.length >= 0) {
+        try {
+          const blob = await pdf(<PdfDocument order={order} loadings={loadings} variant={variant} />).toBlob();
+          url = URL.createObjectURL(blob);
+          setPdfUrl(url);
+        } catch (error) {
+          console.error('Erro ao gerar preview:', error);
+        }
+      }
+    };
+
+    generatePreview();
+
+    return () => {
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [isOpen, order, loadings, variant]);
+
   if (!isOpen) return null;
 
   const isSalesOrder = !!(order as any).customerName;
   const isLandscape = variant === 'internal';
 
-  // Dimensões otimizadas para A4 (baseado no CashierPdfPreviewModal)
-  // Retrato: 800px largura (~210mm)
-  // Paisagem: 1100px largura (~297mm)
-  const renderWidth = isLandscape ? 1100 : 800;
-
   const handleDownloadPdf = async () => {
-    if (!contentRef.current) return;
     setIsGenerating(true);
 
     const prefix = isSalesOrder ? 'Venda' : 'Compra';
     const typeLabel = variant === 'producer' ? (isSalesOrder ? 'Cliente' : 'Produtor') : 'Interno';
     const filename = `${prefix}_${typeLabel}_${order.number}.pdf`;
-    const orientation = isLandscape ? 'landscape' : 'portrait';
-
-    const opt = {
-      margin: 4, // Margem reduzida para melhor aproveitamento de espaço
-      filename,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { 
-        scale: 2, 
-        useCORS: true, 
-        letterRendering: true, 
-        scrollX: 0, 
-        scrollY: 0,
-        windowWidth: renderWidth,
-        width: renderWidth,
-        backgroundColor: '#ffffff',
-        allowTaint: true
-      },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: orientation, compress: true, precision: 10 },
-      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-    };
 
     try {
-      await new Promise(r => setTimeout(r, 400)); // Delay para garantir renderização
-      await html2pdf().set(opt).from(contentRef.current).save();
+      const blob = await pdf(<PdfDocument order={order} loadings={loadings} variant={variant} />).toBlob();
+      saveAs(blob, filename);
     } catch (err) {
       console.error(err);
       alert("Erro ao gerar PDF.");
     } finally {
       setIsGenerating(false);
-    }
-  };
-
-  // Seleciona o template correto
-  const renderTemplate = () => {
-    if (isSalesOrder) {
-        if (variant === 'producer') return <CustomerSalesTemplate order={order} loadings={loadings} />;
-        return <InternalSalesTemplate order={order} loadings={loadings} />;
-    } else {
-        if (variant === 'producer') return <ProducerOrderTemplate order={order} loadings={loadings} />;
-        return <InternalOrderTemplate order={order} loadings={loadings} />;
     }
   };
 
@@ -126,18 +104,18 @@ const PdfPreviewModal: React.FC<Props> = ({ isOpen, onClose, order, variant }) =
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-8 flex justify-center bg-slate-400/20">
-          <div 
-            className="bg-white shadow-2xl origin-top transition-all duration-500 overflow-hidden" 
-            style={{ 
-                width: isLandscape ? '297mm' : '210mm', 
-                minHeight: isLandscape ? '210mm' : '297mm', 
-            }}
-          >
-            <div ref={contentRef} style={{ width: `${renderWidth}px`, margin: '0 auto', backgroundColor: 'white' }}>
-                {renderTemplate()}
+        <div className="flex-1 overflow-auto p-8 flex justify-center bg-slate-400/20">
+          {pdfUrl ? (
+            <iframe
+              src={pdfUrl}
+              className="w-full h-full border-0 shadow-2xl rounded-lg bg-white"
+              title="PDF Preview"
+            />
+          ) : (
+            <div className="flex items-center justify-center">
+              <Loader2 size={48} className="animate-spin text-slate-600" />
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

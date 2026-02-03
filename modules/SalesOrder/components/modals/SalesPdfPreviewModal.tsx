@@ -1,11 +1,11 @@
 
-import React, { useRef, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Download, Loader2, UserCheck, ShieldCheck } from 'lucide-react';
 import { SalesOrder } from '../../types';
 import { Loading } from '../../../Loadings/types';
-import CustomerSalesTemplate from '../../templates/CustomerSalesTemplate';
-import InternalSalesTemplate from '../../templates/InternalSalesTemplate';
-import html2pdf from 'html2pdf.js';
+import { pdf } from '@react-pdf/renderer';
+import { saveAs } from 'file-saver';
+import PdfDocument from './PdfDocument';
 
 type PdfVariant = 'producer' | 'internal'; // Reusing same logic naming: producer=customer, internal=manager
 
@@ -17,42 +17,45 @@ interface Props {
 }
 
 const SalesPdfPreviewModal: React.FC<Props> = ({ isOpen, onClose, order, loadings }) => {
-  const contentRef = useRef<HTMLDivElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [variant, setVariant] = useState<PdfVariant>('producer');
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let url: string | null = null;
+
+    const generatePreview = async () => {
+      if (isOpen && order) {
+        try {
+          const blob = await pdf(<PdfDocument order={order} loadings={loadings} variant={variant} />).toBlob();
+          url = URL.createObjectURL(blob);
+          setPdfUrl(url);
+        } catch (error) {
+          console.error('Erro ao gerar preview:', error);
+        }
+      }
+    };
+
+    generatePreview();
+
+    return () => {
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [isOpen, order, loadings, variant]);
 
   if (!isOpen) return null;
 
   const isLandscape = variant === 'internal';
 
   const handleDownload = async () => {
-    if (!contentRef.current) return;
     setIsGenerating(true);
 
     const typeLabel = variant === 'producer' ? 'Cliente' : 'Interno';
     const filename = `Venda_${typeLabel}_${order.number}.pdf`;
-    const orientation = isLandscape ? 'landscape' : 'portrait';
-
-    const options = {
-      margin: 10,
-      filename,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { 
-        scale: 2, 
-        useCORS: true, 
-        letterRendering: true,
-        width: isLandscape ? 1280 : 1024,
-        windowWidth: isLandscape ? 1280 : 1024,
-        scrollX: 0,
-        scrollY: 0
-      },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: orientation, compress: true },
-      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-    };
 
     try {
-      await new Promise(r => setTimeout(r, 400));
-      await html2pdf().set(options).from(contentRef.current).save();
+      const blob = await pdf(<PdfDocument order={order} loadings={loadings} variant={variant} />).toBlob();
+      saveAs(blob, filename);
     } catch (error) {
       console.error('Erro ao gerar PDF:', error);
       alert('Erro ao gerar arquivo.');
@@ -106,22 +109,18 @@ const SalesPdfPreviewModal: React.FC<Props> = ({ isOpen, onClose, order, loading
         </div>
 
         {/* Preview Area (Scrollable) */}
-        <div className="flex-1 overflow-y-auto p-8 flex justify-center bg-slate-500/50">
-          <div 
-            className="bg-white shadow-2xl origin-top transition-all duration-500 overflow-hidden" 
-            style={{ 
-                width: isLandscape ? '297mm' : '210mm', 
-                minHeight: isLandscape ? '210mm' : '297mm', 
-            }}
-          >
-            <div ref={contentRef} style={{ width: isLandscape ? '1280px' : '1024px', margin: '0 auto', backgroundColor: 'white' }}>
-              {variant === 'producer' ? (
-                  <CustomerSalesTemplate order={order} loadings={loadings} />
-              ) : (
-                  <InternalSalesTemplate order={order} loadings={loadings} />
-              )}
+        <div className="flex-1 overflow-auto p-8 flex justify-center bg-slate-500/50">
+          {pdfUrl ? (
+            <iframe
+              src={pdfUrl}
+              className="w-full h-full border-0 shadow-2xl rounded-lg bg-white"
+              title="PDF Preview"
+            />
+          ) : (
+            <div className="flex items-center justify-center">
+              <Loader2 size={48} className="animate-spin text-white" />
             </div>
-          </div>
+          )}
         </div>
 
       </div>

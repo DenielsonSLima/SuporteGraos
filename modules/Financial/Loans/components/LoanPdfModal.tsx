@@ -1,8 +1,10 @@
 
-import React, { useRef } from 'react';
-import { X, Printer } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { X, Download, Loader2 } from 'lucide-react';
 import { LoanRecord, FinancialRecord } from '../../types';
-import LoanStatementTemplate from '../templates/LoanStatementTemplate';
+import LoanPdfDocument from './LoanPdfDocument';
+import { pdf } from '@react-pdf/renderer';
+import { saveAs } from 'file-saver';
 
 interface Props {
   isOpen: boolean;
@@ -12,38 +14,50 @@ interface Props {
 }
 
 const LoanPdfModal: React.FC<Props> = ({ isOpen, onClose, loan, history }) => {
-  const contentRef = useRef<HTMLDivElement>(null);
+  const [pdfUrl, setPdfUrl] = useState<string>('');
+  const [isGenerating, setIsGenerating] = useState(true);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const generatePdf = async () => {
+      try {
+        setIsGenerating(true);
+        const blob = await pdf(
+          <LoanPdfDocument loan={loan} history={history} />
+        ).toBlob();
+        const url = URL.createObjectURL(blob);
+        setPdfUrl(url);
+        setIsGenerating(false);
+      } catch (error) {
+        console.error('Erro ao gerar PDF:', error);
+        setIsGenerating(false);
+      }
+    };
+
+    generatePdf();
+
+    return () => {
+      if (pdfUrl) {
+        URL.revokeObjectURL(pdfUrl);
+      }
+    };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
-  const handlePrint = () => {
-    const content = contentRef.current;
-    if (!content) return;
-
-    const printWindow = window.open('', '', 'width=800,height=900');
-    if (printWindow) {
-      printWindow.document.write(`
-        <html>
-          <head>
-            <title>Extrato de Empréstimo</title>
-            <script src="https://cdn.tailwindcss.com"></script>
-            <style>
-              @page { size: A4 portrait; margin: 0; }
-              body { margin: 0; padding: 0; -webkit-print-color-adjust: exact; }
-            </style>
-          </head>
-          <body>
-            ${content.innerHTML}
-            <script>
-              setTimeout(() => {
-                window.print();
-                window.close();
-              }, 500);
-            </script>
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
+  const handleDownload = async () => {
+    try {
+      setIsGenerating(true);
+      const filename = `Extrato_Emprestimo_${loan.entityName.replace(/\s+/g, '_')}_${Date.now()}.pdf`;
+      const blob = await pdf(
+        <LoanPdfDocument loan={loan} history={history} />
+      ).toBlob();
+      saveAs(blob, filename);
+    } catch (error) {
+      console.error('Erro ao baixar PDF:', error);
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -61,10 +75,12 @@ const LoanPdfModal: React.FC<Props> = ({ isOpen, onClose, loan, history }) => {
           </div>
           <div className="flex gap-2">
             <button 
-              onClick={handlePrint}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm"
+              onClick={handleDownload}
+              disabled={isGenerating}
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm disabled:opacity-50"
             >
-              <Printer size={18} /> Imprimir / PDF
+              {isGenerating ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+              {isGenerating ? 'Processando...' : 'Baixar PDF'}
             </button>
             <button onClick={onClose} className="hover:bg-white/20 p-2 rounded-full transition-colors text-slate-300 hover:text-white">
               <X size={24} />
@@ -74,15 +90,17 @@ const LoanPdfModal: React.FC<Props> = ({ isOpen, onClose, loan, history }) => {
 
         {/* Preview Area (Scrollable) */}
         <div className="flex-1 overflow-y-auto p-8 flex justify-center bg-slate-500/50">
-          <div 
-            className="bg-white shadow-2xl transform transition-transform origin-top scale-95" 
-            style={{ width: '210mm', minHeight: '297mm' }} 
-          >
-            {/* Real Render for Preview */}
-            <div ref={contentRef}>
-              <LoanStatementTemplate loan={loan} history={history} />
+          {isGenerating ? (
+            <div className="flex items-center justify-center h-full">
+              <Loader2 size={48} className="animate-spin text-slate-700" />
             </div>
-          </div>
+          ) : (
+            <iframe
+              src={pdfUrl}
+              className="bg-white shadow-2xl w-full h-full"
+              title="PDF Preview"
+            />
+          )}
         </div>
 
       </div>

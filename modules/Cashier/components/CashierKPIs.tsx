@@ -8,7 +8,11 @@ interface Props {
 }
 
 const CashierKPIs: React.FC<Props> = ({ data }) => {
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  const currency = (val: number) => {
+    // Ignora o sinal de negativo se o valor for próximo de zero
+    const cleanValue = Math.abs(val) < 0.01 ? 0 : val;
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cleanValue);
+  };
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-6">

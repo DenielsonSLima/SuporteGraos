@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Sprout, Mail, Lock, ArrowRight, Loader2, AlertCircle, MapPin, Clock, Calendar, Quote as QuoteIcon, ArrowLeft, KeyRound, ShieldCheck, UserCheck } from 'lucide-react';
+import { Mail, Lock, ArrowRight, Loader2, AlertCircle, MapPin, Clock, Calendar, Quote as QuoteIcon, ArrowLeft, KeyRound, ShieldCheck, UserCheck } from 'lucide-react';
 import { authService } from '../../services/authService';
 import { userService, UserData } from '../../services/userService';
 import { quoteService, Quote } from '../../services/quoteService';
@@ -205,10 +205,15 @@ const LoginScreen: React.FC<Props> = ({ onLoginSuccess }) => {
 
       <div className="absolute top-6 left-6 z-20 animate-in slide-in-from-top-4 duration-700">
          <div className="flex items-center gap-3 bg-black/40 backdrop-blur-md border border-white/10 px-4 py-2 rounded-full shadow-lg hover:bg-black/50 transition-colors">
-            <div className="bg-emerald-500 p-1.5 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)]">
-              <Sprout className="text-white" size={18} />
+            <img 
+              src="/logo2.png" 
+              alt="Dailabs Logo" 
+              className="w-6 h-6 rounded drop-shadow-[0_0_6px_rgba(16,185,129,0.5)]"
+            />
+            <div className="flex flex-col leading-tight">
+              <span className="text-white font-bold tracking-tight text-sm drop-shadow-md">Dailabs</span>
+              <span className="text-white/70 text-[10px] font-semibold">Creative AI & Software</span>
             </div>
-            <span className="text-white font-bold tracking-tight text-sm drop-shadow-md">Suporte Grãos ERP</span>
          </div>
       </div>
 
@@ -264,16 +269,16 @@ const LoginScreen: React.FC<Props> = ({ onLoginSuccess }) => {
               <div className="relative z-10">
                 {/* Header Dinâmico */}
                 <div className="mb-8">
-                  <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-700 text-white mb-4 shadow-lg shadow-emerald-500/30">
+                  <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-700 text-white mb-4 shadow-lg shadow-black/20">
                     {isRecovering ? <KeyRound size={24} /> : <Lock size={24} />}
                   </div>
                   <h2 className="text-3xl font-bold text-slate-800 tracking-tight">
                     {isRecovering ? (recoveryStep === 'token' ? 'Token de Acesso' : 'Nova Senha') : 'Bem-vindo'}
                   </h2>
-                  <p className="text-slate-600 text-sm mt-1 font-medium">
+                  <p className="text-slate-600 text-sm mt-1 font-medium whitespace-pre-line">
                     {isRecovering 
                       ? (recoveryStep === 'token' ? 'Insira o código fornecido pelo administrador.' : 'Defina suas novas credenciais.')
-                      : 'Acesse o ecossistema Suporte Grãos.'}
+                      : 'Acesse ao sistema ERP personalizado da\nSuporte Grãos LTDA'}
                   </p>
                 </div>
 
@@ -479,7 +484,7 @@ const LoginScreen: React.FC<Props> = ({ onLoginSuccess }) => {
 
                 <div className="pt-8 text-center border-t border-slate-200/50 mt-8">
                   <p className="text-xs font-medium text-slate-500">
-                    © {new Date().getFullYear()} Suporte Grãos Tecnologia.<br/>Todos os direitos reservados.
+                    © 2026 Suporte Grãos LTDA<br/>Todos os direitos reservado.
                   </p>
                 </div>
               </div>

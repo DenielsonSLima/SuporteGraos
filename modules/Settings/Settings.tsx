@@ -33,6 +33,7 @@ import LocationsSettings from './Locations/LocationsSettings';
 import WatermarkSettings from './Watermark/WatermarkSettings';
 import ProductTypesSettings from './ProductTypes/ProductTypesSettings';
 import LoginScreenSettings from './LoginScreen/LoginScreenSettings';
+import LogsSettings from './Logs/LogsSettings';
 
 const SETTINGS_MENU = [
   { 
@@ -138,6 +139,14 @@ const SETTINGS_MENU = [
     icon: FileImage,
     color: 'bg-pink-500',
     component: WatermarkSettings
+  },
+  { 
+    id: 'logs', 
+    title: 'Logs e Eventos', 
+    description: 'Caixa preta do sistema: auditoria, sessões e histórico de ações.', 
+    icon: ScrollText,
+    color: 'bg-orange-500',
+    component: LogsSettings
   },
 ];
 

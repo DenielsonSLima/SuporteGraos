@@ -33,8 +33,15 @@ export interface ReportModule {
   
   /**
    * Componente que renderiza o PDF (Layout de impressão)
+   * DEPRECATED: Use PdfDocument ao invés disso
    */
   Template: React.FC<{ data: GeneratedReportData }>;
+  
+  /**
+   * Componente React-PDF para gerar PDF com texto pesquisável
+   * Este substitui o Template antigo (html2canvas)
+   */
+  PdfDocument?: React.FC<{ data: GeneratedReportData }>;
 }
 
 export interface ReportColumn {

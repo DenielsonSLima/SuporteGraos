@@ -6,9 +6,11 @@ import { authService } from './authService';
 import { loadingService } from './loadingService';
 import { supabase } from './supabase';
 import { payablesService } from './financial/payablesService';
+import { DashboardCache, invalidateDashboardCache } from './dashboardCache';
+import { auditService } from './auditService';
 
 const INITIAL_ORDERS: PurchaseOrder[] = [];
-const db = new Persistence<PurchaseOrder>('purchase_orders', INITIAL_ORDERS);
+const db = new Persistence<PurchaseOrder>('purchase_orders', INITIAL_ORDERS, { useStorage: false });
 
 type DbStatus = 'pending' | 'approved' | 'received' | 'cancelled';
 
@@ -101,6 +103,30 @@ const mapOrderFromDb = (row: any): PurchaseOrder => {
     notes: row?.notes ?? base.notes
   };
 };
+
+// ============================================================================
+// CARREGAMENTO INICIAL (SUPABASE)
+// ============================================================================
+
+const loadFromSupabase = async (): Promise<PurchaseOrder[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('purchase_orders')
+      .select('*')
+      .order('date', { ascending: false });
+
+    if (error) throw error;
+    const mapped = (data || []).map(mapOrderFromDb);
+    db.setAll(mapped);
+    console.log('🔄 Pedidos de compra sincronizando em tempo real...');
+    return mapped;
+  } catch (error) {
+    console.error('❌ Erro ao carregar pedidos de compra:', error);
+    return [];
+  }
+};
+
+void loadFromSupabase();
 
 const persistUpsert = async (order: PurchaseOrder) => {
   try {
@@ -290,6 +316,15 @@ export const purchaseService = {
     
     const { userId, userName } = getLogInfo();
     logService.addLog({ userId, userName, action: 'create', module: 'Compras', description: `Criou Pedido de Compra ${order.number}`, entityId: order.id });
+    
+    // Audit Log
+    void auditService.logAction('create', 'Compras', `Pedido de compra criado: #${order.number} - ${order.partnerName} - R$ ${order.totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, {
+      entityType: 'PurchaseOrder',
+      entityId: order.id,
+      metadata: { partnerId: order.partnerId, totalValue: order.totalValue, status: order.status }
+    });
+    
+    invalidateDashboardCache();
   },
   update: (updatedOrder: PurchaseOrder) => {
     db.update(updatedOrder);
@@ -321,6 +356,15 @@ export const purchaseService = {
     
     const { userId, userName } = getLogInfo();
     logService.addLog({ userId, userName, action: 'update', module: 'Compras', description: `Atualizou Pedido ${updatedOrder.number}`, entityId: updatedOrder.id });
+    
+    // Audit Log
+    void auditService.logAction('update', 'Compras', `Pedido de compra atualizado: #${updatedOrder.number} - Status: ${updatedOrder.status}`, {
+      entityType: 'PurchaseOrder',
+      entityId: updatedOrder.id,
+      metadata: { status: updatedOrder.status, totalValue: updatedOrder.totalValue, paidValue: updatedOrder.paidValue }
+    });
+    
+    invalidateDashboardCache();
   },
   
   updateTransaction: (orderId: string, updatedTx: OrderTransaction) => {
@@ -333,6 +377,7 @@ export const purchaseService = {
     void persistUpsert(updated);
     const { userId, userName } = getLogInfo();
     logService.addLog({ userId, userName, action: 'update', module: 'Financeiro', description: `Editou pagamento no Pedido ${order.number}`, entityId: orderId });
+    invalidateDashboardCache();
   },
 
   deleteTransaction: (orderId: string, txId: string) => {
@@ -352,30 +397,75 @@ export const purchaseService = {
     logService.addLog({ userId, userName, action: 'delete', module: 'Financeiro', description: `Estornou pagamento do Pedido ${order.number}`, entityId: orderId });
   },
 
-  delete: (id: string) => {
+  delete: async (id: string) => {
     const order = db.getById(id);
-    if (!order) return;
+    if (!order) {
+      console.warn('⚠️ Pedido de compra não encontrado para exclusão:', id);
+      return { success: false, error: 'Pedido não encontrado' };
+    }
 
-    // 1. Limpa todos os romaneios vinculados
+    // ⛔ VALIDAÇÃO: Bloquear se houver carregamentos vinculados
     const linkedLoadings = loadingService.getByPurchaseOrder(id);
-    linkedLoadings.forEach(l => {
-        loadingService.delete(l.id);
+    if (linkedLoadings.length > 0) {
+      console.warn('⛔ Exclusão bloqueada: pedido tem carregamentos vinculados');
+      return { 
+        success: false, 
+        error: `Não é possível excluir. Este pedido possui ${linkedLoadings.length} carregamento(s) vinculado(s). Desvincule ou exclua os carregamentos primeiro.` 
+      };
+    }
+
+    // ✅ Apagar payables vinculados ao pedido de compra
+    const allPayables = payablesService.getAll();
+    const linkedPayables = allPayables.filter(p => p.purchaseOrderId === id);
+    
+    console.log(`🗑️ Apagando ${linkedPayables.length} payables vinculados ao pedido ${order.number}`);
+    linkedPayables.forEach(p => {
+      payablesService.delete(p.id);
     });
 
-    // 2. Exclui o pedido principal
+    // ✅ Apagar do cache local
     db.delete(id);
-    void persistDelete(id);
 
-    // 3. Log da ação pesada
+    // ✅ Apagar do Supabase e aguardar resultado
+    try {
+      const { error } = await supabase.from('purchase_orders').delete().eq('id', id);
+      if (error) {
+        console.error('❌ Erro ao excluir pedido de compra no Supabase:', error);
+        // Reverter exclusão local se falhar no Supabase
+        db.add(order);
+        return { success: false, error: error.message };
+      }
+    } catch (err: any) {
+      console.error('❌ Erro inesperado ao excluir pedido de compra:', err);
+      db.add(order);
+      return { success: false, error: err.message };
+    }
+
+    // ✅ Log de auditoria
     const { userId, userName } = getLogInfo();
     logService.addLog({ 
         userId, 
         userName, 
         action: 'delete', 
         module: 'Compras', 
-        description: `EXCLUSÃO EM CASCATA: Pedido ${order.number}, Romaneios (${linkedLoadings.length}) removidos.`, 
+        description: `Excluiu Pedido ${order.number} e ${linkedPayables.length} payable(s)`, 
         entityId: id 
     });
+    
+    // Audit Log
+    void auditService.logAction('delete', 'Compras', `Pedido de compra excluído: #${order.number} - ${order.partnerName}`, {
+      entityType: 'PurchaseOrder',
+      entityId: id,
+      metadata: { totalValue: order.totalValue, status: order.status, linkedPayables: linkedPayables.length }
+    });
+    
+    console.log('✅ Pedido de compra excluído com sucesso:', order.number);
+    
+    // 🎯 LIMPAR CACHE DO DASHBOARD IMEDIATAMENTE
+    DashboardCache.clearAll();
+    invalidateDashboardCache();
+    
+    return { success: true };
   },
   
   importData: (data: PurchaseOrder[]) => {

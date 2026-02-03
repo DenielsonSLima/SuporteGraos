@@ -4,6 +4,8 @@ import { financialActionService } from './financialActionService';
 import { supabase } from './supabase';
 import { waitForInit } from './supabaseInitService';
 import { Persistence } from './persistence';
+import { invalidateDashboardCache } from './dashboardCache';
+import { invalidateFinancialCache } from './financialCache';
 import { Shareholder, ShareholderTransaction, ShareholderRecurrence } from './shareholder/types';
 import { formatCurrency } from './shareholder/utils';
 import { shareholderSupabaseSync } from './shareholder/supabaseSyncService';
@@ -14,7 +16,57 @@ export type { Shareholder, ShareholderTransaction, ShareholderRecurrence } from 
 // Initial Mock Data
 let _shareholders: Shareholder[] = [];
 let _isSupabaseLoaded = false;
-const _shareholdersDb = new Persistence<Shareholder>('shareholders', []);
+const _shareholdersDb = new Persistence<Shareholder>('shareholders', [], { useStorage: true });
+let shareholdersChannel: ReturnType<typeof supabase.channel> | null = null;
+let transactionsChannel: ReturnType<typeof supabase.channel> | null = null;
+let _realtimeStarted = false;
+
+const mapTransactionFromDb = (t: any): ShareholderTransaction => ({
+  id: t.id,
+  date: t.date,
+  type: t.type,
+  value: parseFloat(t.value),
+  description: t.description,
+  accountId: t.account_name || undefined
+});
+
+const mapShareholderFromDb = (s: any, transactions: ShareholderTransaction[] = []): Shareholder => ({
+  id: s.id,
+  name: s.name,
+  cpf: s.cpf || '',
+  email: s.email || '',
+  phone: s.phone || '',
+  address: {
+    street: s.address_street || '',
+    number: s.address_number || '',
+    neighborhood: s.address_neighborhood || '',
+    city: s.address_city || '',
+    state: s.address_state || '',
+    zip: s.address_zip || ''
+  },
+  financial: {
+    proLaboreValue: parseFloat(s.pro_labore_value) || 0,
+    currentBalance: parseFloat(s.current_balance) || 0,
+    lastProLaboreDate: s.last_pro_labore_date || undefined,
+    recurrence: {
+      active: s.recurrence_active || false,
+      amount: parseFloat(s.recurrence_amount) || 0,
+      day: s.recurrence_day || 1,
+      lastGeneratedMonth: s.recurrence_last_generated_month || undefined
+    },
+    history: transactions
+  }
+});
+
+const recalcShareholderBalance = (shareholder: Shareholder) => {
+  const totalCredits = shareholder.financial.history
+    .filter(t => t.type === 'credit')
+    .reduce((acc, t) => acc + t.value, 0);
+  const totalDebits = shareholder.financial.history
+    .filter(t => t.type === 'debit')
+    .reduce((acc, t) => acc + t.value, 0);
+  shareholder.financial.currentBalance = totalCredits - totalDebits;
+};
 
 // Load from Supabase
 const loadFromSupabase = async () => {
@@ -29,42 +81,24 @@ const loadFromSupabase = async () => {
     const mapped: Shareholder[] = stats.data.shareholders.map((s: any) => {
       const transactions: ShareholderTransaction[] = (stats.data.shareholderTransactions || [])
         .filter((t: any) => t.shareholder_id === s.id)
-        .map((t: any) => ({
-          id: t.id,
-          date: t.date,
-          type: t.type,
-          value: parseFloat(t.value),
-          description: t.description,
-          accountId: t.account_name || undefined
-        }));
+        .map(mapTransactionFromDb);
 
-      return {
-        id: s.id,
-        name: s.name,
-        cpf: s.cpf || '',
-        email: s.email || '',
-        phone: s.phone || '',
-        address: {
-          street: s.address_street || '',
-          number: s.address_number || '',
-          neighborhood: s.address_neighborhood || '',
-          city: s.address_city || '',
-          state: s.address_state || '',
-          zip: s.address_zip || ''
-        },
-        financial: {
-          proLaboreValue: parseFloat(s.pro_labore_value) || 0,
-          currentBalance: parseFloat(s.current_balance) || 0,
-          lastProLaboreDate: s.last_pro_labore_date || undefined,
-          recurrence: {
-            active: s.recurrence_active || false,
-            amount: parseFloat(s.recurrence_amount) || 0,
-            day: s.recurrence_day || 1,
-            lastGeneratedMonth: s.recurrence_last_generated_month || undefined
-          },
-          history: transactions
-        }
-      };
+      return mapShareholderFromDb(s, transactions);
+    });
+
+    // Corrige saldos órfãos automaticamente
+    mapped.forEach(shareholder => {
+      if (shareholder.financial.currentBalance > 0 && shareholder.financial.history.length === 0) {
+        const initialTx: ShareholderTransaction = {
+          id: `init-${shareholder.id}-migration`,
+          date: new Date().toISOString().split('T')[0],
+          type: 'credit',
+          value: shareholder.financial.currentBalance,
+          description: 'Saldo Anterior (Migração Automática)'
+        };
+        shareholder.financial.history = [initialTx];
+        console.log(`✅ Saldo órfão corrigido: ${shareholder.name} (${shareholder.financial.currentBalance})`);
+      }
     });
 
     _shareholdersDb.setAll(mapped);
@@ -78,8 +112,81 @@ const loadFromSupabase = async () => {
   }
 };
 
+const startRealtime = () => {
+  if (_realtimeStarted) return;
+  _realtimeStarted = true;
+
+  if (!shareholdersChannel) {
+    shareholdersChannel = supabase.channel('shareholders_realtime');
+    shareholdersChannel
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'shareholders' }, payload => {
+        console.log('[Realtime] Shareholders update:', payload.eventType, payload.new?.name || payload.old?.name);
+        const row = payload.new || payload.old;
+        if (!row) return;
+
+        const existing = _shareholders.find(s => s.id === row.id);
+        const history = existing?.financial.history || [];
+        const mapped = mapShareholderFromDb(row, history);
+
+        if (payload.eventType === 'INSERT') {
+          if (!existing) _shareholders = [mapped, ..._shareholders];
+          console.log('✅ Shareholder inserted:', mapped.name);
+        } else if (payload.eventType === 'UPDATE') {
+          _shareholders = _shareholders.map(s => s.id === row.id ? mapped : s);
+          console.log('✅ Shareholder updated:', mapped.name);
+        } else if (payload.eventType === 'DELETE') {
+          _shareholders = _shareholders.filter(s => s.id !== row.id);
+          console.log('✅ Shareholder deleted:', row.name);
+        }
+
+        _shareholdersDb.setAll(_shareholders);
+        invalidateFinancialCache();
+        invalidateDashboardCache();
+      })
+      .subscribe(() => console.log('✅ Shareholders realtime channel subscribed'));
+  }
+
+  if (!transactionsChannel) {
+    transactionsChannel = supabase.channel('shareholder_transactions_realtime');
+    transactionsChannel
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'shareholder_transactions' }, payload => {
+        console.log('[Realtime] Transaction update:', payload.eventType, payload.new?.description || payload.old?.description);
+        const row = payload.new || payload.old;
+        if (!row) return;
+
+        const shareholderId = row.shareholder_id;
+        const shareholder = _shareholders.find(s => s.id === shareholderId);
+        if (!shareholder) return;
+
+        if (payload.eventType === 'INSERT') {
+          const tx = mapTransactionFromDb(row);
+          const exists = shareholder.financial.history.some(t => t.id === tx.id);
+          if (!exists) {
+            shareholder.financial.history = [tx, ...shareholder.financial.history];
+            console.log('✅ Transaction inserted:', tx.description);
+          }
+        } else if (payload.eventType === 'UPDATE') {
+          const tx = mapTransactionFromDb(row);
+          shareholder.financial.history = shareholder.financial.history.map(t => t.id === tx.id ? tx : t);
+          console.log('✅ Transaction updated:', tx.description);
+        } else if (payload.eventType === 'DELETE') {
+          shareholder.financial.history = shareholder.financial.history.filter(t => t.id !== row.id);
+          console.log('✅ Transaction deleted');
+        }
+
+        recalcShareholderBalance(shareholder);
+        _shareholders = _shareholders.map(s => s.id === shareholderId ? shareholder : s);
+        _shareholdersDb.setAll(_shareholders);
+        invalidateFinancialCache();
+        invalidateDashboardCache();
+      })
+      .subscribe(() => console.log('✅ Transactions realtime channel subscribed'));
+  }
+};
+
 // Initialize on module load
 loadFromSupabase();
+startRealtime();
 
 const getLogInfo = () => {
   const user = authService.getCurrentUser();
@@ -96,7 +203,10 @@ export const shareholderService = {
     return _shareholders;
   },
 
-  subscribe: (callback: (items: Shareholder[]) => void) => _shareholdersDb.subscribe(callback),
+  subscribe: (callback: (items: Shareholder[]) => void) => {
+    startRealtime();
+    return _shareholdersDb.subscribe(callback);
+  },
 
   add: async (shareholder: Shareholder) => {
     if (!shareholder.financial) {
@@ -114,6 +224,8 @@ export const shareholderService = {
       description: `Cadastrou novo sócio: ${shareholder.name}`,
       entityId: shareholder.id
     });
+    invalidateFinancialCache();
+    invalidateDashboardCache();
 
     // Save to Supabase (background)
     if (_isSupabaseLoaded) {
@@ -130,6 +242,8 @@ export const shareholderService = {
       description: `Atualizou dados do sócio: ${updated.name}`,
       entityId: updated.id
     });
+    invalidateFinancialCache();
+    invalidateDashboardCache();
 
     // Update in Supabase (background)
     if (_isSupabaseLoaded) {
@@ -147,6 +261,8 @@ export const shareholderService = {
       description: `Removeu sócio: ${s?.name || 'Desconhecido'}`,
       entityId: id
     });
+    invalidateFinancialCache();
+    invalidateDashboardCache();
 
     // Delete from Supabase (background)
     if (_isSupabaseLoaded) {
@@ -227,6 +343,8 @@ export const shareholderService = {
       description: `Lançamento ${transaction.type === 'credit' ? 'Crédito' : 'Débito'} para ${shareholder.name}: ${formatCurrency(transaction.value)}`,
       entityId: shareholder.id
     });
+    invalidateFinancialCache();
+    invalidateDashboardCache();
   },
 
   updateTransaction: async (shareholderId: string, updatedTx: ShareholderTransaction) => {
@@ -252,6 +370,8 @@ export const shareholderService = {
         shareholderSupabaseSync.syncUpdateBalance(shareholderId, shareholder.financial.currentBalance);
       });
     }
+    invalidateFinancialCache();
+    invalidateDashboardCache();
   },
 
   deleteTransaction: async (shareholderId: string, txId: string) => {
@@ -275,6 +395,8 @@ export const shareholderService = {
         shareholderSupabaseSync.syncUpdateBalance(shareholderId, shareholder.financial.currentBalance);
       });
     }
+    invalidateFinancialCache();
+    invalidateDashboardCache();
   },
 
   // --- Recorrência ---
@@ -296,6 +418,8 @@ export const shareholderService = {
         description: `Configurou recorrência para ${shareholder.name}: ${formatCurrency(config.amount)}`,
         entityId: shareholderId
     });
+    invalidateFinancialCache();
+    invalidateDashboardCache();
   },
 
   checkAndGenerateRecurring: () => {
@@ -335,10 +459,48 @@ export const shareholderService = {
     shareholder.financial.proLaboreValue = value;
     _shareholders = [..._shareholders];
     _shareholdersDb.setAll(_shareholders);
+    invalidateFinancialCache();
+    invalidateDashboardCache();
+  },
+
+  // Corrige saldos órfãos (sem histórico de transações)
+  fixOrphanBalance: async (shareholderId: string, description: string = 'Saldo Anterior Importado') => {
+    const shareholder = _shareholders.find(s => s.id === shareholderId);
+    if (!shareholder) return;
+
+    // Se tem saldo mas SEM histórico, cria transação inicial
+    if (shareholder.financial.currentBalance > 0 && shareholder.financial.history.length === 0) {
+      const initialTx: ShareholderTransaction = {
+        id: `init-${shareholderId}-${Date.now()}`,
+        date: new Date().toISOString().split('T')[0],
+        type: 'credit',
+        value: shareholder.financial.currentBalance,
+        description
+      };
+
+      shareholder.financial.history = [initialTx];
+
+      _shareholders = _shareholders.map(s => s.id === shareholderId ? shareholder : s);
+      _shareholdersDb.setAll(_shareholders);
+
+      // Sync to Supabase
+      if (_isSupabaseLoaded) {
+        Promise.resolve().then(() => 
+          shareholderSupabaseSync.syncInsertTransaction(shareholderId, initialTx)
+        );
+      }
+
+      invalidateFinancialCache();
+      invalidateDashboardCache();
+      return true;
+    }
+    return false;
   },
 
   importData: (data: Shareholder[]) => {
     _shareholders = data;
     _shareholdersDb.setAll(data);
+    invalidateFinancialCache();
+    invalidateDashboardCache();
   }
 };

@@ -178,7 +178,7 @@ const LoadingManagement: React.FC<Props> = ({ loading, onClose, onUpdate, origin
     loadingService.update(updated);
     invalidateLoadingCache();
     onUpdate(updated); 
-    addToast('success', 'Peso Confirmado', 'Valores de faturamento e frete atualizados.');
+    addToast('success', 'Peso Confirmado', 'Contas a receber atualizado (dividido em etapas).');
   };
 
   const handleSaveStructural = () => {
@@ -194,7 +194,7 @@ const LoadingManagement: React.FC<Props> = ({ loading, onClose, onUpdate, origin
     invalidateLoadingCache();
     onUpdate(finalData);
     setIsEditing(false);
-    addToast('success', 'Carregamento salvo com sucesso!');
+    addToast('success', 'Carregamento Confirmado', 'Contas a pagar atualizado.');
   };
 
   const handleSaveDisplacement = () => {

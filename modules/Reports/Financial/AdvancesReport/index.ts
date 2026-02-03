@@ -3,6 +3,7 @@ import { HandCoins } from 'lucide-react';
 import { ReportModule } from '../../types';
 import { advanceService } from '../../../Financial/Advances/services/advanceService';
 import Template from './Template';
+import PdfDocument from './PdfDocument';
 import Filters from './Filters';
 
 const advancesReport: ReportModule = {
@@ -57,7 +58,8 @@ const advancesReport: ReportModule = {
       ]
     };
   },
-  Template: Template
+  Template: Template,
+  PdfDocument: PdfDocument
 };
 
 export default advancesReport;

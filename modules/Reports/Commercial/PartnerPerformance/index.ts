@@ -4,6 +4,7 @@ import { ReportModule } from '../../types';
 import { purchaseService } from '../../../../services/purchaseService';
 import { salesService } from '../../../../services/salesService';
 import Template from './Template';
+import PdfDocument from './PdfDocument';
 import DefaultFilters from '../../components/DefaultFilters';
 
 const partnerPerformanceReport: ReportModule = {
@@ -77,7 +78,8 @@ const partnerPerformanceReport: ReportModule = {
       summary: [{ label: 'Volume Financeiro Total', value: totalMovimentado, format: 'currency' }]
     };
   },
-  Template: Template
+  Template: Template,
+  PdfDocument: PdfDocument
 };
 
 export default partnerPerformanceReport;

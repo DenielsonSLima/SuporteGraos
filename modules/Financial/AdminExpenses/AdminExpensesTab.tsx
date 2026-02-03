@@ -8,8 +8,12 @@ import FinancialPaymentModal, { PaymentData } from '../components/modals/Financi
 import { financialActionService } from '../../../services/financialActionService';
 import { FinancialRecord } from '../types';
 import { financialService } from '../../../services/financialService';
+import ActionConfirmationModal from '../../../components/ui/ActionConfirmationModal';
+import { useToast } from '../../../contexts/ToastContext';
+import { standaloneRecordsService } from '../../../services/standaloneRecordsService';
 
 const AdminExpensesTab: React.FC = () => {
+  const { addToast } = useToast();
   // Data State
   const [records, setRecords] = useState<FinancialRecord[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
@@ -19,10 +23,13 @@ const AdminExpensesTab: React.FC = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isPayModalOpen, setIsPayModalOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<FinancialRecord | null>(null);
+  const [editingRecord, setEditingRecord] = useState<FinancialRecord | null>(null);
+  const [deletingRecord, setDeletingRecord] = useState<FinancialRecord | null>(null);
 
   // Filter State
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
@@ -38,10 +45,10 @@ const AdminExpensesTab: React.FC = () => {
     loadData();
   }, []);
 
-  const handleAddExpenses = (newRecords: any[]) => {
-    newRecords.forEach(record => {
-      financialActionService.addAdminExpense(record);
-    });
+  const handleAddExpenses = async (newRecords: any[]) => {
+    for (const record of newRecords) {
+      await financialActionService.addAdminExpense(record);
+    }
     loadData();
   };
 
@@ -50,17 +57,74 @@ const AdminExpensesTab: React.FC = () => {
     setIsPayModalOpen(true);
   };
 
-  const handleConfirmPayment = (data: PaymentData) => {
+  const handleConfirmPayment = async (data: PaymentData) => {
     if(!selectedRecord) return;
-    financialActionService.processRecord(selectedRecord.id, data, 'admin');
+    await financialActionService.processRecord(selectedRecord.id, data, 'admin');
     setIsPayModalOpen(false);
+    loadData();
+  };
+
+  const handleEditRecord = (record: FinancialRecord) => {
+    setEditingRecord(record);
+  };
+
+  const handleUpdateRecord = async (record: FinancialRecord) => {
+    await standaloneRecordsService.update(record);
+    setEditingRecord(null);
+    loadData();
+  };
+
+  const handleDeleteRecord = (record: FinancialRecord) => {
+    setDeletingRecord(record);
+  };
+
+  const confirmDeleteRecord = async () => {
+    if (!deletingRecord) return;
+    // Remove registros de histórico vinculados para estornar o saldo
+    const all = standaloneRecordsService.getAll();
+    const targetDate = deletingRecord.settlementDate || deletingRecord.issueDate || deletingRecord.dueDate;
+    const targetValue = (deletingRecord.paidValue || 0) + (deletingRecord.discountValue || 0);
+    const linkedHistory = all.filter(r =>
+      r.id?.startsWith('hist-') &&
+      r.subType === deletingRecord.subType &&
+      r.entityName === deletingRecord.entityName &&
+      (r.issueDate === targetDate || r.settlementDate === targetDate) &&
+      Math.abs((r.originalValue || 0) - targetValue) < 0.01 &&
+      (r.notes || '').includes(`ORIGIN:${deletingRecord.id}`)
+    );
+
+    for (const hist of linkedHistory) {
+      await financialActionService.deleteStandaloneRecord(hist.id);
+    }
+
+    await financialActionService.deleteStandaloneRecord(deletingRecord.id);
+    addToast('success', 'Despesa excluída');
+    setDeletingRecord(null);
     loadData();
   };
 
   // --- FILTERING & KPI CALCULATIONS ---
   const expenseRecords = useMemo(() => {
-      return records.filter(r => r.subType === 'admin' || r.category !== 'Venda de Ativo');
-  }, [records]);
+      const allowedCategories = new Set(categories);
+      return records.filter(r => {
+        // Mostrar apenas despesas administrativas válidas do plano de contas
+        const isAdmin = r.subType === 'admin';
+        const isAllowedCategory = allowedCategories.has(r.category);
+        return isAdmin && isAllowedCategory;
+      });
+  }, [records, categories]);
+
+  const categoryTypeMap = useMemo(() => {
+    const defs = financialService.getExpenseCategories();
+    const map = new Map<string, string>();
+    defs.forEach(d => d.subtypes.forEach(s => map.set(s.name, d.type)));
+    return map;
+  }, [categories]);
+
+  const filteredCategories = useMemo(() => {
+    if (!typeFilter) return categories;
+    return categories.filter(cat => (categoryTypeMap.get(cat) || 'custom') === typeFilter);
+  }, [categories, typeFilter, categoryTypeMap]);
 
   const filteredRecords = useMemo(() => {
     return expenseRecords.filter(r => {
@@ -69,6 +133,8 @@ const AdminExpensesTab: React.FC = () => {
         r.entityName.toLowerCase().includes(searchTerm.toLowerCase());
       
       const matchesCategory = categoryFilter ? r.category === categoryFilter : true;
+      const typeKey = categoryTypeMap.get(r.category) || 'custom';
+      const matchesType = typeFilter ? typeKey === typeFilter : true;
 
       let matchesDate = true;
       if (startDate && r.dueDate < startDate) matchesDate = false;
@@ -76,21 +142,24 @@ const AdminExpensesTab: React.FC = () => {
 
       let matchesTab = true;
       const today = new Date();
-      const endOfMonthStr = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0];
+      const currentYear = today.getFullYear();
+      const currentMonth = today.getMonth() + 1;
+      const startOfMonthStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`;
+      const endOfMonthStr = new Date(currentYear, currentMonth, 0).toISOString().split('T')[0];
       
       if (activeTab === 'open') {
-        const isPending = r.status !== 'paid';
-        const isCurrentOrPast = r.dueDate <= endOfMonthStr;
-        matchesTab = isPending && isCurrentOrPast;
+        // Apenas registros do mês/ano atual
+        const isCurrentMonth = r.dueDate >= startOfMonthStr && r.dueDate <= endOfMonthStr;
+        matchesTab = isCurrentMonth;
       } else if (activeTab === 'future') {
         const isPending = r.status !== 'paid';
         const isFuture = r.dueDate > endOfMonthStr;
         matchesTab = isPending && isFuture;
       } 
 
-      return matchesSearch && matchesCategory && matchesDate && matchesTab;
+      return matchesSearch && matchesCategory && matchesType && matchesDate && matchesTab;
     });
-  }, [expenseRecords, searchTerm, categoryFilter, startDate, endDate, activeTab]);
+  }, [expenseRecords, searchTerm, categoryFilter, typeFilter, startDate, endDate, activeTab, categoryTypeMap]);
 
   const kpis = useMemo(() => {
       // KPIs baseados no filtro atual para dar contexto dinâmico
@@ -133,8 +202,8 @@ const AdminExpensesTab: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 pt-4 border-t border-slate-50">
-          <div className="sm:col-span-2 flex items-center gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-5 gap-4 pt-4 border-t border-slate-50">
+          <div className="sm:col-span-3 flex items-center gap-2">
             <div className="relative flex-1">
               <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               <input 
@@ -155,7 +224,20 @@ const AdminExpensesTab: React.FC = () => {
               />
             </div>
           </div>
-          <div className="sm:col-span-2 relative">
+          <div className="sm:col-span-1 relative">
+            <Layers className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+            <select 
+              value={typeFilter}
+              onChange={e => setTypeFilter(e.target.value)}
+              className="w-full pl-10 pr-3 py-2 text-xs border border-slate-200 rounded-lg text-slate-900 bg-white focus:border-slate-800 outline-none appearance-none font-bold"
+            >
+              <option value="">Todos os Tipos</option>
+              <option value="fixed">Fixa</option>
+              <option value="variable">Variável</option>
+              <option value="administrative">Administrativa</option>
+            </select>
+          </div>
+          <div className="sm:col-span-1 relative">
             <Tag className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
             <select 
               value={categoryFilter}
@@ -163,7 +245,7 @@ const AdminExpensesTab: React.FC = () => {
               className="w-full pl-10 pr-3 py-2 text-xs border border-slate-200 rounded-lg text-slate-900 bg-white focus:border-slate-800 outline-none appearance-none font-bold"
             >
               <option value="">Todas as Categorias</option>
-              {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+              {filteredCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
             </select>
           </div>
         </div>
@@ -210,6 +292,8 @@ const AdminExpensesTab: React.FC = () => {
         <AdminExpenseGroupedList 
           records={filteredRecords} 
           onPay={handleOpenPayment} 
+          onEdit={handleEditRecord}
+          onDelete={handleDeleteRecord}
         />
       </div>
 
@@ -220,12 +304,33 @@ const AdminExpensesTab: React.FC = () => {
         onSave={handleAddExpenses}
       />
 
+      <InstallmentExpenseForm
+        isOpen={!!editingRecord}
+        onClose={() => setEditingRecord(null)}
+        onSave={handleAddExpenses}
+        onUpdate={handleUpdateRecord}
+        initialData={editingRecord}
+      />
+
       {/* PAYMENT MODAL */}
       <FinancialPaymentModal 
         isOpen={isPayModalOpen}
         onClose={() => setIsPayModalOpen(false)}
         onConfirm={handleConfirmPayment}
         record={selectedRecord}
+      />
+
+      <ActionConfirmationModal
+        isOpen={!!deletingRecord}
+        onClose={() => setDeletingRecord(null)}
+        onConfirm={confirmDeleteRecord}
+        title="Excluir Despesa?"
+        description={
+          deletingRecord?.status === 'paid'
+            ? 'Esta despesa já foi baixada. Ao excluir, o valor será estornado no caixa.'
+            : 'Tem certeza que deseja excluir esta despesa?'
+        }
+        type="danger"
       />
     </div>
   );

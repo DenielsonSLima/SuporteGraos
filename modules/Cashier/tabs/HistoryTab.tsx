@@ -1,71 +1,47 @@
 
 import React, { useState } from 'react';
-import { cashierService } from '../services/cashierService';
-import { CashierReport } from '../types';
-import CashierReportView from '../components/CashierReportView';
-import { Folder, Calendar, ArrowRight, ChevronLeft } from 'lucide-react';
+import { Plus, Lock } from 'lucide-react';
+import HistoryViewComponent from '../components/HistoryViewComponent';
+import SnapshotModal from '../components/SnapshotModal';
 
 const HistoryTab: React.FC = () => {
-  const [history] = useState<CashierReport[]>(cashierService.getHistory());
-  const [selectedReport, setSelectedReport] = useState<CashierReport | null>(null);
-
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
-
-  if (selectedReport) {
-    return (
-      <div className="animate-in slide-in-from-right-4">
-        <button 
-          onClick={() => setSelectedReport(null)}
-          className="mb-4 flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors"
-        >
-          <ChevronLeft size={16} /> Voltar para lista
-        </button>
-        <CashierReportView 
-          report={selectedReport} 
-          title={`Fechamento ${new Date(selectedReport.referenceDate).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}`} 
-        />
-      </div>
-    );
-  }
+  const [isSnapshotModalOpen, setIsSnapshotModalOpen] = useState(false);
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 animate-in fade-in">
-      {history.map(report => {
-        const date = new Date(report.referenceDate);
-        return (
-          <div 
-            key={report.id}
-            onClick={() => setSelectedReport(report)}
-            className="group cursor-pointer bg-white rounded-xl border border-slate-200 p-6 shadow-sm hover:border-primary-300 hover:shadow-md transition-all"
-          >
-            <div className="flex items-start justify-between mb-4">
-              <div className="bg-blue-50 p-3 rounded-lg text-blue-600 group-hover:bg-primary-50 group-hover:text-primary-600 transition-colors">
-                <Folder size={24} />
-              </div>
-              <div className="text-right">
-                <p className="text-xs font-bold uppercase text-slate-400">Saldo Final</p>
-                <p className={`font-bold text-lg ${report.netBalance >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                  {currency(report.netBalance)}
-                </p>
-              </div>
-            </div>
-            
-            <h3 className="text-lg font-bold text-slate-800 capitalize mb-1">
-              {date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
-            </h3>
-            <p className="text-sm text-slate-500 flex items-center gap-2">
-              <Calendar size={14} /> Fechado em {date.toLocaleDateString('pt-BR')}
-            </p>
+    <div className="space-y-6">
+      {/* Header com botão de novo snapshot */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-slate-800">Histórico de Meses Anteriores</h2>
+          <p className="text-slate-500 text-sm mt-1">
+            Visualize os fechamentos de caixa dos meses anteriores. Você pode congelar um mês manualmente para auditoria.
+          </p>
+        </div>
+        <button
+          onClick={() => setIsSnapshotModalOpen(true)}
+          className="flex items-center gap-2 bg-slate-900 text-white px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg active:scale-95"
+        >
+          <Lock size={16} />
+          Finalizar Mês
+        </button>
+      </div>
 
-            <div className="mt-6 pt-4 border-t border-slate-100 flex justify-between items-center text-sm font-medium text-primary-600 group-hover:translate-x-1 transition-transform">
-              Visualizar Relatório
-              <ArrowRight size={16} />
-            </div>
-          </div>
-        );
-      })}
+      {/* Componente principal de histórico */}
+      <HistoryViewComponent onCloseDetail={() => {}} />
+
+      {/* Modal de snapshot */}
+      <SnapshotModal 
+        isOpen={isSnapshotModalOpen}
+        onClose={() => setIsSnapshotModalOpen(false)}
+        onSuccess={() => {
+          setIsSnapshotModalOpen(false);
+          // Força recalculação do histórico
+          window.dispatchEvent(new Event('cashier:updated'));
+        }}
+      />
     </div>
   );
 };
 
 export default HistoryTab;
+

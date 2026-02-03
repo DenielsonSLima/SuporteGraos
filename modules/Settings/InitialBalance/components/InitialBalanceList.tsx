@@ -10,7 +10,10 @@ interface Props {
 }
 
 const InitialBalanceList: React.FC<Props> = ({ balances, onDelete }) => {
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  const currency = (val: number) => {
+    const cleanValue = Math.abs(val) < 0.01 ? 0 : val;
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cleanValue);
+  };
 
   if (balances.length === 0) {
     return (

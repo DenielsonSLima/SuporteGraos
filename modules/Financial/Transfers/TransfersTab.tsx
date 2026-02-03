@@ -1,19 +1,21 @@
 
 import React, { useState, useEffect } from 'react';
 import { ArrowRightLeft, ArrowRight, Calendar, Plus, Wallet, Trash2, Pencil } from 'lucide-react';
-import { TransferRecord } from '../types';
-import { transfersService } from '../../../services/financial/transfersService';
+import { transfersService, Transfer } from '../../../services/financial/transfersService';
 import FinancialRecordForm from '../components/modals/FinancialRecordForm';
 import ActionConfirmationModal from '../../../components/ui/ActionConfirmationModal';
 import { useToast } from '../../../contexts/ToastContext';
+import { bankAccountService } from '../../../services/bankAccountService';
+import { BankAccount } from '../types';
 
 const TransfersTab: React.FC = () => {
   const { addToast } = useToast();
   const [activeSubTab, setActiveSubTab] = useState<'month' | 'history'>('month');
-  const [records, setRecords] = useState<TransferRecord[]>([]);
+  const [records, setRecords] = useState<Transfer[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [txToDelete, setTxToDelete] = useState<TransferRecord | null>(null);
+  const [txToDelete, setTxToDelete] = useState<Transfer | null>(null);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
 
   const loadData = async () => {
     try {
@@ -33,32 +35,40 @@ const TransfersTab: React.FC = () => {
       setRecords(updatedRecords);
     });
 
+    const unsubscribeAccounts = bankAccountService.subscribe((items) => {
+      setBankAccounts(items);
+    });
+
     return () => {
       unsubscribe();
+      unsubscribeAccounts();
     };
   }, []);
 
-  const handleAddTransfer = (newTransfer: any) => {
-    financialActionService.addTransfer(newTransfer);
-    loadData();
+  const handleAddTransfer = (newTransfer: Transfer) => {
+    transfersService.add(newTransfer);
     addToast('success', 'Transferência Realizada');
   };
 
   const handleDeleteTransfer = () => {
     if (!txToDelete) return;
-    financialActionService.deleteTransfer(txToDelete.id);
+    transfersService.delete(txToDelete.id);
     addToast('success', 'Transferência Estornada');
     setTxToDelete(null);
-    loadData();
   };
 
   const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
   const date = (val: string) => new Date(val).toLocaleDateString('pt-BR');
+  const getAccountLabel = (accountId: string) => {
+    const acc = bankAccounts.find(a => a.id === accountId);
+    if (!acc) return accountId;
+    return `${acc.bankName}${acc.owner ? ` - ${acc.owner}` : ''}`;
+  };
 
   const currentMonthStr = new Date().toISOString().slice(0, 7);
-  const currentMonthTransfers = records.filter(t => t.date.startsWith(currentMonthStr)); 
+  const currentMonthTransfers = records.filter(t => t.transferDate.startsWith(currentMonthStr)); 
   
-  const totalMonthTransfers = currentMonthTransfers.reduce((acc, t) => acc + t.value, 0);
+  const totalMonthTransfers = currentMonthTransfers.reduce((acc, t) => acc + t.amount, 0);
   const displayedTransfers = activeSubTab === 'month' ? currentMonthTransfers : records;
 
   return (
@@ -119,9 +129,9 @@ const TransfersTab: React.FC = () => {
               <div className="flex flex-col items-center md:items-start min-w-[120px]">
                 <div className="flex items-center gap-2 text-slate-500 text-sm font-bold">
                   <Calendar size={16} className="text-slate-300" />
-                  {date(transfer.date)}
+                  {date(transfer.transferDate)}
                 </div>
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Por: {transfer.user}</span>
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Por: Sistema</span>
               </div>
 
               <div className="flex-1 flex flex-col md:flex-row items-center gap-4 w-full">
@@ -129,7 +139,7 @@ const TransfersTab: React.FC = () => {
                   <div className="p-2 bg-rose-50 rounded-xl text-rose-600"><Wallet size={18} /></div>
                   <div className="overflow-hidden">
                     <p className="text-[9px] text-rose-500 font-black uppercase tracking-tighter">Origem (Saída)</p>
-                    <p className="text-sm font-black text-slate-700 truncate uppercase" title={transfer.originAccount}>{transfer.originAccount}</p>
+                    <p className="text-sm font-black text-slate-700 truncate uppercase" title={getAccountLabel(transfer.fromAccountId)}>{getAccountLabel(transfer.fromAccountId)}</p>
                   </div>
                 </div>
 
@@ -142,14 +152,14 @@ const TransfersTab: React.FC = () => {
                   <div className="p-2 bg-emerald-50 rounded-xl text-emerald-600"><Wallet size={18} /></div>
                   <div className="overflow-hidden">
                     <p className="text-[9px] text-emerald-500 font-black uppercase tracking-tighter">Destino (Entrada)</p>
-                    <p className="text-sm font-black text-slate-700 truncate uppercase" title={transfer.destinationAccount}>{transfer.destinationAccount}</p>
+                    <p className="text-sm font-black text-slate-700 truncate uppercase" title={getAccountLabel(transfer.toAccountId)}>{getAccountLabel(transfer.toAccountId)}</p>
                   </div>
                 </div>
               </div>
 
               <div className="text-center md:text-right min-w-[180px] flex items-center justify-between md:justify-end gap-6 w-full md:w-auto">
                 <div>
-                  <p className="text-lg font-black text-slate-900 tracking-tighter">{currency(transfer.value)}</p>
+                  <p className="text-lg font-black text-slate-900 tracking-tighter">{currency(transfer.amount)}</p>
                   <p className="text-[10px] text-slate-500 font-medium italic mt-1 line-clamp-1">{transfer.description}</p>
                 </div>
                 

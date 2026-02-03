@@ -2,6 +2,7 @@
 import { Users } from 'lucide-react';
 import { ReportModule } from '../../types';
 import Template from './Template';
+import PdfDocument from './PdfDocument';
 import Filters from './Filters';
 import { PARTNER_CATEGORY_IDS } from '../../../../constants';
 
@@ -59,10 +60,12 @@ const partnersListReport: ReportModule = {
         location: `${p.address?.city}/${p.address?.state}`,
         typeLabel: getCategoryName(p.categories[0])
       })),
-      summary: [{ label: 'Total Parceiros', value: data.length, format: 'number' }]
+      summary: [{ label: 'Total Parceiros', value: data.length, format: 'number' }],
+      subtitle: `Mostrando ${data.length} parceiros cadastrados` // Adicionar subtitle
     };
   },
-  Template: Template
+  Template: Template,
+  PdfDocument: PdfDocument
 };
 
 export default partnersListReport;

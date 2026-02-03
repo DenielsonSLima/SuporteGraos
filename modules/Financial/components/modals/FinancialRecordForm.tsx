@@ -13,9 +13,20 @@ interface Props {
 
 const FinancialRecordForm: React.FC<Props> = ({ isOpen, onClose, onSave, type }) => {
   const [bankAccounts, setBankAccounts] = useState<BankAccountWithBalance[]>([]);
+
+  const generateUUID = (): string => {
+    if (typeof self !== 'undefined' && self.crypto && self.crypto.randomUUID) {
+      return self.crypto.randomUUID();
+    }
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0;
+      const v = c === 'x' ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+  };
   
   const [formData, setFormData] = useState({
-    description: '',
+    description: type === 'transfer' ? 'Transferência entre contas' : '',
     entityName: '', 
     category: '', 
     originAccount: '', 
@@ -27,6 +38,23 @@ const FinancialRecordForm: React.FC<Props> = ({ isOpen, onClose, onSave, type })
 
   const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
 
+  const formatValueInput = (val: string) => {
+    // Remove tudo que não é número
+    const numbers = val.replace(/\D/g, '');
+    if (!numbers) return '';
+    
+    // Converte para número e formata com 2 casas decimais
+    const numValue = (parseInt(numbers, 10) / 100).toFixed(2);
+    
+    // Formata no padrão brasileiro (1.234,56)
+    return numValue.replace('.', ',').replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1.');
+  };
+
+  const parseValueInput = (val: string): string => {
+    // Remove separadores e converte vírgula em ponto para parseFloat
+    return val.replace(/\./g, '').replace(',', '.');
+  };
+
   useEffect(() => {
     if (isOpen) {
       const sorted = financialService.getBankAccountsWithBalances()
@@ -35,7 +63,7 @@ const FinancialRecordForm: React.FC<Props> = ({ isOpen, onClose, onSave, type })
       setBankAccounts(sorted);
       
       setFormData({
-        description: '',
+        description: type === 'transfer' ? 'Transferência entre contas' : '',
         entityName: '',
         category: '',
         originAccount: '',
@@ -52,25 +80,27 @@ const FinancialRecordForm: React.FC<Props> = ({ isOpen, onClose, onSave, type })
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    const numValue = parseFloat(parseValueInput(formData.value));
+    
     if (type === 'admin_expense') {
       onSave({
         ...formData,
-        value: parseFloat(formData.value),
+        value: numValue,
         id: Math.random().toString(36).substr(2, 9),
-        originalValue: parseFloat(formData.value),
+        originalValue: numValue,
         paidValue: 0,
         status: 'pending',
         subType: 'admin'
       });
     } else {
       onSave({
-        id: Math.random().toString(36).substr(2, 9),
-        date: formData.date,
-        originAccount: formData.originAccount,
-        destinationAccount: formData.destinationAccount,
-        value: parseFloat(formData.value),
+        id: generateUUID(),
+        transferDate: formData.date,
+        fromAccountId: formData.originAccount,
+        toAccountId: formData.destinationAccount,
+        amount: numValue,
         description: formData.description,
-        user: 'Admin'
+        notes: formData.notes || undefined
       });
     }
     
@@ -101,13 +131,13 @@ const FinancialRecordForm: React.FC<Props> = ({ isOpen, onClose, onSave, type })
               <div className="relative">
                 <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                 <input 
-                  type="number" 
-                  step="0.01" 
+                  type="text" 
+                  inputMode="numeric"
                   required
                   className={`${inputClass} pl-10 font-bold`}
                   placeholder="0,00"
                   value={formData.value}
-                  onChange={e => setFormData({...formData, value: e.target.value})}
+                  onChange={e => setFormData({...formData, value: formatValueInput(e.target.value)})}
                 />
               </div>
             </div>
@@ -134,7 +164,7 @@ const FinancialRecordForm: React.FC<Props> = ({ isOpen, onClose, onSave, type })
                 type="text" 
                 required
                 className={`${inputClass} pl-10`}
-                placeholder={type === 'admin_expense' ? "Ex: Conta de Luz" : "Ex: Aporte para Investimento"}
+                placeholder={type === 'admin_expense' ? "Ex: Conta de Luz" : "Transferência entre contas"}
                 value={formData.description}
                 onChange={e => setFormData({...formData, description: e.target.value})}
               />
@@ -193,8 +223,8 @@ const FinancialRecordForm: React.FC<Props> = ({ isOpen, onClose, onSave, type })
                     >
                       <option value="">Selecione a conta...</option>
                       {bankAccounts.map(acc => (
-                        <option key={acc.id} value={acc.bankName}>
-                          {acc.bankName} - {acc.owner} (Bal: {currency(acc.currentBalance)})
+                        <option key={acc.id} value={acc.id}>
+                          {acc.bankName} - {acc.owner} (Saldo: {currency(acc.currentBalance)})
                         </option>
                       ))}
                     </select>
@@ -217,8 +247,8 @@ const FinancialRecordForm: React.FC<Props> = ({ isOpen, onClose, onSave, type })
                     >
                       <option value="">Selecione a conta...</option>
                       {bankAccounts.map(acc => (
-                        <option key={acc.id} value={acc.bankName}>
-                          {acc.bankName} - {acc.owner} (Bal: {currency(acc.currentBalance)})
+                        <option key={acc.id} value={acc.id}>
+                          {acc.bankName} - {acc.owner} (Saldo: {currency(acc.currentBalance)})
                         </option>
                       ))}
                     </select>

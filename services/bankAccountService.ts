@@ -8,10 +8,15 @@ import { waitForInit } from './supabaseInitService';
 import { financialActionService } from './financialActionService';
 import { bankAccountSupabaseSync } from './bankAccount/supabaseSyncService';
 
-const accountsDb = new Persistence<BankAccount>('bank_accounts', []);
+const accountsDb = new Persistence<BankAccount>('bank_accounts', [], { useStorage: false });
 let _isSupabaseLoaded = false;
 let bankAccountsChannel: ReturnType<typeof supabase.channel> | null = null;
 let _realtimeStarted = false;
+
+const syncWindowAccounts = () => {
+  if (typeof window === 'undefined') return;
+  (window as any).bankAccountsList = accountsDb.getAll();
+};
 
 const getLogInfo = () => {
   const user = authService.getCurrentUser();
@@ -40,6 +45,7 @@ const loadFromSupabase = async () => {
         active: account.active
       }));
       accountsDb.setAll(bankAccounts);
+      syncWindowAccounts();
       _isSupabaseLoaded = true;
       invalidateSettingsCache();
     }
@@ -69,6 +75,7 @@ const startBankAccountRealtime = () => {
           accountsDb.delete(account.id);
         }
 
+        syncWindowAccounts();
         invalidateSettingsCache();
         console.log(`🔔 Realtime contas_bancarias: ${payload.eventType}`);
       })
@@ -92,6 +99,7 @@ export const bankAccountService = {
       throw new Error("Já existe uma conta cadastrada com este nome.");
     }
     accountsDb.add(account);
+    syncWindowAccounts();
     invalidateSettingsCache();
     const { userId, userName } = getLogInfo();
     logService.addLog({
@@ -110,6 +118,7 @@ export const bankAccountService = {
       throw new Error("Já existe outra conta com este nome.");
     }
     accountsDb.update(updatedAccount);
+    syncWindowAccounts();
     invalidateSettingsCache();
 
     // Sync to Supabase (background)
@@ -122,6 +131,7 @@ export const bankAccountService = {
     }
     
     accountsDb.delete(id);
+    syncWindowAccounts();
     invalidateSettingsCache();
 
     const { userId, userName } = getLogInfo();
@@ -143,5 +153,6 @@ export const bankAccountService = {
 
   importData: (bankAccounts: BankAccount[]) => {
     if (bankAccounts) accountsDb.setAll(bankAccounts);
+    syncWindowAccounts();
   }
 };

@@ -1,9 +1,10 @@
 
-import React, { useRef, useState } from 'react';
-import { X, Printer, Download, Loader2, FileText } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { X, Download, Loader2, FileText } from 'lucide-react';
 import { PerformanceReport } from '../types';
-import PerformanceReportTemplate from '../templates/PerformanceReportTemplate';
-import html2pdf from 'html2pdf.js';
+import { pdf } from '@react-pdf/renderer';
+import { saveAs } from 'file-saver';
+import PerformancePdfDocument from './PerformancePdfDocument';
 
 interface Props {
   isOpen: boolean;
@@ -13,37 +14,41 @@ interface Props {
 }
 
 const PerformancePdfModal: React.FC<Props> = ({ isOpen, onClose, data, periodLabel }) => {
-  const contentRef = useRef<HTMLDivElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let url: string | null = null;
+
+    const generatePreview = async () => {
+      if (isOpen && data) {
+        try {
+          const blob = await pdf(<PerformancePdfDocument data={data} periodLabel={periodLabel} />).toBlob();
+          url = URL.createObjectURL(blob);
+          setPdfUrl(url);
+        } catch (error) {
+          console.error('Erro ao gerar preview:', error);
+        }
+      }
+    };
+
+    generatePreview();
+
+    return () => {
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [isOpen, data, periodLabel]);
 
   if (!isOpen) return null;
 
   const handleDownloadPdf = async () => {
-    if (!contentRef.current) return;
     setIsGenerating(true);
 
     const filename = `Performance_Analitica_${periodLabel.replace(/\s+/g, '_')}.pdf`;
 
-    const opt = {
-      margin: [5, 5, 5, 5], // Margens pequenas para aproveitar o espaço
-      filename,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { 
-        scale: 2, 
-        useCORS: true, 
-        letterRendering: true,
-        logging: false,
-        windowWidth: 1120, // Largura virtual controlada
-        width: 1120,
-      },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape', compress: true },
-      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-    };
-
     try {
-      // Delay extra para garantir que todos os SVG dos gráficos carregaram
-      await new Promise(r => setTimeout(r, 1200));
-      await html2pdf().set(opt).from(contentRef.current).save();
+      const blob = await pdf(<PerformancePdfDocument data={data} periodLabel={periodLabel} />).toBlob();
+      saveAs(blob, filename);
     } catch (err) {
       console.error('Erro ao gerar PDF:', err);
       alert("Erro ao processar o arquivo PDF analítico.");
@@ -83,26 +88,19 @@ const PerformancePdfModal: React.FC<Props> = ({ isOpen, onClose, data, periodLab
           </div>
         </div>
 
-        {/* Área de Preview (Simulando o Papel) */}
-        <div className="flex-1 overflow-y-auto p-4 flex justify-center bg-slate-400/30">
-          <div 
-            className="bg-white shadow-2xl origin-top transition-all duration-500 mb-10" 
-            style={{ width: '297mm', minHeight: '210mm' }} 
-          >
-            {/* O Container abaixo força a largura exata para o html2canvas não se perder */}
-            <div 
-                ref={contentRef} 
-                className="bg-white"
-                style={{ 
-                    width: '1120px', 
-                    margin: '0 auto', 
-                    padding: '0',
-                    boxSizing: 'border-box'
-                }}
-            >
-              <PerformanceReportTemplate data={data} periodLabel={periodLabel} />
+        {/* Área de Preview */}
+        <div className="flex-1 overflow-auto p-4 flex justify-center bg-slate-400/30">
+          {pdfUrl ? (
+            <iframe
+              src={pdfUrl}
+              className="w-full h-full bg-white shadow-2xl rounded-lg"
+              title="PDF Preview"
+            />
+          ) : (
+            <div className="flex items-center justify-center h-full">
+              <Loader2 className="animate-spin text-slate-500" size={48} />
             </div>
-          </div>
+          )}
         </div>
 
         <div className="bg-white border-t border-slate-300 px-6 py-2 text-[10px] font-black text-slate-500 uppercase tracking-widest text-center">

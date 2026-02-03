@@ -9,6 +9,7 @@ import { financialIntegrationService } from '../../../../services/financialInteg
 import { advanceService } from '../../../Financial/Advances/services/advanceService';
 import Filters from './Filters';
 import Template from './Template';
+import PdfDocument from './PdfDocument';
 
 const partnerDossierReport: ReportModule = {
   metadata: {
@@ -83,7 +84,8 @@ const partnerDossierReport: ReportModule = {
       rows: [dossierData] // Putting everything in one row for the template to parse
     };
   },
-  Template: Template
+  Template: Template,
+  PdfDocument: PdfDocument
 };
 
 export default partnerDossierReport;

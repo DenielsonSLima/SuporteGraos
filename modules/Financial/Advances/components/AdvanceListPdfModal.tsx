@@ -1,9 +1,10 @@
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { X, Download, Loader2, FileText } from 'lucide-react';
 import { AdvanceTransaction } from '../types';
-import AdvanceListTemplate from '../templates/AdvanceListTemplate';
-import html2pdf from 'html2pdf.js';
+import AdvanceListPdfDocument from './AdvanceListPdfDocument';
+import { pdf } from '@react-pdf/renderer';
+import { saveAs } from 'file-saver';
 
 interface Props {
   isOpen: boolean;
@@ -13,36 +14,48 @@ interface Props {
 }
 
 const AdvanceListPdfModal: React.FC<Props> = ({ isOpen, onClose, transactions, tab }) => {
-  const contentRef = useRef<HTMLDivElement>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string>('');
+  const [isGenerating, setIsGenerating] = useState(true);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const generatePdf = async () => {
+      try {
+        setIsGenerating(true);
+        const blob = await pdf(
+          <AdvanceListPdfDocument transactions={transactions} tab={tab} />
+        ).toBlob();
+        const url = URL.createObjectURL(blob);
+        setPdfUrl(url);
+      } catch (error) {
+        console.error('Erro ao gerar PDF:', error);
+      } finally {
+        setIsGenerating(false);
+      }
+    };
+
+    generatePdf();
+
+    return () => {
+      if (pdfUrl) {
+        URL.revokeObjectURL(pdfUrl);
+      }
+    };
+  }, [isOpen, transactions, tab]);
 
   if (!isOpen) return null;
 
   const handleDownloadPdf = async () => {
-    if (!contentRef.current) return;
-    setIsGenerating(true);
-
-    const labels = { taken: 'Recebidos', given: 'Concedidos', history: 'Historico_Geral' };
-    const filename = `Relatorio_Adiantamentos_${labels[tab]}_${new Date().toISOString().slice(0, 10)}.pdf`;
-
-    const opt = {
-      margin: 10,
-      filename,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { 
-        scale: 2, 
-        useCORS: true, 
-        letterRendering: true,
-        windowWidth: 1024,
-        width: 1024
-      },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true },
-      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-    };
-
     try {
-      await new Promise(r => setTimeout(r, 400));
-      await html2pdf().set(opt).from(contentRef.current).save();
+      setIsGenerating(true);
+      const labels = { taken: 'Recebidos', given: 'Concedidos', history: 'Historico_Geral' };
+      const filename = `Relatorio_Adiantamentos_${labels[tab]}_${new Date().toISOString().slice(0, 10)}.pdf`;
+
+      const blob = await pdf(
+        <AdvanceListPdfDocument transactions={transactions} tab={tab} />
+      ).toBlob();
+      saveAs(blob, filename);
     } catch (err) {
       console.error('Erro ao gerar PDF:', err);
       alert("Erro ao processar o arquivo PDF.");
@@ -82,14 +95,17 @@ const AdvanceListPdfModal: React.FC<Props> = ({ isOpen, onClose, transactions, t
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 flex justify-center bg-slate-400/30">
-          <div 
-            className="bg-white shadow-2xl origin-top transition-all duration-500 mb-10 overflow-hidden" 
-            style={{ width: '210mm', minHeight: '297mm' }} 
-          >
-            <div ref={contentRef} style={{ width: '794px', margin: '0 auto', backgroundColor: 'white' }}>
-              <AdvanceListTemplate transactions={transactions} tab={tab} />
+          {isGenerating ? (
+            <div className="flex items-center justify-center h-full">
+              <Loader2 size={48} className="animate-spin text-slate-700" />
             </div>
-          </div>
+          ) : (
+            <iframe
+              src={pdfUrl}
+              className="bg-white shadow-2xl w-full h-full"
+              title="PDF Preview"
+            />
+          )}
         </div>
 
         <div className="bg-white border-t border-slate-300 px-6 py-2 text-[10px] font-black text-slate-500 uppercase tracking-widest text-center shrink-0">

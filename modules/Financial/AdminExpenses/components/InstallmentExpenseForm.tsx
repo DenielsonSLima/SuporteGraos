@@ -2,15 +2,21 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, Save, Calendar, DollarSign, FileText, Tag, User, Layers, Calculator, Clock, Wallet, CheckCircle2, Anchor, TrendingUp, Briefcase, ChevronDown } from 'lucide-react';
 import { financialService, ExpenseCategory, BankAccountWithBalance } from '../../../../services/financialService';
-import { BankAccount } from '../../types';
+import { BankAccount, FinancialRecord } from '../../types';
+import { useToast } from '../../../../contexts/ToastContext';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   onSave: (records: any[]) => void;
+  onUpdate?: (record: FinancialRecord) => void;
+  initialData?: FinancialRecord | null;
 }
 
-const InstallmentExpenseForm: React.FC<Props> = ({ isOpen, onClose, onSave }) => {
+const InstallmentExpenseForm: React.FC<Props> = ({ isOpen, onClose, onSave, onUpdate, initialData }) => {
+  const { addToast } = useToast();
+  const isEditing = !!initialData;
+  const formContainerRef = React.useRef<HTMLDivElement | null>(null);
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccountWithBalance[]>([]);
   
@@ -34,6 +40,9 @@ const InstallmentExpenseForm: React.FC<Props> = ({ isOpen, onClose, onSave }) =>
 
   useEffect(() => {
     if (isOpen) {
+      if (formContainerRef.current) {
+        formContainerRef.current.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+      }
       setCategories(financialService.getExpenseCategories());
       setBankAccounts(financialService.getBankAccountsWithBalances()
         .filter(acc => acc.active !== false)
@@ -52,8 +61,27 @@ const InstallmentExpenseForm: React.FC<Props> = ({ isOpen, onClose, onSave }) =>
       setMode('single');
       setIsPaidNow(false);
       setAccountId('');
+
+      // Edição: preencher dados
+      if (initialData) {
+        const categoryGroup = financialService.getExpenseCategories()
+          .find(c => c.subtypes.some(s => s.name === initialData.category));
+        setSelectedType((categoryGroup?.type as any) || null);
+        setCategoryName(initialData.category || '');
+        setDescription(initialData.description || '');
+        setIssueDate(initialData.issueDate || new Date().toISOString().split('T')[0]);
+        setFirstDueDate(initialData.dueDate || new Date().toISOString().split('T')[0]);
+        setTotalValue(String(initialData.originalValue || 0));
+        setNotes(initialData.notes || '');
+        setMode('single');
+        setIsPaidNow(initialData.status === 'paid');
+
+        const accounts = financialService.getBankAccountsWithBalances().filter(acc => acc.active !== false);
+        const matched = accounts.find(a => a.id === initialData.bankAccount || a.bankName === initialData.bankAccount);
+        setAccountId(matched?.id || '');
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, initialData]);
 
   // Filtra as subcategorias com base no tipo selecionado
   const filteredSubtypes = useMemo(() => {
@@ -67,12 +95,42 @@ const InstallmentExpenseForm: React.FC<Props> = ({ isOpen, onClose, onSave }) =>
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const value = parseFloat(totalValue);
-    if (!value || value <= 0) return alert('Informe um valor válido.');
-    if (!description || !categoryName) return alert('Preencha a descrição e categoria.');
-    if (isPaidNow && !accountId) return alert('Selecione a conta bancária para realizar a baixa.');
+    if (!value || value <= 0) {
+      addToast('warning', 'Valor inválido');
+      return;
+    }
+    if (!description || !categoryName) {
+      addToast('warning', 'Preencha todos os campos obrigatórios');
+      return;
+    }
+    if (isPaidNow && !accountId) {
+      addToast('warning', 'Selecione a conta bancária para realizar a baixa');
+      return;
+    }
 
     const recordsToCreate = [];
     const selectedAccount = bankAccounts.find(a => a.id === accountId);
+
+    if (initialData && onUpdate) {
+      const updatedRecord: FinancialRecord = {
+        ...initialData,
+        description,
+        category: categoryName,
+        dueDate: firstDueDate,
+        issueDate: issueDate,
+        originalValue: value,
+        paidValue: isPaidNow ? value : (initialData.paidValue || 0),
+        status: isPaidNow ? 'paid' : 'pending',
+        subType: 'admin',
+        bankAccount: isPaidNow ? (selectedAccount?.bankName || initialData.bankAccount) : undefined,
+        notes
+      };
+
+      onUpdate(updatedRecord);
+      addToast('success', 'Despesa atualizada com sucesso');
+      onClose();
+      return;
+    }
 
     if (mode === 'single') {
       recordsToCreate.push({
@@ -114,6 +172,7 @@ const InstallmentExpenseForm: React.FC<Props> = ({ isOpen, onClose, onSave }) =>
     }
 
     onSave(recordsToCreate);
+    addToast('success', mode === 'installment' ? `Parcelamento criado com ${installments} parcelas` : 'Despesa lançada com sucesso');
     onClose();
   };
 
@@ -139,20 +198,22 @@ const InstallmentExpenseForm: React.FC<Props> = ({ isOpen, onClose, onSave }) =>
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-8 bg-slate-50/30">
+        <div ref={formContainerRef} className="flex-1 overflow-y-auto p-8 bg-slate-50/30">
           <form id="expense-form" onSubmit={handleSubmit} className="space-y-6">
             
             <div className="flex bg-slate-200 p-1 rounded-2xl shadow-inner">
               <button
                 type="button"
-                onClick={() => setMode('single')}
+                onClick={() => !isEditing && setMode('single')}
+                disabled={isEditing}
                 className={`flex-1 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-2 ${mode === 'single' ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
               >
                 <FileText size={16} /> Único
               </button>
               <button
                 type="button"
-                onClick={() => setMode('installment')}
+                onClick={() => !isEditing && setMode('installment')}
+                disabled={isEditing}
                 className={`flex-1 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-2 ${mode === 'installment' ? 'bg-white shadow text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
               >
                 <Layers size={16} /> Parcelado
@@ -230,7 +291,21 @@ const InstallmentExpenseForm: React.FC<Props> = ({ isOpen, onClose, onSave }) =>
                   <label className={labelClass}>Valor Total (R$)</label>
                   <div className="relative">
                     <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                    <input type="number" step="0.01" required className={`${inputClass} pl-10 text-lg`} placeholder="0,00" value={totalValue} onChange={e => setTotalValue(e.target.value)} />
+                    <input 
+                      type="text" 
+                      required 
+                      className={`${inputClass} pl-10 text-lg`} 
+                      placeholder="0,00" 
+                      value={totalValue ? new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(parseFloat(totalValue) || 0) : ''} 
+                      onChange={e => {
+                        const numValue = e.target.value.replace(/\D/g, '');
+                        setTotalValue(numValue ? (parseFloat(numValue) / 100).toString() : '');
+                      }}
+                      onBlur={e => {
+                        const val = parseFloat(totalValue) || 0;
+                        e.target.value = val ? new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val) : '';
+                      }}
+                    />
                   </div>
                 </div>
                 {mode === 'installment' && (

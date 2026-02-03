@@ -2,6 +2,7 @@
 import React from 'react';
 import { MoreHorizontal, Calendar, CheckCircle2, AlertCircle, Clock, ArrowDownCircle, ArrowUpCircle, Landmark, MinusCircle } from 'lucide-react';
 import { FinancialRecord, FinancialStatus } from '../types';
+import { bankAccountService } from '../../../services/bankAccountService';
 
 interface Props {
   records: FinancialRecord[];
@@ -29,6 +30,16 @@ const FinancialTable: React.FC<Props> = ({
 }) => {
   const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
   
+  const getBankAccountName = (bankAccountId?: string, description?: string) => {
+    if (!bankAccountId) {
+      if (description && /abatimento|desconto|ajuste/i.test(description)) return 'Desconto';
+      return '';
+    }
+    const accounts = bankAccountService.getBankAccounts();
+    const account = accounts.find(a => a.id === bankAccountId);
+    return account?.bankName || bankAccountId;
+  };
+  
   // CORREÇÃO DE FUSO HORÁRIO
   const date = (val: string) => {
     if (!val) return '-';
@@ -38,6 +49,10 @@ const FinancialTable: React.FC<Props> = ({
   };
 
   const isDebit = (record: FinancialRecord) => {
+    // Para transferências, verificar a nota para saber se é saída (Débito) ou entrada (Crédito)
+    if (record.subType === 'transfer') {
+      return record.notes?.startsWith('Saída:') || false;
+    }
     return ['purchase_order', 'freight', 'commission', 'admin', 'loan_taken', 'shareholder'].includes(record.subType || '');
   };
 
@@ -71,7 +86,7 @@ const FinancialTable: React.FC<Props> = ({
             {records.map((record) => {
               const debit = isDebit(record);
               const totalSettled = (record.paidValue || 0) + (record.discountValue || 0);
-              const bankInfo = record.bankAccount || (record.status === 'paid' ? 'Ajuste Contábil' : 'Pendente');
+              const bankInfo = getBankAccountName(record.bankAccount, record.description) || (record.description && /abatimento|desconto|ajuste/i.test(record.description) ? 'Desconto' : record.status === 'paid' ? 'Ajuste Contábil' : 'Pendente');
               
               return (
                 <tr key={record.id} className={`hover:bg-slate-50 transition-colors ${selectable && selectedIds.includes(record.id) ? 'bg-blue-50/50' : ''}`}>
@@ -167,4 +182,16 @@ const FinancialTable: React.FC<Props> = ({
   );
 };
 
-export default FinancialTable;
+export default React.memo(FinancialTable, (prevProps, nextProps) => {
+  // Se os records têm tamanho diferente, precisa re-renderizar
+  if (prevProps.records.length !== nextProps.records.length) return false;
+  
+  // Se os records estão na mesma ordem e com os mesmos IDs, não precisa re-renderizar
+  const isSameOrder = prevProps.records.every((r, i) => r.id === nextProps.records[i]?.id);
+  if (!isSameOrder) return false;
+  
+  // Compara outros props
+  return prevProps.type === nextProps.type && 
+         prevProps.selectable === nextProps.selectable &&
+         JSON.stringify(prevProps.selectedIds) === JSON.stringify(nextProps.selectedIds);
+});

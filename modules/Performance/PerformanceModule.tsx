@@ -12,7 +12,8 @@ import CostTrendChart from './components/CostTrendChart';
 import NetProfitChart from './components/NetProfitChart'; // Novo Import
 import HarvestBreakdown from './components/HarvestBreakdown';
 import ExpenseStructure from './components/ExpenseStructure';
-import PerformancePdfModal from './components/PerformancePdfModal'; 
+import PerformancePdfModal from './components/PerformancePdfModal';
+import { waitForInit } from '../../services/supabaseInitService';
 
 const PerformanceModule: React.FC = () => {
   const [monthsBack, setMonthsBack] = useState<number | null>(6);
@@ -20,8 +21,12 @@ const PerformanceModule: React.FC = () => {
   const [isPdfOpen, setIsPdfOpen] = useState(false);
 
   useEffect(() => {
-    const report = performanceService.getReport(monthsBack);
-    setData(report);
+    const loadData = async () => {
+      await waitForInit();
+      const report = performanceService.getReport(monthsBack);
+      setData(report);
+    };
+    loadData();
   }, [monthsBack]);
 
   if (!data) return <div className="p-10 text-center animate-pulse text-slate-400 font-black uppercase">Calculando Indicadores...</div>;

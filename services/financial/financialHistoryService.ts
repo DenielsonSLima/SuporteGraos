@@ -1,5 +1,7 @@
 import { Persistence } from '../persistence';
 import { supabase } from '../supabase';
+import { invalidateDashboardCache } from '../dashboardCache';
+import { invalidateFinancialCache } from '../financialCache';
 
 export interface FinancialHistory {
   id: string;
@@ -18,7 +20,7 @@ export interface FinancialHistory {
   companyId?: string;
 }
 
-const db = new Persistence<FinancialHistory>('financial_history', []);
+const db = new Persistence<FinancialHistory>('financial_history', [], { useStorage: false });
 let realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
 let isLoaded = false;
 
@@ -106,7 +108,8 @@ const startRealtime = () => {
         db.delete(rec.id);
       }
 
-      console.log(`🔔 Realtime financial_history: ${payload.eventType}`);
+      invalidateFinancialCache();
+      invalidateDashboardCache();
     })
     .subscribe();
 };
@@ -155,15 +158,21 @@ export const financialHistoryService = {
   add: (item: FinancialHistory) => {
     db.add(item);
     void persistUpsert(item);
+    invalidateFinancialCache();
+    invalidateDashboardCache();
   },
 
   update: (item: FinancialHistory) => {
     db.update(item);
     void persistUpsert(item);
+    invalidateFinancialCache();
+    invalidateDashboardCache();
   },
 
   delete: (id: string) => {
     db.delete(id);
     void persistDelete(id);
+    invalidateFinancialCache();
+    invalidateDashboardCache();
   }
 };

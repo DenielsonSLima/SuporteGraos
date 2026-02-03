@@ -20,7 +20,7 @@ const AIAssistant: React.FC = () => {
   const [messages, setMessages] = useState<{ role: 'user' | 'model'; text: string }[]>([
     { 
       role: 'model', 
-      text: `Olá, ${userName}! Eu sou a Daitec AI. Estou conectada ao seu banco de dados em tempo real. Posso analisar sua saúde financeira, detalhar romaneios ou tirar dúvidas do manual. O que vamos analisar hoje?` 
+      text: `Olá, ${userName}! Eu sou a DLABS AI. Estou conectada ao seu banco de dados em tempo real. Posso analisar sua saúde financeira, detalhar romaneios ou tirar dúvidas do manual. O que vamos analisar hoje?` 
     }
   ]);
   const [loading, setLoading] = useState(false);
@@ -80,7 +80,7 @@ const AIAssistant: React.FC = () => {
         model: 'gemini-3-flash-preview',
         contents: userMessage,
         config: {
-          systemInstruction: `Você é a Daitec AI, o cérebro digital do Suporte Grãos ERP. 
+          systemInstruction: `Você é a DLABS AI, o cérebro digital do Suporte Grãos ERP. 
           
           SUA MISSÃO:
           1. Ser um consultor estratégico para o usuário ${userName}.
@@ -98,11 +98,11 @@ const AIAssistant: React.FC = () => {
         }
       });
 
-      const text = response.text || 'Daitec AI: Tive um problema ao processar essa análise. Tente novamente.';
+      const text = response.text || 'DLABS AI: Tive um problema ao processar essa análise. Tente novamente.';
       setMessages(prev => [...prev, { role: 'model', text }]);
     } catch (err) {
       console.error(err);
-      setMessages(prev => [...prev, { role: 'model', text: 'Daitec AI: Estou offline temporariamente. Verifique sua chave de API nas configurações.' }]);
+      setMessages(prev => [...prev, { role: 'model', text: 'DLABS AI: Estou offline temporariamente. Verifique sua chave de API nas configurações.' }]);
     } finally {
       setLoading(false);
     }
@@ -131,7 +131,7 @@ const AIAssistant: React.FC = () => {
             </div>
           </div>
           <div>
-            <h3 className="font-black uppercase text-xs tracking-widest text-white leading-none">Daitec AI</h3>
+            <h3 className="font-black uppercase text-xs tracking-widest text-white leading-none">DLABS AI</h3>
             <p className="text-[9px] text-emerald-500/70 font-black mt-1.5 uppercase tracking-tighter flex items-center gap-1">
                 <Sparkles size={10} /> Consultor Estratégico
             </p>
@@ -218,7 +218,7 @@ const AIAssistant: React.FC = () => {
                 <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest">Live Database Sync</span>
             </div>
             <div className="flex items-center gap-1.5">
-                <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest italic">Powered by Daitec Cloud</span>
+                <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest italic">Powered by DLABS Cloud</span>
                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500/30"></div>
             </div>
         </div>

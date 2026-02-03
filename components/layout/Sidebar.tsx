@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { MENU_ITEMS, APP_NAME } from '../../constants';
 import { ModuleId, User as UserType } from '../../types';
-import { Sprout, LogOut, User, Settings, ChevronRight } from 'lucide-react';
+import { LogOut, User, Settings, ChevronRight } from 'lucide-react';
 
 interface SidebarProps {
   activeModule: ModuleId;
@@ -52,13 +52,18 @@ const Sidebar: React.FC<SidebarProps> = ({ activeModule, onNavigate, isOpen, cur
       {/* Brand Section */}
       <div className="flex h-16 items-center justify-center border-b border-slate-800 bg-slate-950/50 cursor-pointer" onClick={() => onNavigate(ModuleId.HOME)}>
         <div className="flex items-center gap-3">
-          <div className="rounded-lg bg-primary-600 p-2.5 text-white">
-            <Sprout size={36} />
-          </div>
+          <img 
+            src="/logo2.png" 
+            alt="Dailabs Logo" 
+            className="w-10 h-10 rounded-lg"
+          />
           {isOpen && (
-            <span className="text-lg font-bold tracking-tight text-slate-100 whitespace-nowrap overflow-hidden">
-              Suporte Grãos
-            </span>
+            <div className="flex flex-col leading-tight">
+              <span className="text-lg font-bold tracking-tight text-slate-100 whitespace-nowrap overflow-hidden">
+                Dailabs
+              </span>
+              <span className="text-[10px] font-semibold text-slate-400 whitespace-nowrap">Creative AI & Software Design</span>
+            </div>
           )}
         </div>
       </div>

@@ -44,6 +44,7 @@ export interface LoanRecord {
   id: string;
   entityName: string; 
   contractDate: string;
+  originalValue?: number; // Valor original do contrato
   totalValue: number; // Valor original do contrato
   interestRate: number; 
   installments: number;
@@ -52,6 +53,7 @@ export interface LoanRecord {
   status: 'active' | 'settled' | 'default';
   type: 'taken' | 'granted';
   transactions: LoanTransaction[];
+  bankAccountName?: string; // Nome da conta bancária
   // Fix: Added missing optional properties used during loan creation and logging
   accountId?: string;
   accountName?: string;

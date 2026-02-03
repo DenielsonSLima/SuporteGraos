@@ -5,6 +5,7 @@ import { financialIntegrationService } from '../../../../services/financialInteg
 import { advanceService } from '../../../Financial/Advances/services/advanceService';
 import UniversalReportTemplate from '../../templates/UniversalReportTemplate';
 import Filters from '../PartnerReceivables/Filters'; // Reusing Filters as they are identical
+import PdfDocument from './PdfDocument';
 
 const partnerPayablesReport: ReportModule = {
   metadata: {
@@ -72,7 +73,8 @@ const partnerPayablesReport: ReportModule = {
       summary: [{ label: 'Total a Pagar', value: total, format: 'currency' }]
     };
   },
-  Template: UniversalReportTemplate
+  Template: UniversalReportTemplate,
+  PdfDocument: PdfDocument
 };
 
 export default partnerPayablesReport;

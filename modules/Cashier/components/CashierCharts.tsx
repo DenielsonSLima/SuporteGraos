@@ -25,10 +25,12 @@ const CashierCharts: React.FC<Props> = ({ data }) => {
   const totalIncome = incomeData.reduce((acc, d) => acc + d.value, 0);
 
   const expenseData = [
-    { name: 'Fornecedores', value: data.pendingPurchasePayments, color: '#ef4444' },
-    { name: 'Fretes', value: data.pendingFreightPayments, color: '#f97316' },
+    { name: 'Fornecedores (Grãos)', value: data.pendingPurchasePayments, color: '#ef4444' },
+    { name: 'Fretes a Pagar', value: data.pendingFreightPayments, color: '#f97316' },
     { name: 'Adiant. Recebidos', value: data.advancesTaken, color: '#8b5cf6' },
-    { name: 'Outras Obrigações', value: data.loansTaken + data.commissionsToPay + data.shareholderPayables, color: '#64748b' },
+    { name: 'Empréstimos Tomados', value: data.loansTaken, color: '#ec4899' },
+    { name: 'Comissões a Pagar', value: data.commissionsToPay, color: '#f43f5e' },
+    { name: 'Obrigações com Sócios', value: data.shareholderPayables, color: '#64748b' },
   ].filter(d => d.value > 0);
 
   const totalExpense = expenseData.reduce((acc, d) => acc + d.value, 0);

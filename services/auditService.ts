@@ -57,12 +57,12 @@ export interface LoginHistory {
 }
 
 // ============================================================================
-// LOCAL DATABASES
+// LOCAL DATABASES (memoria + Supabase, sem localStorage)
 // ============================================================================
 
-const auditLogsDb = new Persistence<AuditLog>('audit_logs', []);
-const userSessionsDb = new Persistence<UserSession>('user_sessions', []);
-const loginHistoryDb = new Persistence<LoginHistory>('login_history', []);
+const auditLogsDb = new Persistence<AuditLog>('audit_logs', [], { useStorage: false });
+const userSessionsDb = new Persistence<UserSession>('user_sessions', [], { useStorage: false });
+const loginHistoryDb = new Persistence<LoginHistory>('login_history', [], { useStorage: false });
 
 let auditChannel: ReturnType<typeof supabase.channel> | null = null;
 let sessionsChannel: ReturnType<typeof supabase.channel> | null = null;
@@ -74,13 +74,12 @@ let _realtimeStarted = false;
 // HELPERS
 // ============================================================================
 
-const SYSTEM_UUID = '00000000-0000-0000-0000-000000000000';
 const isValidUuid = (value?: string) => !!value && /^[0-9a-fA-F-]{36}$/.test(value);
 
 const getCurrentUser = () => {
   const user = authService.getCurrentUser();
   return {
-    userId: isValidUuid(user?.id) ? user!.id : SYSTEM_UUID,
+    userId: isValidUuid(user?.id) ? user!.id : null,
     userName: user?.name || 'Sistema',
     userEmail: user?.email || 'system@system.com'
   };
@@ -144,7 +143,7 @@ const mapAuditLogFromDb = (record: any): AuditLog => ({
 
 const mapAuditLogToDb = (log: AuditLog) => ({
   id: log.id,
-  user_id: isValidUuid(log.userId) ? log.userId : SYSTEM_UUID,
+  user_id: isValidUuid(log.userId) ? log.userId : null,
   user_name: log.userName,
   user_email: log.userEmail,
   action: log.action,
@@ -179,7 +178,7 @@ const mapUserSessionFromDb = (record: any): UserSession => ({
 
 const mapUserSessionToDb = (session: UserSession) => ({
   id: session.id,
-  user_id: isValidUuid(session.userId) ? session.userId : SYSTEM_UUID,
+  user_id: isValidUuid(session.userId) ? session.userId : null,
   user_name: session.userName,
   user_email: session.userEmail,
   session_start: session.sessionStart,
@@ -217,7 +216,7 @@ const mapLoginHistoryToDb = (login: LoginHistory) => ({
   id: login.id,
   user_email: login.userEmail,
   user_name: login.userName,
-  user_id: isValidUuid(login.userId) ? login.userId : SYSTEM_UUID,
+  user_id: isValidUuid(login.userId) ? login.userId : null,
   login_type: login.loginType,
   failure_reason: login.failureReason,
   ip_address: login.ipAddress,
@@ -237,7 +236,6 @@ const mapLoginHistoryToDb = (login: LoginHistory) => ({
 
 const persistAuditLog = async (log: AuditLog) => {
   try {
-    if (!log.userId) return; // Evita FK quando não há usuário autenticado
     await waitForInit();
     const payload = mapAuditLogToDb(log);
     const { error } = await supabase.from('audit_logs').insert(payload);
@@ -249,7 +247,6 @@ const persistAuditLog = async (log: AuditLog) => {
 
 const persistUserSession = async (session: UserSession) => {
   try {
-    if (!session.userId) return; // Evita FK quando não há usuário autenticado
     await waitForInit();
     const payload = mapUserSessionToDb(session);
     const { error } = await supabase.from('user_sessions').upsert(payload);
@@ -261,7 +258,6 @@ const persistUserSession = async (session: UserSession) => {
 
 const persistLoginHistory = async (login: LoginHistory) => {
   try {
-    if (!login.userId) return; // Evita FK quando não há usuário autenticado
     await waitForInit();
     const payload = mapLoginHistoryToDb(login);
     const { error } = await supabase.from('login_history').insert(payload);

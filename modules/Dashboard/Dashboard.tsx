@@ -3,10 +3,11 @@ import React, { useEffect, useState } from 'react';
 import MarketTicker from './components/MarketTicker';
 import FinancialSummary from './components/FinancialSummary';
 import OperationalSummary from './components/OperationalSummary';
-import FinancialPendingLists from './components/FinancialPendingLists';
 import DashboardChart from './components/DashboardChart';
+import NetWorthChart from './components/NetWorthChart';
 import { dashboardService } from './services/dashboardService';
 import { DashboardCache } from '../../services/dashboardCache';
+import { waitForInit } from '../../services/supabaseInitService';
 import { Loader2 } from 'lucide-react';
 
 const Dashboard = () => {
@@ -16,18 +17,21 @@ const Dashboard = () => {
     financialPending: any;
     financial: any;
     chart: any[];
+    netWorth: { history: any[]; growthPercent: number };
   } | null>(null);
 
   useEffect(() => {
     // 📦 OTIMIZAÇÃO: Carrega cache uma vez e distribui para todos os componentes
     const loadDashboard = async () => {
         try {
+            await waitForInit();
             const cache = DashboardCache.load();
             const dashboardData = {
                 operational: dashboardService.getOperationalKPIs(),
                 financialPending: dashboardService.getFinancialPending(),
                 financial: cache.cashierReport, // ← Dados já carregados no cache!
-                chart: dashboardService.getChartData()
+                chart: dashboardService.getChartData(),
+                netWorth: dashboardService.getNetWorthHistory()
             };
             setData(dashboardData);
         } finally {
@@ -70,16 +74,19 @@ const Dashboard = () => {
         <FinancialSummary data={data.financial} />
       </div>
 
-      {/* 3. Trend Analysis Chart */}
+      {/* 3. Net Worth Evolution Chart */}
+      {data.netWorth.history.length > 0 && (
+        <NetWorthChart 
+          data={data.netWorth.history} 
+          growthPercent={data.netWorth.growthPercent} 
+        />
+      )}
+
+      {/* 4. Trend Analysis Chart */}
       {data.chart.length > 0 && <DashboardChart data={data.chart} />}
 
-      {/* 4. Operational KPIs */}
+      {/* 5. Operational KPIs */}
       <OperationalSummary data={data.operational} />
-
-      {/* 5. Pending Financials */}
-      <div className="mb-2">
-        <FinancialPendingLists data={data.financialPending} />
-      </div>
 
     </div>
   );

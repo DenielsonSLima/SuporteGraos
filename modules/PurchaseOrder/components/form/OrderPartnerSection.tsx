@@ -163,8 +163,8 @@ const OrderPartnerSection: React.FC<Props> = ({ data, partners, onChange }) => {
           </label>
         </div>
 
-        <div ref={citySearchRef} className={`space-y-4 transition-all ${!data.useRegisteredLocation ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}>
-          <div className="relative">
+        <div className={`transition-all ${!data.useRegisteredLocation ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}>
+          <div ref={citySearchRef} className="relative">
              <Map className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
              <input
                 type="text"
@@ -175,21 +175,21 @@ const OrderPartnerSection: React.FC<Props> = ({ data, partners, onChange }) => {
                 placeholder="Pesquisar cidade..."
                 className={`${inputClass} pl-12`}
              />
+
+             {isSearchingCity && !data.useRegisteredLocation && (
+               <div className="absolute top-full left-0 z-50 mt-2 w-full overflow-hidden rounded-2xl bg-white shadow-2xl border border-slate-200">
+                 <ul className="max-h-40 overflow-auto py-1">
+                   {filteredCities.map((loc, idx) => (
+                     <li key={idx} onClick={() => { setCitySearchTerm(`${loc.city}/${loc.state}`); onChange({ loadingCity: loc.city, loadingState: loc.state }); setIsSearchingCity(false); }} className="cursor-pointer px-5 py-2 hover:bg-slate-50 text-sm font-bold text-slate-700 uppercase">
+                       {loc.city} - {loc.state}
+                     </li>
+                   ))}
+                 </ul>
+               </div>
+             )}
           </div>
 
-          {isSearchingCity && !data.useRegisteredLocation && (
-            <div className="absolute z-20 mt-2 w-full overflow-hidden rounded-2xl bg-white shadow-2xl border border-slate-200">
-              <ul className="max-h-40 overflow-auto py-1">
-                {filteredCities.map((loc, idx) => (
-                  <li key={idx} onClick={() => { setCitySearchTerm(`${loc.city}/${loc.state}`); onChange({ loadingCity: loc.city, loadingState: loc.state }); setIsSearchingCity(false); }} className="cursor-pointer px-5 py-2 hover:bg-slate-50 text-sm font-bold text-slate-700 uppercase">
-                    {loc.city} - {loc.state}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          <div>
+          <div className="mt-4">
             <label className={labelClass}>Complemento (Fazenda, Unidade, Sítio, etc.)</label>
             <input
               type="text"

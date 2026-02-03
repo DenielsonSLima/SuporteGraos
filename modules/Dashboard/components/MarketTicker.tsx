@@ -7,6 +7,7 @@ const MarketTicker: React.FC = () => {
   const [marketData, setMarketData] = useState<MarketItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastSync, setLastSync] = useState<string>('');
+  const [isPaused, setIsPaused] = useState(false);
 
   const loadData = async () => {
     const data = await marketService.getMarketData();
@@ -34,7 +35,9 @@ const MarketTicker: React.FC = () => {
 
   return (
     <div 
-      className="relative w-[calc(100%+3rem)] md:w-[calc(100%+4rem)] -ml-6 md:-ml-8 -mt-6 md:-mt-8 mb-8 bg-slate-950 text-white overflow-hidden whitespace-nowrap border-b border-slate-800 h-10 flex items-center shadow-xl z-20 group"
+      className="relative w-[calc(100%+3rem)] md:w-[calc(100%+4rem)] -ml-6 md:-ml-8 -mt-6 md:-mt-8 mb-8 bg-slate-950 text-white overflow-hidden whitespace-nowrap border-b border-slate-800 h-10 flex items-center shadow-xl z-20"
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
     >
       {/* Label Fixo */}
       <div className="absolute left-0 z-30 bg-slate-950 px-5 h-full flex items-center border-r border-slate-800 shadow-[10px_0_15px_rgba(0,0,0,0.5)]">
@@ -48,7 +51,13 @@ const MarketTicker: React.FC = () => {
       </div>
       
       {/* Ticker Animation Container */}
-      <div className="animate-ticker inline-block pl-40 will-change-transform">
+      <div 
+        className="ticker-content inline-block pl-40"
+        style={{
+          animation: 'ticker 45s linear infinite',
+          animationPlayState: isPaused ? 'paused' : 'running'
+        }}
+      >
         {/* Renderizamos 3 vezes para garantir um loop infinito sem buracos visuais */}
         {[...marketData, ...marketData, ...marketData].map((item, index) => (
           <div key={index} className="inline-flex items-center mx-8 py-1 px-3 rounded-lg hover:bg-white/5 transition-colors cursor-default">
@@ -69,14 +78,12 @@ const MarketTicker: React.FC = () => {
       
       <style>{`
         @keyframes ticker {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-33.33%); }
-        }
-        .animate-ticker {
-          animation: ticker 45s linear infinite;
-        }
-        .group:hover .animate-ticker {
-          animation-play-state: paused;
+          0% { 
+            transform: translateX(0); 
+          }
+          100% { 
+            transform: translateX(-33.33%); 
+          }
         }
       `}</style>
     </div>

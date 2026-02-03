@@ -4,6 +4,7 @@ import { purchaseService } from './purchaseService';
 import { salesService } from './salesService';
 import { loadingService } from './loadingService';
 import { financialActionService } from './financialActionService';
+import { transfersService } from './financial/transfersService';
 import { bankAccountService } from './bankAccountService';
 import { initialBalanceService } from './initialBalanceService';
 import { expenseCategoryService } from './expenseCategoryService';
@@ -74,7 +75,7 @@ export const financialService = {
     const accounts = bankAccountService.getBankAccounts();
     const initialBalances = initialBalanceService.getInitialBalances();
     const standaloneRecords = financialActionService.getStandaloneRecords();
-    const transfers = financialActionService.getTransfers();
+    const transfers = transfersService.getAll();
 
     return accounts.map((account: BankAccount) => {
       // 1. Inicia com o Saldo de Implantação
@@ -86,7 +87,7 @@ export const financialService = {
       standaloneRecords.forEach((r: any) => {
         if (r.status !== 'paid') return;
         if (r.bankAccount === account.id || r.bankAccount === account.bankName) {
-           const isCredit = ['sales_order', 'loan_granted', 'receipt', 'Venda de Ativo'].includes(r.subType || '') || r.category === 'Venda de Ativo';
+           const isCredit = ['sales_order', 'receipt', 'loan_taken', 'Venda de Ativo'].includes(r.subType || '') || r.category === 'Venda de Ativo';
            if (isCredit) balance += r.paidValue;
            else balance -= r.paidValue;
         }
@@ -94,8 +95,8 @@ export const financialService = {
 
       // 3. Processa Transferências
       transfers.forEach((tr: any) => {
-        if (tr.originAccount === account.bankName) balance -= tr.value;
-        if (tr.destinationAccount === account.bankName) balance += tr.value;
+        if (tr.fromAccountId === account.id) balance -= tr.amount;
+        if (tr.toAccountId === account.id) balance += tr.amount;
       });
 
       return { ...account, currentBalance: balance };

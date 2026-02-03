@@ -1,13 +1,15 @@
 
 import { CashierReport, BankBalance, AccountInitialBalance } from '../types';
 import { financialActionService } from '../../../services/financialActionService';
+import { transfersService } from '../../../services/financial/transfersService';
+import { loansService } from '../../../services/financial/loansService';
 import { advanceService } from '../../Financial/Advances/services/advanceService';
 import { financialService } from '../../../services/financialService';
 import { LoadingCache } from '../../../services/loadingCache';
 import { shareholderService } from '../../../services/shareholderService';
-import { loanService } from '../../../services/loanService';
 import { assetService } from '../../../services/assetService';
 import { FinancialCache } from '../../../services/financialCache';
+import { historyService, snapshotService } from './cashier-history';
 
 export const cashierService = {
   getCurrentMonthReport: (): CashierReport => {
@@ -15,7 +17,7 @@ export const cashierService = {
     const standaloneRecords = financialActionService.getStandaloneRecords();
     const bankAccounts = financialService.getBankAccounts();
     const initialBalances = financialService.getInitialBalances();
-    const transfers = financialActionService.getTransfers();
+    const transfers = transfersService.getAll();
     const allLoadings = LoadingCache.getAll();
 
     const now = new Date();
@@ -32,21 +34,30 @@ export const cashierService = {
     standaloneRecords.forEach(r => {
         if (r.status !== 'paid') return;
         
+        // Log detalhado COMPLETO para TODOS os registros
+        console.log('📦 Registro:', {
+          description: r.description,
+          subType: r.subType,
+          category: r.category,
+          status: r.status,
+          paidValue: r.paidValue,
+          bankAccount: r.bankAccount
+        });
+        
         // Encontra a conta (pode estar salva por ID ou por Nome no mock)
         const acc = bankAccounts.find(a => a.id === r.bankAccount || a.bankName === r.bankAccount);
         if (!acc) return;
 
-        // Lógica de crédito/débito baseada no subType ou Categoria
-        const isCredit = ['sales_order', 'loan_granted', 'receipt', 'Venda de Ativo'].includes(r.subType || '') || r.category === 'Venda de Ativo';
+        // CRÉDITOS reais que entram na conta
+        const isCredit = ['sales_order', 'receipt', 'loan_taken', 'Venda de Ativo'].includes(r.subType || '') || r.category === 'Venda de Ativo';
+        
         addTx(acc.id, r.paidValue, r.issueDate, isCredit ? 'credit' : 'debit');
     });
 
     // 2. PROCESSA TRANSFERÊNCIAS (Movimentação entre contas)
     transfers.forEach(t => {
-        const originAcc = bankAccounts.find(a => a.bankName === t.originAccount);
-        const destAcc = bankAccounts.find(a => a.bankName === t.destinationAccount);
-        if (originAcc) addTx(originAcc.id, t.value, t.date, 'debit');
-        if (destAcc) addTx(destAcc.id, t.value, t.date, 'credit');
+      if (t.fromAccountId) addTx(t.fromAccountId, t.amount, t.transferDate, 'debit');
+      if (t.toAccountId) addTx(t.toAccountId, t.amount, t.transferDate, 'credit');
     });
 
     // 3. CÁLCULO DOS SALDOS (Início do Mês e Atual)
@@ -100,7 +111,9 @@ export const cashierService = {
       .filter(s => s.financial.currentBalance < 0)
       .reduce((acc, s) => acc + Math.abs(s.financial.currentBalance), 0);
 
-    const loansGranted = loanService.getAll().filter(l => l.type === 'granted' && l.status === 'active').reduce((acc, l) => acc + l.remainingValue, 0);
+    const loansGranted = loansService.getAll()
+      .filter(l => l.subType === 'loan_granted' && l.status !== 'paid')
+      .reduce((acc, l) => acc + (l.originalValue - l.paidValue), 0);
     const advancesGiven = advanceService.getSummaries().filter(s => s.netBalance > 0).reduce((acc, s) => acc + s.netBalance, 0);
     
     const totalAssets = totalBankBalance + pendingSalesReceipts + merchandiseInTransitValue + loansGranted + shareholderReceivables + advancesGiven + totalFixedAssetsValue;
@@ -111,7 +124,9 @@ export const cashierService = {
     const pendingFreightPayments = payables.filter(r => r.subType === 'freight' && r.status !== 'paid').reduce((acc, r) => acc + (r.originalValue - r.paidValue - (r.discountValue || 0)), 0);
     const commissionsToPay = payables.filter(r => r.subType === 'commission' && r.status !== 'paid').reduce((acc, r) => acc + (r.originalValue - r.paidValue - (r.discountValue || 0)), 0);
     
-    const loansTaken = loanService.getAll().filter(l => l.type === 'taken' && l.status === 'active').reduce((acc, l) => acc + l.remainingValue, 0);
+    const loansTaken = loansService.getAll()
+      .filter(l => l.subType === 'loan_taken' && l.status !== 'paid')
+      .reduce((acc, l) => acc + (l.originalValue - l.paidValue), 0);
     const advancesTaken = advanceService.getSummaries().filter(s => s.netBalance < 0).reduce((acc, s) => acc + Math.abs(s.netBalance), 0);
     
     const shareholderPayables = shareholderService.getAll()
@@ -128,5 +143,26 @@ export const cashierService = {
       shareholderPayables, totalLiabilities, netBalance: totalAssets - totalLiabilities
     };
   },
-  getHistory: (): CashierReport[] => []
+  getHistory: (): CashierReport[] => {
+    // 1. Obtém todos os meses (retroativos calculados)
+    const monthlyHistoryItems = historyService.getMonthlyHistory();
+    const reports = monthlyHistoryItems.map(item => item.report);
+    
+    // 2. Enriquece com dados de snapshots (se existirem)
+    const snapshots = snapshotService.getAll();
+    
+    reports.forEach(report => {
+      const snapshot = snapshots.find(s => s.monthKey === report.monthKey);
+      if (snapshot) {
+        // Se tem snapshot, usa os dados congelados
+        report.isSnapshot = true;
+        report.snapshotClosedDate = snapshot.closedDate;
+        report.snapshotClosedBy = snapshot.closedBy;
+        // O resto dos dados vem do snapshot já salvo
+        Object.assign(report, snapshot.report);
+      }
+    });
+
+    return reports;
+  }
 };

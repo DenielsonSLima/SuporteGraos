@@ -3,6 +3,7 @@ import { ArrowRightLeft } from 'lucide-react';
 import { ReportModule } from '../../types';
 import { financialActionService } from '../../../../services/financialActionService';
 import Template from './Template';
+import PdfDocument from './PdfDocument';
 import DefaultFilters from '../../components/DefaultFilters';
 
 const transfersReport: ReportModule = {
@@ -42,7 +43,8 @@ const transfersReport: ReportModule = {
       summary: [{ label: 'Volume Transferido', value: total, format: 'currency' }]
     };
   },
-  Template: Template
+  Template: Template,
+  PdfDocument: PdfDocument
 };
 
 export default transfersReport;

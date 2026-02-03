@@ -1,9 +1,10 @@
 
-import React, { useRef, useState } from 'react';
-import { X, Printer, Download, Loader2, FileText } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Download, Loader2, FileText } from 'lucide-react';
 import { Asset } from '../types';
-import AssetListPdfTemplate from '../templates/AssetListPdfTemplate';
-import html2pdf from 'html2pdf.js';
+import { pdf } from '@react-pdf/renderer';
+import { saveAs } from 'file-saver';
+import PdfDocument from './PdfDocument';
 
 interface Props {
   isOpen: boolean;
@@ -13,29 +14,41 @@ interface Props {
 }
 
 const AssetListPdfModal: React.FC<Props> = ({ isOpen, onClose, assets, financialRecords }) => {
-  const contentRef = useRef<HTMLDivElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let url: string | null = null;
+
+    const generatePreview = async () => {
+      if (isOpen && assets.length > 0) {
+        try {
+          const blob = await pdf(<PdfDocument assets={assets} financialRecords={financialRecords} />).toBlob();
+          url = URL.createObjectURL(blob);
+          setPdfUrl(url);
+        } catch (error) {
+          console.error('Erro ao gerar preview:', error);
+        }
+      }
+    };
+
+    generatePreview();
+
+    return () => {
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [isOpen, assets, financialRecords]);
 
   if (!isOpen) return null;
 
   const handleDownloadPdf = async () => {
-    if (!contentRef.current) return;
     setIsGenerating(true);
 
     const filename = `Inventario_Patrimonial_Consolidado_${new Date().toISOString().slice(0, 10)}.pdf`;
 
-    const opt = {
-      margin: 0,
-      filename,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, letterRendering: true, scrollX: 0, scrollY: 0 },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true },
-      pagebreak: { mode: 'avoid-all' }
-    };
-
     try {
-      await new Promise(r => setTimeout(r, 100));
-      await html2pdf().set(opt).from(contentRef.current).save();
+      const blob = await pdf(<PdfDocument assets={assets} financialRecords={financialRecords} />).toBlob();
+      saveAs(blob, filename);
     } catch (err) {
       console.error(err);
       alert("Erro ao gerar PDF.");
@@ -74,14 +87,18 @@ const AssetListPdfModal: React.FC<Props> = ({ isOpen, onClose, assets, financial
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-10 flex justify-center bg-slate-300/30">
-          <div 
-            className="bg-white shadow-2xl origin-top transition-all duration-500 overflow-hidden" 
-            style={{ width: '210mm', minHeight: '297mm' }} 
-            ref={contentRef}
-          >
-            <AssetListPdfTemplate assets={assets} financialRecords={financialRecords} />
-          </div>
+        <div className="flex-1 overflow-auto p-10 flex justify-center bg-slate-300/30">
+          {pdfUrl ? (
+            <iframe
+              src={pdfUrl}
+              className="w-full h-full border-0 shadow-2xl rounded-lg bg-white"
+              title="PDF Preview"
+            />
+          ) : (
+            <div className="flex items-center justify-center">
+              <Loader2 size={48} className="animate-spin text-slate-600" />
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -89,3 +106,4 @@ const AssetListPdfModal: React.FC<Props> = ({ isOpen, onClose, assets, financial
 };
 
 export default AssetListPdfModal;
+

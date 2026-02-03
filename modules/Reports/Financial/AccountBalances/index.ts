@@ -7,6 +7,7 @@ import { salesService } from '../../../../services/salesService';
 import { loadingService } from '../../../../services/loadingService';
 import { financialActionService } from '../../../../services/financialActionService';
 import Template from './Template';
+import PdfDocument from './PdfDocument';
 import Filters from './Filters';
 
 const accountBalancesMonthlyReport: ReportModule = {
@@ -99,7 +100,8 @@ const accountBalancesMonthlyReport: ReportModule = {
       summary: [{ label: 'Ano Base', value: selectedYear, format: 'number' }]
     };
   },
-  Template: Template
+  Template: Template,
+  PdfDocument: PdfDocument
 };
 
 export default accountBalancesMonthlyReport;

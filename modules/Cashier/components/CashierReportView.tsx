@@ -31,7 +31,11 @@ interface Props {
 const CashierReportView: React.FC<Props> = ({ report, title }) => {
   const [isPdfOpen, setIsPdfOpen] = useState(false);
 
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  const currency = (val: number) => {
+    // Ignora o sinal de negativo se o valor for próximo de zero
+    const cleanValue = Math.abs(val) < 0.01 ? 0 : val;
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cleanValue);
+  };
 
   const ListItem = ({ label, value, icon: Icon, colorClass, borderClass, tooltip }: any) => (
     <div className={`flex items-center justify-between p-3 rounded-xl border ${borderClass || 'border-slate-100'} bg-white hover:bg-slate-50 transition-colors group relative`} title={tooltip}>

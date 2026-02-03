@@ -1,5 +1,8 @@
 import { Persistence } from '../persistence';
 import { supabase } from '../supabase';
+import { invalidateDashboardCache } from '../dashboardCache';
+import { invalidateFinancialCache } from '../financialCache';
+import { auditService } from '../auditService';
 
 const generateUUID = (): string => {
   if (typeof self !== 'undefined' && self.crypto && self.crypto.randomUUID) {
@@ -32,7 +35,7 @@ export interface Payable {
   weightKg?: number;
 }
 
-const db = new Persistence<Payable>('payables', []);
+const db = new Persistence<Payable>('payables', [], { useStorage: false });
 let realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
 let isLoaded = false;
 
@@ -125,7 +128,8 @@ const startRealtime = () => {
         db.delete(rec.id);
       }
 
-      // silencioso
+      invalidateFinancialCache();
+      invalidateDashboardCache();
     })
     .subscribe();
 };
@@ -176,15 +180,49 @@ export const payablesService = {
   add: (item: Payable) => {
     db.add(item);
     void persistUpsert(item);
+    invalidateDashboardCache();
+    
+    // Audit Log
+    void auditService.logAction('create', 'Financeiro', `Conta a pagar criada: ${item.description} - R$ ${item.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, {
+      entityType: 'Payable',
+      entityId: item.id,
+      metadata: { partnerId: item.partnerId, amount: item.amount, dueDate: item.dueDate }
+    });
   },
 
   update: (item: Payable) => {
+    const old = db.getById(item.id);
     db.update(item);
     void persistUpsert(item);
+    invalidateDashboardCache();
+    
+    // Audit Log (detecta se é pagamento)
+    const isPaying = old && old.paidAmount !== item.paidAmount;
+    const action = isPaying ? 'update' : 'update';
+    const desc = isPaying 
+      ? `Pagamento registrado: ${item.description} - R$ ${(item.paidAmount - old.paidAmount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+      : `Conta a pagar atualizada: ${item.description}`;
+    
+    void auditService.logAction(action, 'Financeiro', desc, {
+      entityType: 'Payable',
+      entityId: item.id,
+      metadata: { paidAmount: item.paidAmount, status: item.status }
+    });
   },
 
   delete: (id: string) => {
+    const item = db.getById(id);
     db.delete(id);
     void persistDelete(id);
+    invalidateDashboardCache();
+    
+    // Audit Log
+    if (item) {
+      void auditService.logAction('delete', 'Financeiro', `Conta a pagar excluída: ${item.description} - R$ ${item.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, {
+        entityType: 'Payable',
+        entityId: id,
+        metadata: { amount: item.amount }
+      });
+    }
   }
 };

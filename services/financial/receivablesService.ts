@@ -1,5 +1,8 @@
 import { Persistence } from '../persistence';
 import { supabase } from '../supabase';
+import { invalidateDashboardCache } from '../dashboardCache';
+import { invalidateFinancialCache } from '../financialCache';
+import { auditService } from '../auditService';
 
 export interface Receivable {
   id: string;
@@ -17,7 +20,7 @@ export interface Receivable {
   companyId?: string;
 }
 
-const db = new Persistence<Receivable>('receivables', []);
+const db = new Persistence<Receivable>('receivables', [], { useStorage: false });
 let realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
 let isLoaded = false;
 
@@ -102,7 +105,8 @@ const startRealtime = () => {
         db.delete(rec.id);
       }
 
-      // silencioso
+      invalidateFinancialCache();
+      invalidateDashboardCache();
     })
     .subscribe();
 };
@@ -151,15 +155,48 @@ export const receivablesService = {
   add: (item: Receivable) => {
     db.add(item);
     void persistUpsert(item);
+    invalidateDashboardCache();
+    
+    // Audit Log
+    void auditService.logAction('create', 'Financeiro', `Conta a receber criada: ${item.description} - R$ ${item.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, {
+      entityType: 'Receivable',
+      entityId: item.id,
+      metadata: { partnerId: item.partnerId, amount: item.amount, dueDate: item.dueDate }
+    });
   },
 
   update: (item: Receivable) => {
+    const old = db.getById(item.id);
     db.update(item);
     void persistUpsert(item);
+    invalidateDashboardCache();
+    
+    // Audit Log (detecta se é recebimento)
+    const isReceiving = old && old.receivedAmount !== item.receivedAmount;
+    const desc = isReceiving 
+      ? `Recebimento registrado: ${item.description} - R$ ${(item.receivedAmount - old.receivedAmount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+      : `Conta a receber atualizada: ${item.description}`;
+    
+    void auditService.logAction('update', 'Financeiro', desc, {
+      entityType: 'Receivable',
+      entityId: item.id,
+      metadata: { receivedAmount: item.receivedAmount, status: item.status }
+    });
   },
 
   delete: (id: string) => {
+    const item = db.getById(id);
     db.delete(id);
     void persistDelete(id);
+    invalidateDashboardCache();
+    
+    // Audit Log
+    if (item) {
+      void auditService.logAction('delete', 'Financeiro', `Conta a receber excluída: ${item.description} - R$ ${item.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, {
+        entityType: 'Receivable',
+        entityId: id,
+        metadata: { amount: item.amount }
+      });
+    }
   }
 };

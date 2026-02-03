@@ -49,9 +49,9 @@ class LatencyMonitorService {
     try {
       const start = performance.now();
       
-      // ✅ PING REAL: Query simples na tabela users
+      // ✅ PING REAL: Query simples em tabela existente
       const { error } = await supabase
-        .from('users')
+        .from('app_users')
         .select('id')
         .limit(1);
       

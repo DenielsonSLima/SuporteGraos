@@ -5,7 +5,7 @@ import { AlertTriangle, CheckCircle, X } from 'lucide-react';
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: () => void;
+    onConfirm: () => void | Promise<void>;
   title: string;
   description: React.ReactNode;
   confirmLabel?: string;
@@ -61,7 +61,7 @@ const ActionConfirmationModal: React.FC<Props> = ({
               </button>
             )}
             <button 
-              onClick={() => { onConfirm(); onClose(); }}
+              onClick={async () => { await onConfirm(); onClose(); }}
               className={`flex-1 px-4 py-3 text-white font-bold rounded-xl shadow-md transition-colors flex items-center justify-center gap-2 ${colors.btn}`}
             >
               {confirmLabel}

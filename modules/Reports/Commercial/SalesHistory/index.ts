@@ -3,6 +3,7 @@ import { TrendingUp } from 'lucide-react';
 import { ReportModule } from '../../types';
 import { reportsCache } from '../../../../services/reportsCache';
 import Template from './Template';
+import PdfDocument from './PdfDocument';
 import DefaultFilters from '../../components/DefaultFilters';
 
 const salesHistoryReport: ReportModule = {
@@ -50,7 +51,8 @@ const salesHistoryReport: ReportModule = {
       summary: [{ label: 'Total Vendido', value: totalVal, format: 'currency' }]
     };
   },
-  Template: Template
+  Template: Template,
+  PdfDocument: PdfDocument
 };
 
 export default salesHistoryReport;

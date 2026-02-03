@@ -6,11 +6,10 @@ import { loadingService } from './loadingService';
 import { assetService } from './assetService';
 import { logService } from './logService';
 import { authService } from './authService';
-import { Persistence } from './persistence';
 import { invalidateFinancialCache } from './financialCache';
-
-const standaloneDb = new Persistence<FinancialRecord>('standalone_records', []);
-const transfersDb = new Persistence<TransferRecord>('transfers', []);
+import { invalidateDashboardCache } from './dashboardCache';
+import { standaloneRecordsService } from './standaloneRecordsService';
+import { transfersService, Transfer } from './financial/transfersService';
 
 const getLogInfo = () => {
   const user = authService.getCurrentUser();
@@ -19,11 +18,47 @@ const getLogInfo = () => {
 
 const formatCurrency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
 
-export const financialActionService = {
-  getStandaloneRecords: () => standaloneDb.getAll(),
-  getTransfers: () => transfersDb.getAll(),
+const resolveAccountId = (value: string) => {
+  if (typeof window === 'undefined') return value;
+  const accounts = ((window as any).bankAccountsList || []);
+  const byId = accounts.find((a: any) => a.id === value);
+  if (byId) return byId.id;
+  const byName = accounts.find((a: any) => a.bankName === value);
+  return byName ? byName.id : value;
+};
 
-  processRecord: (recordId: string, data: any, subType?: string) => {
+const resolveAccountLabel = (accountId: string) => {
+  if (typeof window === 'undefined') return accountId;
+  const accounts = ((window as any).bankAccountsList || []);
+  const acc = accounts.find((a: any) => a.id === accountId) || accounts.find((a: any) => a.bankName === accountId);
+  return acc ? `${acc.bankName}${acc.owner ? ` - ${acc.owner}` : ''}` : accountId;
+};
+
+const mapTransferToRecord = (transfer: Transfer): TransferRecord => ({
+  id: transfer.id,
+  date: transfer.transferDate,
+  originAccount: resolveAccountLabel(transfer.fromAccountId),
+  destinationAccount: resolveAccountLabel(transfer.toAccountId),
+  value: transfer.amount,
+  description: transfer.description,
+  user: authService.getCurrentUser()?.name || 'Sistema'
+});
+
+const mapRecordToTransfer = (record: TransferRecord): Transfer => ({
+  id: record.id,
+  transferDate: record.date,
+  fromAccountId: resolveAccountId(record.originAccount),
+  toAccountId: resolveAccountId(record.destinationAccount),
+  amount: record.value,
+  description: record.description,
+  notes: undefined
+});
+
+export const financialActionService = {
+  getStandaloneRecords: () => standaloneRecordsService.getAll(),
+  getTransfers: () => transfersService.getAll().map(mapTransferToRecord),
+
+  processRecord: async (recordId: string, data: any, subType?: string) => {
     const { userId, userName } = getLogInfo();
     const transactionValue = parseFloat(data.amount) || 0;
     const discountValue = parseFloat(data.discount) || 0;
@@ -50,12 +85,12 @@ export const financialActionService = {
       });
     }
 
-    const standalone = standaloneDb.getById(recordId);
+    const standalone = standaloneRecordsService.getById(recordId);
     if (standalone) {
         const currentPaid = standalone.paidValue || 0;
         const currentDisc = standalone.discountValue || 0;
         
-        standaloneDb.update({
+        await standaloneRecordsService.update({
           ...standalone,
           paidValue: currentPaid + transactionValue,
           discountValue: currentDisc + discountValue,
@@ -113,8 +148,9 @@ export const financialActionService = {
         }
     }
 
-    if (!recordId.startsWith('hist-')) {
-        standaloneDb.add({
+    const shouldSkipHistory = standalone?.subType === 'admin' && subType === 'admin';
+    if (!recordId.startsWith('hist-') && !shouldSkipHistory) {
+        await standaloneRecordsService.add({
           id: `hist-${txId}`,
           description: `${isPureAdjustment ? 'Abatimento' : 'Baixa'} de ${subType === 'sales_order' ? 'Recebimento' : 'Pagamento'}`,
           entityName: data.entityName || 'Parceiro',
@@ -128,7 +164,7 @@ export const financialActionService = {
           status: 'paid',
           subType: (subType as any) || 'admin',
           bankAccount: isPureAdjustment ? 'ABATIMENTO' : accountName,
-          notes: data.notes
+          notes: `${data.notes || ''} [ORIGIN:${recordId}]`.trim()
         });
     }
 
@@ -139,41 +175,64 @@ export const financialActionService = {
     });
     
     invalidateFinancialCache();
+    invalidateDashboardCache();
   },
 
-  addAdminExpense: (record: FinancialRecord) => {
-    standaloneDb.add(record);
-    invalidateFinancialCache();
+  addAdminExpense: async (record: FinancialRecord) => {
+    await standaloneRecordsService.add(record);
+    // Cache já é invalidado no standaloneRecordsService
   },
-  deleteStandaloneRecord: (id: string) => {
-    standaloneDb.delete(id);
-    invalidateFinancialCache();
+  deleteStandaloneRecord: async (id: string) => {
+    await standaloneRecordsService.delete(id);
+    // Cache já é invalidado no standaloneRecordsService
   },
   
-  importData: (expenses: FinancialRecord[], transfers: TransferRecord[]) => {
-    if (expenses) standaloneDb.setAll(expenses);
-    if (transfers) transfersDb.setAll(transfers);
+  importData: async (expenses: FinancialRecord[], transfers: TransferRecord[]) => {
+    if (expenses) await standaloneRecordsService.importData(expenses);
+    if (transfers && transfers.length > 0) {
+      transfers.forEach(t => {
+        const mapped = mapRecordToTransfer(t);
+        const existing = transfersService.getById(mapped.id);
+        if (existing) transfersService.update(mapped);
+        else transfersService.add(mapped);
+      });
+      invalidateFinancialCache();
+      invalidateDashboardCache();
+    }
+    // Cache já é invalidado no standaloneRecordsService para expenses
   },
 
-  syncDeleteFromOrigin: (originTxId: string) => standaloneDb.delete(`hist-${originTxId}`),
+  syncDeleteFromOrigin: async (originTxId: string) => {
+    await standaloneRecordsService.delete(`hist-${originTxId}`);
+    // Cache já é invalidado no standaloneRecordsService
+  },
   
   addTransfer: (transfer: TransferRecord) => {
-    transfersDb.add(transfer);
+    const mapped = mapRecordToTransfer(transfer);
+    transfersService.add(mapped);
     const { userId, userName } = getLogInfo();
     logService.addLog({ userId, userName, action: 'create', module: 'Financeiro', description: `Transferência bancária: ${transfer.originAccount} -> ${transfer.destinationAccount} no valor de ${formatCurrency(transfer.value)}` });
     invalidateFinancialCache();
+    invalidateDashboardCache();
   },
 
   updateTransfer: (transfer: TransferRecord) => {
-    transfersDb.update(transfer);
+    const mapped = mapRecordToTransfer(transfer);
+    transfersService.update(mapped);
     const { userId, userName } = getLogInfo();
     logService.addLog({ userId, userName, action: 'update', module: 'Financeiro', description: `Editou transferência ID ${transfer.id}` });
+    invalidateFinancialCache();
+    invalidateDashboardCache();
   },
 
   deleteTransfer: (id: string) => {
-    const t = transfersDb.getById(id);
-    transfersDb.delete(id);
+    const t = transfersService.getById(id);
+    transfersService.delete(id);
     const { userId, userName } = getLogInfo();
-    logService.addLog({ userId, userName, action: 'delete', module: 'Financeiro', description: `Excluiu transferência de ${formatCurrency(t?.value || 0)} entre ${t?.originAccount} e ${t?.destinationAccount}` });
+    const origin = t ? resolveAccountLabel(t.fromAccountId) : 'Conta origem';
+    const dest = t ? resolveAccountLabel(t.toAccountId) : 'Conta destino';
+    logService.addLog({ userId, userName, action: 'delete', module: 'Financeiro', description: `Excluiu transferência de ${formatCurrency(t?.amount || 0)} entre ${origin} e ${dest}` });
+    invalidateFinancialCache();
+    invalidateDashboardCache();
   }
 };

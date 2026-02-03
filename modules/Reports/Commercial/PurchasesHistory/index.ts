@@ -3,6 +3,7 @@ import { ShoppingCart } from 'lucide-react';
 import { ReportModule } from '../../types';
 import { reportsCache } from '../../../../services/reportsCache';
 import Template from './Template';
+import PdfDocument from './PdfDocument';
 import Filters from './Filters';
 
 const purchasesHistoryReport: ReportModule = {
@@ -72,7 +73,8 @@ const purchasesHistoryReport: ReportModule = {
       summary: [{ label: 'Total Comprado', value: totalVal, format: 'currency' }]
     };
   },
-  Template: Template
+  Template: Template,
+  PdfDocument: PdfDocument
 };
 
 export default purchasesHistoryReport;
