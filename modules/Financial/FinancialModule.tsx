@@ -8,7 +8,8 @@ import {
   Users, 
   ArrowRightLeft,
   History,
-  HandCoins
+  HandCoins,
+  TrendingUp
 } from 'lucide-react';
 
 // Import Tabs
@@ -20,6 +21,7 @@ import ShareholdersTab from './Shareholders/ShareholdersTab';
 import TransfersTab from './Transfers/TransfersTab';
 import HistoryTab from './History/HistoryTab';
 import AdvancesTab from './Advances/AdvancesTab';
+import CreditsTab from './Credits/CreditsTab';
 
 // --- CONFIGURATION ---
 const FINANCIAL_MODULES = [
@@ -49,6 +51,15 @@ const FINANCIAL_MODULES = [
     color: 'bg-cyan-100 text-cyan-600 border-cyan-200',
     activeBorder: 'border-cyan-500',
     description: 'Saldos de parceiros'
+  },
+  {
+    id: 'credits',
+    label: 'Créditos',
+    icon: TrendingUp,
+    component: CreditsTab,
+    color: 'bg-emerald-100 text-emerald-600 border-emerald-200',
+    activeBorder: 'border-emerald-500',
+    description: 'Investimentos e rendimentos'
   },
   {
     id: 'transfers',
