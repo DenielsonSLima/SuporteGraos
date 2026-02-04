@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, Search, TrendingUp, DollarSign, Zap, Filter } from 'lucide-react';
+import { Plus, Search, DollarSign } from 'lucide-react';
 import { FinancialRecord } from '../types';
-import CreditKPIs from './components/CreditKPIs';
 import CreditList from './components/CreditList';
 import CreditDetails from './components/CreditDetails';
 import CreditFormModal from './components/CreditFormModal';
-import { creditService } from '../../../services/financial/creditService';
+import creditService from '../../../services/financial/creditService';
 import { useToast } from '../../../contexts/ToastContext';
 import { bankAccountService } from '../../../services/bankAccountService';
 
@@ -109,28 +108,27 @@ const CreditsTab: React.FC = () => {
       const newCredit = await creditService.create({
         id: `credit-${Date.now()}`,
         description: formData.description,
-        entityName: formData.entityName,
+        entityName: formData.description,
         dueDate: formData.dueDate,
-        issueDate: formData.issueDate,
-        originalValue: formData.amount,
-        paidValue: formData.interestRate || 0,
+        issueDate: formData.date,
+        originalValue: formData.value,
+        paidValue: 0,
         status: 'pending',
-        subType: formData.type || 'credit_income',
+        subType: 'credit_income',
         category: 'crédito',
-        bankAccount: formData.bankAccountId,
-        notes: formData.notes,
+        bankAccount: formData.accountId,
       });
 
       if (newCredit) {
-        addToast('Crédito criado com sucesso!', 'success');
+        addToast('success', 'Crédito criado com sucesso!');
         setIsFormOpen(false);
         loadData();
       } else {
-        addToast('Erro ao criar crédito', 'error');
+        addToast('error', 'Erro ao criar crédito');
       }
     } catch (err) {
       console.error('Erro ao criar crédito:', err);
-      addToast('Erro ao criar crédito', 'error');
+      addToast('error', 'Erro ao criar crédito');
     }
   };
 
@@ -141,21 +139,20 @@ const CreditsTab: React.FC = () => {
       const updated = await creditService.update(selectedCredit.id, {
         ...selectedCredit,
         description: formData.description,
-        entityName: formData.entityName,
+        entityName: formData.description,
         dueDate: formData.dueDate,
-        issueDate: formData.issueDate,
-        originalValue: formData.amount,
-        paidValue: formData.interestRate || 0,
-        notes: formData.notes,
+        issueDate: formData.date,
+        originalValue: formData.value,
+        bankAccount: formData.accountId,
       });
 
       if (updated) {
-        addToast('Crédito atualizado com sucesso!', 'success');
+        addToast('success', 'Crédito atualizado com sucesso!');
         setIsFormOpen(false);
         loadData();
       }
     } catch (err) {
-      addToast('Erro ao atualizar crédito', 'error');
+      addToast('error', 'Erro ao atualizar crédito');
     }
   };
 
@@ -165,12 +162,12 @@ const CreditsTab: React.FC = () => {
     try {
       const success = await creditService.remove(selectedCredit.id);
       if (success) {
-        addToast('Crédito removido com sucesso!', 'success');
+        addToast('success', 'Crédito removido com sucesso!');
         setSelectedCreditId(null);
         loadData();
       }
     } catch (err) {
-      addToast('Erro ao remover crédito', 'error');
+      addToast('error', 'Erro ao remover crédito');
     }
   };
 
@@ -193,9 +190,6 @@ const CreditsTab: React.FC = () => {
           Novo Crédito
         </button>
       </div>
-
-      {/* KPIs */}
-      <CreditKPIs credits={filteredCredits} />
 
       {/* Abas de Período */}
       <div className="flex gap-2 border-b border-slate-200">
@@ -284,9 +278,9 @@ const CreditsTab: React.FC = () => {
               onDelete={handleDeleteCredit}
             />
           ) : (
-            <div className="bg-white rounded-xl border border-slate-200 p-6 text-center">
-              <DollarSign className="mx-auto mb-3 text-slate-300" size={40} />
-              <p className="text-slate-500 font-medium">Selecione um crédito para visualizar detalhes</p>
+            <div className="bg-white rounded-3xl border border-slate-200 p-8 text-center">
+              <DollarSign className="mx-auto mb-3 text-slate-300" size={48} />
+              <p className="text-slate-500 font-bold uppercase text-sm">Selecione um crédito para ver detalhes</p>
             </div>
           )}
         </div>

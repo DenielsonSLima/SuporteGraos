@@ -1,282 +1,208 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus } from 'lucide-react';
-import { FinancialRecord } from '../../types';
-import { bankAccountService } from '../../../../services/bankAccountService';
+import { 
+  X, Save, TrendingUp, DollarSign, Calendar, 
+  Wallet
+} from 'lucide-react';
+import { BankAccount } from '../../types';
+import { financialService } from '../../../../services/financialService';
+import { useToast } from '../../../../contexts/ToastContext';
+
+interface BankAccountWithBalance extends BankAccount {
+  currentBalance?: number;
+}
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (data: any) => void;
-  initialData?: FinancialRecord | null;
+  initialData?: any;
 }
 
 const CreditFormModal: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData }) => {
+  const [bankAccounts, setBankAccounts] = useState<BankAccountWithBalance[]>([]);
+  const { addToast } = useToast();
+  
   const [formData, setFormData] = useState({
-    entityName: '',
+    date: new Date().toISOString().split('T')[0],
     description: '',
-    type: 'credit_income',
-    amount: 0,
-    interestRate: 0,
-    issueDate: new Date().toISOString().split('T')[0],
-    dueDate: new Date().toISOString().split('T')[0],
-    bankAccountId: '',
-    notes: '',
+    value: '',
+    accountId: ''
   });
 
-  const accounts = bankAccountService.getBankAccounts();
+  const [displayValue, setDisplayValue] = useState('');
+
+  const formatBRL = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+
+  const formatCurrencyInput = (val: string) => {
+    const raw = val.replace(/\D/g, '');
+    const num = Number(raw) / 100;
+    return num;
+  };
 
   useEffect(() => {
-    if (initialData) {
-      setFormData({
-        entityName: initialData.entityName,
-        description: initialData.description,
-        type: initialData.subType || 'credit_income',
-        amount: initialData.originalValue || 0,
-        interestRate: initialData.paidValue || 0,
-        issueDate: initialData.issueDate.split('T')[0],
-        dueDate: initialData.dueDate.split('T')[0],
-        bankAccountId: initialData.bankAccount || '',
-        notes: initialData.notes || '',
-      });
-    } else {
-      setFormData({
-        entityName: '',
-        description: '',
-        type: 'credit_income',
-        amount: 0,
-        interestRate: 0,
-        issueDate: new Date().toISOString().split('T')[0],
-        dueDate: new Date().toISOString().split('T')[0],
-        bankAccountId: '',
-        notes: '',
-      });
-    }
-  }, [initialData, isOpen]);
+    if (isOpen) {
+      if (initialData) {
+        setFormData({
+          date: new Date(initialData.issueDate).toISOString().split('T')[0],
+          description: initialData.description || '',
+          value: (initialData.originalValue || 0).toString(),
+          accountId: initialData.bankAccount || ''
+        });
+        setDisplayValue(formatBRL(initialData.originalValue || 0));
+      } else {
+        setFormData({
+          date: new Date().toISOString().split('T')[0],
+          description: '',
+          value: '',
+          accountId: ''
+        });
+        setDisplayValue('');
+      }
 
-  const handleChange = (e: any) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: name === 'amount' || name === 'interestRate' ? parseFloat(value) || 0 : value,
-    }));
+      const accounts = financialService.getBankAccountsWithBalances()
+        .filter(acc => acc.active !== false)
+        .sort((a, b) => a.bankName.localeCompare(b.bankName));
+      setBankAccounts(accounts);
+    }
+  }, [isOpen, initialData]);
+
+  const handleValueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const num = formatCurrencyInput(e.target.value);
+    setFormData({ ...formData, value: num.toString() });
+    setDisplayValue(formatBRL(num));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(formData);
+    
+    const value = parseFloat(formData.value);
+
+    if (!formData.description.trim()) return addToast('warning', 'Descrição é obrigatória');
+    if (value <= 0) return addToast('warning', 'Valor deve ser maior que zero');
+    if (!formData.accountId) return addToast('warning', 'Selecione uma conta bancária');
+
+    const selectedAccount = bankAccounts.find(a => a.id === formData.accountId);
+
+    onSubmit({
+      date: formData.date,
+      description: formData.description,
+      value,
+      accountId: formData.accountId,
+      accountName: selectedAccount?.bankName || ''
+    });
+    onClose();
   };
 
   if (!isOpen) return null;
 
+  const labelClass = 'block text-[10px] font-black text-slate-500 uppercase mb-1.5 tracking-widest ml-1';
+  const inputClass = 'w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold text-slate-900 bg-white placeholder:text-slate-300 focus:border-slate-800 outline-none transition-all text-sm shadow-sm';
+
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-300">
-        {/* Header */}
-        <div className="sticky top-0 bg-white border-b border-slate-200 p-6 flex items-center justify-between">
-          <h2 className="text-2xl font-black text-slate-900">
-            {initialData ? 'Editar Crédito' : 'Novo Crédito'}
-          </h2>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-slate-100 rounded-xl transition-all"
-          >
-            <X size={24} className="text-slate-500" />
-          </button>
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in">
+      <div className="w-full max-w-xl bg-white rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 border border-white/20">
+        
+        <div className="px-8 py-6 flex justify-between items-center text-white bg-emerald-600">
+          <div className="flex items-center gap-4">
+             <div className="p-3 bg-white/20 rounded-2xl"><TrendingUp size={24} /></div>
+             <div>
+                <h3 className="font-black text-xl uppercase tracking-tighter italic leading-none">{initialData ? 'Editar Crédito' : 'Novo Crédito'}</h3>
+                <p className="text-[10px] font-black uppercase tracking-widest mt-1.5 opacity-80">Aplicação Financeira</p>
+             </div>
+          </div>
+          <button onClick={onClose} className="hover:bg-white/20 p-2 rounded-full transition-colors"><X size={28} /></button>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* Seção 1: Informações Básicas */}
-          <div className="space-y-4">
-            <h3 className="text-base font-bold text-slate-900 uppercase tracking-wider">
-              Informações Básicas
-            </h3>
-
+        <form onSubmit={handleSubmit} className="p-8 space-y-6 max-h-[75vh] overflow-y-auto bg-slate-50/30">
+          
+          {/* Seção Principal */}
+          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+            
+            {/* Data */}
             <div>
-              <label className="block text-sm font-bold text-slate-700 mb-2">
-                Instituição / Banco *
-              </label>
-              <input
-                type="text"
-                name="entityName"
-                value={formData.entityName}
-                onChange={handleChange}
-                placeholder="Ex: Banco XYZ, Corretora ABC..."
-                required
-                className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-              />
+              <label className={labelClass}>Data</label>
+              <div className="relative">
+                <Calendar className="absolute left-4 top-3.5 text-slate-400" size={18} />
+                <input
+                  type="date"
+                  name="date"
+                  value={formData.date}
+                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                  required
+                  className={`${inputClass} pl-12`}
+                />
+              </div>
             </div>
 
+            {/* Descrição */}
             <div>
-              <label className="block text-sm font-bold text-slate-700 mb-2">
-                Descrição
-              </label>
+              <label className={labelClass}>Descrição *</label>
               <input
                 type="text"
                 name="description"
                 value={formData.description}
-                onChange={handleChange}
-                placeholder="Ex: Investimento CDB, Poupança, Renda Fixa..."
-                className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                required
+                className={inputClass}
+                placeholder="Ex: CDB Banco X"
               />
             </div>
 
+            {/* Valor */}
             <div>
-              <label className="block text-sm font-bold text-slate-700 mb-2">
-                Tipo de Crédito *
-              </label>
-              <select
-                name="type"
-                value={formData.type}
-                onChange={handleChange}
-                className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-              >
-                <option value="credit_income">Crédito de Renda</option>
-                <option value="investment">Investimento</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Seção 2: Valores */}
-          <div className="space-y-4 pt-4 border-t border-slate-200">
-            <h3 className="text-base font-bold text-slate-900 uppercase tracking-wider">
-              Valores e Taxa
-            </h3>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">
-                  Capital Investido (R$) *
-                </label>
+              <label className={labelClass}>Valor *</label>
+              <div className="relative">
+                <DollarSign className="absolute left-4 top-3.5 text-slate-400" size={18} />
                 <input
-                  type="number"
-                  name="amount"
-                  value={formData.amount}
-                  onChange={handleChange}
-                  placeholder="0,00"
-                  step="0.01"
+                  type="text"
+                  name="value"
+                  value={displayValue}
+                  onChange={handleValueChange}
                   required
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">
-                  Taxa de Rendimento (% a.m.) *
-                </label>
-                <input
-                  type="number"
-                  name="interestRate"
-                  value={formData.interestRate}
-                  onChange={handleChange}
-                  placeholder="0,00"
-                  step="0.01"
-                  required
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                  className={`${inputClass} pl-12`}
+                  placeholder="R$ 0,00"
                 />
               </div>
             </div>
-          </div>
 
-          {/* Seção 3: Datas */}
-          <div className="space-y-4 pt-4 border-t border-slate-200">
-            <h3 className="text-base font-bold text-slate-900 uppercase tracking-wider">
-              Período do Investimento
-            </h3>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">
-                  Data de Início *
-                </label>
-                <input
-                  type="date"
-                  name="issueDate"
-                  value={formData.issueDate}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">
-                  Data de Vencimento *
-                </label>
-                <input
-                  type="date"
-                  name="dueDate"
-                  value={formData.dueDate}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Seção 4: Banco/Conta */}
-          <div className="space-y-4 pt-4 border-t border-slate-200">
-            <h3 className="text-base font-bold text-slate-900 uppercase tracking-wider">
-              Conta Bancária
-            </h3>
-
+            {/* Conta Bancária */}
             <div>
-              <label className="block text-sm font-bold text-slate-700 mb-2">
-                Onde os rendimentos serão depositados?
-              </label>
-              <select
-                name="bankAccountId"
-                value={formData.bankAccountId}
-                onChange={handleChange}
-                className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-              >
-                <option value="">Selecione uma conta...</option>
-                {accounts.map(account => (
-                  <option key={account.id} value={account.id}>
-                    {account.bankName}
-                  </option>
-                ))}
-              </select>
+              <label className={labelClass}>Conta Bancária *</label>
+              <div className="relative">
+                <Wallet className="absolute left-4 top-3.5 text-slate-400" size={18} />
+                <select
+                  name="accountId"
+                  value={formData.accountId}
+                  onChange={(e) => setFormData({ ...formData, accountId: e.target.value })}
+                  required
+                  className={`${inputClass} pl-12 appearance-none`}
+                >
+                  <option value="">Selecione uma conta...</option>
+                  {bankAccounts.map(account => (
+                    <option key={account.id} value={account.id}>
+                      {account.bankName}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
 
-          {/* Seção 5: Observações */}
-          <div className="space-y-4 pt-4 border-t border-slate-200">
-            <h3 className="text-base font-bold text-slate-900 uppercase tracking-wider">
-              Observações
-            </h3>
-
-            <div>
-              <label className="block text-sm font-bold text-slate-700 mb-2">
-                Notas adicionais
-              </label>
-              <textarea
-                name="notes"
-                value={formData.notes}
-                onChange={handleChange}
-                placeholder="Ex: Contato com o gerente, Rendimentos antecipados..."
-                rows={3}
-                className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none"
-              />
-            </div>
-          </div>
-
-          {/* Footer com Botões */}
-          <div className="flex gap-3 pt-6 border-t border-slate-200">
+          {/* Botões */}
+          <div className="flex gap-4">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-3 border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-50 transition-all"
+              className="flex-1 py-3 px-4 text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-2xl font-black uppercase tracking-wider transition-all"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-xl font-bold hover:shadow-lg transition-all"
+              className="flex-1 py-3 px-4 text-white bg-gradient-to-r from-emerald-500 to-emerald-600 hover:shadow-lg rounded-2xl font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2"
             >
-              <Plus size={20} />
-              {initialData ? 'Atualizar' : 'Criar Crédito'}
+              <Save size={18} />
+              {initialData ? 'Atualizar' : 'Criar'}
             </button>
           </div>
         </form>

@@ -98,7 +98,7 @@ export const loadFromSupabase = async (): Promise<FinancialRecord[]> => {
     }
 
     const records = (data || []).map(fromSupabase);
-    db.set(records);
+    db.setAll(records);
     isLoaded = true;
 
     return records;
@@ -127,7 +127,7 @@ export const create = async (credit: FinancialRecord): Promise<Credit | null> =>
     }
 
     const mapped = fromSupabase(data);
-    db.set([...db.getAll(), mapped]);
+    db.add(mapped);
     
     invalidateDashboardCache();
     invalidateFinancialCache();
@@ -160,7 +160,8 @@ export const update = async (id: string, updates: Partial<FinancialRecord>): Pro
 
     const mapped = fromSupabase(data);
     const records = db.getAll();
-    db.set(records.map(r => r.id === id ? mapped : r));
+    const updated = records.map(r => r.id === id ? mapped : r);
+    db.setAll(updated);
 
     invalidateDashboardCache();
     invalidateFinancialCache();
@@ -188,7 +189,7 @@ export const remove = async (id: string): Promise<boolean> => {
     }
 
     const records = db.getAll();
-    db.set(records.filter(r => r.id !== id));
+    db.setAll(records.filter(r => r.id !== id));
 
     invalidateDashboardCache();
     invalidateFinancialCache();
