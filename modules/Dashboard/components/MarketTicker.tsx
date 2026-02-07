@@ -52,9 +52,8 @@ const MarketTicker: React.FC = () => {
       
       {/* Ticker Animation Container */}
       <div 
-        className="ticker-content inline-block pl-40"
+        className="ticker-content inline-block pl-40 market-ticker-animation"
         style={{
-          animation: 'ticker 45s linear infinite',
           animationPlayState: isPaused ? 'paused' : 'running'
         }}
       >
@@ -77,13 +76,17 @@ const MarketTicker: React.FC = () => {
       </div>
       
       <style>{`
-        @keyframes ticker {
+        @keyframes marketTicker {
           0% { 
             transform: translateX(0); 
           }
           100% { 
             transform: translateX(-33.33%); 
           }
+        }
+
+        .market-ticker-animation {
+          animation: marketTicker 45s linear infinite;
         }
       `}</style>
     </div>

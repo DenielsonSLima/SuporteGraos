@@ -59,7 +59,7 @@ const FINANCIAL_MODULES = [
     component: CreditsTab,
     color: 'bg-emerald-100 text-emerald-600 border-emerald-200',
     activeBorder: 'border-emerald-500',
-    description: 'Investimentos e rendimentos'
+    description: 'Outros créditos somente'
   },
   {
     id: 'transfers',

@@ -140,8 +140,9 @@ const loadFromSupabase = async () => {
   }
 };
 
-// Initialize on module load
-loadFromSupabase();
+// ❌ NÃO inicializar automaticamente - aguardar autenticação
+// Será chamado por initializeSupabaseData() no App.tsx após login
+// loadFromSupabase();
 
 // --- REALTIME ---
 const refreshLocationDataFromSupabase = async () => {
@@ -237,12 +238,17 @@ const getLogInfo = () => {
 };
 
 export const locationService = {
+  loadFromSupabase,
+  startRealtime: startLocationRealtime,
   // Get all data structured (for Settings Module)
   getStates: () => {
     return _stateDatabase;
   },
 
-  subscribe: (callback: (items: StateData[]) => void) => statesDb.subscribe(callback),
+  subscribe: (callback: (items: StateData[]) => void) => {
+    startLocationRealtime();
+    return statesDb.subscribe(callback);
+  },
 
   // Get flat list of cities (for Autocomplete in Orders)
   getAllCitiesFlat: () => {

@@ -241,8 +241,8 @@ const getTopUsers = (logs: ReportAccessLog[]) => {
     .map(([userId, count]) => ({ userId, count }));
 };
 
-// Initialize
-void loadFromSupabase();
+// ❌ NÃO inicializar automaticamente - aguardar autenticação via supabaseInitService
+// void loadFromSupabase();
 
 // Import at the bottom to avoid circular dependency
 import { authService } from './authService';

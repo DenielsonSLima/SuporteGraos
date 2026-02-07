@@ -87,7 +87,7 @@ export const financialService = {
       standaloneRecords.forEach((r: any) => {
         if (r.status !== 'paid') return;
         if (r.bankAccount === account.id || r.bankAccount === account.bankName) {
-           const isCredit = ['sales_order', 'receipt', 'loan_taken', 'Venda de Ativo'].includes(r.subType || '') || r.category === 'Venda de Ativo';
+           const isCredit = ['sales_order', 'receipt', 'loan_taken', 'credit_income', 'investment', 'Venda de Ativo'].includes(r.subType || '') || r.category === 'Venda de Ativo';
            if (isCredit) balance += r.paidValue;
            else balance -= r.paidValue;
         }

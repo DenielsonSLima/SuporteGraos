@@ -29,12 +29,9 @@ const styles = StyleSheet.create({
   },
   watermark: {
     position: 'absolute',
-    top: '50%',
-    left: '50%',
-    transform: 'translate(-50%, -50%)',
+    width: 449,
+    height: 449,
     opacity: 0.03,
-    width: '70%',
-    objectFit: 'contain',
   },
   header: {
     flexDirection: 'row',
@@ -53,7 +50,6 @@ const styles = StyleSheet.create({
   logo: {
     width: 52,
     height: 52,
-    objectFit: 'contain',
   },
   companyInfo: {
     gap: 3,
@@ -78,7 +74,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Helvetica-Bold',
     textTransform: 'uppercase',
     color: '#1e293b',
-    fontStyle: 'italic',
   },
   subtitle: {
     fontSize: 9,
@@ -87,7 +82,7 @@ const styles = StyleSheet.create({
     color: '#1d4ed8',
     marginTop: 6,
     paddingBottom: 3,
-    borderBottom: 1,
+    borderBottomWidth: 1,
     borderBottomColor: '#bfdbfe',
   },
   dateGenerated: {
@@ -105,8 +100,7 @@ const styles = StyleSheet.create({
   dashCard: {
     flex: 1,
     padding: 12,
-    borderRadius: 8,
-    border: 1,
+    borderWidth: 1,
   },
   dashCardDark: {
     backgroundColor: '#1e293b',
@@ -145,8 +139,6 @@ const styles = StyleSheet.create({
     width: '100%',
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    borderRadius: 4,
-    overflow: 'hidden',
   },
   tableHeader: {
     flexDirection: 'row',
@@ -190,7 +182,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingTop: 10,
-    borderTop: 1,
+    borderTopWidth: 1,
     borderTopColor: '#e2e8f0',
   },
   footerText: {
@@ -256,7 +248,9 @@ const PdfDocument: React.FC<Props> = ({ assets, financialRecords }) => {
       <Page size="A4" style={styles.page}>
         {/* Watermark */}
         {watermark.imageUrl && (
-          <Image src={watermark.imageUrl} style={styles.watermark} />
+          <View style={{ position: 'absolute', top: 140, left: 73, width: 449, height: 449, opacity: 0.03 }}>
+            <Image src={watermark.imageUrl} style={{ width: 449, height: 449 }} />
+          </View>
         )}
 
         {/* Header */}

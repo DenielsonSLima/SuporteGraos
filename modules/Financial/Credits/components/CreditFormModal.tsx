@@ -3,13 +3,8 @@ import {
   X, Save, TrendingUp, DollarSign, Calendar, 
   Wallet
 } from 'lucide-react';
-import { BankAccount } from '../../types';
-import { financialService } from '../../../../services/financialService';
+import { financialService, BankAccountWithBalance } from '../../../../services/financialService';
 import { useToast } from '../../../../contexts/ToastContext';
-
-interface BankAccountWithBalance extends BankAccount {
-  currentBalance?: number;
-}
 
 interface Props {
   isOpen: boolean;
@@ -169,18 +164,18 @@ const CreditFormModal: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialDa
             <div>
               <label className={labelClass}>Conta Bancária *</label>
               <div className="relative">
-                <Wallet className="absolute left-4 top-3.5 text-slate-400" size={18} />
+                <Wallet className="absolute left-4 top-3.5 text-emerald-400" size={18} />
                 <select
                   name="accountId"
                   value={formData.accountId}
                   onChange={(e) => setFormData({ ...formData, accountId: e.target.value })}
                   required
-                  className={`${inputClass} pl-12 appearance-none`}
+                  className={`${inputClass} pl-12 appearance-none bg-white`}
                 >
                   <option value="">Selecione uma conta...</option>
                   {bankAccounts.map(account => (
                     <option key={account.id} value={account.id}>
-                      {account.bankName}
+                      {account.bankName} - {account.owner || 'Sem titular'} (Saldo: {formatBRL(account.currentBalance || 0)})
                     </option>
                   ))}
                 </select>

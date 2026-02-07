@@ -14,7 +14,7 @@ export interface FinancialRecord {
   paidValue: number;
   discountValue?: number;
   status: FinancialStatus;
-  subType?: 'purchase_order' | 'freight' | 'commission' | 'sales_order' | 'loan_taken' | 'loan_granted' | 'admin' | 'shareholder' | 'receipt';
+  subType?: 'purchase_order' | 'freight' | 'commission' | 'sales_order' | 'loan_taken' | 'loan_granted' | 'admin' | 'shareholder' | 'receipt' | 'credit_income' | 'investment';
   bankAccount?: string; 
   notes?: string;
   assetId?: string; 

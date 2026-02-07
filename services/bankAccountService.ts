@@ -85,13 +85,19 @@ const startBankAccountRealtime = () => {
   }
 };
 
-loadFromSupabase();
+// ❌ NÃO inicializar automaticamente - aguardar autenticação
+// loadFromSupabase();
 startBankAccountRealtime();
 
 export const bankAccountService = {
+  loadFromSupabase,
+  startRealtime: startBankAccountRealtime,
   getBankAccounts: () => accountsDb.getAll(),
 
-  subscribe: (callback: (items: BankAccount[]) => void) => accountsDb.subscribe(callback),
+  subscribe: (callback: (items: BankAccount[]) => void) => {
+    startBankAccountRealtime();
+    return accountsDb.subscribe(callback);
+  },
 
   addBankAccount: async (account: BankAccount) => {
     const all = accountsDb.getAll();

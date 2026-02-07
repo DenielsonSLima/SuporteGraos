@@ -71,8 +71,9 @@ const startRealtime = () => {
 };
 
 // Inicializar ao carregar o módulo
-loadFromSupabase();
-startRealtime();
+// ❌ NÃO inicializar automaticamente - aguardar autenticação
+// loadFromSupabase();
+// startRealtime();
 
 // ============================================================================
 // HELPER
@@ -334,5 +335,6 @@ export const partnerAddressService = {
   reload: () => {
     isLoaded = false;
     return loadFromSupabase();
-  }
+  },
+  loadFromSupabase
 };

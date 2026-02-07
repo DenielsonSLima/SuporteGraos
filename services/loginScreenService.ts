@@ -92,14 +92,26 @@ const loadRotationConfig = async (): Promise<RotationConfig | null> => {
     const { data, error } = await supabase
       .from('login_rotation_config')
       .select('*')
-      .limit(1)
-      .single();
+      .limit(1);
 
-    if (error && error.code !== 'PGRST116') throw error; // PGRST116 = no rows returned
-    _rotationConfig = data || null;
+    if (error) {
+      console.warn('⚠️ Erro ao acessar login_rotation_config:', {
+        code: (error as any)?.code,
+        message: error.message
+      });
+      return null;
+    }
+    
+    // Se houver dados, retorna o primeiro; se não, retorna null
+    _rotationConfig = (data && data.length > 0) ? data[0] : null;
+    if (_rotationConfig) {
+      console.log('✅ Configuração de rotação carregada');
+    } else {
+      console.log('ℹ️ Nenhuma configuração de rotação encontrada, usando padrão');
+    }
     return _rotationConfig;
-  } catch (error) {
-    console.error('❌ Erro ao carregar rotation config:', error);
+  } catch (err) {
+    console.error('❌ Erro ao carregar rotation config:', err);
     return null;
   }
 };
@@ -147,7 +159,7 @@ const addScreen = async (input: LoginScreenInput): Promise<LoginScreen | null> =
     if (data) {
       _screens.push(data);
       console.log(`[loginScreenService] ✅ Imagem salva! ID: ${data.id}`);
-      dispatchEvent(new Event('login_screens:updated'));
+      window.dispatchEvent(new Event('login_screens:updated'));
     }
 
     return data || null;
@@ -189,7 +201,7 @@ const updateScreen = async (id: string, updates: Partial<LoginScreenInput> & { i
     const index = _screens.findIndex(s => s.id === id);
     if (index >= 0 && data) {
       _screens[index] = data;
-      dispatchEvent(new Event('login_screens:updated'));
+      window.dispatchEvent(new Event('login_screens:updated'));
     }
 
     return data || null;
@@ -213,7 +225,7 @@ const deleteScreen = async (id: string): Promise<boolean> => {
 
     // Remover do cache
     _screens = _screens.filter(s => s.id !== id);
-    dispatchEvent(new Event('login_screens:updated'));
+    window.dispatchEvent(new Event('login_screens:updated'));
 
     return true;
   } catch (error) {
@@ -241,7 +253,7 @@ const toggleScreenActive = async (id: string, isActive: boolean): Promise<boolea
       if (!isActive) {
         _screens = _screens.filter(s => s.id !== id);
       }
-      dispatchEvent(new Event('login_screens:updated'));
+      window.dispatchEvent(new Event('login_screens:updated'));
     }
 
     return true;
@@ -287,7 +299,7 @@ const updateRotationConfig = async (input: RotationConfigInput): Promise<boolean
       _rotationConfig = data || null;
     }
 
-    dispatchEvent(new Event('login_screens:config_updated'));
+    window.dispatchEvent(new Event('login_screens:config_updated'));
     return true;
   } catch (error) {
     console.error('❌ Erro ao atualizar rotation config:', error);
@@ -335,7 +347,7 @@ const startRealtime = () => {
       const rec = payload.new;
       if (rec) {
         _rotationConfig = rec;
-        dispatchEvent(new Event('login_screens:config_updated'));
+        window.dispatchEvent(new Event('login_screens:config_updated'));
       }
     })
     .subscribe();
@@ -370,10 +382,8 @@ export const loginScreenService = {
 // INITIALIZATION
 // ============================================================================
 
-// Inicializar ao carregar o módulo
-loadActiveScreens();
-loadRotationConfig();
-startRealtime();
+// NÃO inicializar automaticamente - aguardar autenticação primeiro
+// A inicialização será feita pelo LoginScreen.tsx após login bem-sucedido
 
 // ============================================================================
 // EVENT LISTENERS

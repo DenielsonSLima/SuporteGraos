@@ -1,11 +1,60 @@
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
+import { createClient, AuthError, Session, User as SupabaseUser } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 
 // ✅ CREDENCIAIS SUPABASE - Projeto: Suporte Grãos ERP
-const supabaseUrl = 'https://vqhjbsiwzgxaozcedqcn.supabase.co';
-const supabaseAnonKey = 'sb_publishable_m8MBqafWFUIhbSmhatvDYw_NWrO_E8V';
+export const supabaseUrl = 'https://vqhjbsiwzgxaozcedqcn.supabase.co';
+export const supabaseAnonKey = 'sb_publishable_m8MBqafWFUIhbSmhatvDYw_NWrO_E8V';
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Configurações do cliente com persistência de sessão
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true,
+    storage: window.sessionStorage,
+    storageKey: 'supabase.auth.token'
+  }
+});
+
+// ============================================================================
+// HELPERS DE AUTENTICAÇÃO
+// ============================================================================
+
+/**
+ * Obtém a sessão atual do Supabase
+ */
+export const getSupabaseSession = async (): Promise<Session | null> => {
+  const { data: { session } } = await supabase.auth.getSession();
+  return session;
+};
+
+/**
+ * Obtém o usuário autenticado atual
+ */
+export const getSupabaseUser = async (): Promise<SupabaseUser | null> => {
+  const { data: { user } } = await supabase.auth.getUser();
+  return user;
+};
+
+/**
+ * Verifica se há uma sessão ativa
+ */
+export const isAuthenticated = async (): Promise<boolean> => {
+  const session = await getSupabaseSession();
+  return !!session;
+};
+
+/**
+ * Escuta mudanças no estado de autenticação
+ */
+export const onAuthStateChange = (callback: (session: Session | null) => void) => {
+  return supabase.auth.onAuthStateChange((_event, session) => {
+    callback(session);
+  });
+};
+
+// Exportar tipos
+export type { AuthError, Session, SupabaseUser };
 
 /**
  * SQL PARA CRIAÇÃO DAS TABELAS NO SUPABASE (Copie e cole no SQL Editor do Supabase):

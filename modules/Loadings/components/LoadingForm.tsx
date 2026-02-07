@@ -214,10 +214,12 @@ const LoadingForm: React.FC<Props> = ({ purchaseOrder, onSave, onClose }) => {
     
     // Notificação profissional após criação
     addToast(
+      'success',
       'Carregamento Criado',
-      `Carregamento ${formData.loadingNumber} registrado com sucesso no sistema`,
-      'success'
+      `Carregamento ${formData.vehiclePlate || 'N/A'} registrado com sucesso no sistema`
     );
+
+    onClose();
   };
 
   const filteredSales = activeSales.filter(s => 

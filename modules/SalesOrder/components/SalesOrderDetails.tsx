@@ -10,7 +10,7 @@ import SalesLoadingsTable from './details/SalesLoadingsTable';
 import SalesReceiptModal from './modals/SalesReceiptModal';
 import NoteModal from '../../PurchaseOrder/components/modals/NoteModal';
 import LoadingManagement from '../../Loadings/components/LoadingManagement';
-import PdfPreviewModal from '../../PurchaseOrder/components/modals/PdfPreviewModal'; 
+import SalesPdfPreviewModal from './modals/SalesPdfPreviewModal';
 import ActionConfirmationModal from '../../../components/ui/ActionConfirmationModal';
 import { Loading } from '../../Loadings/types';
 import { loadingService } from '../../../services/loadingService';
@@ -77,8 +77,24 @@ const SalesOrderDetails: React.FC<Props> = ({ order, onBack, onEdit, onDelete, o
           </div>
         </div>
         <div className="flex gap-2">
-            <button onClick={() => { setPdfVariant('producer'); setIsPdfOpen(true); }} className="px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-[10px] font-black uppercase text-slate-700 hover:bg-slate-50 transition-all shadow-sm flex items-center gap-2"><UserCheck size={16}/> PDF Cliente</button>
-            <button onClick={() => { setPdfVariant('internal'); setIsPdfOpen(true); }} className="px-4 py-2.5 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase hover:bg-slate-800 transition-all shadow-lg flex items-center gap-2"><ShieldCheck size={16}/> Auditoria</button>
+            <button
+              onClick={() => {
+                setPdfVariant('producer');
+                setIsPdfOpen(true);
+              }}
+              className="px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-[10px] font-black uppercase text-slate-700 hover:bg-slate-50 transition-all shadow-sm flex items-center gap-2"
+            >
+              <UserCheck size={16}/> PDF Cliente
+            </button>
+            <button
+              onClick={() => {
+                setPdfVariant('internal');
+                setIsPdfOpen(true);
+              }}
+              className="px-4 py-2.5 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase hover:bg-slate-800 transition-all shadow-lg flex items-center gap-2"
+            >
+              <ShieldCheck size={16}/> Auditoria
+            </button>
             <div className="w-px h-10 bg-slate-200 mx-2"></div>
             <button onClick={onEdit} className="px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-black uppercase text-slate-700 hover:bg-slate-50">Editar</button>
             <button onClick={onDelete} className="px-4 py-2.5 bg-white border border-rose-200 rounded-xl text-xs font-black uppercase text-rose-600 hover:bg-rose-50">Excluir</button>
@@ -127,7 +143,7 @@ const SalesOrderDetails: React.FC<Props> = ({ order, onBack, onEdit, onDelete, o
 
       <SalesReceiptModal isOpen={isPayModalOpen} onClose={() => setIsPayModalOpen(false)} onConfirm={handleConfirmReceipt} totalPending={stats.balance} recordDescription={`Cliente ${currentOrder.customerName}`} />
       <NoteModal isOpen={isNoteModalOpen} onClose={() => setIsNoteModalOpen(false)} onSave={(n) => { const note = { ...n, id: Math.random().toString(36).substr(2,9) }; salesService.update({ ...currentOrder, notesList: [note, ...(currentOrder.notesList || [])] }); refreshData(); }} consultantName={currentOrder.consultantName} />
-      <PdfPreviewModal isOpen={isPdfOpen} onClose={() => setIsPdfOpen(false)} order={currentOrder} variant={pdfVariant} />
+      <SalesPdfPreviewModal isOpen={isPdfOpen} onClose={() => setIsPdfOpen(false)} order={currentOrder} loadings={loadings} variant={pdfVariant} />
       {selectedLoading && <LoadingManagement loading={selectedLoading} onClose={() => setSelectedLoading(null)} onUpdate={refreshData} originContext="sales" />}
       <ActionConfirmationModal isOpen={isFinalizePromptOpen} onClose={() => setIsFinalizePromptOpen(false)} onConfirm={() => { onFinalize(); refreshData(); setIsFinalizePromptOpen(false); }} title="Saldo Quitado!" description="Deseja marcar esta venda como finalizada?" type="success" confirmLabel="Finalizar" />
     </div>

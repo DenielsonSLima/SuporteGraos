@@ -198,59 +198,139 @@ const startWatermarkRealtime = () => {
     });
 };
 
+const fetchCompanyFromSupabase = async (): Promise<boolean> => {
+  const { data, error } = await supabase
+    .from('companies')
+    .select('id, razao_social, nome_fantasia, cnpj, ie, endereco, numero, bairro, cidade, uf, cep, telefone, email, website, logo_url')
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (error && error.code !== 'PGRST116') {
+    throw error;
+  }
+
+  if (!data) {
+    console.log('⚠️ settingsService: nenhuma empresa encontrada no Supabase. Mantendo dados locais.');
+    return false;
+  }
+
+  _companyId = data.id;
+  _companyData = mapCompanyRecord(data);
+  localStorage.setItem(COMPANY_KEY, JSON.stringify(_companyData));
+  notifyCompanyListeners();
+  console.log('✅ settingsService: company sincronizada com Supabase');
+  return true;
+};
+
+const fetchWatermarkFromSupabase = async (): Promise<boolean> => {
+  const { data, error } = await supabase
+    .from('watermarks')
+    .select('id, image_url, opacity, orientation')
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (error && error.code !== 'PGRST116') {
+    throw error;
+  }
+
+  if (!data) {
+    console.log('⚠️ settingsService: nenhuma marca d\'água encontrada no Supabase. Mantendo dados locais.');
+    return false;
+  }
+
+  _watermarkId = data.id;
+  _watermarkSettings = mapWatermarkRecord(data);
+  localStorage.setItem(WATERMARK_KEY, JSON.stringify(_watermarkSettings));
+  notifyWatermarkListeners();
+  console.log('✅ settingsService: watermark sincronizada com Supabase');
+  return true;
+};
+
+const loadSettingsFromSupabase = async () => {
+  console.log('🔄 settingsService: sincronizando com Supabase...');
+  const [companyResult, watermarkResult] = await Promise.allSettled([
+    fetchCompanyFromSupabase(),
+    fetchWatermarkFromSupabase()
+  ]);
+
+  if (companyResult.status === 'rejected') {
+    console.warn('⚠️ settingsService: falha ao carregar dados da empresa do Supabase:', companyResult.reason);
+  }
+  if (watermarkResult.status === 'rejected') {
+    console.warn('⚠️ settingsService: falha ao carregar marca d\'água do Supabase:', watermarkResult.reason);
+  }
+
+  startCompanyRealtime();
+  startWatermarkRealtime();
+
+  return {
+    companyLoaded: companyResult.status === 'fulfilled' ? companyResult.value : false,
+    watermarkLoaded: watermarkResult.status === 'fulfilled' ? watermarkResult.value : false
+  };
+};
+
+// ❌ NÃO inicializar automaticamente - aguardar autenticação via supabaseInitService
 // Load company from Supabase on startup (fallback to localStorage)
-(async () => {
-  try {
-    const { data, error } = await supabase
-      .from('companies')
-      .select(
-        'id, razao_social, nome_fantasia, cnpj, ie, endereco, numero, bairro, cidade, uf, cep, telefone, email, website, logo_url'
-      )
-      .order('created_at', { ascending: true })
-      .limit(1)
-      .maybeSingle();
+// (async () => {
+//   try {
+//     const { data, error } = await supabase
+//       .from('companies')
+//       .select(
+//         'id, razao_social, nome_fantasia, cnpj, ie, endereco, numero, bairro, cidade, uf, cep, telefone, email, website, logo_url'
+//       )
+//       .order('created_at', { ascending: true })
+//       .limit(1)
+//       .maybeSingle();
 
-    if (error) throw error;
-    if (data) {
-      _companyId = data.id;
-      _companyData = mapCompanyRecord(data);
-      localStorage.setItem(COMPANY_KEY, JSON.stringify(_companyData));
-      notifyCompanyListeners();
-      console.log('✅ Company carregada do Supabase');
-    }
-  } catch (err) {
-    console.warn('⚠️ settingsService: usando company do localStorage. Motivo:', err);
-  } finally {
-    startCompanyRealtime();
-  }
-})();
+//     if (error) throw error;
+//     if (data) {
+//       _companyId = data.id;
+//       _companyData = mapCompanyRecord(data);
+//       localStorage.setItem(COMPANY_KEY, JSON.stringify(_companyData));
+//       notifyCompanyListeners();
+//       console.log('✅ Company carregada do Supabase');
+//     }
+//   } catch (err) {
+//     console.warn('⚠️ settingsService: usando company do localStorage. Motivo:', err);
+//   } finally {
+//     startCompanyRealtime();
+//   }
+// })();
 
+// ❌ NÃO inicializar automaticamente - aguardar autenticação via supabaseInitService
 // Load watermark from Supabase on startup (fallback to localStorage)
-(async () => {
-  try {
-    const { data, error } = await supabase
-      .from('watermarks')
-      .select('id, image_url, opacity, orientation')
-      .order('created_at', { ascending: true })
-      .limit(1)
-      .maybeSingle();
+// (async () => {
+//   try {
+//     const { data, error } = await supabase
+//       .from('watermarks')
+//       .select('id, image_url, opacity, orientation')
+//       .order('created_at', { ascending: true })
+//       .limit(1)
+//       .maybeSingle();
 
-    if (error) throw error;
-    if (data) {
-      _watermarkId = data.id;
-      _watermarkSettings = mapWatermarkRecord(data);
-      localStorage.setItem(WATERMARK_KEY, JSON.stringify(_watermarkSettings));
-      notifyWatermarkListeners();
-      console.log('✅ Watermark carregada do Supabase');
-    }
-  } catch (err) {
-    console.warn('⚠️ settingsService: usando watermark do localStorage. Motivo:', err);
-  } finally {
-    startWatermarkRealtime();
-  }
-})();
+//     if (error) throw error;
+//     if (data) {
+//       _watermarkId = data.id;
+//       _watermarkSettings = mapWatermarkRecord(data);
+//       localStorage.setItem(WATERMARK_KEY, JSON.stringify(_watermarkSettings));
+//       notifyWatermarkListeners();
+//       console.log('✅ Watermark carregada do Supabase');
+//     }
+//   } catch (err) {
+//     console.warn('⚠️ settingsService: usando watermark do localStorage. Motivo:', err);
+//   } finally {
+//     startWatermarkRealtime();
+//   }
+// })();
 
 export const settingsService = {
+  loadFromSupabase: () => loadSettingsFromSupabase(),
+  startRealtime: () => {
+    startCompanyRealtime();
+    startWatermarkRealtime();
+  },
   // --- DADOS DA EMPRESA ---
   getCompanyData: () => _companyData,
 

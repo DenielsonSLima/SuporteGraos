@@ -185,8 +185,9 @@ const startRealtime = () => {
 };
 
 // Initialize on module load
-loadFromSupabase();
-startRealtime();
+// ❌ NÃO inicializar automaticamente - aguardar autenticação
+// loadFromSupabase();
+// startRealtime();
 
 const getLogInfo = () => {
   const user = authService.getCurrentUser();
@@ -502,5 +503,11 @@ export const shareholderService = {
     _shareholdersDb.setAll(data);
     invalidateFinancialCache();
     invalidateDashboardCache();
-  }
+  },
+
+  reload: () => {
+    _isSupabaseLoaded = false;
+    return loadFromSupabase();
+  },
+  loadFromSupabase
 };

@@ -71,7 +71,8 @@ const loadFromSupabase = async () => {
 };
 
 // Initialize
-loadFromSupabase();
+// ❌ NÃO inicializar automaticamente - aguardar autenticação
+// loadFromSupabase();
 
 const getLogInfo = () => {
   const user = authService.getCurrentUser();
@@ -82,6 +83,7 @@ const getLogInfo = () => {
 };
 
 export const classificationService = {
+  loadFromSupabase,
   // --- PARTNER TYPES ---
   getPartnerTypes: () => partnerTypesDb.getAll(),
   

@@ -15,8 +15,7 @@ import {
   FileImage,
   ChevronRight,
   Search,
-  Package,
-  Layout
+  Package
 } from 'lucide-react';
 
 // Import sub-modules
@@ -32,7 +31,6 @@ import BackupSettings from './Backup/BackupSettings';
 import LocationsSettings from './Locations/LocationsSettings';
 import WatermarkSettings from './Watermark/WatermarkSettings';
 import ProductTypesSettings from './ProductTypes/ProductTypesSettings';
-import LoginScreenSettings from './LoginScreen/LoginScreenSettings';
 import LogsSettings from './Logs/LogsSettings';
 
 const SETTINGS_MENU = [
@@ -43,14 +41,6 @@ const SETTINGS_MENU = [
     icon: Building2,
     color: 'bg-blue-500',
     component: CompanySettings
-  },
-  { 
-    id: 'login_screen', 
-    title: 'Tela Inicial', 
-    description: 'Imagens de fundo e rotação da tela de acesso.', 
-    icon: Layout,
-    color: 'bg-indigo-600',
-    component: LoginScreenSettings
   },
   { 
     id: 'users', 

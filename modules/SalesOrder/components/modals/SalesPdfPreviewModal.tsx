@@ -14,11 +14,11 @@ interface Props {
   onClose: () => void;
   order: SalesOrder;
   loadings: Loading[];
+  variant: PdfVariant;
 }
 
-const SalesPdfPreviewModal: React.FC<Props> = ({ isOpen, onClose, order, loadings }) => {
+const SalesPdfPreviewModal: React.FC<Props> = ({ isOpen, onClose, order, loadings, variant }) => {
   const [isGenerating, setIsGenerating] = useState(false);
-  const [variant, setVariant] = useState<PdfVariant>('producer');
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -71,24 +71,13 @@ const SalesPdfPreviewModal: React.FC<Props> = ({ isOpen, onClose, order, loading
         {/* Toolbar */}
         <div className="bg-slate-900 text-white px-4 py-3 flex justify-between items-center shadow-md z-20 shrink-0">
           <div className="flex items-center gap-4">
-             <div className="flex bg-slate-800 p-1 rounded-lg">
-                <button 
-                  onClick={() => setVariant('producer')}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-md text-xs font-bold uppercase transition-all ${variant === 'producer' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
-                >
-                   <UserCheck size={16} /> Cliente
-                </button>
-                <button 
-                  onClick={() => setVariant('internal')}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-md text-xs font-bold uppercase transition-all ${variant === 'internal' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
-                >
-                   <ShieldCheck size={16} /> Interno
-                </button>
-             </div>
-             <div>
-                <h3 className="font-bold text-lg">Visualização de Venda</h3>
-                <p className="text-[10px] text-slate-400 uppercase tracking-widest">{isLandscape ? 'Paisagem (A4 Landscape)' : 'Retrato (A4 Portrait)'}</p>
-             </div>
+            <div className={`p-2 rounded-lg ${variant === 'producer' ? 'bg-emerald-600' : 'bg-blue-600'}`}> 
+              {variant === 'producer' ? <UserCheck size={20} /> : <ShieldCheck size={20} />}
+            </div>
+            <div>
+              <h3 className="font-bold text-lg">Visualização de Venda</h3>
+              <p className="text-[10px] text-slate-400 uppercase tracking-widest">{isLandscape ? 'Paisagem (A4 Landscape)' : 'Retrato (A4 Portrait)'}</p>
+            </div>
           </div>
           <div className="flex gap-2">
             <button 

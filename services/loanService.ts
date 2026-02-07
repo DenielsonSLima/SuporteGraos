@@ -95,8 +95,8 @@ const startRealtime = () => {
     });
 };
 
-// Inicializar ao carregar módulo
-void loadFromSupabase().then(() => startRealtime());
+// ❌ NÃO inicializar automaticamente - aguardar autenticação via supabaseInitService
+// void loadFromSupabase().then(() => startRealtime());
 
 // ============================================================================
 // API PÚBLICA

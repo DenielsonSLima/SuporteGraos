@@ -6,7 +6,7 @@ import { Persistence } from './persistence';
 import { supabase } from './supabase';
 import { supabaseWithRetry } from '../utils/fetchWithRetry';
 import { payablesService } from './financial/payablesService';
-import { DashboardCache } from './dashboardCache';
+import { DashboardCache, invalidateDashboardCache } from './dashboardCache';
 import { purchaseService } from './purchaseService';
 import { receivablesService, Receivable } from './financial/receivablesService';
 import { salesService } from './salesService';
@@ -197,9 +197,9 @@ const persistDelete = async (id: string) => {
   }
 };
 
-// Inicializa carga e realtime ao importar o módulo
-void loadFromSupabase();
-startRealtime();
+// ❌ NÃO inicializar automaticamente - aguardar autenticação via supabaseInitService
+// void loadFromSupabase();
+// startRealtime();
 
 export const loadingService = {
   setToastCallback: (callback: (type: 'success' | 'error' | 'info', title: string, message?: string) => void) => {
@@ -583,7 +583,13 @@ export const loadingService = {
     });
     
     console.log('🎉 RECÁLCULO CONCLUÍDO!');
-  }
+  },
+
+  reload: () => {
+    isLoaded = false;
+    return loadFromSupabase();
+  },
+  loadFromSupabase
 };
 
 // ✅ EXECUTAR CORREÇÃO AUTOMATICAMENTE AO CARREGAR O MÓDULO

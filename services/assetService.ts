@@ -151,9 +151,9 @@ const persistDelete = async (id: string) => {
   }
 };
 
-// Inicializa ao importar
-void loadFromSupabase();
-startRealtime();
+// ❌ NÃO inicializar automaticamente - aguardar autenticação via supabaseInitService
+// void loadFromSupabase();
+// startRealtime();
 
 // ============================================================================
 // EXPORT SERVICE
@@ -226,5 +226,11 @@ export const assetService = {
         console.error('Erro inesperado ao importar assets no Supabase', err);
       }
     })();
-  }
+  },
+  
+  reload: () => {
+    isLoaded = false;
+    return loadFromSupabase();
+  },
+  loadFromSupabase
 };

@@ -29,12 +29,9 @@ const styles = StyleSheet.create({
   },
   watermark: {
     position: 'absolute',
-    top: '50%',
-    left: '50%',
-    transform: 'translate(-50%, -50%)',
+    width: 300,
+    height: 300,
     opacity: 0.03,
-    width: '60%',
-    objectFit: 'contain',
   },
   header: {
     flexDirection: 'row',
@@ -51,7 +48,6 @@ const styles = StyleSheet.create({
   logo: {
     width: 48,
     height: 48,
-    objectFit: 'contain',
   },
   companyInfo: {
     gap: 2,
@@ -240,7 +236,9 @@ const AssetDossierPdfDocument: React.FC<Props> = ({ asset, financialHistory }) =
     <Document>
       <Page size="A4" style={styles.page}>
         {watermark.imageUrl && (
-          <Image src={watermark.imageUrl} style={styles.watermark} />
+          <View style={{ position: 'absolute', top: 120, left: 110, width: 300, height: 300, opacity: 0.03 }}>
+            <Image src={watermark.imageUrl} style={{ width: 300, height: 300 }} />
+          </View>
         )}
 
         {/* Header */}

@@ -8,7 +8,8 @@
 -- 1. VIEW: Partners com endereço principal (evita join duplo)
 -- ============================================================================
 
-CREATE OR REPLACE VIEW v_partners_with_primary_address AS
+CREATE OR REPLACE VIEW v_partners_with_primary_address
+WITH (security_invoker = true) AS
 SELECT 
   p.id,
   p.name,

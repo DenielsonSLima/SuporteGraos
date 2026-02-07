@@ -55,11 +55,12 @@ const loadFromSupabase = async () => {
   }
 };
 
-// Inicia carga do Supabase em background (não-bloqueante)
-void loadFromSupabase();
+// ❌ NÃO inicializar automaticamente - aguardar autenticação via supabaseInitService
+// void loadFromSupabase();
 
 
 export const expenseCategoryService = {
+  loadFromSupabase,
   subscribe: (callback: (items: ExpenseCategory[]) => void) => categoriesDb.subscribe(callback),
 
   getExpenseCategories: (): ExpenseCategory[] => {

@@ -59,7 +59,14 @@ const loadFromSupabase = async (): Promise<MonthlySnapshot[]> => {
       .select('*')
       .order('closed_date', { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      console.warn('⚠️ Erro ao acessar tabela cashier_monthly_snapshots:', {
+        code: (error as any)?.code,
+        message: error.message,
+        details: (error as any)?.details
+      });
+      throw error;
+    }
     
     const mapped = (data || []).map(mapFromDb);
     snapshotsDb.setAll(mapped);
@@ -68,8 +75,10 @@ const loadFromSupabase = async (): Promise<MonthlySnapshot[]> => {
     return mapped;
   } catch (err) {
     const code = (err as { code?: string } | null)?.code;
-    if (code === 'PGRST205') {
-      console.warn('⚠️ Tabela public.cashier_monthly_snapshots não encontrada. Snapshots desativados.');
+    const errorMsg = (err as any)?.message || String(err);
+    
+    if (code === 'PGRST205' || errorMsg.includes('404')) {
+      console.warn('⚠️ Tabela public.cashier_monthly_snapshots não encontrada ou sem permissão RLS. Snapshots desativados.');
       return [];
     }
     console.error('❌ Erro ao carregar snapshots:', err);
@@ -145,9 +154,9 @@ const persistDelete = async (id: string) => {
   }
 };
 
-// Carrega ao iniciar
-void loadFromSupabase();
-startRealtime();
+// ❌ NÃO inicializar automaticamente - aguardar autenticação via supabaseInitService
+// void loadFromSupabase();
+// startRealtime();
 
 // ============================================================================
 // SERVICE

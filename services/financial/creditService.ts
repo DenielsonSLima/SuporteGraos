@@ -2,6 +2,9 @@ import { Persistence } from '../persistence';
 import { supabase } from '../supabase';
 import { invalidateDashboardCache } from '../dashboardCache';
 import { invalidateFinancialCache } from '../financialCache';
+import { logService } from '../logService';
+import { auditService } from '../auditService';
+import { authService } from '../authService';
 import { FinancialRecord } from '../../modules/Financial/types';
 
 // Tipos de créditos
@@ -17,6 +20,14 @@ export interface Credit extends FinancialRecord {
 const db = new Persistence<FinancialRecord>('credits', [], { useStorage: false });
 let realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
 let isLoaded = false;
+
+const getLogInfo = () => {
+  const user = authService.getCurrentUser();
+  return {
+    userId: user?.id || 'system',
+    userName: user?.name || 'Sistema'
+  };
+};
 
 // ============================================================================
 // MAPEAMENTO
@@ -40,7 +51,7 @@ const fromSupabase = (record: any): FinancialRecord => {
     discountValue: parseFloat(record.discount_value || 0) || 0,
     status: record.status,
     subType: record.sub_type,
-    bankAccount: record.bank_account_id,
+    bankAccount: record.bank_account,
     notes: record.notes,
     assetId: record.asset_id,
     isAssetReceipt: record.is_asset_receipt,
@@ -52,27 +63,31 @@ const fromSupabase = (record: any): FinancialRecord => {
 /**
  * Converte registro do app para formato Supabase (camelCase → snake_case)
  */
-const toSupabase = (record: FinancialRecord) => ({
-  id: record.id,
-  description: record.description,
-  entity_name: record.entityName,
-  driver_name: record.driverName,
-  category: record.category,
-  due_date: record.dueDate,
-  issue_date: record.issueDate,
-  settlement_date: record.settlementDate,
-  original_value: record.originalValue,
-  paid_value: record.paidValue,
-  discount_value: record.discountValue,
-  status: record.status,
-  sub_type: record.subType,
-  bank_account_id: record.bankAccount,
-  notes: record.notes,
-  asset_id: record.assetId,
-  is_asset_receipt: record.isAssetReceipt,
-  asset_name: record.assetName,
-  weight_kg: record.weightKg,
-});
+const toSupabase = (record: FinancialRecord) => {
+  const result = {
+    id: record.id,
+    description: record.description,
+    entity_name: record.entityName,
+    driver_name: record.driverName || null,
+    category: record.category || 'income',
+    due_date: record.dueDate,
+    issue_date: record.issueDate,
+    settlement_date: record.settlementDate || null,
+    original_value: record.originalValue,
+    paid_value: record.paidValue ?? 0,
+    discount_value: record.discountValue ?? 0,
+    status: record.status,
+    sub_type: record.subType && record.subType.length > 0 ? record.subType : 'credit_income',
+    bank_account: record.bankAccount,
+    notes: record.notes || null,
+    asset_id: record.assetId || null,
+    is_asset_receipt: record.isAssetReceipt || null,
+    asset_name: record.assetName || null,
+    weight_kg: record.weightKg ?? 0,
+  };
+  console.log('🔄 toSupabase resultado:', result);
+  return result;
+};
 
 // ============================================================================
 // FUNCIONALIDADES PRINCIPAIS
@@ -88,9 +103,10 @@ export const loadFromSupabase = async (): Promise<FinancialRecord[]> => {
 
   try {
     const { data, error } = await supabase
-      .from('loans')
+      .from('standalone_records')
       .select('*')
-      .in('sub_type', ['credit_income', 'investment']);
+      .in('sub_type', ['credit_income', 'investment'])
+      .order('issue_date', { ascending: false });
 
     if (error) {
       console.error('❌ Erro ao carregar créditos:', error);
@@ -114,21 +130,42 @@ export const loadFromSupabase = async (): Promise<FinancialRecord[]> => {
 export const create = async (credit: FinancialRecord): Promise<Credit | null> => {
   try {
     const sbRecord = toSupabase(credit);
+    console.log('📝 Criando crédito:', {
+      input: credit,
+      converted: sbRecord
+    });
     
     const { data, error } = await supabase
-      .from('loans')
+      .from('standalone_records')
       .insert([sbRecord])
       .select()
       .single();
 
     if (error) {
       console.error('❌ Erro ao criar crédito:', error);
+      console.error('Dados enviados:', sbRecord);
       return null;
     }
 
+    console.log('✅ Crédito criado:', data);
     const mapped = fromSupabase(data);
     db.add(mapped);
     
+    const { userId, userName } = getLogInfo();
+    logService.addLog({
+      userId,
+      userName,
+      action: 'create',
+      module: 'Financeiro',
+      description: `Crédito criado: ${mapped.description} - R$ ${mapped.originalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+      entityId: mapped.id
+    });
+    void auditService.logAction('create', 'Financeiro', `Crédito criado: ${mapped.description} - R$ ${mapped.originalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, {
+      entityType: 'credit',
+      entityId: mapped.id,
+      metadata: { subType: mapped.subType, bankAccount: mapped.bankAccount }
+    });
+
     invalidateDashboardCache();
     invalidateFinancialCache();
 
@@ -147,7 +184,7 @@ export const update = async (id: string, updates: Partial<FinancialRecord>): Pro
     const sbUpdates = toSupabase(updates as FinancialRecord);
     
     const { data, error } = await supabase
-      .from('loans')
+      .from('standalone_records')
       .update(sbUpdates)
       .eq('id', id)
       .select()
@@ -162,6 +199,21 @@ export const update = async (id: string, updates: Partial<FinancialRecord>): Pro
     const records = db.getAll();
     const updated = records.map(r => r.id === id ? mapped : r);
     db.setAll(updated);
+
+    const { userId, userName } = getLogInfo();
+    logService.addLog({
+      userId,
+      userName,
+      action: 'update',
+      module: 'Financeiro',
+      description: `Crédito atualizado: ${mapped.description} - R$ ${mapped.originalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+      entityId: mapped.id
+    });
+    void auditService.logAction('update', 'Financeiro', `Crédito atualizado: ${mapped.description} - R$ ${mapped.originalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, {
+      entityType: 'credit',
+      entityId: mapped.id,
+      metadata: { subType: mapped.subType, bankAccount: mapped.bankAccount }
+    });
 
     invalidateDashboardCache();
     invalidateFinancialCache();
@@ -179,7 +231,7 @@ export const update = async (id: string, updates: Partial<FinancialRecord>): Pro
 export const remove = async (id: string): Promise<boolean> => {
   try {
     const { error } = await supabase
-      .from('loans')
+      .from('standalone_records')
       .delete()
       .eq('id', id);
 
@@ -190,6 +242,20 @@ export const remove = async (id: string): Promise<boolean> => {
 
     const records = db.getAll();
     db.setAll(records.filter(r => r.id !== id));
+
+    const { userId, userName } = getLogInfo();
+    logService.addLog({
+      userId,
+      userName,
+      action: 'delete',
+      module: 'Financeiro',
+      description: `Crédito removido: ${id}`,
+      entityId: id
+    });
+    void auditService.logAction('delete', 'Financeiro', `Crédito removido: ${id}`, {
+      entityType: 'credit',
+      entityId: id
+    });
 
     invalidateDashboardCache();
     invalidateFinancialCache();
@@ -212,7 +278,7 @@ export const subscribe = (callback: (credits: FinancialRecord[]) => void): (() =
       {
         event: '*',
         schema: 'public',
-        table: 'loans',
+        table: 'standalone_records',
         filter: `sub_type=in.(credit_income,investment)`,
       },
       async () => {

@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { Mail, Lock, ArrowRight, Loader2, AlertCircle, MapPin, Clock, Calendar, Quote as QuoteIcon, ArrowLeft, KeyRound, ShieldCheck, UserCheck } from 'lucide-react';
+import logo2 from '../../Logo2.png';
+import { Mail, Lock, ArrowRight, Loader2, AlertCircle, MapPin, Clock, Calendar, Quote as QuoteIcon, ArrowLeft, KeyRound, ShieldCheck, UserCheck, Eye, EyeOff } from 'lucide-react';
 import { authService } from '../../services/authService';
 import { userService, UserData } from '../../services/userService';
 import { quoteService, Quote } from '../../services/quoteService';
@@ -17,10 +18,19 @@ const LoginScreen: React.FC<Props> = ({ onLoginSuccess }) => {
   const { addToast } = useToast();
   
   // Login State
-  const [email, setEmail] = useState('admin');
+  const [email, setEmail] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    const remember = localStorage.getItem('login_remember') === 'true';
+    return remember ? (localStorage.getItem('login_email') || '') : '';
+  });
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [rememberMe, setRememberMe] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('login_remember') === 'true';
+  });
 
   // Recovery State
   const [isRecovering, setIsRecovering] = useState(false);
@@ -36,6 +46,27 @@ const LoginScreen: React.FC<Props> = ({ onLoginSuccess }) => {
   const [location, setLocation] = useState<string>('Localizando...');
   const [dailyQuote, setDailyQuote] = useState<Quote | null>(null);
   const [backgroundImage, setBackgroundImage] = useState('');
+  const [publicLoginImages] = useState<string[]>([
+    '/login-images/login.jpg',
+    '/login-images/banner-1.jpg',
+    '/login-images/banner-2.jpg',
+    '/login-images/banner-3.jpg',
+    '/login-images/banner-4.jpg',
+    '/login-images/banner-5.jpg',
+    '/login-images/banner-6.jpg',
+    '/login-images/banner-7.jpg',
+    '/login-images/banner-8.jpg',
+    '/login-images/banner-9.jpg',
+    '/login-images/banner-10.jpg',
+    '/login-images/banner-11.jpg',
+  ]);
+
+  // Log de montagem (roda APENAS UMA VEZ)
+  useEffect(() => {
+    console.log('%c[LOGIN_SCREEN] 🎬 Componente MONTADO!', 'background: #1a1a2e; color: #00ff88; font-size: 14px; font-weight: bold;');
+    console.log('[LOGIN_SCREEN] ⏰ Timestamp:', new Date().toISOString());
+    console.log('[LOGIN_SCREEN] 📋 Props recebidas:', { hasOnLoginSuccess: !!onLoginSuccess });
+  }, []); // Array vazio = roda apenas no mount
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -44,30 +75,67 @@ const LoginScreen: React.FC<Props> = ({ onLoginSuccess }) => {
     return () => clearInterval(timer);
   }, []);
 
-  useEffect(() => {
+useEffect(() => {
     setDailyQuote(quoteService.getDailyQuote());
     
-    // Carregar imagem de fundo do loginScreenService (Supabase) ou fallback para settingsService (localStorage)
+    // Carregar imagem de fundo com fallback correto
+    // Ordem: Supabase → Imagens Públicas → localStorage → Padrão
     const loadBackgroundImage = async () => {
       try {
-        const screens = await loginScreenService.loadActiveScreens();
-        if (screens && screens.length > 0) {
-          // Buscar primeira imagem ativa
-          const firstScreen = screens.sort((a, b) => a.sequence_order - b.sequence_order)[0];
-          if (firstScreen && (firstScreen.image_url || firstScreen.image_data)) {
-            setBackgroundImage(firstScreen.image_url || firstScreen.image_data || '');
-          } else {
-            // Fallback para settingsService se não houver imagens no Supabase
-            setBackgroundImage(settingsService.getActiveLoginImage());
+        // 1. TENTAR SUPABASE (Requer autenticação)
+        // Não bloqueia a tela - falha rapidamente se não autenticado
+        try {
+          const screens = await Promise.race([
+            loginScreenService.loadActiveScreens(),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 1500))
+          ]);
+          
+          if (screens && Array.isArray(screens) && screens.length > 0) {
+            const firstScreen = screens[0];
+            if (firstScreen?.image_url) {
+              console.log('✅ LoginScreen: Usando image_url do Supabase');
+              setBackgroundImage(firstScreen.image_url);
+              return;
+            } else if (firstScreen?.image_data) {
+              console.log('✅ LoginScreen: Usando image_data (base64) do Supabase');
+              setBackgroundImage(firstScreen.image_data);
+              return;
+            }
           }
-        } else {
-          // Fallback para settingsService
-          setBackgroundImage(settingsService.getActiveLoginImage());
+        } catch (supabaseError) {
+          console.log('⚠️ LoginScreen: Supabase indisponível (esperado antes do login):', supabaseError);
         }
+
+        // 2. TENTAR IMAGENS PÚBLICAS (Sem autenticação - Prioridade!)
+        // Isso resolve o problema de autenticação na tela de login
+        if (publicLoginImages && publicLoginImages.length > 0) {
+          const now = new Date();
+          const dayOfYear = Math.floor(
+            (now.getTime() - new Date(now.getFullYear(), 0, 0).getTime()) / 86400000
+          );
+          const imageIndex = dayOfYear % publicLoginImages.length;
+          const selectedImage = publicLoginImages[imageIndex];
+          
+          console.log(`✅ LoginScreen: Usando imagem pública [${imageIndex + 1}/${publicLoginImages.length}]: ${selectedImage}`);
+          setBackgroundImage(selectedImage);
+          return;
+        }
+
+        // 3. FALLBACK: localStorage
+        const fallbackImage = settingsService.getActiveLoginImage();
+        if (fallbackImage) {
+          console.log('✅ LoginScreen: Usando imagem do localStorage');
+          setBackgroundImage(fallbackImage);
+          return;
+        }
+
+        // 4. FALLBACK: Imagem padrão
+        console.log('⚠️ LoginScreen: Sem imagem configurada, usando padrão');
+        setBackgroundImage('https://images.unsplash.com/photo-1551467013-eb30663473f6?q=80&w=1600');
       } catch (error) {
-        console.error('Erro ao carregar imagem de fundo:', error);
-        // Fallback em caso de erro
-        setBackgroundImage(settingsService.getActiveLoginImage());
+        console.error('❌ LoginScreen: Erro ao carregar imagem de fundo:', error);
+        // Fallback final
+        setBackgroundImage('https://images.unsplash.com/photo-1551467013-eb30663473f6?q=80&w=1600');
       }
     };
     
@@ -75,9 +143,9 @@ const LoginScreen: React.FC<Props> = ({ onLoginSuccess }) => {
     
     // Listener para atualização em tempo real das imagens
     const handleLoginScreenUpdate = () => {
+      console.log('🔄 LoginScreen: Atualizando imagem de fundo...');
       loadBackgroundImage();
     };
-    
     window.addEventListener('login_screens:updated', handleLoginScreenUpdate);
 
     // Use environment variable for IP API if available, or fetch carefully
@@ -101,26 +169,72 @@ const LoginScreen: React.FC<Props> = ({ onLoginSuccess }) => {
       controller.abort();
       window.removeEventListener('login_screens:updated', handleLoginScreenUpdate);
     };
-  }, []);
+  }, []); // ✅ Array vazio - roda apenas UMA VEZ no mount
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isLoading) return;
 
+    console.log('\n' + '='.repeat(80));
+    console.log('🔐 LOGIN INICIADO');
+    console.log('='.repeat(80));
+    console.log('📧 Email:', email);
+    console.log('🕐 Timestamp:', new Date().toISOString());
+
     setError('');
     setIsLoading(true);
+    console.log('⏳ isLoading definido como true');
 
     try {
+      console.log('⏱️  Aguardando 800ms (delay de UX)...');
       // Simulate network delay for better UX and brute-force mitigation
       await new Promise(resolve => setTimeout(resolve, 800));
+      console.log('✅ Delay concluído');
+      
+      console.log('🔄 Chamando authService.login()...');
+      const loginStartTime = performance.now();
       const user = await authService.login(email, password);
+      const loginEndTime = performance.now();
+      
+      console.log('✅ authService.login() sucesso!');
+      console.log('⏱️  Tempo de login:', (loginEndTime - loginStartTime).toFixed(2) + 'ms');
+      console.log('👤 Usuário autenticado:', user.email);
+      console.log('🆔 User ID:', user.id);
+      console.log('📍 Role:', user.role);
+      
+      // Inicializar serviços que dependem de autenticação
+      console.log('🔄 Inicializando loginScreenService.startRealtime()...');
+      loginScreenService.startRealtime();
+      console.log('✅ loginScreenService iniciado');
+      
+      console.log('[LOGIN_SCREEN] 📤 Preparando para chamar onLoginSuccess()...');
+      console.log('[LOGIN_SCREEN] 👤 Usuário para enviar:', user.email);
+      console.log('[LOGIN_SCREEN] 🎯 onLoginSuccess é função?', typeof onLoginSuccess === 'function');
+      console.log('📤 Chamando onLoginSuccess()...');
       onLoginSuccess(user);
+      console.log('[LOGIN_SCREEN] ✅ onLoginSuccess() CHAMADO com sucesso!');
+      if (typeof window !== 'undefined') {
+        if (rememberMe) {
+          localStorage.setItem('login_email', email);
+          localStorage.setItem('login_remember', 'true');
+        } else {
+          localStorage.removeItem('login_email');
+          localStorage.removeItem('login_remember');
+        }
+      }
+      console.log('✅ onLoginSuccess() chamado');
+      
     } catch (err: any) {
+      console.error('❌ Erro ao realizar login:');
+      console.error('   Mensagem:', err.message);
+      console.error('   Stack:', err.stack);
       setError(err.message || 'Erro ao realizar login. Verifique suas credenciais.');
       // Clear password on error for security
       setPassword(''); 
     } finally {
+      console.log('⏳ isLoading definido como false');
       setIsLoading(false);
+      console.log('='.repeat(80) + '\n');
     }
   };
 
@@ -206,9 +320,9 @@ const LoginScreen: React.FC<Props> = ({ onLoginSuccess }) => {
       <div className="absolute top-6 left-6 z-20 animate-in slide-in-from-top-4 duration-700">
          <div className="flex items-center gap-3 bg-black/40 backdrop-blur-md border border-white/10 px-4 py-2 rounded-full shadow-lg hover:bg-black/50 transition-colors">
             <img 
-              src="/logo2.png" 
+              src={logo2} 
               alt="Dailabs Logo" 
-              className="w-6 h-6 rounded drop-shadow-[0_0_6px_rgba(16,185,129,0.5)]"
+              className="w-6 h-6 rounded"
             />
             <div className="flex flex-col leading-tight">
               <span className="text-white font-bold tracking-tight text-sm drop-shadow-md">Dailabs</span>
@@ -340,9 +454,8 @@ const LoginScreen: React.FC<Props> = ({ onLoginSuccess }) => {
                                     <UserCheck size={20} />
                                 </div>
                                 <div>
-                                    <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Usuário Identificado</p>
-                                    <p className="text-sm font-black text-emerald-900">{recoveryUser?.firstName} {recoveryUser?.lastName}</p>
-                                    <p className="text-xs text-emerald-700">{recoveryUser?.email}</p>
+                                    <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Email Identificado</p>
+                                    <p className="text-sm font-black text-emerald-900">{recoveryUser?.email}</p>
                                 </div>
                             </div>
 
@@ -404,7 +517,7 @@ const LoginScreen: React.FC<Props> = ({ onLoginSuccess }) => {
                         
                         <div className="space-y-4">
                             <div className="space-y-1.5">
-                            <label className="text-xs font-bold text-slate-600 uppercase ml-1 tracking-wide">Usuário / E-mail</label>
+                            <label className="text-xs font-bold text-slate-600 uppercase ml-1 tracking-wide">E-mail</label>
                             <div className="relative group">
                                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                                 <Mail className="h-5 w-5 text-slate-400 group-focus-within:text-emerald-600 transition-colors" />
@@ -415,7 +528,7 @@ const LoginScreen: React.FC<Props> = ({ onLoginSuccess }) => {
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 className={inputClass}
-                                placeholder="admin"
+                                placeholder="email@dominio.com"
                                 disabled={isLoading}
                                 />
                             </div>
@@ -428,7 +541,7 @@ const LoginScreen: React.FC<Props> = ({ onLoginSuccess }) => {
                                 <Lock className="h-5 w-5 text-slate-400 group-focus-within:text-emerald-600 transition-colors" />
                                 </div>
                                 <input
-                                type="password"
+                                type={showPassword ? "text" : "password"}
                                 required
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
@@ -436,6 +549,14 @@ const LoginScreen: React.FC<Props> = ({ onLoginSuccess }) => {
                                 placeholder="••••••••"
                                 disabled={isLoading}
                                 />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+                                    tabIndex={-1}
+                                >
+                                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                                </button>
                             </div>
                             </div>
                         </div>
@@ -443,7 +564,12 @@ const LoginScreen: React.FC<Props> = ({ onLoginSuccess }) => {
                         <div className="flex items-center justify-between pt-1">
                             <label className="flex items-center gap-2 cursor-pointer group select-none">
                             <div className="relative flex items-center">
-                                <input type="checkbox" className="peer h-4 w-4 cursor-pointer appearance-none rounded border border-slate-300 shadow transition-all checked:border-emerald-500 checked:bg-emerald-500 hover:shadow-md" />
+                                <input
+                                  type="checkbox"
+                                  checked={rememberMe}
+                                  onChange={(e) => setRememberMe(e.target.checked)}
+                                  className="peer h-4 w-4 cursor-pointer appearance-none rounded border border-slate-300 shadow transition-all checked:border-emerald-500 checked:bg-emerald-500 hover:shadow-md"
+                                />
                                 <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-white opacity-0 peer-checked:opacity-100">
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor" stroke="currentColor" strokeWidth="1">
                                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />

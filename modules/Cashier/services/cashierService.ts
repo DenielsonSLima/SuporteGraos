@@ -49,7 +49,7 @@ export const cashierService = {
         if (!acc) return;
 
         // CRÉDITOS reais que entram na conta
-        const isCredit = ['sales_order', 'receipt', 'loan_taken', 'Venda de Ativo'].includes(r.subType || '') || r.category === 'Venda de Ativo';
+        const isCredit = ['sales_order', 'receipt', 'loan_taken', 'credit_income', 'investment', 'Venda de Ativo'].includes(r.subType || '') || r.category === 'Venda de Ativo';
         
         addTx(acc.id, r.paidValue, r.issueDate, isCredit ? 'credit' : 'debit');
     });

@@ -325,5 +325,5 @@ export const standaloneRecordsService = {
   },
 };
 
-// Auto-inicializar ao carregar o módulo
-void standaloneRecordsService.initialize();
+// ❌ NÃO inicializar automaticamente - aguardar autenticação via supabaseInitService
+// void standaloneRecordsService.initialize();

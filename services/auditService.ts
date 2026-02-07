@@ -431,11 +431,12 @@ const startAllRealtime = () => {
 // INITIALIZATION
 // ============================================================================
 
-void Promise.all([
-  loadAuditLogsFromSupabase(),
-  loadUserSessionsFromSupabase(),
-  loadLoginHistoryFromSupabase()
-]);
+// ❌ NÃO inicializar automaticamente - aguardar autenticação via supabaseInitService
+// void Promise.all([
+//   loadAuditLogsFromSupabase(),
+//   loadUserSessionsFromSupabase(),
+//   loadLoginHistoryFromSupabase()
+// ]);
 
 // ============================================================================
 // EXPORT SERVICE

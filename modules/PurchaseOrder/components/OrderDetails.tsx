@@ -101,8 +101,11 @@ const OrderDetails: React.FC<Props> = ({ order, onBack, onEdit, onDelete, onFina
   };
 
   const onLoadingSave = (loading: Loading) => {
-    actions.handleSaveNewLoading(loading);
-    setShowLoadingForm(false);
+    try {
+      actions.handleSaveNewLoading(loading);
+    } finally {
+      setShowLoadingForm(false);
+    }
   };
 
   return (

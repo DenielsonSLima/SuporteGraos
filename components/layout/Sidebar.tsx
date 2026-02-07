@@ -1,5 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
+import logo2 from '../../Logo2.png';
 import { MENU_ITEMS, APP_NAME } from '../../constants';
 import { ModuleId, User as UserType } from '../../types';
 import { LogOut, User, Settings, ChevronRight } from 'lucide-react';
@@ -53,7 +54,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeModule, onNavigate, isOpen, cur
       <div className="flex h-16 items-center justify-center border-b border-slate-800 bg-slate-950/50 cursor-pointer" onClick={() => onNavigate(ModuleId.HOME)}>
         <div className="flex items-center gap-3">
           <img 
-            src="/logo2.png" 
+            src={logo2} 
             alt="Dailabs Logo" 
             className="w-10 h-10 rounded-lg"
           />

@@ -73,13 +73,19 @@ const startInitialBalanceRealtime = () => {
   }
 };
 
-loadFromSupabase();
+// ❌ NÃO inicializar automaticamente - aguardar autenticação
+// loadFromSupabase();
 startInitialBalanceRealtime();
 
 export const initialBalanceService = {
+  loadFromSupabase,
+  startRealtime: startInitialBalanceRealtime,
   getInitialBalances: () => balancesDb.getAll(),
 
-  subscribe: (callback: (items: InitialBalanceRecord[]) => void) => balancesDb.subscribe(callback),
+  subscribe: (callback: (items: InitialBalanceRecord[]) => void) => {
+    startInitialBalanceRealtime();
+    return balancesDb.subscribe(callback);
+  },
 
   addInitialBalance: async (balance: InitialBalanceRecord) => {
     const existing = balancesDb.getAll().find(b => b.accountId === balance.accountId);

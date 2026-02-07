@@ -115,7 +115,8 @@ const loadFromSupabase = async (): Promise<SalesOrder[]> => {
   }
 };
 
-void loadFromSupabase();
+// ❌ NÃO inicializar automaticamente - aguardar autenticação via supabaseInitService
+// void loadFromSupabase();
 
 const persistUpsert = async (order: SalesOrder) => {
   try {
@@ -164,7 +165,8 @@ const syncFromSupabase = async () => {
   }
 };
 
-void syncFromSupabase();
+// ❌ NÃO inicializar automaticamente - aguardar autenticação via supabaseInitService
+// void syncFromSupabase();
 
 const startRealtime = () => {
   if (realtimeChannel) return;
@@ -192,7 +194,8 @@ const startRealtime = () => {
     });
 };
 
-startRealtime();
+// ❌ NÃO inicializar automaticamente - aguardar autenticação
+// startRealtime();
 
 const getLogInfo = () => {
   const user = authService.getCurrentUser();
@@ -392,5 +395,12 @@ export const salesService = {
     })();
   },
 
-  subscribe: (callback: (items: SalesOrder[]) => void) => db.subscribe(callback)
+  subscribe: (callback: (items: SalesOrder[]) => void) => db.subscribe(callback),
+  
+  reload: () => {
+    isLoaded = false;
+    return loadFromSupabase();
+  },
+  loadFromSupabase,
+  startRealtime
 };

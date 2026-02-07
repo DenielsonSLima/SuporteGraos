@@ -1,62 +1,161 @@
 import React from 'react';
-import { TrendingUp, ChevronRight } from 'lucide-react';
+import { Calendar, Edit2, Trash2 } from 'lucide-react';
 import { FinancialRecord } from '../../types';
+import { bankAccountService } from '../../../../services/bankAccountService';
 
 interface Props {
   credits: FinancialRecord[];
-  onSelect: (id: string) => void;
+  onEdit: (credit: FinancialRecord) => void;
+  onDelete: (credit: FinancialRecord) => void;
+  groupBy?: 'none' | 'account_month';
 }
 
-const CreditList: React.FC<Props> = ({ credits, onSelect }) => {
+const CreditList: React.FC<Props> = ({ credits, onEdit, onDelete, groupBy = 'none' }) => {
   const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  const dateStr = (val: string) => new Date(val).toLocaleDateString('pt-BR');
 
-  // Ordenar créditos alfabeticamente por descrição
-  const sortedCredits = [...credits].sort((a, b) => 
-    (a.description || '').localeCompare(b.description || '', 'pt-BR')
+  const getAccountLabel = (accountId?: string) => {
+    if (!accountId) return 'Conta não informada';
+    const accounts = bankAccountService.getBankAccounts();
+    const account = accounts.find(a => a.id === accountId);
+    if (!account) return accountId;
+    return `${account.bankName}${account.owner ? ` - ${account.owner}` : ''}`;
+  };
+
+  const sortedCredits = [...credits].sort((a, b) =>
+    new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime()
   );
 
   if (credits.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
-        <TrendingUp size={48} className="text-slate-300 mb-4" />
-        <p className="font-black text-slate-400 uppercase tracking-widest">Nenhum crédito encontrado</p>
+      <div className="text-center py-20 text-slate-400 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50">
+        Nenhum crédito registrado neste período.
+      </div>
+    );
+  }
+
+  const renderTable = (rows: FinancialRecord[]) => (
+    <div className="overflow-x-auto">
+      <table className="w-full text-left text-sm text-slate-600">
+        <thead className="bg-slate-50 text-xs uppercase text-slate-400 font-medium">
+          <tr>
+            <th className="px-5 py-2 w-32">Data</th>
+            <th className="px-5 py-2">Descrição</th>
+            <th className="px-5 py-2 w-64">Conta</th>
+            <th className="px-5 py-2 text-right w-36">Valor</th>
+            <th className="px-5 py-2 text-center w-32">Ações</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-50">
+          {rows.map(credit => (
+            <tr
+              key={credit.id}
+              className="hover:bg-blue-50/30 transition-colors group"
+            >
+              <td className="px-5 py-3">
+                <div className="flex items-center gap-2">
+                  <Calendar size={14} className="text-slate-400 group-hover:text-blue-500 transition-colors" />
+                  <span className="text-slate-700 font-medium">
+                    {dateStr(credit.issueDate)}
+                  </span>
+                </div>
+              </td>
+              <td className="px-5 py-3">
+                <div className="font-medium text-slate-800">{credit.description || '-'}</div>
+                <div className="text-xs text-slate-500">{credit.entityName || ''}</div>
+              </td>
+              <td className="px-5 py-3 text-xs">
+                <span className="bg-slate-100 px-2 py-1 rounded text-slate-600">
+                  {getAccountLabel(credit.bankAccount)}
+                </span>
+              </td>
+              <td className="px-5 py-3 text-right font-bold text-emerald-600">
+                {currency(credit.originalValue || 0)}
+              </td>
+              <td className="px-5 py-3">
+                <div className="flex items-center justify-center gap-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEdit(credit);
+                    }}
+                    className="p-2 hover:bg-blue-100 rounded-lg text-blue-600 transition-colors"
+                    title="Editar"
+                  >
+                    <Edit2 size={16} />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete(credit);
+                    }}
+                    className="p-2 hover:bg-red-100 rounded-lg text-red-600 transition-colors"
+                    title="Excluir"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+
+  if (groupBy === 'account_month') {
+    const groupedByAccount: Record<string, FinancialRecord[]> = {};
+    sortedCredits.forEach((credit) => {
+      const accountLabel = getAccountLabel(credit.bankAccount);
+      if (!groupedByAccount[accountLabel]) groupedByAccount[accountLabel] = [];
+      groupedByAccount[accountLabel].push(credit);
+    });
+
+    const accountLabels = Object.keys(groupedByAccount).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    const monthLabel = (dateValue: string) => new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(new Date(dateValue));
+
+    return (
+      <div className="space-y-6">
+        {accountLabels.map((accountLabel) => {
+          const creditsByAccount = groupedByAccount[accountLabel];
+          const groupedByMonth: Record<string, FinancialRecord[]> = {};
+          creditsByAccount.forEach((credit) => {
+            const d = new Date(credit.issueDate);
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            if (!groupedByMonth[key]) groupedByMonth[key] = [];
+            groupedByMonth[key].push(credit);
+          });
+
+          const monthKeys = Object.keys(groupedByMonth).sort((a, b) => b.localeCompare(a));
+
+          return (
+            <div key={accountLabel} className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+              <div className="px-5 py-3 border-b border-slate-200 bg-slate-50">
+                <div className="text-sm font-bold text-slate-700">Conta Bancária</div>
+                <div className="text-xs text-slate-500 mt-0.5">{accountLabel}</div>
+              </div>
+              {monthKeys.map((monthKey, index) => {
+                const rows = groupedByMonth[monthKey];
+                const monthHeader = monthLabel(rows[0].issueDate);
+                return (
+                  <div key={monthKey} className={index === 0 ? '' : 'border-t border-slate-200'}>
+                    <div className="px-5 py-2 bg-white text-xs font-bold text-slate-600">
+                      {monthHeader}
+                    </div>
+                    {renderTable(rows)}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {sortedCredits.map(credit => (
-        <div 
-          key={credit.id} 
-          onClick={() => onSelect(credit.id)}
-          className="group cursor-pointer bg-white rounded-3xl border border-slate-200 p-6 shadow-sm hover:shadow-xl hover:border-emerald-400 transition-all relative overflow-hidden"
-        >
-           <div className="flex justify-between items-start mb-6">
-              <div className="p-3 rounded-2xl bg-emerald-50 text-emerald-600">
-                  <TrendingUp size={24} />
-              </div>
-              <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase border ${credit.status === 'pending' || credit.status === 'partial' ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
-                  {credit.status === 'paid' ? 'Recebido' : credit.status === 'pending' ? 'Pendente' : 'Parcial'}
-              </span>
-           </div>
-           
-           <h3 className="text-lg font-black text-slate-900 uppercase tracking-tighter italic line-clamp-1">{credit.description || 'Crédito'}</h3>
-           <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Data: {new Date(credit.issueDate).toLocaleDateString()}</p>
-
-           <div className="mt-8 pt-6 border-t border-slate-50 flex justify-between items-end">
-              <div>
-                  <span className="text-[9px] font-black text-slate-400 uppercase block mb-1">Capital</span>
-                  <p className="text-2xl font-black tracking-tighter text-emerald-600">
-                      {currency(credit.originalValue || 0)}
-                  </p>
-              </div>
-              <div className="p-2 bg-slate-50 rounded-xl group-hover:bg-slate-900 group-hover:text-white transition-all">
-                  <ChevronRight size={18} />
-              </div>
-           </div>
-        </div>
-      ))}
+    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+      {renderTable(sortedCredits)}
     </div>
   );
 };

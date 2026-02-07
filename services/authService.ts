@@ -1,85 +1,163 @@
 import { User } from '../types';
 import { logService } from './logService';
 import { auditService } from './auditService';
-import { supabase } from './supabase';
+import { supabase, getSupabaseSession, onAuthStateChange } from './supabase';
 
 const STORAGE_KEY = 'sg_user';
 let currentSessionId: string | null = null;
 
+const normalizeRole = (value?: string | null): 'admin' | 'manager' | 'user' => {
+  const role = (value || '').trim().toLowerCase();
+  if (['admin', 'administrator', 'administrador'].includes(role)) {
+    return 'admin';
+  }
+  if (['manager', 'gerente'].includes(role)) {
+    return 'manager';
+  }
+  return 'user';
+};
+
+// ============================================================================
+// TIPOS
+// ============================================================================
+
+// ============================================================================
+// AUTH SERVICE COM SUPABASE AUTH
+// ============================================================================
+
 export const authService = {
   /**
-   * Login usando função Supabase (bcrypt no servidor)
+   * Login usando Supabase Auth (signInWithPassword)
+   * Busca dados adicionais do usuário na tabela app_users
    */
   login: async (email: string, password: string): Promise<User> => {
-    try {
-      console.log('🔐 Autenticando via Supabase...');
-      console.log('📧 Email:', email);
-      console.log('🔑 Senha length:', password.length);
+    const loginTraceId = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : `login-${Date.now()}`;
+    const loginStart = typeof performance !== 'undefined' ? performance.now() : Date.now();
 
-      // Chamar função SQL que valida bcrypt no servidor
-      const { data, error } = await supabase.rpc('authenticate_user', {
-        p_email: email,
-        p_password: password
+    console.log('%c╔════════════════════════════════════╗', 'color: orange; font-weight: bold;');
+    console.log('%c║  🔐 AUTH SERVICE - LOGIN INICIADO  ║', 'color: orange; font-weight: bold;');
+    console.log('%c╚════════════════════════════════════╝', 'color: orange; font-weight: bold;');
+    console.log('[AUTH] 🧭 Trace ID:', loginTraceId);
+    console.log('[AUTH] 📧 Email recebido:', email);
+    console.log('[AUTH] 🕐 Timestamp:', new Date().toISOString());
+    
+    try {
+      console.log('[AUTH] 🔐 Autenticando via Supabase Auth...');
+
+      // 1. Autenticar com Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password
       });
 
-      console.log('🔍 Raw response:', { data, error });
-
-      if (error) {
-        console.error('❌ Erro Supabase:', error);
-        void auditService.recordLogin(email, false, 'Erro no servidor');
-        throw new Error('Erro ao processar autenticação.');
+      if (authError) {
+        const elapsedMs = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - loginStart;
+        console.warn('[AUTH] ⚠️ Supabase Auth falhou:', {
+          traceId: loginTraceId,
+          message: authError.message,
+          code: authError.code,
+          status: authError.status,
+          elapsedMs: Math.round(elapsedMs)
+        });
+        void auditService.recordLogin(email, false, authError.message || 'Falha ao autenticar');
+        throw new Error(authError.message || 'Erro ao processar autenticacao.');
       }
 
-      console.log('📦 Resposta completa:', JSON.stringify(data, null, 2));
-
-      if (!data || !data.success) {
-        void auditService.recordLogin(email, false, data?.error || 'Credenciais inválidas');
-        throw new Error(data?.error || 'Credenciais inválidas.');
+      if (!authData.user || !authData.session) {
+        const elapsedMs = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - loginStart;
+        console.error('[AUTH] ❌ Sessão inválida - authData.user ou authData.session é null', {
+          traceId: loginTraceId,
+          hasUser: !!authData.user,
+          hasSession: !!authData.session,
+          elapsedMs: Math.round(elapsedMs)
+        });
+        void auditService.recordLogin(email, false, 'Sessão inválida');
+        throw new Error('Falha ao criar sessão de autenticação.');
       }
 
-      const dbUser = data.user;
+      console.log('[AUTH] ✅ Autenticação Supabase bem-sucedida!');
+      console.log('[AUTH] 👤 User ID:', authData.user.id);
+      console.log('[AUTH] 🎫 Access Token (20 primeiros chars):', authData.session.access_token.substring(0, 20) + '...');
 
-      // Gerar token simples (JWT no backend seria melhor, mas por ora token mock)
-      const accessToken = `secure-token-${dbUser.id}-${Date.now()}`;
+      const metadata = (authData.user.user_metadata || {}) as Record<string, any>;
+      const firstName = metadata.first_name || authData.user.email?.split('@')[0] || 'Usuario';
+      const lastName = metadata.last_name || '';
+      const roleValue = normalizeRole(metadata.role);
+      const isActive = metadata.active !== undefined ? !!metadata.active : true;
 
-      // Criar sessão do usuário
+      if (!isActive) {
+        await supabase.auth.signOut();
+        void auditService.recordLogin(email, false, 'Usuário inativo');
+        throw new Error('Usuário inativo. Contate o administrador.');
+      }
+
       const userSession: User = {
-        id: dbUser.id,
-        name: `${dbUser.first_name} ${dbUser.last_name}`,
-        email: dbUser.email,
-        role: dbUser.role === 'Administrador' ? 'admin' : 'user',
-        token: accessToken,
-        avatar: `https://ui-avatars.com/api/?name=${dbUser.first_name}+${dbUser.last_name}&background=0D8ABC&color=fff`
+        id: authData.user.id,
+        name: `${firstName} ${lastName}`.trim(),
+        email: authData.user.email || email,
+        role: roleValue,
+        token: authData.session.access_token,
+        avatar: `https://ui-avatars.com/api/?name=${firstName}+${lastName}&background=0D8ABC&color=fff`
       };
 
-      // Salvar sessão
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(userSession));
+      console.log('[AUTH] 👤 UserSession criado:', {
+        id: userSession.id,
+        name: userSession.name,
+        email: userSession.email,
+        role: userSession.role
+      });
 
-      // Log de auditoria
+      // 5. Salvar sessão
+      console.log('[AUTH] 💾 Salvando sessão no sessionStorage...');
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(userSession));
+      console.log('[AUTH] ✅ Sessão salva com sucesso');
+
+      // 6. Log de auditoria
+      console.log('[AUTH] 📝 Criando log de auditoria...');
       logService.addLog({
-        userId: dbUser.id,
+        userId: authData.user.id,
         userName: userSession.name,
         action: 'login',
         module: 'Sistema',
-        description: `Acesso realizado via Supabase (Seguro).`
+        description: 'Acesso realizado via Supabase Auth'
       });
 
+      console.log('[AUTH] 📊 Gravando login no auditService...');
       void auditService.recordLogin(email, true);
 
-      // Criar sessão
+      // 7. Criar sessão de auditoria
+      console.log('[AUTH] 🔐 Criando sessão de auditoria...');
       const session = await auditService.createSession();
       currentSessionId = session.id;
+      console.log('[AUTH] ✅ Sessão de auditoria criada com ID:', currentSessionId);
 
-      console.log('✅ Login bem-sucedido!');
+      console.log('%c╔════════════════════════════════════╗', 'color: green; font-weight: bold;');
+      console.log('%c║  ✅ LOGIN COMPLETO BEM-SUCEDIDO!  ║', 'color: green; font-weight: bold;');
+      console.log('%c╚════════════════════════════════════╝', 'color: green; font-weight: bold;');
+      const elapsedMs = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - loginStart;
+      console.log('[AUTH] ✅ Duração total do login (ms):', Math.round(elapsedMs));
+      console.log('[AUTH] 🧭 Trace ID final:', loginTraceId);
+      console.log('[AUTH] 📤 Retornando userSession completo:', userSession);
+      
       return userSession;
 
     } catch (error: any) {
-      console.error('❌ Erro no login:', error.message);
+      const elapsedMs = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - loginStart;
+      console.error('❌ Erro no login:', {
+        traceId: loginTraceId,
+        message: error?.message || String(error),
+        elapsedMs: Math.round(elapsedMs)
+      });
       throw error;
     }
   },
 
-  logout: () => {
+  /**
+   * Logout - encerra sessão Supabase e local
+   */
+  logout: async () => {
     const user = authService.getCurrentUser();
 
     if (user) {
@@ -91,10 +169,17 @@ export const authService = {
       }
     }
 
+    // Fazer logout no Supabase Auth
+    await supabase.auth.signOut();
+
+    // Limpar storage local
     sessionStorage.removeItem(STORAGE_KEY);
     sessionStorage.clear();
   },
 
+  /**
+   * Obtém usuário atual do sessionStorage
+   */
   getCurrentUser: (): User | null => {
     const userStr = sessionStorage.getItem(STORAGE_KEY);
     if (!userStr) return null;
@@ -102,18 +187,123 @@ export const authService = {
     try {
       return JSON.parse(userStr);
     } catch {
+      sessionStorage.removeItem(STORAGE_KEY);
       return null;
     }
   },
 
+  /**
+   * Verifica se usuário está autenticado
+   */
   isAuthenticated: (): boolean => {
-    return authService.getCurrentUser() !== null;
+    return !!authService.getCurrentUser();
   },
 
-  hasPermission: (permission: string): boolean => {
+  /**
+   * Verifica se usuário tem permissão específica
+   */
+  hasPermission: (requiredRole: 'admin' | 'manager' | 'user'): boolean => {
     const user = authService.getCurrentUser();
     if (!user) return false;
     if (user.role === 'admin') return true;
+    if (user.role === requiredRole) return true;
     return false;
+  },
+
+  /**
+   * Verifica e restaura sessão do Supabase ao carregar app
+   */
+  restoreSession: async (): Promise<User | null> => {
+    const restoreTraceId = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : `restore-${Date.now()}`;
+    const restoreStart = typeof performance !== 'undefined' ? performance.now() : Date.now();
+
+    try {
+      console.log('[AUTH] 🔁 RestoreSession iniciado:', restoreTraceId);
+      const session = await getSupabaseSession();
+      
+      if (!session || !session.user) {
+        const elapsedMs = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - restoreStart;
+        console.log('[AUTH] ℹ️ Nenhuma sessão Supabase encontrada:', {
+          traceId: restoreTraceId,
+          elapsedMs: Math.round(elapsedMs)
+        });
+        sessionStorage.removeItem(STORAGE_KEY);
+        return null;
+      }
+
+      // Verificar se já temos dados no sessionStorage
+      const storedUser = authService.getCurrentUser();
+      if (storedUser) {
+        const elapsedMs = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - restoreStart;
+        console.log('✅ Sessão restaurada do storage', {
+          traceId: restoreTraceId,
+          elapsedMs: Math.round(elapsedMs)
+        });
+        return storedUser;
+      }
+
+      // Se não tem no storage mas tem sessão Supabase, buscar dados
+      console.log('🔄 Restaurando sessão do Supabase...', {
+        traceId: restoreTraceId,
+        email: session.user.email
+      });
+      
+      const metadata = (session.user.user_metadata || {}) as Record<string, any>;
+      const firstName = metadata.first_name || session.user.email?.split('@')[0] || 'Usuario';
+      const lastName = metadata.last_name || '';
+      const roleValue = normalizeRole(metadata.role);
+      const isActive = metadata.active !== undefined ? !!metadata.active : true;
+
+      if (!isActive) {
+        const elapsedMs = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - restoreStart;
+        console.log('[AUTH] ℹ️ RestoreSession usuario inativo:', {
+          traceId: restoreTraceId,
+          elapsedMs: Math.round(elapsedMs)
+        });
+        return null;
+      }
+
+      const userSession: User = {
+        id: session.user.id,
+        name: `${firstName} ${lastName}`.trim(),
+        email: session.user.email || '',
+        role: roleValue,
+        token: session.access_token,
+        avatar: `https://ui-avatars.com/api/?name=${firstName}+${lastName}&background=0D8ABC&color=fff`
+      };
+
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(userSession));
+      const elapsedMs = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - restoreStart;
+      console.log('✅ Sessão restaurada com sucesso', {
+        traceId: restoreTraceId,
+        elapsedMs: Math.round(elapsedMs)
+      });
+      return userSession;
+    } catch (error) {
+      const elapsedMs = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - restoreStart;
+      console.error('❌ Erro ao restaurar sessão:', {
+        traceId: restoreTraceId,
+        error,
+        elapsedMs: Math.round(elapsedMs)
+      });
+      return null;
+    }
+  },
+
+  /**
+   * Observa mudanças no estado de autenticação
+   */
+  onAuthStateChanged: (callback: (user: User | null) => void) => {
+    return onAuthStateChange(async (session) => {
+      if (session && session.user) {
+        const user = await authService.restoreSession();
+        callback(user);
+      } else {
+        sessionStorage.removeItem(STORAGE_KEY);
+        callback(null);
+      }
+    });
   }
 };

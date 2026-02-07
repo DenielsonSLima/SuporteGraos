@@ -3,6 +3,9 @@ import { supabase } from '../supabase';
 import { invalidateDashboardCache } from '../dashboardCache';
 import { invalidateFinancialCache } from '../financialCache';
 import { FinancialRecord } from '../../modules/Financial/types';
+import { logService } from '../logService';
+import { auditService } from '../auditService';
+import { authService } from '../authService';
 
 // Tipos de empréstimos
 export type LoanType = 'loan_taken' | 'loan_granted';
@@ -15,6 +18,14 @@ export interface Loan extends FinancialRecord {
 const db = new Persistence<FinancialRecord>('loans', [], { useStorage: false });
 let realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
 let isLoaded = false;
+
+const getLogInfo = () => {
+  const user = authService.getCurrentUser();
+  return {
+    userId: user?.id || 'system',
+    userName: user?.name || 'Sistema'
+  };
+};
 
 // ============================================================================
 // MAPEAMENTO
@@ -181,8 +192,9 @@ const persistDelete = async (id: string) => {
   }
 };
 
-void loadFromSupabase();
-startRealtime();
+// ❌ NÃO inicializar automaticamente - aguardar autenticação via supabaseInitService
+// void loadFromSupabase();
+// startRealtime();
 
 // ============================================================================
 // EXPORT SERVICE
@@ -239,6 +251,21 @@ export const loansService = {
       void persistUpsert(rec);
     });
 
+    const { userId, userName } = getLogInfo();
+    logService.addLog({
+      userId,
+      userName,
+      action: 'create',
+      module: 'Financeiro',
+      description: `Empréstimo criado: ${item.description} - R$ ${item.originalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+      entityId: item.id
+    });
+    void auditService.logAction('create', 'Financeiro', `Empréstimo criado: ${item.description} - R$ ${item.originalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, {
+      entityType: 'loan',
+      entityId: item.id,
+      metadata: { subType: item.subType, bankAccount: item.bankAccount }
+    });
+
     // NÃO atualizar saldo manualmente - o sistema já calcula baseado nas transações (receipt/admin)
     // O registro 'receipt' com status='paid' será processado pelo cashierService automaticamente
 
@@ -249,6 +276,21 @@ export const loansService = {
   update: (item: FinancialRecord) => {
     db.update(item);
     void persistUpsert(item);
+
+    const { userId, userName } = getLogInfo();
+    logService.addLog({
+      userId,
+      userName,
+      action: 'update',
+      module: 'Financeiro',
+      description: `Empréstimo atualizado: ${item.description} - R$ ${item.originalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+      entityId: item.id
+    });
+    void auditService.logAction('update', 'Financeiro', `Empréstimo atualizado: ${item.description} - R$ ${item.originalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, {
+      entityType: 'loan',
+      entityId: item.id,
+      metadata: { subType: item.subType, bankAccount: item.bankAccount }
+    });
     invalidateFinancialCache();
     invalidateDashboardCache();
   },
@@ -267,6 +309,20 @@ export const loansService = {
     
     db.delete(debitId);
     void persistDelete(debitId);
+
+    const { userId, userName } = getLogInfo();
+    logService.addLog({
+      userId,
+      userName,
+      action: 'delete',
+      module: 'Financeiro',
+      description: `Empréstimo removido: ${id}`,
+      entityId: id
+    });
+    void auditService.logAction('delete', 'Financeiro', `Empréstimo removido: ${id}`, {
+      entityType: 'loan',
+      entityId: id
+    });
     
     invalidateFinancialCache();
     invalidateDashboardCache();

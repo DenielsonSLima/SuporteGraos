@@ -166,8 +166,9 @@ const persistDelete = async (id: string) => {
   }
 };
 
-void loadFromSupabase();
-startRealtime();
+// ❌ NÃO inicializar automaticamente - aguardar autenticação via supabaseInitService
+// void loadFromSupabase();
+// startRealtime();
 
 // ============================================================================
 // EXPORT SERVICE

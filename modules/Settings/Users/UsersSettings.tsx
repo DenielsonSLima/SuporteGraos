@@ -31,7 +31,6 @@ import { useToast } from '../../../contexts/ToastContext';
 import ActionConfirmationModal from '../../../components/ui/ActionConfirmationModal';
 import { authService } from '../../../services/authService';
 import { validatePasswordStrength, getStrengthColor, getStrengthLabel } from '../../../utils/passwordValidator';
-import { supabase } from '../../../services/supabase';
 
 interface PasswordStrength {
   score: number;
@@ -43,6 +42,8 @@ interface PasswordStrength {
 interface Props {
   onBack: () => void;
 }
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const UsersSettings: React.FC<Props> = ({ onBack }) => {
   const { addToast } = useToast();
@@ -57,7 +58,7 @@ const UsersSettings: React.FC<Props> = ({ onBack }) => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPasswordFields, setShowPasswordFields] = useState(false);
-  const [passwordMode, setPasswordMode] = useState<'auto' | 'manual'>('auto');
+  const [passwordMode, setPasswordMode] = useState<'auto' | 'manual'>('manual');
   const [expandedModules, setExpandedModules] = useState<string[]>([]);
 
   // Data
@@ -79,40 +80,6 @@ const UsersSettings: React.FC<Props> = ({ onBack }) => {
       setUsers(data);
     };
     loadUsers();
-
-    // 🔴 REALTIME: Inscrever para mudanças na tabela app_users
-    const subscription = supabase
-      .channel('users_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*', // INSERT, UPDATE, DELETE
-          schema: 'public',
-          table: 'app_users'
-        },
-        async (payload) => {
-          console.log('🔄 Mudança detectada na tabela app_users:', payload);
-          
-          // Recarregar lista automaticamente
-          const updatedData = await userService.getAll();
-          setUsers(updatedData);
-          
-          // Mostrar notificação
-          if (payload.eventType === 'INSERT') {
-            addToast('info', 'Novo usuário', 'Um usuário foi adicionado ao sistema.');
-          } else if (payload.eventType === 'UPDATE') {
-            addToast('info', 'Usuário atualizado', 'Um usuário foi modificado.');
-          } else if (payload.eventType === 'DELETE') {
-            addToast('info', 'Usuário removido', 'Um usuário foi excluído do sistema.');
-          }
-        }
-      )
-      .subscribe();
-
-    // Cleanup: Cancelar inscrição quando componente desmontar
-    return () => {
-      subscription.unsubscribe();
-    };
   }, []);
 
   const refreshList = async () => {
@@ -148,6 +115,7 @@ const UsersSettings: React.FC<Props> = ({ onBack }) => {
     setPassword('');
     setConfirmPassword('');
     setShowPasswordFields(true);
+    setPasswordMode('manual');
     setEditingId(null);
     setViewMode('form');
   };
@@ -197,6 +165,21 @@ const UsersSettings: React.FC<Props> = ({ onBack }) => {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    const normalizedEmail = (formData.email || '').trim().toLowerCase();
+    if (!EMAIL_REGEX.test(normalizedEmail)) {
+      addToast('error', 'E-mail inválido', 'Informe um endereço válido (ex: usuario@empresa.com).');
+      return;
+    }
+
+    const emailAlreadyInUse = users.some(u => (
+      (u.email || '').toLowerCase() === normalizedEmail && u.id !== editingId
+    ));
+
+    if (emailAlreadyInUse) {
+      addToast('error', 'E-mail duplicado', 'Já existe um usuário utilizando este e-mail.');
+      return;
+    }
+
     // Validar senha apenas se for modo manual
     if (!editingId && passwordMode === 'manual') {
       if (password !== confirmPassword) {
@@ -214,15 +197,16 @@ const UsersSettings: React.FC<Props> = ({ onBack }) => {
 
     try {
       if (editingId) {
-        const updateData: any = { ...formData, id: editingId };
+        const updateData: any = { ...formData, id: editingId, email: normalizedEmail };
         if (showPasswordFields && password) {
             updateData.password = password;
         }
-        userService.update(updateData);
+        await userService.update(updateData);
       } else {
         const newUser: UserData = { 
           ...formData, 
           id: Math.random().toString(36).substr(2, 9),
+          email: normalizedEmail,
           password: passwordMode === 'manual' ? password : ''
         } as UserData;
         
@@ -355,10 +339,26 @@ const UsersSettings: React.FC<Props> = ({ onBack }) => {
                     required 
                     value={formData.phone} 
                     onChange={e => {
-                      const value = e.target.value.replace(/\D/g, '').slice(0, 11);
-                      const formatted = value.length <= 10 
-                        ? value.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3').replace(/(\d{2})(\d{4})$/, '($1) $2').replace(/(\d{2})$/, '($1')
-                        : value.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3').replace(/(\d{2})(\d{5})$/, '($1) $2').replace(/(\d{2})$/, '($1');
+                      // Remove tudo que não é dígito
+                      const digits = e.target.value.replace(/\D/g, '').slice(0, 11);
+                      
+                      let formatted = '';
+                      if (digits.length === 0) {
+                        formatted = '';
+                      } else if (digits.length <= 2) {
+                        // (XX
+                        formatted = `(${digits}`;
+                      } else if (digits.length <= 6) {
+                        // (XX) XXXX
+                        formatted = `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+                      } else if (digits.length <= 10) {
+                        // (XX) XXXX-XXXX (telefone fixo com hífen)
+                        formatted = `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+                      } else if (digits.length === 11) {
+                        // (XX) XXXXX-XXXX (celular)
+                        formatted = `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+                      }
+                      
                       setFormData({...formData, phone: formatted});
                     }} 
                     placeholder="(00) 00000-0000"

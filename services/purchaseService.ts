@@ -128,7 +128,8 @@ const loadFromSupabase = async (): Promise<PurchaseOrder[]> => {
   }
 };
 
-void loadFromSupabase();
+// ❌ NÃO inicializar automaticamente - aguardar autenticação via supabaseInitService
+// void loadFromSupabase();
 
 const persistUpsert = async (order: PurchaseOrder) => {
   try {
@@ -219,7 +220,8 @@ const syncFromSupabase = async () => {
   }
 };
 
-void syncFromSupabase();
+// ❌ NÃO inicializar automaticamente - aguardar autenticação via supabaseInitService
+// void syncFromSupabase();
 
 // ============================================================================
 // SYNC DE PAYABLES PARA PEDIDOS EXISTENTES
@@ -533,5 +535,11 @@ export const purchaseService = {
       console.log('[PurchaseOrder Realtime] Unsubscribing');
       supabase.removeChannel(channel);
     };
-  }
+  },
+
+  reload: () => {
+    isLoaded = false;
+    return loadFromSupabase();
+  },
+  loadFromSupabase
 };

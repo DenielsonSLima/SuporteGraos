@@ -19,12 +19,9 @@ const styles = StyleSheet.create({
   },
   watermark: {
     position: 'absolute',
-    top: '50%',
-    left: '50%',
-    transform: 'translate(-50%, -50%)',
+    width: 300,
+    height: 300,
     opacity: 0.03,
-    width: '60%',
-    objectFit: 'contain',
   },
   header: {
     flexDirection: 'row',
@@ -43,7 +40,6 @@ const styles = StyleSheet.create({
   logo: {
     width: 40,
     height: 40,
-    objectFit: 'contain',
   },
   companyName: {
     fontSize: 12,
@@ -179,7 +175,9 @@ const PerformancePdfDocument: React.FC<Props> = ({ data, periodLabel }) => {
     <Document>
       <Page size="A4" orientation="landscape" style={styles.page}>
         {watermark.imageUrl && (
-          <Image src={watermark.imageUrl} style={styles.watermark} />
+          <View style={{ position: 'absolute', top: 150, left: 150, width: 300, height: 300, opacity: 0.03 }}>
+            <Image src={watermark.imageUrl} style={{ width: 300, height: 300 }} />
+          </View>
         )}
 
         <View style={styles.header}>

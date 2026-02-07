@@ -1,5 +1,6 @@
 
-import React, { useRef, useEffect } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import DOMPurify from 'dompurify';
 import { Send, Paperclip, XCircle, Bot, User, CheckCircle2, AlertTriangle } from 'lucide-react';
 
 interface Message {
@@ -81,7 +82,15 @@ const ChatInterface: React.FC<Props> = ({
                             ? 'bg-blue-600 text-white rounded-tr-none' 
                             : 'bg-slate-800 text-slate-200 border border-slate-700 rounded-tl-none'
                         }`}>
-                            <div dangerouslySetInnerHTML={{ __html: msg.text.replace(/\*\*(.*?)\*\*/g, '<strong class="text-white font-bold">$1</strong>').replace(/`([^`]+)`/g, '<code class="bg-black/30 px-1 rounded text-emerald-300 font-mono text-[10px]">$1</code>') }} />
+                                                        <div
+                                                            dangerouslySetInnerHTML={{
+                                                                __html: DOMPurify.sanitize(
+                                                                    msg.text
+                                                                        .replace(/\*\*(.*?)\*\*/g, '<strong class="text-white font-bold">$1</strong>')
+                                                                        .replace(/`([^`]+)`/g, '<code class="bg-black/30 px-1 rounded text-emerald-300 font-mono text-[10px]">$1</code>')
+                                                                )
+                                                            }}
+                                                        />
                         </div>
                     </div>
                 </div>

@@ -182,5 +182,5 @@ export const logService = {
   startRealtime
 };
 
-// Initialize
-void loadFromSupabase();
+// ❌ NÃO inicializar automaticamente - aguardar autenticação via supabaseInitService
+// void loadFromSupabase();
