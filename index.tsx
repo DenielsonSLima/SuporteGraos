@@ -3,6 +3,12 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 
+if (import.meta.env.PROD) {
+  console.log = () => {};
+  console.info = () => {};
+  console.debug = () => {};
+}
+
 console.log('%c╔════════════════════════════════════════╗', 'color: magenta; font-weight: bold; font-size: 14px;');
 console.log('%c║  🎯 INDEX.TSX - INICIANDO APLICAÇÃO  ║', 'color: magenta; font-weight: bold; font-size: 14px;');
 console.log('%c╚════════════════════════════════════════╝', 'color: magenta; font-weight: bold; font-size: 14px;');
