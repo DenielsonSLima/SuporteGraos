@@ -351,29 +351,32 @@ export const userService = {
   delete: async (id: string) => {
     try {
       const u = db.getById(id);
-      console.log('🗑️ Deletando usuário do Supabase Auth...');
+      console.log('🗑️ Desativando usuário no Supabase Auth...');
 
       const session = await getSupabaseSession();
       if (!session?.access_token) {
         throw new Error('Sessao invalida. Faca login novamente.');
       }
 
-      const { data, error } = await invokeAdminFunction('delete-user', 'delete', {
-        userId: id
+      const { data, error } = await invokeAdminFunction('update-user', 'update', {
+        userId: id,
+        active: false
       }, session);
 
       if (error || !data?.success) {
         const detailedMessage = data?.error
-          || (error ? await extractEdgeFunctionError(error) : 'Erro ao deletar usuario no Supabase Auth');
+          || (error ? await extractEdgeFunctionError(error) : 'Erro ao desativar usuario no Supabase Auth');
         if (error) {
           console.error('❌ Contexto erro delete-user:', error);
         }
-        console.error('❌ Erro ao deletar do Supabase Auth:', detailedMessage);
+        console.error('❌ Erro ao desativar no Supabase Auth:', detailedMessage);
         throw new Error(detailedMessage);
       }
 
-      console.log('✅ Usuário deletado do Supabase Auth');
-      db.delete(id);
+      console.log('✅ Usuário desativado no Supabase Auth');
+      if (u) {
+        db.update({ ...u, active: false });
+      }
 
       const { userId, userName } = getLogInfo();
       logService.addLog({
@@ -381,7 +384,7 @@ export const userService = {
         userName,
         action: 'delete',
         module: 'Configurações',
-        description: `Excluiu usuário: ${u?.firstName || 'Desconhecido'}`,
+        description: `Desativou usuário: ${u?.firstName || 'Desconhecido'}`,
         entityId: id
       });
     } catch (error: any) {

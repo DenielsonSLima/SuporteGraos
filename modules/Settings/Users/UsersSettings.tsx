@@ -70,6 +70,7 @@ const UsersSettings: React.FC<Props> = ({ onBack }) => {
 
   // Delete Confirmation Modal
   const [userToDelete, setUserToDelete] = useState<{ id: string; name: string } | null>(null);
+  const [userToActivate, setUserToActivate] = useState<UserData | null>(null);
 
   // Generated Password Modal
   const [generatedPasswordData, setGeneratedPasswordData] = useState<{ name: string; email: string; password: string } | null>(null);
@@ -153,12 +154,25 @@ const UsersSettings: React.FC<Props> = ({ onBack }) => {
     if (!userToDelete) return;
     try {
       await userService.delete(userToDelete.id);
-      addToast('success', 'Usuário excluído', 'Usuário removido do sistema com sucesso.');
+      addToast('success', 'Usuário desativado', 'Usuário desativado com sucesso.');
       await refreshList();
     } catch (error: any) {
-      addToast('error', 'Erro ao excluir', error.message);
+      addToast('error', 'Erro ao desativar', error.message);
     } finally {
       setUserToDelete(null);
+    }
+  };
+
+  const confirmActivate = async () => {
+    if (!userToActivate) return;
+    try {
+      await userService.update({ ...userToActivate, active: true });
+      addToast('success', 'Usuário ativado', 'Usuário ativado com sucesso.');
+      await refreshList();
+    } catch (error: any) {
+      addToast('error', 'Erro ao ativar', error.message);
+    } finally {
+      setUserToActivate(null);
     }
   };
 
@@ -249,12 +263,11 @@ const UsersSettings: React.FC<Props> = ({ onBack }) => {
           }
         } else {
           // Se adicionar um pai, seleciona todos os filhos automaticamente?
-          // Comportamento: Ao marcar o pai, seleciona todos os filhos para facilitar
           const submodules = SUBMODULES[permId];
           if (submodules) {
-             submodules.forEach(sub => {
-                if (!newPerms.includes(sub.id)) newPerms.push(sub.id);
-             });
+            submodules.forEach(sub => {
+              if (!newPerms.includes(sub.id)) newPerms.push(sub.id);
+            });
           }
         }
       }
@@ -266,7 +279,6 @@ const UsersSettings: React.FC<Props> = ({ onBack }) => {
     const allModules = MENU_ITEMS.map(m => m.id);
     const allSubmodules = Object.values(SUBMODULES).flat().map(s => s.id);
     const allIds = [...allModules, ...allSubmodules];
-    
     // Se já tem quase tudo, desmarca. Se falta algo, marca tudo.
     const isFull = allIds.every(id => formData.permissions?.includes(id));
 
@@ -730,7 +742,7 @@ const UsersSettings: React.FC<Props> = ({ onBack }) => {
               <tr><td colSpan={isAdmin ? 5 : 4} className="px-6 py-10 text-center text-slate-500 italic font-medium">Nenhum usuário encontrado.</td></tr>
             ) : (
               filteredUsers.map((user) => (
-                <tr key={user.id} className="hover:bg-slate-50 transition-colors group">
+                <tr key={user.id} className={`transition-colors group ${user.active ? 'hover:bg-slate-50' : 'bg-rose-50/50 opacity-75'}`}>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100 text-indigo-700 font-black text-xs border border-indigo-200">
@@ -776,6 +788,16 @@ const UsersSettings: React.FC<Props> = ({ onBack }) => {
                   {isAdmin && (
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {!user.active && (
+                          <button
+                            onClick={() => setUserToActivate(user)}
+                            className={`rounded-lg p-2 transition-colors ${user.id === '1' ? 'text-slate-200 cursor-not-allowed' : 'text-emerald-600 hover:bg-emerald-50'}`}
+                            disabled={user.id === '1'}
+                            title="Ativar"
+                          >
+                            <ShieldCheck size={16} />
+                          </button>
+                        )}
                         <button 
                             onClick={() => handleGenerateToken(user)} 
                             className={`rounded-lg p-2 transition-colors ${user.allowRecovery ? 'text-amber-500 hover:bg-amber-50' : 'text-slate-300 cursor-not-allowed'}`}
@@ -787,7 +809,7 @@ const UsersSettings: React.FC<Props> = ({ onBack }) => {
                         <button onClick={() => handleEdit(user)} className="rounded-lg p-2 text-slate-400 hover:bg-indigo-50 hover:text-indigo-600 transition-colors" title="Editar">
                           <Pencil size={16} />
                         </button>
-                        <button onClick={() => setUserToDelete({ id: user.id, name: `${user.firstName} ${user.lastName}` })} className={`rounded-lg p-2 transition-colors ${user.id === '1' ? 'text-slate-200 cursor-not-allowed' : 'text-slate-400 hover:bg-red-50 hover:text-red-600'}`} disabled={user.id === '1'} title="Excluir">
+                        <button onClick={() => setUserToDelete({ id: user.id, name: `${user.firstName} ${user.lastName}` })} className={`rounded-lg p-2 transition-colors ${user.id === '1' ? 'text-slate-200 cursor-not-allowed' : 'text-slate-400 hover:bg-red-50 hover:text-red-600'}`} disabled={user.id === '1'} title="Desativar">
                           <Trash2 size={16} />
                         </button>
                       </div>
@@ -827,16 +849,33 @@ const UsersSettings: React.FC<Props> = ({ onBack }) => {
         isOpen={userToDelete !== null}
         onConfirm={confirmDelete}
         onCancel={() => setUserToDelete(null)}
-        title="Excluir Usuário"
+        title="Desativar Usuário"
         message={
           <div className="space-y-3">
-            <p>Tem certeza que deseja remover o usuário <strong>{userToDelete?.name}</strong>?</p>
-            <p className="text-sm text-red-600">Esta ação não pode ser desfeita!</p>
+            <p>Tem certeza que deseja desativar o usuário <strong>{userToDelete?.name}</strong>?</p>
+            <p className="text-sm text-red-600">O usuário perderá acesso ao sistema.</p>
           </div>
         }
-        confirmLabel="Excluir"
+        confirmLabel="Desativar"
         cancelLabel="Cancelar"
         type="danger"
+      />
+
+      {/* Modal de Ativação */}
+      <ActionConfirmationModal
+        isOpen={userToActivate !== null}
+        onConfirm={confirmActivate}
+        onCancel={() => setUserToActivate(null)}
+        title="Ativar Usuário"
+        message={
+          <div className="space-y-3">
+            <p>Deseja ativar o usuário <strong>{userToActivate?.firstName} {userToActivate?.lastName}</strong>?</p>
+            <p className="text-sm text-emerald-600">O usuário poderá acessar o sistema novamente.</p>
+          </div>
+        }
+        confirmLabel="Ativar"
+        cancelLabel="Cancelar"
+        type="success"
       />
 
       {/* Modal de Senha Gerada */}

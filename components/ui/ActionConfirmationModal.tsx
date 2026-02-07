@@ -4,10 +4,12 @@ import { AlertTriangle, CheckCircle, X } from 'lucide-react';
 
 interface Props {
   isOpen: boolean;
-  onClose: () => void;
-    onConfirm: () => void | Promise<void>;
+  onClose?: () => void;
+  onCancel?: () => void;
+  onConfirm: () => void | Promise<void>;
   title: string;
-  description: React.ReactNode;
+  description?: React.ReactNode;
+  message?: React.ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
   type?: 'danger' | 'success' | 'warning';
@@ -16,14 +18,19 @@ interface Props {
 const ActionConfirmationModal: React.FC<Props> = ({
   isOpen,
   onClose,
+  onCancel,
   onConfirm,
   title,
   description,
+  message,
   confirmLabel = 'Confirmar',
   cancelLabel = 'Cancelar',
   type = 'danger'
 }) => {
   if (!isOpen) return null;
+
+  const handleClose = onClose || onCancel || (() => {});
+  const content = description ?? message;
 
   const getColors = () => {
     switch (type) {
@@ -47,21 +54,21 @@ const ActionConfirmationModal: React.FC<Props> = ({
           <h3 className="text-xl font-bold text-slate-900 mb-2">{title}</h3>
           
           <div className="text-sm text-slate-500 mb-8 leading-relaxed">
-            {description}
+            {content}
           </div>
           
           <div className="flex gap-3 w-full">
             {/* Renderiza o botão cancelar apenas se houver texto definido */}
             {cancelLabel && (
               <button 
-                onClick={onClose}
+                onClick={handleClose}
                 className="flex-1 px-4 py-3 bg-white border border-slate-300 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition-colors"
               >
                 {cancelLabel}
               </button>
             )}
             <button 
-              onClick={async () => { await onConfirm(); onClose(); }}
+              onClick={async () => { await onConfirm(); handleClose(); }}
               className={`flex-1 px-4 py-3 text-white font-bold rounded-xl shadow-md transition-colors flex items-center justify-center gap-2 ${colors.btn}`}
             >
               {confirmLabel}

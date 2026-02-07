@@ -228,7 +228,10 @@ useEffect(() => {
       console.error('❌ Erro ao realizar login:');
       console.error('   Mensagem:', err.message);
       console.error('   Stack:', err.stack);
-      setError(err.message || 'Erro ao realizar login. Verifique suas credenciais.');
+      const rawMessage = err?.message || 'Erro ao realizar login. Verifique suas credenciais.';
+      const isInactive = typeof rawMessage === 'string' && rawMessage.toLowerCase().includes('inativo');
+      const message = isInactive ? 'Usuário desativado. Contate o administrador.' : rawMessage;
+      setError(message);
       // Clear password on error for security
       setPassword(''); 
     } finally {

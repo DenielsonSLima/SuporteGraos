@@ -227,6 +227,12 @@ export const loadingService = {
       supplierName: loading.supplierName
     });
 
+    const normalizedPurchaseValue = Number(loading.totalPurchaseValue) || 0;
+    if (normalizedPurchaseValue <= 0 && loading.weightKg && loading.purchasePricePerSc) {
+      const calculatedSc = loading.weightKg / 60;
+      loading.totalPurchaseValue = Number((calculatedSc * loading.purchasePricePerSc).toFixed(2));
+    }
+
     if (!loading.transactions) loading.transactions = [];
     if (!loading.extraExpenses) loading.extraExpenses = [];
     db.add(loading);
