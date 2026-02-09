@@ -26,6 +26,7 @@ import AssetKPIs from './components/AssetKPIs';
 import AssetListPdfModal from './components/AssetListPdfModal';
 import ActionConfirmationModal from '../../components/ui/ActionConfirmationModal';
 import { useToast } from '../../contexts/ToastContext';
+import { waitForInit } from '../../services/supabaseInitService';
 
 const AssetsModule: React.FC = () => {
   const { addToast } = useToast();
@@ -43,7 +44,14 @@ const AssetsModule: React.FC = () => {
   const [assetToDelete, setAssetToDelete] = useState<Asset | null>(null);
 
   useEffect(() => {
-    loadData();
+    const initModule = async () => {
+      await waitForInit();
+      assetService.startRealtime();
+      await assetService.loadFromSupabase();
+      loadData();
+    };
+
+    void initModule();
     
     // Subscription para updates em tempo real
     const unsubscribe = assetService.subscribe(() => {

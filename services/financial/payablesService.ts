@@ -179,6 +179,7 @@ export const payablesService = {
   getById: (id: string) => db.getById(id),
   subscribe: (callback: (items: Payable[]) => void) => db.subscribe(callback),
   loadFromSupabase,
+  startRealtime,
 
   add: (item: Payable) => {
     db.add(item);

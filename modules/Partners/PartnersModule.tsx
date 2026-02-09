@@ -24,7 +24,6 @@ import { locationService } from '../../services/locationService';
 import { financialIntegrationService } from '../../services/financialIntegrationService';
 import { advanceService } from '../Financial/Advances/services/advanceService';
 import { useToast } from '../../contexts/ToastContext';
-import { supabase } from '../../services/supabase';
 import { waitForInit } from '../../services/supabaseInitService';
 
 const PartnersModule: React.FC = () => {
@@ -49,6 +48,8 @@ const PartnersModule: React.FC = () => {
     const initModule = async () => {
       setLoading(true);
       await waitForInit();
+      partnerService.startRealtime();
+      partnerAddressService.startRealtime();
       refreshPartners();
       setLoading(false);
     };
@@ -91,20 +92,6 @@ const PartnersModule: React.FC = () => {
       });
     });
 
-    // Setup Realtime listener para atualizações automáticas
-    const realtimeChannel = supabase
-      .channel('realtime:partners')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'partners' }, (payload) => {
-        console.log('🔔 Realtime partners:', payload.eventType);
-        // Pequeno atraso para evitar condição de corrida com partnerService
-        setTimeout(() => {
-          refreshPartners();
-        }, 50);
-      })
-      .subscribe(status => {
-        if (status === 'SUBSCRIBED') console.log('✅ Realtime ativo: PartnersModule');
-      });
-
     const handleGlobalNav = (e: any) => {
       if (e.detail?.moduleId === 'partners' && e.detail?.partnerId) {
         const p = partnerService.getById(e.detail.partnerId);
@@ -123,7 +110,6 @@ const PartnersModule: React.FC = () => {
     
     return () => {
       window.removeEventListener('app:navigate', handleGlobalNav);
-      realtimeChannel.unsubscribe();
       unsubscribeDb();
       unsubscribeAddresses();
     };

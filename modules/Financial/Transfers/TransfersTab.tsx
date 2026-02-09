@@ -7,6 +7,7 @@ import ActionConfirmationModal from '../../../components/ui/ActionConfirmationMo
 import { useToast } from '../../../contexts/ToastContext';
 import { bankAccountService } from '../../../services/bankAccountService';
 import { BankAccount } from '../types';
+import { waitForInit } from '../../../services/supabaseInitService';
 
 const TransfersTab: React.FC = () => {
   const { addToast } = useToast();
@@ -28,7 +29,13 @@ const TransfersTab: React.FC = () => {
   };
 
   useEffect(() => {
-    loadData();
+    const initTab = async () => {
+      await waitForInit();
+      transfersService.startRealtime();
+      await loadData();
+    };
+
+    void initTab();
     
     // Subscribe to real-time updates
     const unsubscribe = transfersService.subscribe((updatedRecords) => {

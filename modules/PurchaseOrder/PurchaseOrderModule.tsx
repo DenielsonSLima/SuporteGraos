@@ -13,6 +13,7 @@ import ActionConfirmationModal from '../../components/ui/ActionConfirmationModal
 import { purchaseService } from '../../services/purchaseService';
 import { shareholderService } from '../../services/shareholderService';
 import { useToast } from '../../contexts/ToastContext';
+import { waitForInit } from '../../services/supabaseInitService';
 
 export type GroupByOption = 'month' | 'harvest' | 'partner' | 'none';
 
@@ -54,11 +55,15 @@ const PurchaseOrderModule: React.FC = () => {
   });
 
   useEffect(() => {
-    // Carrega apenas no mount; atualizações são incrementais
-    setOrders(purchaseService.getAll());
-    setShareholders(shareholderService.getAll().map(s => ({ id: s.id, name: s.name })));
+    const initModule = async () => {
+      await waitForInit();
+      purchaseService.startRealtime();
+      await purchaseService.loadFromSupabase();
+      setOrders(purchaseService.getAll());
+      setShareholders(shareholderService.getAll().map(s => ({ id: s.id, name: s.name })));
+    };
 
-    void purchaseService.loadFromSupabase();
+    void initModule();
 
     const unsubscribe = purchaseService.subscribe(setOrders);
 
@@ -77,7 +82,7 @@ const PurchaseOrderModule: React.FC = () => {
       window.removeEventListener('app:navigate', handleNavigation);
       unsubscribe?.();
     };
-  }, [selectedOrder?.id, viewMode]); 
+  }, []); 
 
   const handleAddNew = () => {
     setSelectedOrder(undefined);

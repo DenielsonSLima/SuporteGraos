@@ -10,6 +10,7 @@ import LoanListPdfModal from './components/LoanListPdfModal';
 import { loansService } from '../../../services/financial/loansService';
 import { useToast } from '../../../contexts/ToastContext';
 import { bankAccountService } from '../../../services/bankAccountService';
+import { waitForInit } from '../../../services/supabaseInitService';
 
 type TabType = 'all' | 'taken' | 'granted' | 'history';
 
@@ -56,7 +57,13 @@ const LoansTab: React.FC = () => {
   };
 
   useEffect(() => {
-    loadData();
+    const initTab = async () => {
+      await waitForInit();
+      loansService.startRealtime();
+      await loadData();
+    };
+
+    void initTab();
     
     // Debounce para evitar múltiplas atualizações quando cria os 2 registros (loan_taken + receipt)
     let debounceTimer: NodeJS.Timeout | null = null;

@@ -11,6 +11,7 @@ import { salesService } from '../../services/salesService';
 import { loadingService } from '../../services/loadingService';
 import { shareholderService } from '../../services/shareholderService';
 import { useToast } from '../../contexts/ToastContext';
+import { waitForInit } from '../../services/supabaseInitService';
 
 export type SalesGroupByOption = 'month' | 'partner' | 'none';
 
@@ -49,7 +50,14 @@ const SalesOrderModule: React.FC = () => {
   });
 
   useEffect(() => {
-    loadSales();
+    const initModule = async () => {
+      await waitForInit();
+      salesService.startRealtime();
+      await salesService.loadFromSupabase();
+      loadSales();
+    };
+
+    void initModule();
     const unsubscribe = salesService.subscribe((items) => setSales(items));
     setShareholders(shareholderService.getAll().map(s => ({ id: s.id, name: s.name })));
 

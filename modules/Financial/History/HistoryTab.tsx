@@ -392,6 +392,17 @@ const HistoryTab: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    const initRealtime = async () => {
+      await waitForInit();
+      payablesService.startRealtime();
+      receivablesService.startRealtime();
+      financialHistoryService.startRealtime();
+      transfersService.startRealtime();
+      loansService.startRealtime();
+      shareholderService.startRealtime();
+    };
+
+    void initRealtime();
     loadRealData();
     
     // ✅ DEBOUNCE nas subscriptions para evitar atualizações muito frequentes

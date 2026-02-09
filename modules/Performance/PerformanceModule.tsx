@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Calendar, LayoutDashboard, Table, PieChart, Printer } from 'lucide-react';
 import { performanceService } from './services/performanceService';
 import { PerformanceReport } from './types';
@@ -21,14 +21,29 @@ const PerformanceModule: React.FC = () => {
   const [data, setData] = useState<PerformanceReport | null>(null);
   const [isPdfOpen, setIsPdfOpen] = useState(false);
 
-  useEffect(() => {
-    const loadData = async () => {
-      await waitForInit();
-      const report = performanceService.getReport(monthsBack);
-      setData(report);
-    };
-    loadData();
+  const loadData = useCallback(async () => {
+    await waitForInit();
+    const report = performanceService.getReport(monthsBack);
+    setData(report);
   }, [monthsBack]);
+
+  useEffect(() => {
+    void loadData();
+  }, [loadData]);
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      void loadData();
+    };
+
+    window.addEventListener('data:updated', handleUpdate);
+    window.addEventListener('financial:updated', handleUpdate);
+
+    return () => {
+      window.removeEventListener('data:updated', handleUpdate);
+      window.removeEventListener('financial:updated', handleUpdate);
+    };
+  }, [loadData]);
 
   if (!data) return <div className="p-10 text-center animate-pulse text-slate-400 font-black uppercase">Calculando Indicadores...</div>;
 

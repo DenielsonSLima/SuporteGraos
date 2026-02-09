@@ -336,5 +336,6 @@ export const partnerAddressService = {
     isLoaded = false;
     return loadFromSupabase();
   },
-  loadFromSupabase
+  loadFromSupabase,
+  startRealtime
 };

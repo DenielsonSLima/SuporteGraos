@@ -65,6 +65,7 @@ const LogisticsModule: React.FC = () => {
   useEffect(() => {
     const initModule = async () => {
       await waitForInit();
+      loadingService.startRealtime();
       refreshFreights();
       setCarriers(partnerService.getAll().filter(p => p.categories.includes(PARTNER_CATEGORY_IDS.CARRIER)).map(p => p.name).sort());
       setLoading(false);

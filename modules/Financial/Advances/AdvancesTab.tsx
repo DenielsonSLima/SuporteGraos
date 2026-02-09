@@ -24,6 +24,7 @@ import { assetService } from '../../../services/assetService';
 import { financialActionService } from '../../../services/financialActionService';
 import { FinancialRecord } from '../types';
 import ActionConfirmationModal from '../../../components/ui/ActionConfirmationModal';
+import { waitForInit } from '../../../services/supabaseInitService';
 
 type AdvanceSubTab = 'taken' | 'given' | 'history';
 
@@ -48,7 +49,13 @@ const AdvancesTab: React.FC = () => {
   };
 
   useEffect(() => {
-    loadData();
+    const initTab = async () => {
+      await waitForInit();
+      advancesService.startRealtime();
+      await loadData();
+    };
+
+    void initTab();
     
     // Subscribe to real-time updates
     const unsubscribe = advancesService.subscribe((updatedRecords) => {

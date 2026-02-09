@@ -6,6 +6,7 @@ import { FinancialRecord } from '../types';
 import { receivablesService, Receivable } from '../../../services/financial/receivablesService';
 import { partnerService } from '../../../services/partnerService';
 import { loadingService } from '../../../services/loadingService';
+import { waitForInit } from '../../../services/supabaseInitService';
 
 // Converter Receivable → FinancialRecord
 const convertToFinancialRecord = (receivable: Receivable): FinancialRecord => {
@@ -77,7 +78,13 @@ const ReceivablesTab: React.FC = () => {
   };
 
   useEffect(() => {
-    loadData();
+    const initTab = async () => {
+      await waitForInit();
+      receivablesService.startRealtime();
+      await loadData();
+    };
+
+    void initTab();
     
     // Subscribe to real-time updates
     const unsubscribe = receivablesService.subscribe((updatedRecords) => {

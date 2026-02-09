@@ -5,6 +5,7 @@ import UnifiedPayableManager from './components/UnifiedPayableManager';
 import { FinancialRecord } from '../types';
 import { payablesService, Payable } from '../../../services/financial/payablesService';
 import { loadingService } from '../../../services/loadingService';
+import { waitForInit } from '../../../services/supabaseInitService';
 
 // Converter Payable → FinancialRecord
 const convertToFinancialRecord = (
@@ -69,7 +70,13 @@ const PayablesTab: React.FC = () => {
   };
 
   useEffect(() => {
-    loadData();
+    const initTab = async () => {
+      await waitForInit();
+      payablesService.startRealtime();
+      await loadData();
+    };
+
+    void initTab();
     
     // Subscribe to real-time updates
     const unsubscribe = payablesService.subscribe((updatedRecords) => {
