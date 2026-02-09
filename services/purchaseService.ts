@@ -306,9 +306,70 @@ const createPayableForPurchaseOrder = (order: PurchaseOrder) => {
   console.log('✅ Payable do pedido de compra criado com sucesso');
 };
 
+// ✅ REALTIME: Inscrever em mudanças em tempo real
+const subscribeToUpdates = (callback: (order: PurchaseOrder, eventType: 'INSERT' | 'UPDATE' | 'DELETE') => void) => {
+  const channelName = `purchase_orders_${Date.now()}`;
+  const channel = supabase.channel(channelName);
+
+  channel
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'purchase_orders'
+      },
+      (payload: any) => {
+        console.log('[PurchaseOrder Realtime]', payload.eventType, payload);
+
+        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+          const newData = payload.new;
+          if (newData) {
+            const order = mapOrderFromDb(newData);
+            // Atualizar cache local
+            if (payload.eventType === 'INSERT') {
+              db.add(order);
+            } else {
+              db.update(order);
+            }
+            // Notificar subscribers
+            callback(order, payload.eventType);
+          }
+        } else if (payload.eventType === 'DELETE') {
+          const oldData = payload.old;
+          if (oldData?.id) {
+            db.delete(oldData.id);
+            // Notificar com ID do deletado
+            callback({ id: oldData.id } as PurchaseOrder, 'DELETE');
+          }
+        }
+      }
+    )
+    .subscribe((status) => {
+      console.log('[PurchaseOrder Realtime] Status:', status);
+    });
+
+  // Retornar função para desinscrever
+  return () => {
+    console.log('[PurchaseOrder Realtime] Unsubscribing');
+    supabase.removeChannel(channel);
+  };
+};
+
+let purchaseRealtimeUnsub: (() => void) | null = null;
+const startRealtime = () => {
+  if (purchaseRealtimeUnsub) return;
+  purchaseRealtimeUnsub = subscribeToUpdates(() => {
+    // Atualizacao em tempo real do cache local
+  });
+};
+
 export const purchaseService = {
   getAll: () => db.getAll(),
   getById: (id: string) => db.getById(id),
+  subscribe: (callback: (items: PurchaseOrder[]) => void) => db.subscribe(callback),
+  subscribeToUpdates,
+  loadFromSupabase,
   add: (order: PurchaseOrder) => {
     db.add(order);
     void persistUpsert(order);
@@ -471,75 +532,5 @@ export const purchaseService = {
     
     return { success: true };
   },
-  
-  importData: (data: PurchaseOrder[]) => {
-    db.setAll(data);
-    const payload = data.map(mapOrderToDb);
-    void (async () => {
-      try {
-        const { error } = await supabase.from('purchase_orders').upsert(payload);
-        if (error) {
-          console.error('Erro ao importar pedidos no Supabase', error);
-        }
-      } catch (err) {
-        console.error('Erro inesperado ao importar pedidos no Supabase', err);
-      }
-    })();
-  },
-
-  // ✅ REALTIME: Inscrever em mudanças em tempo real
-  subscribeToUpdates: (callback: (order: PurchaseOrder, eventType: 'INSERT' | 'UPDATE' | 'DELETE') => void) => {
-    const channelName = `purchase_orders_${Date.now()}`;
-    const channel = supabase.channel(channelName);
-    
-    channel
-      .on(
-        'postgres_changes',
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'purchase_orders' 
-        },
-        (payload: any) => {
-          console.log('[PurchaseOrder Realtime]', payload.eventType, payload);
-          
-          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-            const newData = payload.new;
-            if (newData) {
-              const order = mapOrderFromDb(newData);
-              // Atualizar cache local
-              if (payload.eventType === 'INSERT') {
-                db.add(order);
-              } else {
-                db.update(order);
-              }
-              // Notificar subscribers
-              callback(order, payload.eventType);
-            }
-          } else if (payload.eventType === 'DELETE') {
-            const oldData = payload.old;
-            if (oldData?.id) {
-              db.delete(oldData.id);
-              // Notificar com ID do deletado
-              callback({ id: oldData.id } as PurchaseOrder, 'DELETE');
-            }
-          }
-        }
-      )
-      .subscribe((status) => {
-        console.log('[PurchaseOrder Realtime] Status:', status);
-      });
-
-    // Retornar função para desinscrever
-    return () => {
-      console.log('[PurchaseOrder Realtime] Unsubscribing');
-      supabase.removeChannel(channel);
-    };
-  },
-
-  reload: () => {
-    isLoaded = false;
-    return loadFromSupabase();
-  },
-  loadFromSupabase
+  startRealtime
 };

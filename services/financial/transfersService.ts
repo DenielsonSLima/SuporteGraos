@@ -142,6 +142,7 @@ export const transfersService = {
   getById: (id: string) => db.getById(id),
   subscribe: (callback: (items: Transfer[]) => void) => db.subscribe(callback),
   loadFromSupabase,
+  startRealtime,
 
   add: (item: Transfer) => {
     db.add(item);

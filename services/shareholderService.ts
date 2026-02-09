@@ -208,6 +208,7 @@ export const shareholderService = {
     startRealtime();
     return _shareholdersDb.subscribe(callback);
   },
+  startRealtime,
 
   add: async (shareholder: Shareholder) => {
     if (!shareholder.financial) {

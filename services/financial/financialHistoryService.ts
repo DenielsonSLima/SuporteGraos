@@ -155,6 +155,7 @@ export const financialHistoryService = {
   getById: (id: string) => db.getById(id),
   subscribe: (callback: (items: FinancialHistory[]) => void) => db.subscribe(callback),
   loadFromSupabase,
+  startRealtime,
 
   add: (item: FinancialHistory) => {
     db.add(item);

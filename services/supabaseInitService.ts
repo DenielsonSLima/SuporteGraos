@@ -532,22 +532,29 @@ export const initializeSupabaseData = async (): Promise<InitStats> => {
 
             // 🔄 Iniciar subscriptions em tempo real
             console.log('[SUPABASE_INIT] Iniciando Realtime Subscriptions...');
-            if (typeof transporterModule.startRealtime === 'function') transporterModule.startRealtime();
-            if (typeof vehicleModule.startRealtime === 'function') vehicleModule.startRealtime();
-            if (typeof driverModule.startRealtime === 'function') driverModule.startRealtime();
-            if (typeof shareholderModule.startRealtime === 'function') shareholderModule.startRealtime();
-            if (typeof partnerAddressModule.startRealtime === 'function') partnerAddressModule.startRealtime();
-            if (typeof partnerModule.startRealtime === 'function') partnerModule.startRealtime();
-            if (typeof salesModule.startRealtime === 'function') salesModule.startRealtime();
-            if (typeof assetModule.startRealtime === 'function') assetModule.startRealtime();
-            if (typeof loadingModule.startRealtime === 'function') loadingModule.startRealtime();
-            if (typeof advancesModule.startRealtime === 'function') advancesModule.startRealtime();
-            if (typeof receivablesModule.startRealtime === 'function') receivablesModule.startRealtime();
-            if (typeof payablesModule.startRealtime === 'function') payablesModule.startRealtime();
-            if (typeof transfersModule.startRealtime === 'function') transfersModule.startRealtime();
-            if (typeof loansModule.startRealtime === 'function') loansModule.startRealtime();
-            if (typeof financialHistoryModule.startRealtime === 'function') financialHistoryModule.startRealtime();
-            if (typeof purchaseModule.startRealtime === 'function') purchaseModule.startRealtime();
+            const startServiceRealtime = (moduleRef: any, serviceKey?: string) => {
+              const target = serviceKey ? moduleRef?.[serviceKey] : moduleRef;
+              if (typeof target?.startRealtime === 'function') {
+                target.startRealtime();
+              }
+            };
+
+            startServiceRealtime(transporterModule, 'transporterService');
+            startServiceRealtime(vehicleModule, 'vehicleService');
+            startServiceRealtime(driverModule, 'driverService');
+            startServiceRealtime(shareholderModule, 'shareholderService');
+            startServiceRealtime(partnerAddressModule, 'partnerAddressService');
+            startServiceRealtime(partnerModule, 'partnerService');
+            startServiceRealtime(salesModule, 'salesService');
+            startServiceRealtime(assetModule, 'assetService');
+            startServiceRealtime(loadingModule, 'loadingService');
+            startServiceRealtime(advancesModule, 'advancesService');
+            startServiceRealtime(receivablesModule, 'receivablesService');
+            startServiceRealtime(payablesModule, 'payablesService');
+            startServiceRealtime(transfersModule, 'transfersService');
+            startServiceRealtime(loansModule, 'loansService');
+            startServiceRealtime(financialHistoryModule, 'financialHistoryService');
+            startServiceRealtime(purchaseModule, 'purchaseService');
             if (typeof auditModule.auditService?.startRealtime === 'function') auditModule.auditService.startRealtime();
             if (typeof logModule.logService?.startRealtime === 'function') logModule.logService.startRealtime();
             if (typeof settingsModule.settingsService?.startRealtime === 'function') settingsModule.settingsService.startRealtime();

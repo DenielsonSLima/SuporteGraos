@@ -58,39 +58,9 @@ const PurchaseOrderModule: React.FC = () => {
     setOrders(purchaseService.getAll());
     setShareholders(shareholderService.getAll().map(s => ({ id: s.id, name: s.name })));
 
-    // ✅ REALTIME: Subscribe para mudanças em purchase_orders
-    console.log('[PurchaseOrderModule] Subscribing to realtime updates...');
-    const subscription = purchaseService.subscribeToUpdates((updatedOrder, eventType) => {
-      console.log('[PurchaseOrderModule] Realtime event:', eventType, updatedOrder);
-      
-      if (eventType === 'DELETE') {
-        // Remover da lista
-        setOrders(prev => prev.filter(o => o.id !== updatedOrder.id));
-        // Se está visualizando este pedido, voltar para lista
-        if (selectedOrder?.id === updatedOrder.id) {
-          setViewMode('list');
-          setSelectedOrder(undefined);
-        }
-      } else {
-        // INSERT ou UPDATE
-        setOrders(prev => {
-          const index = prev.findIndex(o => o.id === updatedOrder.id);
-          if (index >= 0) {
-            // Atualizar existente
-            const newOrders = [...prev];
-            newOrders[index] = updatedOrder;
-            return newOrders;
-          } else {
-            // Novo pedido adicionado por outro usuário
-            return [...prev, updatedOrder];
-          }
-        });
-        // Se está visualizando este pedido, atualizar também
-        if (selectedOrder?.id === updatedOrder.id) {
-          setSelectedOrder(updatedOrder);
-        }
-      }
-    });
+    void purchaseService.loadFromSupabase();
+
+    const unsubscribe = purchaseService.subscribe(setOrders);
 
     const handleNavigation = (e: any) => {
         if (e.detail?.moduleId === 'purchase_order' && e.detail?.orderId) {
@@ -105,7 +75,7 @@ const PurchaseOrderModule: React.FC = () => {
     return () => {
       console.log('[PurchaseOrderModule] Cleaning up subscriptions...');
       window.removeEventListener('app:navigate', handleNavigation);
-      subscription?.(); // Limpar subscription
+      unsubscribe?.();
     };
   }, [selectedOrder?.id, viewMode]); 
 

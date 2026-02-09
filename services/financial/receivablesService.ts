@@ -154,6 +154,7 @@ export const receivablesService = {
   getById: (id: string) => db.getById(id),
   subscribe: (callback: (items: Receivable[]) => void) => db.subscribe(callback),
   loadFromSupabase,
+  startRealtime,
 
   add: (item: Receivable) => {
     db.add(item);

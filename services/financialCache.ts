@@ -66,6 +66,7 @@ export class FinancialCache {
 // Listener global para invalidar cache quando houver atualizações
 if (typeof window !== 'undefined') {
   window.addEventListener('financial:updated', () => FinancialCache.invalidate());
+  window.addEventListener('data:updated', () => FinancialCache.invalidate());
 }
 
 export const invalidateFinancialCache = () => {

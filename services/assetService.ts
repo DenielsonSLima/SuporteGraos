@@ -165,6 +165,7 @@ export const assetService = {
   getById: (id: string) => db.getById(id),
 
   subscribe: (callback: (items: Asset[]) => void) => db.subscribe(callback),
+  startRealtime,
 
   add: (asset: Asset) => {
     db.add(asset);

@@ -595,7 +595,8 @@ export const loadingService = {
     isLoaded = false;
     return loadFromSupabase();
   },
-  loadFromSupabase
+  loadFromSupabase,
+  startRealtime
 };
 
 // ✅ EXECUTAR CORREÇÃO AUTOMATICAMENTE AO CARREGAR O MÓDULO

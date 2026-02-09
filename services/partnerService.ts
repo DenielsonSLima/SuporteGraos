@@ -229,6 +229,7 @@ export const partnerService = {
   
   // Assinatura reativa de mudanças (usando Persistence.subscribe)
   subscribe: (callback: (items: Partner[]) => void) => db.subscribe(callback),
+  startRealtime,
 
   add: async (partner: Partner) => {
     // Adiciona no cache com id do frontend para UX rápida

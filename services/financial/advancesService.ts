@@ -144,6 +144,7 @@ export const advancesService = {
   getById: (id: string) => db.getById(id),
   subscribe: (callback: (items: Advance[]) => void) => db.subscribe(callback),
   loadFromSupabase,
+  startRealtime,
 
   add: (item: Advance) => {
     db.add(item);

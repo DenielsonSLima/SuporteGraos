@@ -205,6 +205,7 @@ export const loansService = {
   getById: (id: string) => db.getById(id),
   subscribe: (callback: (items: FinancialRecord[]) => void) => db.subscribe(callback),
   loadFromSupabase,
+  startRealtime,
 
   add: (item: FinancialRecord) => {
     // Criar dois registros: o empréstimo em si + o crédito/débito na conta
