@@ -61,6 +61,12 @@ export const financialActionService = {
   getTransfers: () => transfersService.getAll().map(mapTransferToRecord),
 
   processRecord: async (recordId: string, data: any, subType?: string) => {
+    if (subType === 'purchase_order' || subType === 'freight' || subType === 'commission') {
+      await payablesService.loadFromSupabase();
+    }
+    if (subType === 'sales_order') {
+      await receivablesService.loadFromSupabase();
+    }
     const { userId, userName } = getLogInfo();
     const transactionValue = parseFloat(data.amount) || 0;
     const discountValue = parseFloat(data.discount) || 0;
