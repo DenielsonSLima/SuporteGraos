@@ -230,6 +230,23 @@ const mapLoginHistoryToDb = (login: LoginHistory) => ({
   created_at: login.createdAt
 });
 
+const MAX_ACTIVE_SESSIONS_PER_USER = 4;
+
+const AUDIT_LOG_FIELDS = 'id,user_id,user_name,user_email,action,module,description,entity_type,entity_id,ip_address,user_agent,metadata,company_id,created_at';
+const USER_SESSION_FIELDS = 'id,user_id,user_name,user_email,session_start,session_end,duration_minutes,ip_address,user_agent,browser_info,device_info,status,company_id,created_at,updated_at';
+const LOGIN_HISTORY_FIELDS = 'id,user_email,user_name,user_id,login_type,failure_reason,ip_address,user_agent,browser_info,device_info,location,two_factor_used,session_id,company_id,created_at';
+
+const buildDateRangeFilters = (query: any, startDate?: string, endDate?: string) => {
+  if (startDate) query = query.gte('created_at', `${startDate}T00:00:00.000Z`);
+  if (endDate) query = query.lte('created_at', `${endDate}T23:59:59.999Z`);
+  return query;
+};
+
+const buildSearchOr = (fields: string[], term: string) => {
+  const sanitized = term.replace(/%/g, '\\%');
+  return fields.map((field) => `${field}.ilike.%${sanitized}%`).join(',');
+};
+
 // ============================================================================
 // PERSIST OPERATIONS
 // ============================================================================
@@ -264,6 +281,45 @@ const persistLoginHistory = async (login: LoginHistory) => {
     if (error) console.error('❌ Erro ao salvar login history:', error);
   } catch (err) {
     console.error('❌ Erro inesperado ao salvar login history:', err);
+  }
+};
+
+const enforceActiveSessionLimit = async (userId?: string | null) => {
+  if (!userId) return;
+  try {
+    await waitForInit();
+    const { data, error } = await supabase
+      .from('user_sessions')
+      .select('id,user_id,user_name,user_email,session_start,session_end,duration_minutes,ip_address,user_agent,browser_info,device_info,status,company_id,created_at,updated_at')
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .order('session_start', { ascending: true });
+
+    if (error) {
+      console.error('❌ Erro ao carregar sessões ativas:', error);
+      return;
+    }
+
+    const sessions = (data || []).map(mapUserSessionFromDb);
+    if (sessions.length < MAX_ACTIVE_SESSIONS_PER_USER) return;
+
+    const nowIso = new Date().toISOString();
+    const toClose = sessions.slice(0, sessions.length - (MAX_ACTIVE_SESSIONS_PER_USER - 1));
+
+    toClose.forEach((session) => {
+      const updated: UserSession = {
+        ...session,
+        sessionEnd: nowIso,
+        status: 'closed',
+        updatedAt: nowIso
+      };
+      const existing = userSessionsDb.getById(updated.id);
+      if (existing) userSessionsDb.update(updated);
+      else userSessionsDb.add(updated);
+      void persistUserSession(updated);
+    });
+  } catch (err) {
+    console.error('❌ Erro ao aplicar limite de sessões:', err);
   }
 };
 
@@ -338,6 +394,170 @@ const loadLoginHistoryFromSupabase = async () => {
   } catch (err) {
     console.warn('⚠️ AuditService: Usando fallback para login history:', err);
   }
+};
+
+// ============================================================================
+// FETCH PAGINADO (Egress baixo)
+// ============================================================================
+
+const fetchAuditLogsPage = async (options: {
+  limit: number;
+  cursor?: string;
+  module?: string;
+  search?: string;
+  startDate?: string;
+  endDate?: string;
+}) => {
+  await waitForInit();
+  let query = supabase
+    .from('audit_logs')
+    .select(AUDIT_LOG_FIELDS)
+    .order('created_at', { ascending: false })
+    .limit(options.limit);
+
+  if (options.cursor) query = query.lt('created_at', options.cursor);
+  if (options.module && options.module !== 'all') query = query.eq('module', options.module);
+  if (options.search) query = query.or(buildSearchOr(['description', 'user_name', 'user_email'], options.search));
+  query = buildDateRangeFilters(query, options.startDate, options.endDate);
+
+  const { data, error } = await query;
+  if (error) throw error;
+  const items = (data || []).map(mapAuditLogFromDb);
+  const nextCursor = items.length > 0 ? items[items.length - 1].createdAt : undefined;
+
+  return {
+    items,
+    nextCursor,
+    hasMore: items.length === options.limit
+  };
+};
+
+const fetchUserSessionsPage = async (options: {
+  limit: number;
+  cursor?: string;
+  search?: string;
+  startDate?: string;
+  endDate?: string;
+}) => {
+  await waitForInit();
+  let query = supabase
+    .from('user_sessions')
+    .select(USER_SESSION_FIELDS)
+    .order('session_start', { ascending: false })
+    .limit(options.limit);
+
+  if (options.cursor) query = query.lt('session_start', options.cursor);
+  if (options.search) query = query.or(buildSearchOr(['user_name', 'user_email'], options.search));
+  if (options.startDate) query = query.gte('session_start', `${options.startDate}T00:00:00.000Z`);
+  if (options.endDate) query = query.lte('session_start', `${options.endDate}T23:59:59.999Z`);
+
+  const { data, error } = await query;
+  if (error) throw error;
+  const items = (data || []).map(mapUserSessionFromDb);
+  const nextCursor = items.length > 0 ? items[items.length - 1].sessionStart : undefined;
+
+  return {
+    items,
+    nextCursor,
+    hasMore: items.length === options.limit
+  };
+};
+
+const fetchLoginHistoryPage = async (options: {
+  limit: number;
+  cursor?: string;
+  search?: string;
+  startDate?: string;
+  endDate?: string;
+}) => {
+  await waitForInit();
+  let query = supabase
+    .from('login_history')
+    .select(LOGIN_HISTORY_FIELDS)
+    .order('created_at', { ascending: false })
+    .limit(options.limit);
+
+  if (options.cursor) query = query.lt('created_at', options.cursor);
+  if (options.search) query = query.or(buildSearchOr(['user_email', 'user_name'], options.search));
+  query = buildDateRangeFilters(query, options.startDate, options.endDate);
+
+  const { data, error } = await query;
+  if (error) throw error;
+  const items = (data || []).map(mapLoginHistoryFromDb);
+  const nextCursor = items.length > 0 ? items[items.length - 1].createdAt : undefined;
+
+  return {
+    items,
+    nextCursor,
+    hasMore: items.length === options.limit
+  };
+};
+
+const fetchActiveSessionsCount = async (options?: { minutes?: number }) => {
+  const minutes = options?.minutes ?? 60;
+  const thresholdIso = new Date(Date.now() - minutes * 60 * 1000).toISOString();
+  await waitForInit();
+  const { count, error } = await supabase
+    .from('user_sessions')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'active')
+    .gte('updated_at', thresholdIso);
+
+  if (error) throw error;
+  return count || 0;
+};
+
+const closeStaleSessions = async (minutes: number) => {
+  await waitForInit();
+  const thresholdIso = new Date(Date.now() - minutes * 60 * 1000).toISOString();
+  const nowIso = new Date().toISOString();
+
+  const { error } = await supabase
+    .from('user_sessions')
+    .update({ status: 'timeout', session_end: nowIso, updated_at: nowIso })
+    .eq('status', 'active')
+    .lt('updated_at', thresholdIso);
+
+  if (error) throw error;
+};
+
+const heartbeatSession = async (sessionId: string) => {
+  await waitForInit();
+  const nowIso = new Date().toISOString();
+  const { error } = await supabase
+    .from('user_sessions')
+    .update({ updated_at: nowIso })
+    .eq('id', sessionId);
+
+  if (error) throw error;
+};
+
+const fetchFailedLoginsLast30 = async () => {
+  await waitForInit();
+  const { data, error } = await supabase
+    .from('login_history')
+    .select('login_type')
+    .order('created_at', { ascending: false })
+    .limit(30);
+
+  if (error) throw error;
+  const failed = (data || []).filter((item) => item.login_type === 'failed').length;
+  return {
+    failed,
+    total: (data || []).length
+  };
+};
+
+const fetchRecentLoginsCount = async (limit: number) => {
+  await waitForInit();
+  const { data, error } = await supabase
+    .from('login_history')
+    .select('id')
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error) throw error;
+  return (data || []).length;
 };
 
 // ============================================================================
@@ -443,6 +663,14 @@ const startAllRealtime = () => {
 // ============================================================================
 
 export const auditService = {
+  fetchAuditLogsPage,
+  fetchUserSessionsPage,
+  fetchLoginHistoryPage,
+  fetchActiveSessionsCount,
+  fetchFailedLoginsLast30,
+  fetchRecentLoginsCount,
+  closeStaleSessions,
+  heartbeatSession,
   // === AUDIT LOGS ===
   getAuditLogs: () => auditLogsDb.getAll().sort((a, b) => 
     new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -494,6 +722,8 @@ export const auditService = {
   createSession: async (): Promise<UserSession> => {
     const { userId, userName, userEmail } = getCurrentUser();
     const clientInfo = getClientInfo();
+
+    await enforceActiveSessionLimit(userId);
     
     const session: UserSession = {
       id: crypto.randomUUID(),

@@ -20,6 +20,13 @@ export interface FinancialHistory {
   companyId?: string;
 }
 
+export interface FinancialHistoryPageOptions {
+  limit: number;
+  beforeDate?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
 const db = new Persistence<FinancialHistory>('financial_history', [], { useStorage: false });
 let realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
 let isLoaded = false;
@@ -61,6 +68,45 @@ const mapFromDb = (row: any): FinancialHistory => ({
   notes: row.notes,
   companyId: row.company_id
 });
+
+const FINANCIAL_HISTORY_SELECT_FIELDS = [
+  'id',
+  'date',
+  'type',
+  'operation',
+  'reference_type',
+  'reference_id',
+  'partner_id',
+  'description',
+  'amount',
+  'balance_before',
+  'balance_after',
+  'bank_account_id',
+  'notes',
+  'company_id'
+].join(',');
+
+const fetchPage = async (options: FinancialHistoryPageOptions): Promise<FinancialHistory[]> => {
+  try {
+    const { limit, beforeDate, startDate, endDate } = options;
+    let query = supabase
+      .from('financial_history')
+      .select(FINANCIAL_HISTORY_SELECT_FIELDS)
+      .order('date', { ascending: false })
+      .limit(limit);
+
+    if (beforeDate) query = query.lte('date', beforeDate);
+    if (startDate) query = query.gte('date', startDate);
+    if (endDate) query = query.lte('date', endDate);
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return (data || []).map(mapFromDb);
+  } catch (error) {
+    console.error('❌ Erro ao paginar financial history:', error);
+    return [];
+  }
+};
 
 // ============================================================================
 // CARREGAMENTO INICIAL
@@ -155,6 +201,7 @@ export const financialHistoryService = {
   getById: (id: string) => db.getById(id),
   subscribe: (callback: (items: FinancialHistory[]) => void) => db.subscribe(callback),
   loadFromSupabase,
+  fetchPage,
   startRealtime,
 
   add: (item: FinancialHistory) => {

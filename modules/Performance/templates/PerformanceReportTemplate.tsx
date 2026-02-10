@@ -104,48 +104,43 @@ const PerformanceReportTemplate: React.FC<Props> = ({ data, periodLabel }) => {
             <HarvestBreakdown harvests={data.harvests} />
         </div>
 
-        {/* SEÇÃO 5: ESTRUTURA DE DESPESAS E TABELA MENSAL (LADO A LADO EM PAISAGEM) */}
-        <div className="grid grid-cols-12 gap-6 break-inside-avoid pb-10">
-            {/* Tabela Mensal - 7/12 colunas */}
-            <div className="col-span-7">
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden h-full">
-                    <div className="bg-slate-50 px-6 py-3 border-b border-slate-100 flex items-center gap-2">
-                        <Table size={16} className="text-slate-500" />
-                        <h3 className="font-bold text-slate-800 text-[10px] uppercase tracking-widest">Demonstrativo Mensal Consolidado</h3>
-                    </div>
-                    <table className="w-full text-left text-[9px] text-slate-600">
-                        <thead className="bg-white border-b border-slate-100 text-[8px] uppercase text-slate-400 font-black">
-                            <tr>
-                                <th className="px-4 py-2">Mês/Ano</th>
-                                <th className="px-4 py-2 text-right">Faturamento</th>
-                                <th className="px-4 py-2 text-right">Custos Dir.</th>
-                                <th className="px-4 py-2 text-right">Saldo Líq.</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-50 font-bold">
-                            {data.monthlyHistory.map(m => (
-                                <tr key={m.fullDate}>
-                                    <td className="px-4 py-2 font-black text-slate-800 uppercase">{m.name} {m.fullDate.split('-')[0]}</td>
-                                    <td className="px-4 py-2 text-right text-emerald-700">{formatMoney(m.revenue)}</td>
-                                    <td className="px-4 py-2 text-right text-rose-700">{formatMoney(m.purchaseCost + m.freightCost)}</td>
-                                    <td className={`px-4 py-2 text-right font-black ${m.netResult >= 0 ? 'text-blue-700' : 'text-rose-700'}`}>{formatMoney(m.netResult)}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+        {/* SEÇÃO 5: TABELA MENSAL */}
+        <div className="break-inside-avoid pb-10">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden h-full">
+            <div className="bg-slate-50 px-6 py-3 border-b border-slate-100 flex items-center gap-2">
+              <Table size={16} className="text-slate-500" />
+              <h3 className="font-bold text-slate-800 text-[10px] uppercase tracking-widest">Demonstrativo Mensal Consolidado</h3>
             </div>
+            <table className="w-full text-left text-[9px] text-slate-600">
+              <thead className="bg-white border-b border-slate-100 text-[8px] uppercase text-slate-400 font-black">
+                <tr>
+                  <th className="px-4 py-2">Mês/Ano</th>
+                  <th className="px-4 py-2 text-right">Faturamento</th>
+                  <th className="px-4 py-2 text-right">Custos Dir.</th>
+                  <th className="px-4 py-2 text-right">Saldo Líq.</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50 font-bold">
+                {data.monthlyHistory.map(m => (
+                  <tr key={m.fullDate}>
+                    <td className="px-4 py-2 font-black text-slate-800 uppercase">{m.name} {m.fullDate.split('-')[0]}</td>
+                    <td className="px-4 py-2 text-right text-emerald-700">{formatMoney(m.revenue)}</td>
+                    <td className="px-4 py-2 text-right text-rose-700">{formatMoney(m.purchaseCost + m.freightCost)}</td>
+                    <td className={`px-4 py-2 text-right font-black ${m.netResult >= 0 ? 'text-blue-700' : 'text-rose-700'}`}>{formatMoney(m.netResult)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
 
-            {/* Expense Structure - 5/12 colunas */}
-            <div className="col-span-5 flex flex-col space-y-4">
-                <div className="flex items-center gap-2 px-1">
-                    <BarChart3 size={16} className="text-slate-400" />
-                    <h3 className="font-black text-slate-800 uppercase text-[10px] tracking-widest italic">Breakdown Despesas</h3>
-                </div>
-                <div className="flex-1">
-                    <ExpenseStructure data={data.expenseBreakdown} />
-                </div>
-            </div>
+        {/* SEÇÃO 6: BREAKDOWN DESPESAS (NOVA PÁGINA) */}
+        <div className="break-inside-avoid pb-10" style={{ pageBreakBefore: 'always', breakBefore: 'page' }}>
+          <div className="flex items-center gap-2 px-1 mb-4">
+            <BarChart3 size={16} className="text-slate-400" />
+            <h3 className="font-black text-slate-800 uppercase text-[10px] tracking-widest italic">Breakdown Despesas</h3>
+          </div>
+          <ExpenseStructure data={data.expenseBreakdown} />
         </div>
 
         {/* RODAPÉ TÉCNICO */}

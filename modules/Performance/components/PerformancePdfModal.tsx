@@ -1,57 +1,51 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { X, Download, Loader2, FileText } from 'lucide-react';
 import { PerformanceReport } from '../types';
-import { pdf } from '@react-pdf/renderer';
-import { saveAs } from 'file-saver';
-import PerformancePdfDocument from './PerformancePdfDocument';
+import PerformanceReportTemplate from '../templates/PerformanceReportTemplate';
+import html2pdf from 'html2pdf.js';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  data: PerformanceReport;
+  data: PerformanceReport | null;
   periodLabel: string;
 }
 
 const PerformancePdfModal: React.FC<Props> = ({ isOpen, onClose, data, periodLabel }) => {
+  const contentRef = useRef<HTMLDivElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    let url: string | null = null;
-
-    const generatePreview = async () => {
-      if (isOpen && data) {
-        try {
-          const blob = await pdf(<PerformancePdfDocument data={data} periodLabel={periodLabel} />).toBlob();
-          url = URL.createObjectURL(blob);
-          setPdfUrl(url);
-        } catch (error) {
-          console.error('Erro ao gerar preview:', error);
-        }
-      }
-    };
-
-    generatePreview();
-
-    return () => {
-      if (url) URL.revokeObjectURL(url);
-    };
-  }, [isOpen, data, periodLabel]);
 
   if (!isOpen) return null;
 
   const handleDownloadPdf = async () => {
+    if (!contentRef.current || !data) return;
     setIsGenerating(true);
 
     const filename = `Performance_Analitica_${periodLabel.replace(/\s+/g, '_')}.pdf`;
+    const options = {
+      margin: 0,
+      filename,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: {
+        scale: 2,
+        useCORS: true,
+        letterRendering: true,
+        width: 1120,
+        windowWidth: 1120,
+        scrollX: 0,
+        scrollY: 0
+      },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape', compress: true },
+      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+    };
 
     try {
-      const blob = await pdf(<PerformancePdfDocument data={data} periodLabel={periodLabel} />).toBlob();
-      saveAs(blob, filename);
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      await html2pdf().set(options).from(contentRef.current).save();
     } catch (err) {
       console.error('Erro ao gerar PDF:', err);
-      alert("Erro ao processar o arquivo PDF analítico.");
+      alert('Erro ao processar o PDF de performance.');
     } finally {
       setIsGenerating(false);
     }
@@ -90,12 +84,18 @@ const PerformancePdfModal: React.FC<Props> = ({ isOpen, onClose, data, periodLab
 
         {/* Área de Preview */}
         <div className="flex-1 overflow-auto p-4 flex justify-center bg-slate-400/30">
-          {pdfUrl ? (
-            <iframe
-              src={pdfUrl}
-              className="w-full h-full bg-white shadow-2xl rounded-lg"
-              title="PDF Preview"
-            />
+          {data ? (
+            <div
+              className="bg-white shadow-2xl origin-top transition-transform duration-500 mb-10"
+              style={{ width: '297mm', minHeight: '210mm' }}
+            >
+              <div
+                ref={contentRef}
+                style={{ width: '1120px', margin: '0 auto', backgroundColor: 'white', position: 'relative' }}
+              >
+                <PerformanceReportTemplate data={data} periodLabel={periodLabel} />
+              </div>
+            </div>
           ) : (
             <div className="flex items-center justify-center h-full">
               <Loader2 className="animate-spin text-slate-500" size={48} />

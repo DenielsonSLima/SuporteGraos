@@ -122,6 +122,7 @@ const ReportsModule: React.FC = () => {
       return (
         <ReportScreen 
           reportModule={activeReportModule} 
+          reportId={activeReportId}
           onBack={() => {
             setActiveReportId(null);
             setActiveReportModule(null);

@@ -12,6 +12,13 @@ const db = new Persistence<FinancialRecord>('standalone_records', [], { useStora
 let isInitialized = false;
 let realtimeSubscription: any = null;
 
+export interface StandaloneRecordsPageOptions {
+  limit: number;
+  beforeDate?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
 /**
  * Converte registro do Supabase (snake_case) para o formato do app (camelCase)
  */
@@ -73,6 +80,56 @@ const toSupabase = (record: FinancialRecord): any => ({
   total_ton: record.totalTon,
   total_sc: record.totalSc,
 });
+
+const STANDALONE_SELECT_FIELDS = [
+  'id',
+  'description',
+  'entity_name',
+  'driver_name',
+  'category',
+  'due_date',
+  'issue_date',
+  'settlement_date',
+  'original_value',
+  'paid_value',
+  'discount_value',
+  'status',
+  'sub_type',
+  'bank_account',
+  'notes',
+  'asset_id',
+  'is_asset_receipt',
+  'asset_name',
+  'weight_sc',
+  'weight_kg',
+  'unit_price_ton',
+  'unit_price_sc',
+  'load_count',
+  'total_ton',
+  'total_sc'
+].join(',');
+
+const fetchPage = async (options: StandaloneRecordsPageOptions): Promise<FinancialRecord[]> => {
+  try {
+    const { limit, beforeDate, startDate, endDate } = options;
+    let query = supabase
+      .from('standalone_records')
+      .select(STANDALONE_SELECT_FIELDS)
+      .order('issue_date', { ascending: false })
+      .limit(limit);
+
+    if (beforeDate) query = query.lte('issue_date', beforeDate);
+    if (startDate) query = query.gte('issue_date', startDate);
+    if (endDate) query = query.lte('issue_date', endDate);
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return (data || []).map(fromSupabase);
+  } catch (error) {
+    console.error('❌ [StandaloneRecordsService] Erro ao paginar:', error);
+    return [];
+  }
+};
 
 /**
  * Carrega todos os registros do Supabase
@@ -148,6 +205,8 @@ export const standaloneRecordsService = {
    * Retorna todos os registros
    */
   getAll: (): FinancialRecord[] => db.getAll(),
+
+  fetchPage,
 
   /**
    * Retorna um registro por ID

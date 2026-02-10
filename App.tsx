@@ -5,6 +5,7 @@ import HeaderSimple from './components/layout/HeaderSimple';
 import { ModuleId, User } from './types';
 import { MENU_ITEMS } from './constants';
 import { authService } from './services/authService';
+import { auditService } from './services/auditService';
 import { supabase } from './services/supabase';
 import { ToastProvider, useToast } from './contexts/ToastContext';
 import { NotificationProvider } from './contexts/NotificationContext';
@@ -246,11 +247,98 @@ const AppContent: React.FC = () => {
     }
   }, []); // Nenhuma dependência = função estável
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     await authService.logout();
     setCurrentUser(null);
     setActiveModule(ModuleId.HOME);
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const INACTIVITY_LIMIT_MS = 60 * 60 * 1000;
+    const WARNING_BEFORE_MS = 5 * 60 * 1000;
+    const REFRESH_PING_KEY = 'sg_refresh_ping';
+    const REFRESH_GRACE_MS = 2000;
+    const HEARTBEAT_INTERVAL_MS = 5 * 60 * 1000;
+    const activityEvents: Array<keyof WindowEventMap> = [
+      'mousemove',
+      'mousedown',
+      'keydown',
+      'scroll',
+      'touchstart'
+    ];
+
+    let timeoutId: number | null = null;
+    let warningTimeoutId: number | null = null;
+    let heartbeatId: number | null = null;
+    let lastHeartbeatAt = 0;
+
+    const resetTimer = () => {
+      if (timeoutId) window.clearTimeout(timeoutId);
+      if (warningTimeoutId) window.clearTimeout(warningTimeoutId);
+
+      warningTimeoutId = window.setTimeout(() => {
+        addToast('warning', 'Sessao vai expirar', 'Faltam 5 minutos por inatividade.');
+      }, INACTIVITY_LIMIT_MS - WARNING_BEFORE_MS);
+
+      timeoutId = window.setTimeout(() => {
+        console.warn('[APP] Inatividade detectada: encerrando sessao.');
+        void handleLogout();
+      }, INACTIVITY_LIMIT_MS);
+    };
+
+    const sendHeartbeat = () => {
+      const sessionId = authService.getCurrentSessionId();
+      if (!sessionId) return;
+      const now = Date.now();
+      if (now - lastHeartbeatAt < HEARTBEAT_INTERVAL_MS) return;
+      lastHeartbeatAt = now;
+      void auditService.heartbeatSession(sessionId);
+    };
+
+    const handleActivity = () => {
+      resetTimer();
+      sendHeartbeat();
+    };
+
+    const handlePageExit = () => {
+      const unloadAt = Date.now();
+      window.setTimeout(() => {
+        const ping = localStorage.getItem(REFRESH_PING_KEY);
+        const pingTime = ping ? Number(ping) : 0;
+        if (pingTime && pingTime >= unloadAt) return;
+        void authService.logout();
+      }, REFRESH_GRACE_MS);
+    };
+
+    activityEvents.forEach((eventName) =>
+      window.addEventListener(eventName, handleActivity, { passive: true })
+    );
+    window.addEventListener('pagehide', handlePageExit);
+
+    // Marca load atual para evitar logout em refresh
+    localStorage.setItem(REFRESH_PING_KEY, String(Date.now()));
+    window.setTimeout(() => {
+      const ping = localStorage.getItem(REFRESH_PING_KEY);
+      if (ping) localStorage.removeItem(REFRESH_PING_KEY);
+    }, REFRESH_GRACE_MS);
+
+    resetTimer();
+    void auditService.closeStaleSessions(60);
+    sendHeartbeat();
+    heartbeatId = window.setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
+
+    return () => {
+      if (timeoutId) window.clearTimeout(timeoutId);
+      if (warningTimeoutId) window.clearTimeout(warningTimeoutId);
+      if (heartbeatId) window.clearInterval(heartbeatId);
+      activityEvents.forEach((eventName) =>
+        window.removeEventListener(eventName, handleActivity)
+      );
+      window.removeEventListener('pagehide', handlePageExit);
+    };
+  }, [addToast, currentUser, handleLogout]);
 
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 

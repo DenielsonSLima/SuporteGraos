@@ -4,6 +4,7 @@ import { auditService } from './auditService';
 import { supabase, getSupabaseSession, onAuthStateChange } from './supabase';
 
 const STORAGE_KEY = 'sg_user';
+const SESSION_ID_KEY = 'sg_session_id';
 let currentSessionId: string | null = null;
 
 const normalizeRole = (value?: string | null): 'admin' | 'manager' | 'user' => {
@@ -131,6 +132,7 @@ export const authService = {
       console.log('[AUTH] 🔐 Criando sessão de auditoria...');
       const session = await auditService.createSession();
       currentSessionId = session.id;
+      sessionStorage.setItem(SESSION_ID_KEY, session.id);
       console.log('[AUTH] ✅ Sessão de auditoria criada com ID:', currentSessionId);
 
       console.log('%c╔════════════════════════════════════╗', 'color: green; font-weight: bold;');
@@ -174,6 +176,7 @@ export const authService = {
 
     // Limpar storage local
     sessionStorage.removeItem(STORAGE_KEY);
+    sessionStorage.removeItem(SESSION_ID_KEY);
     sessionStorage.clear();
   },
 
@@ -275,6 +278,8 @@ export const authService = {
       };
 
       sessionStorage.setItem(STORAGE_KEY, JSON.stringify(userSession));
+      const storedSessionId = sessionStorage.getItem(SESSION_ID_KEY);
+      if (storedSessionId) currentSessionId = storedSessionId;
       const elapsedMs = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - restoreStart;
       console.log('✅ Sessão restaurada com sucesso', {
         traceId: restoreTraceId,
@@ -305,5 +310,7 @@ export const authService = {
         callback(null);
       }
     });
-  }
+  },
+
+  getCurrentSessionId: () => currentSessionId
 };

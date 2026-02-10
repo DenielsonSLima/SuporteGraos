@@ -56,9 +56,8 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 13,
-    fontFamily: 'Helvetica-Bold',
+    fontFamily: 'Helvetica-BoldOblique',
     textTransform: 'uppercase',
-    fontStyle: 'italic',
   },
   subtitle: {
     fontSize: 7,

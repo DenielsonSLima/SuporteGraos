@@ -16,6 +16,13 @@ export interface Transfer {
   companyId?: string;
 }
 
+export interface TransfersPageOptions {
+  limit: number;
+  beforeDate?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
 const db = new Persistence<Transfer>('transfers', [], { useStorage: false });
 let realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
 let isLoaded = false;
@@ -45,6 +52,38 @@ const mapFromDb = (row: any): Transfer => ({
   notes: row.notes,
   companyId: row.company_id
 });
+
+const TRANSFERS_SELECT_FIELDS = [
+  'id',
+  'from_account_id',
+  'to_account_id',
+  'amount',
+  'transfer_date',
+  'description',
+  'notes',
+  'company_id'
+].join(',');
+
+const fetchPage = async (options: TransfersPageOptions): Promise<Transfer[]> => {
+  try {
+    const { limit, beforeDate, startDate, endDate } = options;
+    let query = supabase
+      .from('transfers')
+      .select(TRANSFERS_SELECT_FIELDS)
+      .order('transfer_date', { ascending: false })
+      .limit(limit);
+
+    if (beforeDate) query = query.lte('transfer_date', beforeDate);
+    if (startDate) query = query.gte('transfer_date', startDate);
+    if (endDate) query = query.lte('transfer_date', endDate);
+
+    const data = await supabaseWithRetry(() => query);
+    return (data || []).map(mapFromDb);
+  } catch (error) {
+    console.error('❌ Erro ao paginar transfers:', error);
+    return [];
+  }
+};
 
 // ============================================================================
 // CARREGAMENTO INICIAL
@@ -142,6 +181,7 @@ export const transfersService = {
   getById: (id: string) => db.getById(id),
   subscribe: (callback: (items: Transfer[]) => void) => db.subscribe(callback),
   loadFromSupabase,
+  fetchPage,
   startRealtime,
 
   add: (item: Transfer) => {

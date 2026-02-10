@@ -15,6 +15,13 @@ export interface Loan extends FinancialRecord {
   type: 'taken' | 'granted';
 }
 
+export interface LoansPageOptions {
+  limit: number;
+  beforeDate?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
 const db = new Persistence<FinancialRecord>('loans', [], { useStorage: false });
 let realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
 let isLoaded = false;
@@ -84,6 +91,47 @@ const toSupabase = (record: FinancialRecord): any => ({
   bank_account: record.bankAccount,
   notes: record.notes,
 });
+
+const LOANS_SELECT_FIELDS = [
+  'id',
+  'description',
+  'entity_name',
+  'driver_name',
+  'category',
+  'due_date',
+  'issue_date',
+  'settlement_date',
+  'original_value',
+  'paid_value',
+  'discount_value',
+  'status',
+  'sub_type',
+  'bank_account',
+  'notes'
+].join(',');
+
+const fetchPage = async (options: LoansPageOptions): Promise<FinancialRecord[]> => {
+  try {
+    const { limit, beforeDate, startDate, endDate } = options;
+    let query = supabase
+      .from('standalone_records')
+      .select(LOANS_SELECT_FIELDS)
+      .in('sub_type', ['loan_taken', 'loan_granted'])
+      .order('issue_date', { ascending: false })
+      .limit(limit);
+
+    if (beforeDate) query = query.lte('issue_date', beforeDate);
+    if (startDate) query = query.gte('issue_date', startDate);
+    if (endDate) query = query.lte('issue_date', endDate);
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return (data || []).map(fromSupabase);
+  } catch (error) {
+    console.error('❌ Erro ao paginar loans:', error);
+    return [];
+  }
+};
 
 // ============================================================================
 // CARREGAMENTO INICIAL
@@ -205,6 +253,7 @@ export const loansService = {
   getById: (id: string) => db.getById(id),
   subscribe: (callback: (items: FinancialRecord[]) => void) => db.subscribe(callback),
   loadFromSupabase,
+  fetchPage,
   startRealtime,
 
   add: (item: FinancialRecord) => {

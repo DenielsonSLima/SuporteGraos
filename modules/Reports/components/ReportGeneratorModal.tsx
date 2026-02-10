@@ -2,6 +2,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { X, Download, Calendar, FileText, Loader2 } from 'lucide-react';
 import { getReportById } from '../registry';
+import { ReportModule } from '../types';
+import UniversalReportTemplate from '../templates/UniversalReportTemplate';
 import html2pdf from 'html2pdf.js';
 
 interface Props {
@@ -11,6 +13,7 @@ interface Props {
 }
 
 const ReportGeneratorModal: React.FC<Props> = ({ isOpen, onClose, reportId }) => {
+  const [reportModule, setReportModule] = useState<ReportModule | null>(null);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [reportData, setReportData] = useState<any>(null);
@@ -18,7 +21,27 @@ const ReportGeneratorModal: React.FC<Props> = ({ isOpen, onClose, reportId }) =>
   const [isGenerating, setIsGenerating] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
 
-  const reportModule = reportId ? getReportById(reportId) : null;
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadReport = async () => {
+      if (!isOpen || !reportId) {
+        setReportModule(null);
+        return;
+      }
+
+      const module = await getReportById(reportId);
+      if (isMounted) {
+        setReportModule(module || null);
+      }
+    };
+
+    void loadReport();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isOpen, reportId]);
 
   // Set default dates (Current Month)
   useEffect(() => {
@@ -78,7 +101,7 @@ const ReportGeneratorModal: React.FC<Props> = ({ isOpen, onClose, reportId }) =>
     }
   };
 
-  const TemplateComponent = reportModule.Template;
+  const TemplateComponent = UniversalReportTemplate;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">

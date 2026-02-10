@@ -20,6 +20,8 @@ const PerformanceModule: React.FC = () => {
   const [monthsBack, setMonthsBack] = useState<number | null>(6);
   const [data, setData] = useState<PerformanceReport | null>(null);
   const [isPdfOpen, setIsPdfOpen] = useState(false);
+  const [pdfData, setPdfData] = useState<PerformanceReport | null>(null);
+  const [pdfPeriodLabel, setPdfPeriodLabel] = useState('');
 
   const loadData = useCallback(async () => {
     await waitForInit();
@@ -49,6 +51,12 @@ const PerformanceModule: React.FC = () => {
 
   const periodLabel = monthsBack ? `Últimos ${monthsBack} Meses` : 'Histórico Total';
 
+  const handleOpenPdf = () => {
+    setPdfData(data);
+    setPdfPeriodLabel(periodLabel);
+    setIsPdfOpen(true);
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
       
@@ -64,7 +72,7 @@ const PerformanceModule: React.FC = () => {
         
         <div className="flex flex-wrap items-center gap-3">
             <button 
-                onClick={() => setIsPdfOpen(true)}
+              onClick={handleOpenPdf}
                 className="flex items-center gap-2 bg-white border-2 border-slate-200 text-slate-700 px-5 py-2 rounded-xl hover:bg-slate-50 transition-all shadow-sm font-black text-xs uppercase tracking-widest"
             >
                 <Printer size={16} /> Exportar PDF
@@ -169,8 +177,8 @@ const PerformanceModule: React.FC = () => {
       <PerformancePdfModal 
         isOpen={isPdfOpen} 
         onClose={() => setIsPdfOpen(false)} 
-        data={data} 
-        periodLabel={periodLabel} 
+        data={pdfData} 
+        periodLabel={pdfPeriodLabel} 
       />
 
     </div>

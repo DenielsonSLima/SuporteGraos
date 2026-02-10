@@ -11,20 +11,21 @@ import {
   Eye
 } from 'lucide-react';
 import { ReportModule, GeneratedReportData } from '../types';
-import ReportPdfPreviewModal from './ReportPdfPreviewModal';
+import ReportGeneratorModal from './ReportGeneratorModal';
 import { reportAuditService } from '../../../services/reportAuditService';
 import { loadingService } from '../../../services/loadingService';
 
 interface Props {
   reportModule: ReportModule;
+  reportId: string;
   onBack: () => void;
 }
 
-const ReportScreen: React.FC<Props> = ({ reportModule, onBack }) => {
+const ReportScreen: React.FC<Props> = ({ reportModule, reportId, onBack }) => {
   const [filters, setFilters] = useState(reportModule.initialFilters);
   const [data, setData] = useState<GeneratedReportData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
+  const [isHtmlPdfOpen, setIsHtmlPdfOpen] = useState(false);
   
 
   // Atualização em tempo real para relatórios de logística
@@ -89,7 +90,7 @@ const ReportScreen: React.FC<Props> = ({ reportModule, onBack }) => {
 
   const handleOpenPdfPreview = () => {
     if (!data || data.rows.length === 0) return;
-    setIsPdfModalOpen(true);
+    setIsHtmlPdfOpen(true);
   };
 
   const formatValue = (value: any, type?: string) => {
@@ -259,14 +260,11 @@ const ReportScreen: React.FC<Props> = ({ reportModule, onBack }) => {
       </div>
 
       {/* Modal de Pré-visualização do PDF */}
-      {isPdfModalOpen && data && (
-        <ReportPdfPreviewModal 
-          isOpen={isPdfModalOpen}
-          onClose={() => setIsPdfModalOpen(false)}
-          reportId={reportModule.metadata.id}
-          reportTitle={reportModule.metadata.title}
-          PdfDocument={reportModule.PdfDocument || reportModule.Template}
-          data={data}
+      {isHtmlPdfOpen && (
+        <ReportGeneratorModal
+          isOpen={isHtmlPdfOpen}
+          onClose={() => setIsHtmlPdfOpen(false)}
+          reportId={reportId}
         />
       )}
 

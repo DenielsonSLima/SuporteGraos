@@ -22,7 +22,6 @@ import {
   Activity
 } from 'lucide-react';
 import SettingsSubPage from '../components/SettingsSubPage';
-import { logService, LogEntry } from '../../../services/logService';
 import { auditService, AuditLog, UserSession, LoginHistory } from '../../../services/auditService';
 
 interface Props {
@@ -34,18 +33,21 @@ const LogsSettings: React.FC<Props> = ({ onBack }) => {
   
   // Audit Logs State
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
-  const [filteredAuditLogs, setFilteredAuditLogs] = useState<AuditLog[]>([]);
+  const [auditCursor, setAuditCursor] = useState<string | undefined>(undefined);
+  const [auditHasMore, setAuditHasMore] = useState(false);
+  const [auditLoading, setAuditLoading] = useState(false);
   
   // Sessions State
   const [userSessions, setUserSessions] = useState<UserSession[]>([]);
-  const [filteredSessions, setFilteredSessions] = useState<UserSession[]>([]);
+  const [sessionsCursor, setSessionsCursor] = useState<string | undefined>(undefined);
+  const [sessionsHasMore, setSessionsHasMore] = useState(false);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
   
   // Login History State
   const [loginHistory, setLoginHistory] = useState<LoginHistory[]>([]);
-  const [filteredLogins, setFilteredLogins] = useState<LoginHistory[]>([]);
-  
-  // Old Logs State (fallback)
-  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [loginsCursor, setLoginsCursor] = useState<string | undefined>(undefined);
+  const [loginsHasMore, setLoginsHasMore] = useState(false);
+  const [loginsLoading, setLoginsLoading] = useState(false);
   
   // Filters State
   const [searchTerm, setSearchTerm] = useState('');
@@ -53,134 +55,119 @@ const LogsSettings: React.FC<Props> = ({ onBack }) => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [statsData, setStatsData] = useState({ totalAuditLogs: 0, activeSessions: 0, totalLogins: 0, failedLogins: 0 });
+  const [activeSessionsCount, setActiveSessionsCount] = useState(0);
+  const [failedLoginsLast30, setFailedLoginsLast30] = useState(0);
 
-  // Load Data
-  useEffect(() => {
-    // Subscribe to audit logs realtime
-    const unsubAudit = auditService.subscribeAuditLogs((logs) => {
-      setAuditLogs(logs);
-      applyFilters('audit', logs, [], []);
-    });
+  const AUDIT_PAGE_SIZE = 30;
+  const SESSIONS_PAGE_SIZE = 30;
+  const LOGINS_PAGE_SIZE = 20;
 
-    // Subscribe to user sessions realtime
-    const unsubSessions = auditService.subscribeUserSessions((sessions) => {
-      setUserSessions(sessions);
-      applyFilters('sessions', [], sessions, []);
-    });
-
-    // Subscribe to login history realtime
-    const unsubLogins = auditService.subscribeLoginHistory((logins) => {
-      setLoginHistory(logins);
-      applyFilters('logins', [], [], logins);
-    });
-
-    // Load old logs as fallback
-    setLogs(logService.getFiltered({}));
-    const unsubLegacy = logService.subscribe((legacy) => {
-      setLogs(legacy);
-    });
-
-    // Load stats
-    updateStats();
-
-    // Start realtime
-    auditService.startRealtime();
-
-    return () => {
-      unsubAudit?.();
-      unsubSessions?.();
-      unsubLogins?.();
-      unsubLegacy?.();
-    };
-  }, []);
-
-  useEffect(() => {
-    applyFilters(activeTab, auditLogs, userSessions, loginHistory);
-    updateStats();
-  }, [searchTerm, selectedModule, startDate, endDate, activeTab, auditLogs, userSessions, loginHistory]);
-
-  const mapLegacyToAudit = (entry: LogEntry): AuditLog => ({
-    id: entry.id,
-    userId: entry.userId || 'system',
-    userName: entry.userName || 'Sistema',
-    userEmail: 'system@system.com',
-    action: entry.action,
-    module: entry.module,
-    description: entry.description,
-    entityId: entry.entityId,
-    createdAt: entry.timestamp,
-    metadata: entry.metadata
-  });
-
-  const applyFilters = (tab: string, audit: AuditLog[], sessions: UserSession[], logins: LoginHistory[]) => {
-    if (tab === 'audit') {
-      const legacyMapped = logs.map(mapLegacyToAudit);
-      const merged = [...audit, ...legacyMapped]
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-      let filtered = merged;
-
-      if (searchTerm) {
-        const term = searchTerm.toLowerCase();
-        filtered = filtered.filter(l => 
-          l.description.toLowerCase().includes(term) || 
-          l.userName.toLowerCase().includes(term)
-        );
-      }
-
-      if (selectedModule && selectedModule !== 'all') {
-        filtered = filtered.filter(l => l.module === selectedModule);
-      }
-
-      if (startDate || endDate) {
-        filtered = filtered.filter(l => {
-          const logDate = new Date(l.createdAt);
-          if (startDate && logDate < new Date(startDate)) return false;
-          if (endDate) {
-            const end = new Date(endDate);
-            end.setHours(23, 59, 59, 999);
-            if (logDate > end) return false;
-          }
-          return true;
-        });
-      }
-
-      setFilteredAuditLogs(filtered);
-    } else if (tab === 'sessions') {
-      let filtered = sessions;
-
-      if (searchTerm) {
-        const term = searchTerm.toLowerCase();
-        filtered = filtered.filter(s => 
-          s.userName.toLowerCase().includes(term) || 
-          s.userEmail.toLowerCase().includes(term)
-        );
-      }
-
-      setFilteredSessions(filtered);
-    } else if (tab === 'logins') {
-      let filtered = logins;
-
-      if (searchTerm) {
-        const term = searchTerm.toLowerCase();
-        filtered = filtered.filter(l => 
-          l.userEmail.toLowerCase().includes(term) || 
-          (l.userName && l.userName.toLowerCase().includes(term))
-        );
-      }
-
-      setFilteredLogins(filtered);
+  const refreshStats = async () => {
+    try {
+      const [activeCount, failedStats, recentLoginsCount] = await Promise.all([
+        auditService.fetchActiveSessionsCount({ minutes: 60 }),
+        auditService.fetchFailedLoginsLast30(),
+        auditService.fetchRecentLoginsCount(LOGINS_PAGE_SIZE)
+      ]);
+      setActiveSessionsCount(activeCount);
+      setFailedLoginsLast30(failedStats.failed);
+      setStatsData((prev) => ({
+        ...prev,
+        totalLogins: recentLoginsCount
+      }));
+    } catch (error) {
+      console.warn('⚠️ Falha ao atualizar estatisticas de sessoes/logins:', error);
     }
   };
 
-  const updateStats = () => {
-    const stats = auditService.getStats();
-    const legacyCount = logs.length;
-    setStatsData({
-      ...stats,
-      totalAuditLogs: stats.totalAuditLogs + legacyCount
-    });
+  const loadAuditLogs = async (reset = false) => {
+    if (auditLoading) return;
+    setAuditLoading(true);
+    try {
+      const result = await auditService.fetchAuditLogsPage({
+        limit: AUDIT_PAGE_SIZE,
+        cursor: reset ? undefined : auditCursor,
+        module: selectedModule,
+        search: searchTerm,
+        startDate,
+        endDate
+      });
+      setAuditLogs(prev => reset ? result.items : [...prev, ...result.items]);
+      setAuditCursor(result.nextCursor);
+      setAuditHasMore(result.hasMore);
+      void refreshStats();
+    } finally {
+      setAuditLoading(false);
+    }
   };
+
+  const loadSessions = async (reset = false) => {
+    if (sessionsLoading) return;
+    setSessionsLoading(true);
+    try {
+      const result = await auditService.fetchUserSessionsPage({
+        limit: SESSIONS_PAGE_SIZE,
+        cursor: reset ? undefined : sessionsCursor,
+        search: searchTerm,
+        startDate,
+        endDate
+      });
+      setUserSessions(prev => reset ? result.items : [...prev, ...result.items]);
+      setSessionsCursor(result.nextCursor);
+      setSessionsHasMore(result.hasMore);
+      void refreshStats();
+    } finally {
+      setSessionsLoading(false);
+    }
+  };
+
+  const loadLogins = async (reset = false) => {
+    if (loginsLoading) return;
+    setLoginsLoading(true);
+    try {
+      const result = await auditService.fetchLoginHistoryPage({
+        limit: LOGINS_PAGE_SIZE,
+        cursor: reset ? undefined : loginsCursor,
+        search: searchTerm,
+        startDate,
+        endDate
+      });
+      setLoginHistory(prev => reset ? result.items : [...prev, ...result.items]);
+      setLoginsCursor(result.nextCursor);
+      setLoginsHasMore(result.hasMore);
+      void refreshStats();
+    } finally {
+      setLoginsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'audit') {
+      setAuditCursor(undefined);
+      void loadAuditLogs(true);
+    }
+    if (activeTab === 'sessions') {
+      setSessionsCursor(undefined);
+      void loadSessions(true);
+    }
+    if (activeTab === 'logins') {
+      setLoginsCursor(undefined);
+      void loadLogins(true);
+    }
+  }, [activeTab, searchTerm, selectedModule, startDate, endDate]);
+
+  useEffect(() => {
+    setStatsData({
+      totalAuditLogs: auditLogs.length,
+      activeSessions: activeSessionsCount,
+      totalLogins: loginHistory.length,
+      failedLogins: failedLoginsLast30
+    });
+  }, [auditLogs, activeSessionsCount, loginHistory, failedLoginsLast30]);
+
+  useEffect(() => {
+    void refreshStats();
+  }, []);
 
   const clearFilters = () => {
     setSearchTerm('');
@@ -247,22 +234,22 @@ const LogsSettings: React.FC<Props> = ({ onBack }) => {
           <div className="bg-gradient-to-br from-slate-50 to-slate-100 p-3 rounded-lg border border-slate-200">
             <div className="text-xs text-slate-600 mb-1">Logs de Auditoria</div>
             <div className="text-2xl font-bold text-slate-900">{statsData.totalAuditLogs}</div>
-            <div className="text-[10px] text-slate-400 mt-1">registros do sistema</div>
+            <div className="text-[10px] text-slate-400 mt-1">registros carregados</div>
           </div>
           <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 p-3 rounded-lg border border-emerald-200">
             <div className="text-xs text-emerald-600 mb-1">Sessões Ativas</div>
             <div className="text-2xl font-bold text-emerald-900">{statsData.activeSessions}</div>
-            <div className="text-[10px] text-emerald-600 mt-1">usuários conectados</div>
+            <div className="text-[10px] text-emerald-600 mt-1">contagem global</div>
           </div>
           <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-3 rounded-lg border border-blue-200">
             <div className="text-xs text-blue-600 mb-1">Logins</div>
             <div className="text-2xl font-bold text-blue-900">{statsData.totalLogins}</div>
-            <div className="text-[10px] text-blue-600 mt-1">total de acessos</div>
+            <div className="text-[10px] text-blue-600 mt-1">ultimos 20 carregados</div>
           </div>
           <div className="bg-gradient-to-br from-rose-50 to-rose-100 p-3 rounded-lg border border-rose-200">
             <div className="text-xs text-rose-600 mb-1">Falhas</div>
             <div className="text-2xl font-bold text-rose-900">{statsData.failedLogins}</div>
-            <div className="text-[10px] text-rose-600 mt-1">tentativas falhadas</div>
+            <div className="text-[10px] text-rose-600 mt-1">falhas nos ultimos 30 logins</div>
           </div>
         </div>
 
@@ -376,14 +363,14 @@ const LogsSettings: React.FC<Props> = ({ onBack }) => {
         <div className="space-y-4">
           {/* AUDIT LOGS TAB */}
           {activeTab === 'audit' && (
-            filteredAuditLogs.length === 0 ? (
+            auditLogs.length === 0 ? (
               <div className="text-center py-12 text-slate-400 bg-white rounded-xl border border-dashed border-slate-200">
                 <Search size={32} className="mx-auto mb-2 opacity-50" />
                 <p>Nenhum registro de auditoria encontrado.</p>
                 <p className="text-xs mt-2 text-slate-400">As ações realizadas no sistema aparecerão aqui.</p>
               </div>
             ) : (
-              filteredAuditLogs.map((log) => {
+              auditLogs.map((log) => {
                 const style = getActionStyle(log.action);
                 const ActionIcon = style.icon;
                 const { date: logDate, time: logTime } = formatDate(log.createdAt);
@@ -430,9 +417,21 @@ const LogsSettings: React.FC<Props> = ({ onBack }) => {
             )
           )}
 
+          {activeTab === 'audit' && auditHasMore && (
+            <div className="flex justify-center">
+              <button
+                onClick={() => loadAuditLogs(false)}
+                disabled={auditLoading}
+                className="px-4 py-2 text-xs font-black uppercase tracking-widest rounded-lg border border-slate-200 text-slate-600 hover:text-slate-800 hover:border-slate-300 transition-all disabled:opacity-50"
+              >
+                {auditLoading ? 'Carregando...' : 'Carregar mais'}
+              </button>
+            </div>
+          )}
+
           {/* SESSIONS TAB */}
           {activeTab === 'sessions' && (
-            filteredSessions.length === 0 ? (
+            userSessions.length === 0 ? (
               <div className="text-center py-12 text-slate-400 bg-white rounded-xl border border-dashed border-slate-200">
                 <Activity size={32} className="mx-auto mb-2 opacity-50" />
                 <p>Nenhuma sessão encontrada.</p>
@@ -440,7 +439,7 @@ const LogsSettings: React.FC<Props> = ({ onBack }) => {
               </div>
             ) : (
               <div className="space-y-3">
-                {filteredSessions.map((session) => {
+                {userSessions.map((session) => {
                   const statusStyle = getSessionStatus(session.status);
                   const { date: startDate, time: startTime } = formatDate(session.sessionStart);
                   const endDate = session.sessionEnd ? formatDate(session.sessionEnd) : null;
@@ -488,9 +487,21 @@ const LogsSettings: React.FC<Props> = ({ onBack }) => {
             )
           )}
 
+          {activeTab === 'sessions' && sessionsHasMore && (
+            <div className="flex justify-center">
+              <button
+                onClick={() => loadSessions(false)}
+                disabled={sessionsLoading}
+                className="px-4 py-2 text-xs font-black uppercase tracking-widest rounded-lg border border-slate-200 text-slate-600 hover:text-slate-800 hover:border-slate-300 transition-all disabled:opacity-50"
+              >
+                {sessionsLoading ? 'Carregando...' : 'Carregar mais'}
+              </button>
+            </div>
+          )}
+
           {/* LOGIN HISTORY TAB */}
           {activeTab === 'logins' && (
-            filteredLogins.length === 0 ? (
+            loginHistory.length === 0 ? (
               <div className="text-center py-12 text-slate-400 bg-white rounded-xl border border-dashed border-slate-200">
                 <LogIn size={32} className="mx-auto mb-2 opacity-50" />
                 <p>Nenhum login registrado.</p>
@@ -498,7 +509,7 @@ const LogsSettings: React.FC<Props> = ({ onBack }) => {
               </div>
             ) : (
               <div className="space-y-3">
-                {filteredLogins.map((login) => {
+                {loginHistory.map((login) => {
                   const typeStyle = getLoginTypeStyle(login.loginType);
                   const TypeIcon = typeStyle.icon;
                   const { date: loginDate, time: loginTime } = formatDate(login.createdAt);
@@ -550,6 +561,18 @@ const LogsSettings: React.FC<Props> = ({ onBack }) => {
                 })}
               </div>
             )
+          )}
+
+          {activeTab === 'logins' && loginsHasMore && (
+            <div className="flex justify-center">
+              <button
+                onClick={() => loadLogins(false)}
+                disabled={loginsLoading}
+                className="px-4 py-2 text-xs font-black uppercase tracking-widest rounded-lg border border-slate-200 text-slate-600 hover:text-slate-800 hover:border-slate-300 transition-all disabled:opacity-50"
+              >
+                {loginsLoading ? 'Carregando...' : 'Carregar mais'}
+              </button>
+            </div>
           )}
         </div>
 

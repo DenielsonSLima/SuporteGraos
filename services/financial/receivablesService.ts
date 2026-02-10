@@ -21,6 +21,13 @@ export interface Receivable {
   companyId?: string;
 }
 
+export interface ReceivablesPageOptions {
+  limit: number;
+  beforeDate?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
 const db = new Persistence<Receivable>('receivables', [], { useStorage: false });
 let realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
 let isLoaded = false;
@@ -60,6 +67,43 @@ const mapFromDb = (row: any): Receivable => ({
   notes: row.notes,
   companyId: row.company_id
 });
+
+const RECEIVABLES_SELECT_FIELDS = [
+  'id',
+  'sales_order_id',
+  'partner_id',
+  'description',
+  'due_date',
+  'amount',
+  'received_amount',
+  'status',
+  'payment_method',
+  'bank_account_id',
+  'receipt_date',
+  'notes',
+  'company_id'
+].join(',');
+
+const fetchPage = async (options: ReceivablesPageOptions): Promise<Receivable[]> => {
+  try {
+    const { limit, beforeDate, startDate, endDate } = options;
+    let query = supabase
+      .from('receivables')
+      .select(RECEIVABLES_SELECT_FIELDS)
+      .order('due_date', { ascending: false })
+      .limit(limit);
+
+    if (beforeDate) query = query.lte('due_date', beforeDate);
+    if (startDate) query = query.gte('due_date', startDate);
+    if (endDate) query = query.lte('due_date', endDate);
+
+    const data = await supabaseWithRetry(() => query);
+    return (data || []).map(mapFromDb);
+  } catch (error) {
+    console.error('❌ Erro ao paginar receivables:', error);
+    return [];
+  }
+};
 
 // ============================================================================
 // CARREGAMENTO INICIAL
@@ -154,6 +198,7 @@ export const receivablesService = {
   getById: (id: string) => db.getById(id),
   subscribe: (callback: (items: Receivable[]) => void) => db.subscribe(callback),
   loadFromSupabase,
+  fetchPage,
   startRealtime,
 
   add: (item: Receivable) => {

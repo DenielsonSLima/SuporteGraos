@@ -37,6 +37,13 @@ export interface Payable {
   weightKg?: number;
 }
 
+export interface PayablesPageOptions {
+  limit: number;
+  beforeDate?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
 const db = new Persistence<Payable>('payables', [], { useStorage: false });
 let realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
 let isLoaded = false;
@@ -86,6 +93,48 @@ const mapFromDb = (row: any): Payable => ({
   driverName: row.driver_name,
   weightKg: row.weight_kg ? Number(row.weight_kg) : undefined
 });
+
+const PAYABLES_SELECT_FIELDS = [
+  'id',
+  'purchase_order_id',
+  'loading_id',
+  'partner_id',
+  'partner_name',
+  'description',
+  'due_date',
+  'amount',
+  'paid_amount',
+  'status',
+  'sub_type',
+  'payment_method',
+  'bank_account_id',
+  'payment_date',
+  'notes',
+  'company_id',
+  'driver_name',
+  'weight_kg'
+].join(',');
+
+const fetchPage = async (options: PayablesPageOptions): Promise<Payable[]> => {
+  try {
+    const { limit, beforeDate, startDate, endDate } = options;
+    let query = supabase
+      .from('payables')
+      .select(PAYABLES_SELECT_FIELDS)
+      .order('due_date', { ascending: false })
+      .limit(limit);
+
+    if (beforeDate) query = query.lte('due_date', beforeDate);
+    if (startDate) query = query.gte('due_date', startDate);
+    if (endDate) query = query.lte('due_date', endDate);
+
+    const data = await supabaseWithRetry(() => query);
+    return (data || []).map(mapFromDb);
+  } catch (error) {
+    console.error('❌ Erro ao paginar payables:', error);
+    return [];
+  }
+};
 
 // ============================================================================
 // CARREGAMENTO INICIAL
@@ -182,6 +231,7 @@ export const payablesService = {
   getById: (id: string) => db.getById(id),
   subscribe: (callback: (items: Payable[]) => void) => db.subscribe(callback),
   loadFromSupabase,
+  fetchPage,
   startRealtime,
 
   add: (item: Payable) => {

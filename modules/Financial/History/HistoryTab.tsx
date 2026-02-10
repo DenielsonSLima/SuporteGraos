@@ -30,7 +30,10 @@ import { standaloneRecordsService } from '../../../services/standaloneRecordsSer
 const HistoryTab: React.FC = () => {
   const [records, setRecords] = useState<FinancialRecord[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [filterType, setFilterType] = useState<'all' | 'payable' | 'receivable'>('all');
+  const cursorDateRef = React.useRef<string | null>(null);
   
   // Flag para evitar múltiplas chamadas simultâneas
   const loadingRef = React.useRef(false);
@@ -48,13 +51,49 @@ const HistoryTab: React.FC = () => {
   const [isPdfOpen, setIsPdfOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<FinancialRecord | null>(null);
 
+  const PAGE_SIZE = 30;
+
   // ✅ Log quando o componente monta
   useEffect(() => {
     console.log('📋 HistoryTab montado - aguardando dados...');
   }, []);
 
+  const resolveRecordDate = (record: FinancialRecord & { date?: string }): string =>
+    record.issueDate || record.dueDate || record.date || '';
+
+  const resolveRecordTimestamp = (record: FinancialRecord & { date?: string }) => {
+    const date = resolveRecordDate(record);
+    return date ? new Date(date).getTime() : 0;
+  };
+
+  const mergeRecords = (base: FinancialRecord[], incoming: FinancialRecord[]) => {
+    const merged = new Map<string, FinancialRecord>();
+    base.forEach(item => merged.set(item.id, item));
+    incoming.forEach(item => merged.set(item.id, item));
+    return Array.from(merged.values());
+  };
+
+  const sortRecords = (items: FinancialRecord[]) =>
+    items.sort((a, b) => {
+      const dateA = resolveRecordTimestamp(a);
+      const dateB = resolveRecordTimestamp(b);
+      const dateCompare = dateB - dateA;
+      return dateCompare !== 0 ? dateCompare : b.id.localeCompare(a.id);
+    });
+
+  const getOldestRecordDate = (items: FinancialRecord[]) => {
+    if (items.length === 0) return null;
+    return items.reduce((oldest, item) => {
+      const date = resolveRecordDate(item);
+      if (!date) return oldest;
+      if (!oldest) return date;
+      return date < oldest ? date : oldest;
+    }, null as string | null);
+  };
+
   // --- CARREGAMENTO DE DADOS CONSOLIDADO COM DEBOUNCE ---
-  const loadRealData = useCallback(async () => {
+  const loadRealData = useCallback(async (options?: { reset?: boolean }) => {
+    const reset = options?.reset ?? false;
     // ✅ EVITAR múltiplas chamadas simultâneas
     if (loadingRef.current) {
       console.log('⏳ Carregamento já em progresso, ignorando...');
@@ -62,10 +101,10 @@ const HistoryTab: React.FC = () => {
     }
 
     loadingRef.current = true;
-    setIsLoading(true);
+    if (reset) setIsLoading(true);
+    else setIsLoadingMore(true);
 
     try {
-      await standaloneRecordsService.initialize();
       const mapPayables = (payablesRaw: any[]): FinancialRecord[] => payablesRaw.map(p => ({
         id: p.id,
         description: p.description,
@@ -291,63 +330,29 @@ const HistoryTab: React.FC = () => {
         
         return records;
       };
-
-      // ✅ Mostra dados em cache imediatamente (evita tela zerada)
-      const cachedPayables = mapPayables(payablesService.getAll());
-      const cachedReceivables = mapReceivables(receivablesService.getAll());
-      const cachedStandalone = financialHistoryService.getAll() as unknown as FinancialRecord[];
-      const cachedStandaloneRecords = standaloneRecordsService.getAll();
-      const cachedInitialBalances = mapInitialBalances(financialService.getInitialBalances());
-      const cachedTransfers = mapTransferRecords(transfersService.getAll());
-      const cachedLoans = mapLoans(loansService.getAll());
-      const cachedShareholders = mapShareholderRecords();
-
-      const cachedAll: FinancialRecord[] = [
-        ...cachedPayables,
-        ...cachedReceivables,
-        ...cachedStandalone,
-        ...cachedStandaloneRecords,
-        ...cachedInitialBalances,
-        ...cachedTransfers,
-        ...cachedLoans,
-        ...cachedShareholders
-      ];
-
-      if (cachedAll.length > 0) {
-        console.log(`✅ CACHE LOCAL: ${cachedAll.length} registros (${cachedTransfers.length} transferências, ${cachedLoans.length} empréstimos)`);
-        const sortedCache = cachedAll.sort((a, b) => {
-          const dateA = new Date(a.issueDate || '').getTime();
-          const dateB = new Date(b.issueDate || '').getTime();
-          const dateCompare = dateB - dateA; // DESC (mais recente primeiro)
-          // Se datas são iguais, usar ID como tiebreaker para estabilidade
-          return dateCompare !== 0 ? dateCompare : b.id.localeCompare(a.id);
-        });
-        setRecords(sortedCache);
-      }
-
-      // 1. Todos os Títulos (Pagos e Pendentes - O HISTÓRICO MOSTRA TUDO!)
-      const payablesRaw = await payablesService.loadFromSupabase();
-      const receivablesRaw = await receivablesService.loadFromSupabase();
-
-      // 2. Movimentações Reais (Baixas, Despesas Diretas, etc.)
-      const standalone = await financialHistoryService.loadFromSupabase();
-      const standaloneRecords = standaloneRecordsService.getAll();
-
-      // 3. Transferências entre contas
-      const transfersRaw = await transfersService.loadFromSupabase();
-
-      // 4. Empréstimos
-      const loansRaw = await loansService.loadFromSupabase();
-
-      // 5. Saldos Iniciais (Aportes)
-      const initialBalances = mapInitialBalances(financialService.getInitialBalances());
-
-      // 6. Sócios (aguarda init para garantir carga)
       await waitForInit();
-      const shareholderRecords = mapShareholderRecords();
 
-      // Consolida tudo
-      const all: FinancialRecord[] = [
+      const pageCursor = reset ? undefined : cursorDateRef.current || undefined;
+      const pageOptions = {
+        limit: PAGE_SIZE,
+        beforeDate: pageCursor,
+        startDate: startDate || undefined,
+        endDate: endDate || undefined
+      };
+
+      const [payablesRaw, receivablesRaw, standalone, standaloneRecords, transfersRaw, loansRaw] = await Promise.all([
+        payablesService.fetchPage(pageOptions),
+        receivablesService.fetchPage(pageOptions),
+        financialHistoryService.fetchPage(pageOptions),
+        standaloneRecordsService.fetchPage(pageOptions),
+        transfersService.fetchPage(pageOptions),
+        loansService.fetchPage(pageOptions)
+      ]);
+
+      const initialBalances = reset ? mapInitialBalances(financialService.getInitialBalances()) : [];
+      const shareholderRecords = reset ? mapShareholderRecords() : [];
+
+      const pageRecords: FinancialRecord[] = [
         ...mapPayables(payablesRaw),
         ...mapReceivables(receivablesRaw),
         ...standalone as unknown as FinancialRecord[],
@@ -357,39 +362,30 @@ const HistoryTab: React.FC = () => {
         ...initialBalances,
         ...shareholderRecords
       ];
-      
-      console.log(`✅ SUPABASE LOAD: ${all.length} registros (${mapTransferRecords(transfersRaw).length} transferências, ${mapLoans(loansRaw).length} empréstimos)`);
-      
-      // Pequeno delay para garantir que os dados estão prontos para renderizar
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // Ordena por data de lançamento decrescente (com tiebreaker de ID para estabilidade)
-      const sortedRecords = all.sort((a, b) => {
-        const dateA = new Date(a.issueDate || '').getTime();
-        const dateB = new Date(b.issueDate || '').getTime();
-        const dateCompare = dateB - dateA; // DESC (mais recente primeiro)
-        // Se datas são iguais, usar ID como tiebreaker
-        return dateCompare !== 0 ? dateCompare : b.id.localeCompare(a.id);
+
+      setRecords(prev => {
+        const merged = reset ? pageRecords : mergeRecords(prev, pageRecords);
+        const sorted = sortRecords(merged);
+        cursorDateRef.current = getOldestRecordDate(sorted);
+        return sorted;
       });
-      
-      // Só atualiza se os dados realmente mudaram
-      // Usar comparação mais robusta: comparar quantidade e IDs na ordem
-      const recordsChanged = records.length !== sortedRecords.length || 
-        records.some((r, i) => r.id !== sortedRecords[i]?.id);
-      
-      if (recordsChanged) {
-        console.log(`📊 Registros mudaram (${records.length} → ${sortedRecords.length}), atualizando com ordenação DESC por data...`);
-        setRecords(sortedRecords);
-      } else {
-        console.log('✅ Registros não mudaram, mantendo ordem estável...');
-        // Apenas desativa o loading mesmo que não tenha mudado
-        setIsLoading(false);
-      }
+
+      const hasMorePage = [
+        payablesRaw.length,
+        receivablesRaw.length,
+        standalone.length,
+        standaloneRecords.length,
+        transfersRaw.length,
+        loansRaw.length
+      ].some(count => count === PAGE_SIZE);
+
+      setHasMore(hasMorePage);
     } finally {
       loadingRef.current = false;
       setIsLoading(false);
+      setIsLoadingMore(false);
     }
-  }, []);
+  }, [endDate, startDate]);
 
   useEffect(() => {
     const initRealtime = async () => {
@@ -403,14 +399,14 @@ const HistoryTab: React.FC = () => {
     };
 
     void initRealtime();
-    loadRealData();
+    loadRealData({ reset: true });
     
     // ✅ DEBOUNCE nas subscriptions para evitar atualizações muito frequentes
     const debouncedLoad = () => {
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
       debounceTimerRef.current = setTimeout(() => {
         console.log('🔄 Atualizando histórico...');
-        loadRealData();
+        loadRealData({ reset: true });
       }, 2000); // 2 segundos para evitar recargas desnecessárias
     };
     
@@ -457,7 +453,7 @@ const HistoryTab: React.FC = () => {
       console.log('💰 Evento financeiro disparado - recarregando...');
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
       debounceTimerRef.current = setTimeout(() => {
-        loadRealData();
+        loadRealData({ reset: true });
       }, 2000); // Aumentado para 2s para evitar recargas muito frequentes
     };
 
@@ -469,6 +465,19 @@ const HistoryTab: React.FC = () => {
       window.removeEventListener('data:updated', handleFinancialUpdate);
     };
   }, [loadRealData]);
+
+  useEffect(() => {
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = setTimeout(() => {
+      setHasMore(true);
+      cursorDateRef.current = null;
+      loadRealData({ reset: true });
+    }, 300);
+
+    return () => {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    };
+  }, [startDate, endDate, loadRealData]);
 
   const filteredRecords = useMemo(() => {
     const filtered = records.filter(record => {
@@ -495,8 +504,9 @@ const HistoryTab: React.FC = () => {
         record.notes?.toLowerCase().includes(searchLower);
 
       // 3. Date Range
-      if (startDate && record.issueDate < startDate) return false;
-      if (endDate && record.issueDate > endDate) return false;
+      const recordDate = resolveRecordDate(record);
+      if (startDate && (!recordDate || recordDate < startDate)) return false;
+      if (endDate && (!recordDate || recordDate > endDate)) return false;
 
       // 4. Category & Bank
       if (selectedCategory && record.category !== selectedCategory) return false;
@@ -538,7 +548,7 @@ const HistoryTab: React.FC = () => {
               <ArrowUpCircle size={16} /> Entradas
             </button>
           </nav>
-          <button onClick={loadRealData} className="p-2 text-slate-400 hover:text-primary-600 hover:bg-slate-50 rounded-full transition-all">
+          <button onClick={() => loadRealData({ reset: true })} className="p-2 text-slate-400 hover:text-primary-600 hover:bg-slate-50 rounded-full transition-all">
             <RefreshCw size={18} />
           </button>
         </div>
@@ -643,6 +653,18 @@ const HistoryTab: React.FC = () => {
         )}
       </div>
 
+      {filteredRecords.length > 0 && (
+        <div className="flex items-center justify-center">
+          <button
+            onClick={() => loadRealData({ reset: false })}
+            disabled={!hasMore || isLoadingMore}
+            className="px-6 py-2 rounded-lg text-sm font-bold border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+          >
+            {isLoadingMore ? 'Carregando...' : hasMore ? 'Carregar mais' : 'Sem mais resultados'}
+          </button>
+        </div>
+      )}
+
       <FinancialPdfModal 
         isOpen={isPdfOpen} 
         onClose={() => setIsPdfOpen(false)}
@@ -656,7 +678,7 @@ const HistoryTab: React.FC = () => {
             isOpen={!!selectedRecord}
             onClose={() => setSelectedRecord(null)}
             record={selectedRecord}
-            onRefresh={loadRealData}
+            onRefresh={() => loadRealData({ reset: true })}
         />
       )}
     </div>
