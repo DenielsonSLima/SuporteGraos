@@ -172,10 +172,63 @@ export const reconcilePayablesFromHistory = async () => {
   console.log('🔄 Reconciliação de payables concluída');
 };
 
+// Reconciliar payables diretamente dos pedidos de compra (para pagamentos sem histórico ORIGIN)
+export const reconcilePayablesFromOrders = async () => {
+  console.log('🔄 Iniciando reconciliação de payables a partir dos pedidos de compra...');
+  
+  const payables = payablesService.getAll();
+  const orders = purchaseService.getAll();
+  
+  console.log(`📊 Total de payables: ${payables.length}`);
+  console.log(`📊 Total de pedidos de compra: ${orders.length}`);
+  
+  let updated = 0;
+  
+  for (const payable of payables) {
+    if (!payable.purchaseOrderId) {
+      console.log(`  ⚠️ Payable ${payable.id} sem purchaseOrderId`);
+      continue;
+    }
+    
+    const order = orders.find(o => o.id === payable.purchaseOrderId);
+    if (!order) {
+      console.log(`  ⚠️ Pedido ${payable.purchaseOrderId} não encontrado para payable ${payable.id}`);
+      continue;
+    }
+    
+    const orderPaidValue = toNumber(order.paidValue) + toNumber(order.discountValue);
+    const payablePaidAmount = toNumber(payable.paidAmount);
+    
+    console.log(`  📝 Payable ${payable.id}: pedido=${payable.purchaseOrderId}, paidValue do pedido=${orderPaidValue}, paidAmount do payable=${payablePaidAmount}`);
+    
+    if (Math.abs(orderPaidValue - payablePaidAmount) > 0.01) {
+      const newStatus: Payable['status'] = orderPaidValue >= payable.amount - 0.01
+        ? 'paid'
+        : orderPaidValue > 0
+          ? 'partially_paid'
+          : 'pending';
+      
+      payablesService.update({
+        ...payable,
+        paidAmount: Number(orderPaidValue.toFixed(2)),
+        status: newStatus
+      });
+      
+      console.log(`  ✅ Payable ${payable.id} atualizado: ${payablePaidAmount} -> ${orderPaidValue} (status: ${newStatus})`);
+      updated++;
+    }
+  }
+  
+  console.log(`🔄 Reconciliação concluída: ${updated} payables atualizados`);
+  return updated;
+};
+
 // Função para forçar reconciliação (reseta o flag hasRun)
 export const forceReconcilePayables = async () => {
   hasRun = false;
   await reconcilePayablesFromHistory();
+  // Também reconciliar diretamente dos pedidos (para pagamentos antigos)
+  await reconcilePayablesFromOrders();
 };
 
 // Expor no window para debug via console do browser

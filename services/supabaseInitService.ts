@@ -471,6 +471,8 @@ export const initializeSupabaseData = async (): Promise<InitStats> => {
         setTimeout(() => {
           void reconciliationModule.reconcileReceivablesFromHistory();
           void payablesReconciliationModule.reconcilePayablesFromHistory();
+          // Também reconciliar diretamente dos pedidos (para pagamentos sem histórico ORIGIN)
+          void payablesReconciliationModule.reconcilePayablesFromOrders();
         }, 300);
         emitInitEvent('supabase:init:critical', { diagnostics: _initDiagnostics });
         emitInitEvent('supabase:init:complete', { diagnostics: _initDiagnostics });
