@@ -253,6 +253,7 @@ export const loadingService = {
 
       payablesService.add({
         id: generateUUID(),
+        loadingId: loading.id, // ID do carregamento para busca direta
         purchaseOrderId: loading.purchaseOrderId,
         partnerId: loading.carrierId,
         partnerName: loading.carrierName,

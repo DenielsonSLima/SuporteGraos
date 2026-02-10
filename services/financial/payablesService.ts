@@ -19,6 +19,7 @@ const generateUUID = (): string => {
 export interface Payable {
   id: string;
   purchaseOrderId?: string;
+  loadingId?: string; // ID do carregamento (para fretes)
   partnerId: string;
   partnerName?: string;
   description: string;
@@ -47,6 +48,7 @@ let isLoaded = false;
 const mapToDb = (item: Payable) => ({
   id: item.id,
   purchase_order_id: item.purchaseOrderId || null,
+  loading_id: item.loadingId || null,
   partner_id: item.partnerId,
   partner_name: item.partnerName || null,
   description: item.description,
@@ -67,6 +69,7 @@ const mapToDb = (item: Payable) => ({
 const mapFromDb = (row: any): Payable => ({
   id: row.id,
   purchaseOrderId: row.purchase_order_id,
+  loadingId: row.loading_id,
   partnerId: row.partner_id,
   partnerName: row.partner_name,
   description: row.description,

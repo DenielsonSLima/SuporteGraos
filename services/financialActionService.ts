@@ -299,20 +299,61 @@ export const financialActionService = {
     } else if (subType === 'freight') {
         // CORREÇÃO: Detectar se recordId é UUID (do payable) ou formatado (fr-...)
         const isPayableUUID = !recordId.startsWith('fr-');
-        let loadingId: string;
+        let loadingId: string = '';
         let payable: Payable | undefined;
         
-        // Se for UUID do payable de frete, buscar o loading correspondente
+        // Se for UUID do payable de frete, buscar o payable primeiro para obter o loadingId
         if (isPayableUUID) {
-            const allFreightPayables = payablesService.getAll().filter(p => p.subType === 'freight');
-            payable = allFreightPayables.find(p => p.id === recordId);
+            payable = payablesService.getById(recordId);
             if (payable) {
-                // Tentar extrair loadingId da descrição ou notes
-                const descMatch = payable.description.match(/Frete.*?(?:ID|id|Carga)?\s*(\w{8,})/i);
-                loadingId = descMatch ? descMatch[1] : recordId;
-                console.log(`[PAGAMENTO FRETE] ID é UUID do payable: ${recordId.substring(0, 8)}..., loadingId tentativo=${loadingId}`);
+                // Estratégia 1: Usar loadingId do payable (novo campo)
+                loadingId = payable.loadingId || '';
+                console.log(`[PAGAMENTO FRETE] ID é UUID do payable: ${recordId.substring(0, 8)}..., loadingId=${loadingId || 'VAZIO'}`);
+                
+                // Estratégia 2: Buscar pelo peso + transportadora
+                if (!loadingId && payable.weightKg && payable.partnerId) {
+                    const loading = loadingService.getAll().find(l => 
+                        l.carrierId === payable!.partnerId &&
+                        Math.abs((l.weightKg || 0) - (payable!.weightKg || 0)) < 1
+                    );
+                    if (loading) {
+                        loadingId = loading.id;
+                        console.log(`[PAGAMENTO FRETE] Loading encontrado por peso+carrierId: ${loadingId}`);
+                        // Corrigir o loadingId no payable para futuras operações
+                        payablesService.update({ ...payable, loadingId });
+                    }
+                }
+                
+                // Estratégia 3: Buscar pela placa na descrição
+                if (!loadingId && payable.description) {
+                    const plateMatch = payable.description.match(/[A-Z]{3}[-\s]?\d{1}[A-Z0-9]\d{2}/i);
+                    if (plateMatch) {
+                        const plate = plateMatch[0].replace(/\s/g, '').toUpperCase();
+                        const loading = loadingService.getAll().find(l => 
+                            l.vehiclePlate?.toUpperCase() === plate
+                        );
+                        if (loading) {
+                            loadingId = loading.id;
+                            console.log(`[PAGAMENTO FRETE] Loading encontrado por placa ${plate}: ${loadingId}`);
+                            // Corrigir o loadingId no payable
+                            payablesService.update({ ...payable, loadingId });
+                        }
+                    }
+                }
+                
+                // Estratégia 4: Buscar pelo valor + transportadora
+                if (!loadingId && payable.amount && payable.partnerId) {
+                    const loading = loadingService.getAll().find(l => 
+                        l.carrierId === payable!.partnerId &&
+                        Math.abs((l.totalFreightValue || 0) - payable!.amount) < 0.01
+                    );
+                    if (loading) {
+                        loadingId = loading.id;
+                        console.log(`[PAGAMENTO FRETE] Loading encontrado por valor+carrierId: ${loadingId}`);
+                        payablesService.update({ ...payable, loadingId });
+                    }
+                }
             } else {
-                loadingId = recordId;
                 console.log(`[PAGAMENTO FRETE] ⚠️ Payable de frete não encontrado: ${recordId}`);
             }
         } else {
@@ -320,16 +361,7 @@ export const financialActionService = {
         }
         
         // Buscar o loading
-        let loading = loadingService.getAll().find(l => l.id === loadingId);
-        
-        // Se não encontrou pelo id, tentar buscar pelo payable (vehiclePlate)
-        if (!loading && payable) {
-            const plateMatch = payable.description.match(/[A-Z]{3}[-\s]?\d{1}[A-Z0-9]\d{2}/i);
-            if (plateMatch) {
-                loading = loadingService.getAll().find(l => l.vehiclePlate === plateMatch[0].replace(/\s/g, ''));
-                console.log(`[PAGAMENTO FRETE] Busca por placa ${plateMatch[0]}: ${loading?.id || 'N/A'}`);
-            }
-        }
+        let loading = loadingId ? loadingService.getAll().find(l => l.id === loadingId) : undefined;
         
         if (loading) {
             console.log(`[PAGAMENTO FRETE] ✅ Loading encontrado: ${loading.id}, freightPaid=${loading.freightPaid} -> ${(loading.freightPaid || 0) + transactionValue}`);
