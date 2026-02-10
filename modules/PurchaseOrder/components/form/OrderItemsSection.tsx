@@ -23,7 +23,10 @@ const OrderItemsSection: React.FC<Props> = ({ items, onChange }) => {
     }
   }, []);
 
-  const formatBRL = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  const formatBRL = (val: number) => {
+    const normalized = Math.abs(val) < 0.01 ? 0 : val;
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(normalized);
+  };
 
   const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value.replace(/\D/g, '');

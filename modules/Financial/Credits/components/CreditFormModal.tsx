@@ -26,7 +26,10 @@ const CreditFormModal: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialDa
 
   const [displayValue, setDisplayValue] = useState('');
 
-  const formatBRL = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  const formatBRL = (val: number) => {
+    const normalized = Math.abs(val) < 0.01 ? 0 : val;
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(normalized);
+  };
 
   const formatCurrencyInput = (val: string) => {
     const raw = val.replace(/\D/g, '');

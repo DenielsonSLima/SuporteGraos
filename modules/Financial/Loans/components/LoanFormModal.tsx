@@ -35,7 +35,10 @@ const LoanFormModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialType =
   const [displayContractValue, setDisplayContractValue] = useState('');
   const [displayRemainingValue, setDisplayRemainingValue] = useState('');
 
-  const formatBRL = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  const formatBRL = (val: number) => {
+    const normalized = Math.abs(val) < 0.01 ? 0 : val;
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(normalized);
+  };
 
   const formatCurrencyInput = (val: string) => {
     const raw = val.replace(/\D/g, '');

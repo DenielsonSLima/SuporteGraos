@@ -30,7 +30,10 @@ const FreightPaymentModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, tota
   const [availableCredit, setAvailableCredit] = useState(0);
   const [useAdvanceBalance, setUseAdvanceBalance] = useState(false);
 
-  const formatBRL = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  const formatBRL = (val: number) => {
+    const normalized = Math.abs(val) < 0.01 ? 0 : val;
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(normalized);
+  };
 
   useEffect(() => {
     if (isOpen) {

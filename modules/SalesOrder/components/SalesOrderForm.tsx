@@ -31,7 +31,10 @@ const SalesOrderForm: React.FC<Props> = ({ initialData, onSave, onCancel }) => {
   const [customerSearch, setCustomerSearch] = useState(initialData?.customerName || '');
   const [isSearching, setIsSearching] = useState(false);
 
-  const formatBRL = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  const formatBRL = (val: number) => {
+    const normalized = Math.abs(val) < 0.01 ? 0 : val;
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(normalized);
+  };
 
   useEffect(() => {
     // Busca e ordena parceiros alfabeticamente (Padronizado com Compra)
