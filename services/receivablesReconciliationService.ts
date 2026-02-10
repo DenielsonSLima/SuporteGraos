@@ -53,8 +53,12 @@ export const reconcileReceivablesFromHistory = async () => {
   if (historyByOrigin.size === 0) return;
 
   const receivables = receivablesService.getAll();
-  const receivableById = new Map(receivables.map(r => [r.id, r]));
-  const receivableByOrder = new Map(receivables.map(r => [r.salesOrderId || '', r]).filter(([k]) => k));
+  const receivableById = new Map<string, Receivable>(receivables.map(r => [r.id, r]));
+  const receivableByOrder = new Map<string, Receivable>(
+    receivables
+      .filter(r => r.salesOrderId)
+      .map(r => [r.salesOrderId!, r])
+  );
 
   const orders = salesService.getAll();
   const orderById = new Map(orders.map(o => [o.id, o]));
@@ -67,7 +71,7 @@ export const reconcileReceivablesFromHistory = async () => {
     const receivableFromOrigin = receivableById.get(origin);
     const orderId = orderIdFromOrigin || receivableFromOrigin?.salesOrderId || '';
 
-    const receivable = receivableFromOrigin || (orderId ? receivableByOrder.get(orderId) : undefined);
+    const receivable: Receivable | undefined = receivableFromOrigin || (orderId ? receivableByOrder.get(orderId) : undefined);
     if (receivable) {
       const newReceived = Number(totalReceived.toFixed(2));
       if (Math.abs((receivable.receivedAmount || 0) - newReceived) > 0.01) {
