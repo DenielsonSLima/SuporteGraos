@@ -116,8 +116,26 @@ export const financialActionService = {
     };
 
     if (subType === 'purchase_order') {
-        const orderId = recordId.replace('po-grain-', '');
-        console.log(`[PAGAMENTO] processRecord: recordId=${recordId}, orderId=${orderId}`);
+        // CORREÇÃO: Detectar se recordId é UUID (do payable) ou formatado (po-grain-...)
+        const isPayableUUID = !recordId.startsWith('po-grain-');
+        let orderId: string;
+        let payable: Payable | undefined;
+        
+        // Se for UUID do payable, buscar primeiro para obter o purchaseOrderId
+        if (isPayableUUID) {
+            payable = payablesService.getById(recordId);
+            if (payable) {
+                orderId = payable.purchaseOrderId || '';
+                console.log(`[PAGAMENTO] ID é UUID do payable: ${recordId.substring(0, 8)}..., purchaseOrderId=${orderId}`);
+            } else {
+                orderId = recordId;
+                console.log(`[PAGAMENTO] ⚠️ Payable não encontrado pelo UUID: ${recordId}`);
+            }
+        } else {
+            orderId = recordId.replace('po-grain-', '');
+        }
+        
+        console.log(`[PAGAMENTO] processRecord: recordId=${recordId}, orderId=${orderId}, isPayableUUID=${isPayableUUID}`);
         
         const order = purchaseService.getById(orderId);
         if (order) {
@@ -134,9 +152,9 @@ export const financialActionService = {
             console.log(`[PAGAMENTO] Pedido NÃO encontrado: ${orderId}`);
         }
 
-        // Atualizar o payable correspondente - BUSCA ROBUSTA
-        const allPayables = payablesService.getAll();
-        console.log(`[PAGAMENTO] Total payables do tipo purchase_order: ${allPayables.filter(p => p.subType === 'purchase_order').length}`);
+        // Atualizar o payable correspondente - BUSCA ROBUSTA (apenas purchase_order!)
+        const allPayables = payablesService.getAll().filter(p => p.subType === 'purchase_order');
+        console.log(`[PAGAMENTO] Total payables do tipo purchase_order: ${allPayables.length}`);
         
         // Log de todos os payables de purchase_order para debug
         allPayables.filter(p => p.subType === 'purchase_order').forEach(p => {
@@ -244,14 +262,61 @@ export const financialActionService = {
         }
       }
     } else if (subType === 'freight') {
-        const loadingId = recordId.replace('fr-', '');
-        const loading = loadingService.getAll().find(l => l.id === loadingId);
+        // CORREÇÃO: Detectar se recordId é UUID (do payable) ou formatado (fr-...)
+        const isPayableUUID = !recordId.startsWith('fr-');
+        let loadingId: string;
+        let payable: Payable | undefined;
+        
+        // Se for UUID do payable de frete, buscar o loading correspondente
+        if (isPayableUUID) {
+            const allFreightPayables = payablesService.getAll().filter(p => p.subType === 'freight');
+            payable = allFreightPayables.find(p => p.id === recordId);
+            if (payable) {
+                // Tentar extrair loadingId da descrição ou notes
+                const descMatch = payable.description.match(/Frete.*?(?:ID|id|Carga)?\s*(\w{8,})/i);
+                loadingId = descMatch ? descMatch[1] : recordId;
+                console.log(`[PAGAMENTO FRETE] ID é UUID do payable: ${recordId.substring(0, 8)}..., loadingId tentativo=${loadingId}`);
+            } else {
+                loadingId = recordId;
+                console.log(`[PAGAMENTO FRETE] ⚠️ Payable de frete não encontrado: ${recordId}`);
+            }
+        } else {
+            loadingId = recordId.replace('fr-', '');
+        }
+        
+        // Buscar o loading
+        let loading = loadingService.getAll().find(l => l.id === loadingId);
+        
+        // Se não encontrou pelo id, tentar buscar pelo payable (vehiclePlate)
+        if (!loading && payable) {
+            const plateMatch = payable.description.match(/[A-Z]{3}[-\s]?\d{1}[A-Z0-9]\d{2}/i);
+            if (plateMatch) {
+                loading = loadingService.getAll().find(l => l.vehiclePlate === plateMatch[0].replace(/\s/g, ''));
+                console.log(`[PAGAMENTO FRETE] Busca por placa ${plateMatch[0]}: ${loading?.id || 'N/A'}`);
+            }
+        }
+        
         if (loading) {
+            console.log(`[PAGAMENTO FRETE] ✅ Loading encontrado: ${loading.id}, freightPaid=${loading.freightPaid} -> ${(loading.freightPaid || 0) + transactionValue}`);
             loadingService.update({
                 ...loading,
                 freightPaid: (loading.freightPaid || 0) + transactionValue,
                 transactions: [commonTx as any, ...(loading.transactions || [])]
             });
+            
+            // Também atualizar o payable de frete
+            if (payable) {
+                const newPaidAmount = (payable.paidAmount || 0) + transactionValue + discountValue;
+                const status: Payable['status'] = newPaidAmount >= payable.amount - 0.01 ? 'paid' : newPaidAmount > 0 ? 'partially_paid' : 'pending';
+                payablesService.update({
+                    ...payable,
+                    paidAmount: Number(newPaidAmount.toFixed(2)),
+                    status
+                });
+                console.log(`[PAGAMENTO FRETE] ✅ Payable atualizado: ${payable.id.substring(0, 8)}..., paidAmount=${newPaidAmount}`);
+            }
+        } else {
+            console.log(`[PAGAMENTO FRETE] ⚠️ Loading NÃO encontrado para: ${loadingId}`);
         }
     }
 
