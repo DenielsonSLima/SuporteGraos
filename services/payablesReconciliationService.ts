@@ -27,9 +27,13 @@ export const reconcilePayablesFromHistory = async () => {
   if (hasRun) return;
   hasRun = true;
 
+  console.log('🔄 Iniciando reconciliação de payables...');
+
   // Buscar histórico de pagamentos de purchase_order
-  const history = standaloneRecordsService
-    .getAll()
+  const allRecords = standaloneRecordsService.getAll();
+  console.log(`📊 Total de registros no histórico: ${allRecords.length}`);
+  
+  const history = allRecords
     .filter(r => r.subType === 'purchase_order')
     .map(r => ({
       id: r.id,
@@ -41,43 +45,75 @@ export const reconcilePayablesFromHistory = async () => {
     }))
     .filter(r => r.date && (r.value > 0 || r.discountValue > 0));
 
-  if (history.length === 0) return;
+  console.log(`📊 Pagamentos de purchase_order encontrados: ${history.length}`);
+  
+  if (history.length === 0) {
+    console.log('⚠️ Nenhum pagamento de purchase_order encontrado no histórico');
+    return;
+  }
 
   // Agrupar por origem (ID do pedido/payable)
   const historyByOrigin = new Map<string, typeof history>();
   for (const record of history) {
     const origin = parseOrigin(record.notes);
+    console.log(`  📝 Registro ${record.id}: origin=${origin || 'N/A'}, valor=${record.value}`);
     if (!origin) continue;
     if (!historyByOrigin.has(origin)) historyByOrigin.set(origin, []);
     historyByOrigin.get(origin)!.push(record);
   }
 
-  if (historyByOrigin.size === 0) return;
+  console.log(`📊 Origins únicos encontrados: ${historyByOrigin.size}`);
+  
+  if (historyByOrigin.size === 0) {
+    console.log('⚠️ Nenhuma origem válida encontrada nos pagamentos');
+    return;
+  }
 
   const payables = payablesService.getAll();
+  console.log(`📊 Total de payables: ${payables.length}`);
+  
   const payableById = new Map(payables.map(p => [p.id, p] as [string, Payable]));
   const payableByOrder = new Map(
     payables
       .filter(p => p.purchaseOrderId)
       .map(p => [p.purchaseOrderId!, p] as [string, Payable])
   );
+  
+  console.log(`📊 Payables com purchaseOrderId: ${payableByOrder.size}`);
+  payables.forEach(p => {
+    console.log(`  💳 Payable ${p.id}: purchaseOrderId=${p.purchaseOrderId || 'N/A'}, amount=${p.amount}, paidAmount=${p.paidAmount}`);
+  });
 
   const orders = purchaseService.getAll();
   const orderById = new Map(orders.map(o => [o.id, o]));
 
   historyByOrigin.forEach((records, origin) => {
     const totalPaid = records.reduce((acc, r) => acc + r.value + r.discountValue, 0);
+    console.log(`\n🔍 Processando origin: ${origin}, totalPaid: ${totalPaid}`);
     if (totalPaid <= 0) return;
 
     // Tentar encontrar o orderId a partir do origin
     const orderIdFromOrigin = origin.startsWith('po-grain-') ? origin.replace('po-grain-', '') : '';
+    console.log(`  orderId extraído: ${orderIdFromOrigin || 'N/A'}`);
+    
     const payableFromOrigin = payableById.get(origin);
+    console.log(`  payable por ID direto: ${payableFromOrigin?.id || 'N/A'}`);
+    
     const orderId = orderIdFromOrigin || payableFromOrigin?.purchaseOrderId || '';
 
     // Atualizar payable
-    const payable = payableFromOrigin || (orderId ? payableByOrder.get(orderId) : undefined);
+    let payable = payableFromOrigin || (orderId ? payableByOrder.get(orderId) : undefined);
+    console.log(`  payable por purchaseOrderId: ${payable?.id || 'N/A'}`);
+    
+    // Se ainda não encontrou, procurar por nome do parceiro ou qualquer payable com o mesmo purchaseOrderId
+    if (!payable && orderId) {
+      payable = payables.find(p => p.purchaseOrderId === orderId);
+      console.log(`  payable por busca direta: ${payable?.id || 'N/A'}`);
+    }
+    
     if (payable) {
       const newPaidAmount = Number(totalPaid.toFixed(2));
+      console.log(`  Atualizando payable: atual=${payable.paidAmount}, novo=${newPaidAmount}`);
       if (Math.abs((payable.paidAmount || 0) - newPaidAmount) > 0.01) {
         const status: Payable['status'] = newPaidAmount >= payable.amount - 0.01
           ? 'paid'
@@ -135,3 +171,22 @@ export const reconcilePayablesFromHistory = async () => {
 
   console.log('🔄 Reconciliação de payables concluída');
 };
+
+// Função para forçar reconciliação (reseta o flag hasRun)
+export const forceReconcilePayables = async () => {
+  hasRun = false;
+  await reconcilePayablesFromHistory();
+};
+
+// Expor no window para debug via console do browser
+if (typeof window !== 'undefined') {
+  (window as any).forceReconcilePayables = forceReconcilePayables;
+  (window as any).debugPayables = () => {
+    const payables = payablesService.getAll();
+    const records = standaloneRecordsService.getAll().filter(r => r.subType === 'purchase_order');
+    console.log('=== DEBUG PAYABLES ===');
+    console.log('Payables:', payables);
+    console.log('Histórico de pagamentos purchase_order:', records);
+    return { payables, records };
+  };
+}
