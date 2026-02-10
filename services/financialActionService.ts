@@ -358,6 +358,47 @@ export const financialActionService = {
             }
         } else {
             loadingId = recordId.replace('fr-', '');
+            // Quando vem do módulo Logística, buscar o payable pelo loadingId
+            const allFreightPayables = payablesService.getAll().filter(p => p.subType === 'freight');
+            
+            // Estratégia 1: Por loadingId
+            payable = allFreightPayables.find(p => p.loadingId === loadingId);
+            
+            // Estratégia 2: Buscar loading primeiro, depois por peso+carrierId
+            if (!payable) {
+                const loadingTemp = loadingService.getAll().find(l => l.id === loadingId);
+                if (loadingTemp) {
+                    payable = allFreightPayables.find(p => 
+                        p.partnerId === loadingTemp.carrierId &&
+                        Math.abs((p.weightKg || 0) - (loadingTemp.weightKg || 0)) < 1
+                    );
+                    
+                    // Estratégia 3: Por valor do frete + carrierId
+                    if (!payable) {
+                        payable = allFreightPayables.find(p => 
+                            p.partnerId === loadingTemp.carrierId &&
+                            Math.abs(p.amount - (loadingTemp.totalFreightValue || 0)) < 0.01
+                        );
+                    }
+                    
+                    // Estratégia 4: Por placa na descrição
+                    if (!payable && loadingTemp.vehiclePlate) {
+                        payable = allFreightPayables.find(p => 
+                            p.description?.includes(loadingTemp.vehiclePlate!)
+                        );
+                    }
+                }
+            }
+            
+            if (payable) {
+                console.log(`[PAGAMENTO FRETE] Payable encontrado para fr-${loadingId}: ${payable.id.substring(0, 8)}...`);
+                // Corrigir o loadingId no payable para futuras operações
+                if (!payable.loadingId) {
+                    payablesService.update({ ...payable, loadingId });
+                }
+            } else {
+                console.log(`[PAGAMENTO FRETE] ⚠️ Payable não encontrado para fr-${loadingId}`);
+            }
         }
         
         // Buscar o loading
