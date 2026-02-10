@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { DollarSign, CreditCard, Plus, ArrowUpRight, Calendar, Wallet, Pencil, Trash2, Landmark, MinusCircle } from 'lucide-react';
 import { OrderTransaction } from '../../types';
+import { formatDateBR } from '../../../../utils/dateUtils';
 import TransactionManagementModal from '../../../Financial/components/modals/TransactionManagementModal';
 import { purchaseService } from '../../../../services/purchaseService';
 
@@ -19,7 +20,7 @@ const OrderFinancialCard: React.FC<Props> = ({ orderId, transactions, totalOrder
   const [selectedTx, setSelectedTx] = useState<OrderTransaction | null>(null);
   
   const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
-  const date = (val: string) => new Date(val).toLocaleDateString('pt-BR');
+  const date = (val: string) => formatDateBR(val);
 
   const financialTransactions = transactions.filter(t => t.type === 'payment' || t.type === 'advance' || t.type === 'receipt');
   

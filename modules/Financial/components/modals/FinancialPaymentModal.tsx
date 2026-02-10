@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { X, DollarSign, Calendar, Wallet, FileText, CheckCircle2, ArrowDown, MinusCircle, Calculator, TrendingUp } from 'lucide-react';
 import { FinancialRecord, BankAccount } from '../../types';
 import { financialService, BankAccountWithBalance } from '../../../../services/financialService';
+import { getLocalDateString } from '../../../../utils/dateUtils';
 import { useToast } from '../../../../contexts/ToastContext';
 
 export interface PaymentData {
@@ -35,7 +36,7 @@ const FinancialPaymentModal: React.FC<Props> = ({ record, bulkTotal, bulkCount, 
   const [displayDiscount, setDisplayDiscount] = useState('');
   const [numericDiscount, setNumericDiscount] = useState(0);
   
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(getLocalDateString());
   const [accountId, setAccountId] = useState('');
   const [notes, setNotes] = useState('');
   const [bankAccounts, setBankAccounts] = useState<BankAccountWithBalance[]>([]);
@@ -57,7 +58,7 @@ const FinancialPaymentModal: React.FC<Props> = ({ record, bulkTotal, bulkCount, 
       setNumericDiscount(initialDisc);
       setDisplayDiscount(formatBRL(initialDisc));
       
-      setDate(initialData?.date || new Date().toISOString().split('T')[0]);
+      setDate(initialData?.date?.split('T')[0] || getLocalDateString());
       setNotes(initialData?.notes || '');
       setAccountId(initialData?.accountId || '');
       

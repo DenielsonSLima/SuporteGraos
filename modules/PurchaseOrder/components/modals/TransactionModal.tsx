@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Save, Calendar, DollarSign, Wallet, FileText, Tags, CheckSquare, Square, ArrowDown, MinusCircle, AlertTriangle } from 'lucide-react';
 import { TransactionType } from '../../types';
 import { financialService, ExpenseCategory } from '../../../../services/financialService';
+import { getLocalDateString } from '../../../../utils/dateUtils';
 import { BankAccount } from '../../../../Financial/types';
 
 interface Props {
@@ -18,7 +19,7 @@ const TransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, type, titl
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   
   const [formData, setFormData] = useState({
-    date: new Date().toISOString().split('T')[0],
+    date: getLocalDateString(),
     amount: '', // Valor em Dinheiro
     discount: '', // Valor do Desconto
     accountId: '',
@@ -30,7 +31,7 @@ const TransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, type, titl
   useEffect(() => {
     if (isOpen) {
       setFormData({
-        date: new Date().toISOString().split('T')[0],
+        date: getLocalDateString(),
         amount: '',
         discount: '',
         accountId: '',

@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, DollarSign, Calendar, Wallet, FileText, ArrowDown, MinusCircle, AlertTriangle, Truck, Coins } from 'lucide-react';
 import { financialService, BankAccountWithBalance } from '../../../../services/financialService';
+import { getLocalDateString } from '../../../../utils/dateUtils';
 import { advanceService } from '../../../Financial/Advances/services/advanceService';
 import { BankAccount } from '../../../Financial/types';
 import { useToast } from '../../../../contexts/ToastContext';
@@ -20,7 +21,7 @@ interface Props {
 const FreightPaymentModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, totalPending, recordDescription, initialData, type = 'payment', isProcessing = false }) => {
   const { addToast } = useToast();
   
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(getLocalDateString());
   const [amount, setAmount] = useState(''); 
   const [discount, setDiscount] = useState(''); 
   const [accountId, setAccountId] = useState('');
@@ -49,13 +50,13 @@ const FreightPaymentModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, tota
       }
 
       if (initialData) {
-        setDate(initialData.date);
+        setDate(initialData.date?.split('T')[0] || getLocalDateString());
         setAmount(initialData.value?.toString() || '');
         setDiscount(initialData.discountValue?.toString() || '');
         setAccountId(initialData.accountId || '');
         setNotes(initialData.notes || '');
       } else {
-        setDate(new Date().toISOString().split('T')[0]);
+        setDate(getLocalDateString());
         setAmount(totalPending > 0 ? totalPending.toFixed(2) : '');
         setDiscount('');
         setAccountId('');

@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, DollarSign, Calendar, Wallet, FileText, ArrowRight, ArrowDownLeft } from 'lucide-react';
 import { financialService, BankAccountWithBalance } from '../../../../services/financialService';
+import { getLocalDateString } from '../../../../utils/dateUtils';
 import { BankAccount } from '../../../Financial/types';
 import { useToast } from '../../../../contexts/ToastContext';
 
@@ -15,7 +16,7 @@ interface Props {
 const PurchaseAdvanceModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, partnerName }) => {
   const { addToast } = useToast();
   
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(getLocalDateString());
   const [amount, setAmount] = useState('');
   const [accountId, setAccountId] = useState('');
   const [notes, setNotes] = useState('');
@@ -35,7 +36,7 @@ const PurchaseAdvanceModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, par
       setAmount('');
       setAccountId('');
       setNotes('');
-      setDate(new Date().toISOString().split('T')[0]);
+      setDate(getLocalDateString());
     }
   }, [isOpen]);
 

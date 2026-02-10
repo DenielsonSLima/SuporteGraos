@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, DollarSign, Calendar, Wallet, FileText, ArrowDown, MinusCircle, AlertTriangle } from 'lucide-react';
 import { financialService, BankAccountWithBalance } from '../../../../services/financialService';
+import { getLocalDateString } from '../../../../utils/dateUtils';
 import { useToast } from '../../../../contexts/ToastContext';
 
 interface Props {
@@ -16,7 +17,7 @@ interface Props {
 const PurchasePaymentModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, totalPending, recordDescription, initialData }) => {
   const { addToast } = useToast();
   
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(getLocalDateString());
   const [displayAmount, setDisplayAmount] = useState('');
   const [numericAmount, setNumericAmount] = useState(0);
   const [displayDiscount, setDisplayDiscount] = useState('');
@@ -38,7 +39,7 @@ const PurchasePaymentModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, tot
       setBankAccounts(sorted);
 
       if (initialData) {
-        setDate(initialData.date);
+        setDate(initialData.date?.split('T')[0] || getLocalDateString());
         const initAmount = Number(initialData.value) || 0;
         const initDiscount = Number(initialData.discountValue) || 0;
         setNumericAmount(initAmount);
@@ -48,7 +49,7 @@ const PurchasePaymentModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, tot
         setAccountId(initialData.accountId || '');
         setNotes(initialData.notes || '');
       } else {
-        setDate(new Date().toISOString().split('T')[0]);
+        setDate(getLocalDateString());
         setNumericAmount(totalPending);
         setDisplayAmount(formatBRL(totalPending));
         setNumericDiscount(0);

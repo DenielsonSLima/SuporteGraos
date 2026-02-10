@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, Save, Calendar, DollarSign, Wallet, FileText, Tag, CheckSquare, Square, ArrowDown, TrendingUp } from 'lucide-react';
 import { financialService, ExpenseCategory, BankAccountWithBalance } from '../../../../../services/financialService';
+import { getLocalDateString } from '../../../../../utils/dateUtils';
 import { useToast } from '../../../../../contexts/ToastContext';
 
 interface Props {
@@ -19,7 +20,7 @@ const ExpenseFormModal: React.FC<Props> = ({ isOpen, onClose, onSave }) => {
   const [selectedType, setSelectedType] = useState<'variable' | null>('variable');
 
   const [formData, setFormData] = useState({
-    date: new Date().toISOString().split('T')[0],
+    date: getLocalDateString(),
     value: '',
     accountId: '',
     notes: '',
@@ -30,7 +31,7 @@ const ExpenseFormModal: React.FC<Props> = ({ isOpen, onClose, onSave }) => {
   useEffect(() => {
     if (isOpen) {
       setFormData({
-        date: new Date().toISOString().split('T')[0],
+        date: getLocalDateString(),
         value: '',
         accountId: '',
         notes: '',

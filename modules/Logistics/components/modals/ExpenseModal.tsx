@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, DollarSign, Calendar, Wallet, FileText, ArrowDown } from 'lucide-react';
 import { financialService, BankAccountWithBalance } from '../../../../services/financialService';
+import { getLocalDateString } from '../../../../utils/dateUtils';
 import { useToast } from '../../../../contexts/ToastContext';
 
 interface Props {
@@ -14,7 +15,7 @@ const ExpenseModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, vehiclePlat
   const { addToast } = useToast();
   
   const [description, setDescription] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(getLocalDateString());
   const [amount, setAmount] = useState('');
   const [discount, setDiscount] = useState('');
   const [accountId, setAccountId] = useState('');
@@ -35,7 +36,7 @@ const ExpenseModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, vehiclePlat
       setBankAccounts(sorted);
       
       setDescription('');
-      setDate(new Date().toISOString().split('T')[0]);
+      setDate(getLocalDateString());
       setAmount('');
       setDiscount('');
       setAccountId('');

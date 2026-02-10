@@ -4,6 +4,7 @@ import {
   Wallet
 } from 'lucide-react';
 import { financialService, BankAccountWithBalance } from '../../../../services/financialService';
+import { getLocalDateString } from '../../../../utils/dateUtils';
 import { useToast } from '../../../../contexts/ToastContext';
 
 interface Props {
@@ -18,7 +19,7 @@ const CreditFormModal: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialDa
   const { addToast } = useToast();
   
   const [formData, setFormData] = useState({
-    date: new Date().toISOString().split('T')[0],
+    date: getLocalDateString(),
     description: '',
     value: '',
     accountId: ''
@@ -41,7 +42,7 @@ const CreditFormModal: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialDa
     if (isOpen) {
       if (initialData) {
         setFormData({
-          date: new Date(initialData.issueDate).toISOString().split('T')[0],
+          date: initialData.issueDate ? initialData.issueDate.split('T')[0] : getLocalDateString(),
           description: initialData.description || '',
           value: (initialData.originalValue || 0).toString(),
           accountId: initialData.bankAccount || ''
@@ -49,7 +50,7 @@ const CreditFormModal: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialDa
         setDisplayValue(formatBRL(initialData.originalValue || 0));
       } else {
         setFormData({
-          date: new Date().toISOString().split('T')[0],
+          date: getLocalDateString(),
           description: '',
           value: '',
           accountId: ''

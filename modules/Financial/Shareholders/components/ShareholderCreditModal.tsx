@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, Save, Calendar, DollarSign, FileText, TrendingUp, Pencil, CheckSquare, Square, Wallet, ArrowDown, User } from 'lucide-react';
 import { financialService, BankAccountWithBalance } from '../../../../services/financialService';
+import { getLocalDateString } from '../../../../utils/dateUtils';
 import { Shareholder } from '../../../../services/shareholderService';
 import { useToast } from '../../../../contexts/ToastContext';
 
@@ -22,7 +23,7 @@ const ShareholderCreditModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, s
   const { addToast } = useToast();
   
   const [selectedShareholderId, setSelectedShareholderId] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(getLocalDateString());
   const [value, setValue] = useState('');
   const [description, setDescription] = useState('Pro-labore Mensal');
   const [payImmediately, setPayImmediately] = useState(false);
@@ -37,12 +38,12 @@ const ShareholderCreditModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, s
   useEffect(() => {
     if (isOpen) {
       if (initialData) {
-        setDate(initialData.date);
+        setDate(initialData.date?.split('T')[0] || getLocalDateString());
         setValue(initialData.value.toString());
         setDescription(initialData.description);
         setPayImmediately(false);
       } else {
-        setDate(new Date().toISOString().split('T')[0]);
+        setDate(getLocalDateString());
         setValue('');
         setDescription('Pro-labore Mensal');
         setPayImmediately(false);

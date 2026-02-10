@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Save, Calendar, DollarSign, FileText, User, Wallet, ArrowRight, CheckCircle2, TrendingDown, TrendingUp, ArrowDown } from 'lucide-react';
 import { Shareholder } from '../../../../services/shareholderService';
 import { financialService, BankAccountWithBalance } from '../../../../services/financialService';
+import { getLocalDateString } from '../../../../utils/dateUtils';
 import { useToast } from '../../../../contexts/ToastContext';
 
 interface Props {
@@ -15,7 +16,7 @@ interface Props {
 const ShareholderBulkCreditModal: React.FC<Props> = ({ isOpen, onClose, shareholders, onProcessTransaction }) => {
   const { addToast } = useToast();
   
-  const [globalDate, setGlobalDate] = useState(new Date().toISOString().split('T')[0]);
+  const [globalDate, setGlobalDate] = useState(getLocalDateString());
   const [globalDescription, setGlobalDescription] = useState('Pro-labore Mensal');
   const [values, setValues] = useState<Record<string, string>>({});
   const [payingShareholderId, setPayingShareholderId] = useState<string | null>(null);
@@ -31,7 +32,7 @@ const ShareholderBulkCreditModal: React.FC<Props> = ({ isOpen, onClose, sharehol
         setBankAccounts(accounts);
         setProcessedIds([]);
         setValues({});
-        setGlobalDate(new Date().toISOString().split('T')[0]);
+        setGlobalDate(getLocalDateString());
         setGlobalDescription('Pro-labore Mensal');
     }
   }, [isOpen]);

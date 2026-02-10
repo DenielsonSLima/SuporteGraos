@@ -99,7 +99,8 @@ export const financialService = {
         if (tr.toAccountId === account.id) balance += tr.amount;
       });
 
-      return { ...account, currentBalance: balance };
+      const normalizedBalance = Math.abs(balance) < 0.01 ? 0 : Number(balance.toFixed(2));
+      return { ...account, currentBalance: normalizedBalance };
     });
   }
 };

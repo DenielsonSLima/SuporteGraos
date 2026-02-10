@@ -17,7 +17,15 @@ interface Props {
 const SalesReceiptModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, totalPending, recordDescription, initialData }) => {
   const { addToast } = useToast();
   
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const getTodayLocal = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const [date, setDate] = useState(getTodayLocal());
   const [amount, setAmount] = useState(''); 
   const [discount, setDiscount] = useState(''); 
   const [accountId, setAccountId] = useState('');
@@ -43,7 +51,7 @@ const SalesReceiptModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, totalP
         setAccountId(initialData.accountId || '');
         setNotes(initialData.notes || '');
       } else {
-        setDate(new Date().toISOString().split('T')[0]);
+        setDate(getTodayLocal());
         setAmount(totalPending.toFixed(2));
         setDiscount('');
         setAccountId('');

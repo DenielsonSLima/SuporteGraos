@@ -17,7 +17,13 @@ const SalesFinancialCard: React.FC<Props> = ({ orderId, transactions, totalOrder
   const [selectedTx, setSelectedTx] = useState<any>(null);
   
   const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
-  const dateStr = (val: string) => new Date(val).toLocaleDateString('pt-BR');
+  const dateStr = (val: string) => {
+    if (!val) return '-';
+    if (val.includes('T')) return new Date(val).toLocaleDateString('pt-BR');
+    const [year, month, day] = val.split('-');
+    if (year && month && day) return `${day}/${month}/${year}`;
+    return new Date(val).toLocaleDateString('pt-BR');
+  };
   const cleanNotes = (val?: string) => val ? val.replace(/\s*\[ORIGIN:[^\]]+\]\s*/g, ' ').trim() : '';
 
   // Filtra apenas recebimentos
