@@ -123,7 +123,7 @@ export const financialActionService = {
         if (order) {
             const newPaid = (order.paidValue || 0) + transactionValue;
             const newDiscount = (order.discountValue || 0) + discountValue;
-            console.log(`[PAGAMENTO] Pedido encontrado: paidValue=${order.paidValue} -> ${newPaid}`);
+            console.log(`[PAGAMENTO] Pedido encontrado: ${order.number}, paidValue=${order.paidValue} -> ${newPaid}`);
             purchaseService.update({
                 ...order,
                 paidValue: newPaid,
@@ -137,13 +137,21 @@ export const financialActionService = {
         // Atualizar o payable correspondente
         const allPayables = payablesService.getAll();
         console.log(`[PAGAMENTO] Total payables: ${allPayables.length}`);
-        allPayables.forEach(p => console.log(`  - Payable ${p.id}: purchaseOrderId=${p.purchaseOrderId}`));
         
+        // Buscar payable de várias formas
         const directPayable = payablesService.getById(recordId);
-        console.log(`[PAGAMENTO] Payable por ID direto (${recordId}): ${directPayable?.id || 'NÃO ENCONTRADO'}`);
+        const payableByOrderId = allPayables.find(p => p.purchaseOrderId === orderId);
+        const payableByOrderNumber = order ? allPayables.find(p => 
+          p.subType === 'purchase_order' && 
+          p.description.includes(order.number || '') &&
+          p.partnerId === order.partnerId
+        ) : undefined;
         
-        let payable = directPayable || (orderId ? allPayables.find(p => p.purchaseOrderId === orderId) : undefined);
-        console.log(`[PAGAMENTO] Payable por purchaseOrderId (${orderId}): ${payable?.id || 'NÃO ENCONTRADO'}`);
+        console.log(`[PAGAMENTO] Payable por ID direto (${recordId}): ${directPayable?.id || 'N/A'}`);
+        console.log(`[PAGAMENTO] Payable por purchaseOrderId (${orderId}): ${payableByOrderId?.id || 'N/A'}`);
+        console.log(`[PAGAMENTO] Payable por número do pedido: ${payableByOrderNumber?.id || 'N/A'}`);
+        
+        const payable = directPayable || payableByOrderId || payableByOrderNumber;
         
         if (payable) {
           const newPaidAmount = (payable.paidAmount || 0) + transactionValue + discountValue;
@@ -153,7 +161,7 @@ export const financialActionService = {
             ? 'partially_paid'
             : 'pending';
 
-          console.log(`[PAGAMENTO] Atualizando payable ${payable.id}: ${payable.paidAmount} -> ${newPaidAmount}, status=${status}`);
+          console.log(`[PAGAMENTO] ✅ Atualizando payable ${payable.id}: ${payable.paidAmount} -> ${newPaidAmount}, status=${status}`);
           payablesService.update({
             ...payable,
             paidAmount: Number(newPaidAmount.toFixed(2)),
@@ -161,6 +169,25 @@ export const financialActionService = {
           });
         } else {
           console.log(`[PAGAMENTO] ⚠️ NENHUM PAYABLE ENCONTRADO para recordId=${recordId} ou orderId=${orderId}`);
+          // Criar payable se não existir
+          if (order) {
+            console.log(`[PAGAMENTO] 🔧 Criando payable para o pedido ${order.number}...`);
+            const newPayableId = Math.random().toString(36).substr(2, 9);
+            payablesService.add({
+              id: newPayableId,
+              purchaseOrderId: order.id,
+              partnerId: order.partnerId,
+              partnerName: order.partnerName,
+              description: `Pedido de Compra ${order.number}`,
+              dueDate: new Date(new Date(order.date).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+              amount: order.totalValue || 0,
+              paidAmount: transactionValue + discountValue,
+              status: (transactionValue + discountValue) >= (order.totalValue || 0) - 0.01 ? 'paid' : 'partially_paid',
+              subType: 'purchase_order',
+              notes: `Fornecedor: ${order.partnerName}`
+            });
+            console.log(`[PAGAMENTO] ✅ Payable criado: ${newPayableId}`);
+          }
         }
     } else if (subType === 'sales_order') {
       const orderIdFromPrefix = recordId.startsWith('so-') ? recordId.replace('so-', '') : '';
