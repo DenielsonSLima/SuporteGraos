@@ -189,6 +189,9 @@ export const financialActionService = {
         // Atualizar o payable correspondente - BUSCA ROBUSTA (apenas purchase_order!)
         // Se já encontramos o payable antes (quando veio como UUID), usar ele
         if (!payable) {
+          if (payablesService.getAll().length === 0) {
+            await payablesService.loadFromSupabase();
+          }
           const allPayables = payablesService.getAll().filter(p => p.subType === 'purchase_order');
           console.log(`[PAGAMENTO] Total payables do tipo purchase_order: ${allPayables.length}`);
           
