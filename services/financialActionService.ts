@@ -117,21 +117,34 @@ export const financialActionService = {
 
     if (subType === 'purchase_order') {
         const orderId = recordId.replace('po-grain-', '');
+        console.log(`[PAGAMENTO] processRecord: recordId=${recordId}, orderId=${orderId}`);
+        
         const order = purchaseService.getById(orderId);
         if (order) {
             const newPaid = (order.paidValue || 0) + transactionValue;
             const newDiscount = (order.discountValue || 0) + discountValue;
+            console.log(`[PAGAMENTO] Pedido encontrado: paidValue=${order.paidValue} -> ${newPaid}`);
             purchaseService.update({
                 ...order,
                 paidValue: newPaid,
                 discountValue: newDiscount,
                 transactions: [commonTx as any, ...(order.transactions || [])]
             });
+        } else {
+            console.log(`[PAGAMENTO] Pedido NÃO encontrado: ${orderId}`);
         }
 
         // Atualizar o payable correspondente
+        const allPayables = payablesService.getAll();
+        console.log(`[PAGAMENTO] Total payables: ${allPayables.length}`);
+        allPayables.forEach(p => console.log(`  - Payable ${p.id}: purchaseOrderId=${p.purchaseOrderId}`));
+        
         const directPayable = payablesService.getById(recordId);
-        const payable = directPayable || (orderId ? payablesService.getAll().find(p => p.purchaseOrderId === orderId) : undefined);
+        console.log(`[PAGAMENTO] Payable por ID direto (${recordId}): ${directPayable?.id || 'NÃO ENCONTRADO'}`);
+        
+        let payable = directPayable || (orderId ? allPayables.find(p => p.purchaseOrderId === orderId) : undefined);
+        console.log(`[PAGAMENTO] Payable por purchaseOrderId (${orderId}): ${payable?.id || 'NÃO ENCONTRADO'}`);
+        
         if (payable) {
           const newPaidAmount = (payable.paidAmount || 0) + transactionValue + discountValue;
           const status: Payable['status'] = newPaidAmount >= payable.amount - 0.01
@@ -140,11 +153,14 @@ export const financialActionService = {
             ? 'partially_paid'
             : 'pending';
 
+          console.log(`[PAGAMENTO] Atualizando payable ${payable.id}: ${payable.paidAmount} -> ${newPaidAmount}, status=${status}`);
           payablesService.update({
             ...payable,
             paidAmount: Number(newPaidAmount.toFixed(2)),
             status
           });
+        } else {
+          console.log(`[PAGAMENTO] ⚠️ NENHUM PAYABLE ENCONTRADO para recordId=${recordId} ou orderId=${orderId}`);
         }
     } else if (subType === 'sales_order') {
       const orderIdFromPrefix = recordId.startsWith('so-') ? recordId.replace('so-', '') : '';
