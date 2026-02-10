@@ -176,31 +176,71 @@ export const reconcilePayablesFromHistory = async () => {
 export const reconcilePayablesFromOrders = async () => {
   console.log('🔄 Iniciando reconciliação de payables a partir dos pedidos de compra...');
   
-  const payables = payablesService.getAll();
+  const payables = payablesService.getAll().filter(p => p.subType === 'purchase_order');
   const orders = purchaseService.getAll();
   
-  console.log(`📊 Total de payables: ${payables.length}`);
+  console.log(`📊 Total de payables purchase_order: ${payables.length}`);
   console.log(`📊 Total de pedidos de compra: ${orders.length}`);
   
   let updated = 0;
+  let fixed = 0;
   
-  for (const payable of payables) {
-    if (!payable.purchaseOrderId) {
-      console.log(`  ⚠️ Payable ${payable.id} sem purchaseOrderId`);
-      continue;
-    }
-    
-    const order = orders.find(o => o.id === payable.purchaseOrderId);
-    if (!order) {
-      console.log(`  ⚠️ Pedido ${payable.purchaseOrderId} não encontrado para payable ${payable.id}`);
-      continue;
-    }
+  // Para cada pedido de compra, encontrar o payable correspondente
+  for (const order of orders) {
+    if (!order.totalValue || order.totalValue <= 0) continue;
     
     const orderPaidValue = toNumber(order.paidValue) + toNumber(order.discountValue);
+    
+    // Buscar payable de múltiplas formas
+    let payable = payables.find(p => p.purchaseOrderId === order.id);
+    
+    // Se não encontrou por purchaseOrderId, buscar por descrição + partnerId
+    if (!payable) {
+      payable = payables.find(p => 
+        p.description.includes(order.number || '') && 
+        p.partnerId === order.partnerId
+      );
+      
+      // Se encontrou, corrigir o purchaseOrderId
+      if (payable && !payable.purchaseOrderId) {
+        console.log(`  🔧 Corrigindo purchaseOrderId do payable ${payable.id} para ${order.id}`);
+        payablesService.update({
+          ...payable,
+          purchaseOrderId: order.id
+        });
+        fixed++;
+      }
+    }
+    
+    // Se não encontrou por descrição, buscar por valor + partnerId
+    if (!payable) {
+      payable = payables.find(p => 
+        Math.abs(p.amount - (order.totalValue || 0)) < 0.01 && 
+        p.partnerId === order.partnerId &&
+        !p.purchaseOrderId // Somente payables sem purchaseOrderId
+      );
+      
+      // Se encontrou, corrigir o purchaseOrderId
+      if (payable) {
+        console.log(`  🔧 Associando payable ${payable.id} ao pedido ${order.id} (${order.number})`);
+        payablesService.update({
+          ...payable,
+          purchaseOrderId: order.id
+        });
+        fixed++;
+      }
+    }
+    
+    if (!payable) {
+      console.log(`  ⚠️ Nenhum payable encontrado para pedido ${order.number} (${order.id})`);
+      continue;
+    }
+    
     const payablePaidAmount = toNumber(payable.paidAmount);
     
-    console.log(`  📝 Payable ${payable.id}: pedido=${payable.purchaseOrderId}, paidValue do pedido=${orderPaidValue}, paidAmount do payable=${payablePaidAmount}`);
+    console.log(`  📝 Pedido ${order.number}: orderPaidValue=${orderPaidValue}, payablePaidAmount=${payablePaidAmount}`);
     
+    // Se há diferença entre o paidValue do pedido e o paidAmount do payable
     if (Math.abs(orderPaidValue - payablePaidAmount) > 0.01) {
       const newStatus: Payable['status'] = orderPaidValue >= payable.amount - 0.01
         ? 'paid'
@@ -210,6 +250,7 @@ export const reconcilePayablesFromOrders = async () => {
       
       payablesService.update({
         ...payable,
+        purchaseOrderId: order.id, // Garantir que está correto
         paidAmount: Number(orderPaidValue.toFixed(2)),
         status: newStatus
       });
@@ -219,8 +260,8 @@ export const reconcilePayablesFromOrders = async () => {
     }
   }
   
-  console.log(`🔄 Reconciliação concluída: ${updated} payables atualizados`);
-  return updated;
+  console.log(`🔄 Reconciliação concluída: ${updated} payables atualizados, ${fixed} associações corrigidas`);
+  return { updated, fixed };
 };
 
 // Função para forçar reconciliação (reseta o flag hasRun)
