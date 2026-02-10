@@ -385,6 +385,43 @@ export const financialActionService = {
         } else {
             console.log(`[PAGAMENTO FRETE] ⚠️ Loading NÃO encontrado para: ${loadingId}`);
         }
+    } else if (subType === 'commission') {
+        // COMISSÕES: Buscar e atualizar o payable de comissão
+        console.log(`[PAGAMENTO COMISSÃO] processRecord: recordId=${recordId}`);
+        
+        // O recordId pode ser UUID do payable diretamente
+        let payable = payablesService.getById(recordId);
+        
+        // Se não encontrar, buscar por purchaseOrderId ou outras estratégias
+        if (!payable) {
+            const allCommissionPayables = payablesService.getAll().filter(p => p.subType === 'commission');
+            console.log(`[PAGAMENTO COMISSÃO] Total payables de comissão: ${allCommissionPayables.length}`);
+            
+            // Tentar buscar por purchaseOrderId se vier no formato esperado
+            const orderId = recordId.replace('com-', '');
+            payable = allCommissionPayables.find(p => p.purchaseOrderId === orderId);
+            
+            if (!payable) {
+                console.log(`[PAGAMENTO COMISSÃO] ⚠️ Payable não encontrado para: ${recordId}`);
+            }
+        }
+        
+        if (payable) {
+            const newPaidAmount = (payable.paidAmount || 0) + transactionValue + discountValue;
+            const status: Payable['status'] = newPaidAmount >= payable.amount - 0.01 
+                ? 'paid' 
+                : newPaidAmount > 0 
+                ? 'partially_paid' 
+                : 'pending';
+            
+            console.log(`[PAGAMENTO COMISSÃO] ✅ Atualizando payable ${payable.id.substring(0, 8)}...: ${payable.paidAmount} -> ${newPaidAmount}, status=${status}`);
+            
+            payablesService.update({
+                ...payable,
+                paidAmount: Number(newPaidAmount.toFixed(2)),
+                status
+            });
+        }
     }
 
     const shouldSkipHistory = standalone?.subType === 'admin' && subType === 'admin';
