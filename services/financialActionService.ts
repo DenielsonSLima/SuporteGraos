@@ -11,6 +11,7 @@ import { invalidateDashboardCache } from './dashboardCache';
 import { standaloneRecordsService } from './standaloneRecordsService';
 import { transfersService, Transfer } from './financial/transfersService';
 import { receivablesService, Receivable } from './financial/receivablesService';
+import { payablesService, Payable } from './financial/payablesService';
 
 const getLogInfo = () => {
   const user = authService.getCurrentUser();
@@ -126,6 +127,24 @@ export const financialActionService = {
                 discountValue: newDiscount,
                 transactions: [commonTx as any, ...(order.transactions || [])]
             });
+        }
+
+        // Atualizar o payable correspondente
+        const directPayable = payablesService.getById(recordId);
+        const payable = directPayable || (orderId ? payablesService.getAll().find(p => p.purchaseOrderId === orderId) : undefined);
+        if (payable) {
+          const newPaidAmount = (payable.paidAmount || 0) + transactionValue + discountValue;
+          const status: Payable['status'] = newPaidAmount >= payable.amount - 0.01
+            ? 'paid'
+            : newPaidAmount > 0
+            ? 'partially_paid'
+            : 'pending';
+
+          payablesService.update({
+            ...payable,
+            paidAmount: Number(newPaidAmount.toFixed(2)),
+            status
+          });
         }
     } else if (subType === 'sales_order') {
       const orderIdFromPrefix = recordId.startsWith('so-') ? recordId.replace('so-', '') : '';

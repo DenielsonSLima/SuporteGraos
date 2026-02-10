@@ -382,6 +382,7 @@ export const initializeSupabaseData = async (): Promise<InitStats> => {
         const classificationModule = await import('./classificationService');
         const locationModule = await import('./locationService');
         const reconciliationModule = await import('./receivablesReconciliationService');
+        const payablesReconciliationModule = await import('./payablesReconciliationService');
         
         // 📥 CARREGAR DADOS DE CADA SERVICE (em paralelo) - critico primeiro
         console.log('[SUPABASE_INIT] 📥 Iniciando carga paralela dos services (critico)...');
@@ -469,6 +470,7 @@ export const initializeSupabaseData = async (): Promise<InitStats> => {
         // Reconcilia recebimentos antigos automaticamente (sem bloquear a UI)
         setTimeout(() => {
           void reconciliationModule.reconcileReceivablesFromHistory();
+          void payablesReconciliationModule.reconcilePayablesFromHistory();
         }, 300);
         emitInitEvent('supabase:init:critical', { diagnostics: _initDiagnostics });
         emitInitEvent('supabase:init:complete', { diagnostics: _initDiagnostics });

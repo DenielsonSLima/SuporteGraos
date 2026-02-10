@@ -17,13 +17,18 @@ const PurchasePaymentModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, tot
   const { addToast } = useToast();
   
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [amount, setAmount] = useState(''); 
-  const [discount, setDiscount] = useState(''); 
+  const [displayAmount, setDisplayAmount] = useState('');
+  const [numericAmount, setNumericAmount] = useState(0);
+  const [displayDiscount, setDisplayDiscount] = useState('');
+  const [numericDiscount, setNumericDiscount] = useState(0);
   const [accountId, setAccountId] = useState('');
   const [notes, setNotes] = useState('');
   const [bankAccounts, setBankAccounts] = useState<BankAccountWithBalance[]>([]);
 
-  const formatBRL = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  const formatBRL = (val: number) => {
+    const normalized = Math.abs(val) < 0.01 ? 0 : val;
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(normalized);
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -34,14 +39,20 @@ const PurchasePaymentModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, tot
 
       if (initialData) {
         setDate(initialData.date);
-        setAmount(initialData.value?.toString() || '');
-        setDiscount(initialData.discountValue?.toString() || '');
+        const initAmount = Number(initialData.value) || 0;
+        const initDiscount = Number(initialData.discountValue) || 0;
+        setNumericAmount(initAmount);
+        setDisplayAmount(formatBRL(initAmount));
+        setNumericDiscount(initDiscount);
+        setDisplayDiscount(formatBRL(initDiscount));
         setAccountId(initialData.accountId || '');
         setNotes(initialData.notes || '');
       } else {
         setDate(new Date().toISOString().split('T')[0]);
-        setAmount(totalPending.toFixed(2));
-        setDiscount('');
+        setNumericAmount(totalPending);
+        setDisplayAmount(formatBRL(totalPending));
+        setNumericDiscount(0);
+        setDisplayDiscount(formatBRL(0));
         setAccountId('');
         setNotes('');
       }
@@ -50,10 +61,24 @@ const PurchasePaymentModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, tot
 
   if (!isOpen) return null;
 
-  const valAmount = parseFloat(amount) || 0;
-  const valDiscount = parseFloat(discount) || 0;
+  const valAmount = numericAmount || 0;
+  const valDiscount = numericDiscount || 0;
   const totalOperation = valAmount + valDiscount;
   const isCashMovement = valAmount > 0;
+
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value.replace(/\D/g, '');
+    const num = Number(raw) / 100;
+    setNumericAmount(num);
+    setDisplayAmount(formatBRL(num));
+  };
+
+  const handleDiscountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value.replace(/\D/g, '');
+    const num = Number(raw) / 100;
+    setNumericDiscount(num);
+    setDisplayDiscount(formatBRL(num));
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,11 +119,11 @@ const PurchasePaymentModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, tot
           </div>
           <div className="grid grid-cols-2 gap-4">
              <div><label className={labelClass}>Data Pagamento</label><input type="date" required value={date} onChange={e => setDate(e.target.value)} className={inputClass} /></div>
-             <div><label className={labelClass}>Valor em Dinheiro (R$)</label><div className="relative"><DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} /><input type="number" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} className={`${inputClass} pl-10 text-rose-700`} placeholder="0,00" /></div></div>
+             <div><label className={labelClass}>Valor em Dinheiro (R$)</label><div className="relative"><DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} /><input type="text" value={displayAmount} onChange={handleAmountChange} className={`${inputClass} pl-10 text-rose-700`} placeholder="R$ 0,00" /></div></div>
           </div>
           <div className="bg-amber-50 p-4 rounded-xl border border-amber-100">
              <label className={labelClass}>Desconto / Abatimento Comercial</label>
-             <div className="relative"><MinusCircle className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-500" size={18} /><input type="number" step="0.01" value={discount} onChange={e => setDiscount(e.target.value)} className="w-full border-2 border-amber-200 rounded-lg bg-white px-4 py-2 pl-9 text-amber-800 font-bold outline-none text-sm" placeholder="0,00" /></div>
+             <div className="relative"><MinusCircle className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-500" size={18} /><input type="text" value={displayDiscount} onChange={handleDiscountChange} className="w-full border-2 border-amber-200 rounded-lg bg-white px-4 py-2 pl-9 text-amber-800 font-bold outline-none text-sm" placeholder="R$ 0,00" /></div>
           </div>
           {isCashMovement ? (
               <div className="animate-in fade-in slide-in-from-top-2">
