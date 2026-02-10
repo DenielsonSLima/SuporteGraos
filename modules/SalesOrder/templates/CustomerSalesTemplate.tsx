@@ -28,6 +28,12 @@ const CustomerSalesTemplate: React.FC<Props> = ({ order, loadings }) => {
     const [year, month, day] = val.split('-');
     return `${day}/${month}/${year}`;
   };
+    const cleanNotes = (val?: string) => val ? val.replace(/\s*\[ORIGIN:[^\]]+\]\s*/g, ' ').trim() : '';
+    const receiptAccountLabel = (accountName?: string, notes?: string) => {
+        if (accountName) return accountName;
+        const cleaned = cleanNotes(notes);
+        return cleaned || 'Conta nao informada';
+    };
 
   // --- CÁLCULOS CONSOLIDADOS PARA O CLIENTE ---
   const stats = useMemo(() => {
@@ -307,7 +313,7 @@ const CustomerSalesTemplate: React.FC<Props> = ({ order, loadings }) => {
                                     <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform"><DollarSign size={20}/></div>
                                     <div>
                                         <p className="font-black text-slate-900 uppercase text-[9px]">{dateStr(r.date)}</p>
-                                        <p className="text-[7px] font-bold text-slate-400 uppercase italic truncate max-w-[120px]">{r.notes || 'Recebimento Comercial'}</p>
+                                        <p className="text-[7px] font-bold text-slate-400 uppercase italic truncate max-w-[120px]">CONTA: {receiptAccountLabel(r.accountName, r.notes)}</p>
                                     </div>
                                 </div>
                                 <span className="font-black text-emerald-700 text-base">{currency(r.value + (r.discountValue || 0))}</span>

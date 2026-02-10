@@ -18,6 +18,7 @@ const SalesFinancialCard: React.FC<Props> = ({ orderId, transactions, totalOrder
   
   const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
   const dateStr = (val: string) => new Date(val).toLocaleDateString('pt-BR');
+  const cleanNotes = (val?: string) => val ? val.replace(/\s*\[ORIGIN:[^\]]+\]\s*/g, ' ').trim() : '';
 
   // Filtra apenas recebimentos
   const receipts = transactions.filter(t => t.type === 'receipt');
@@ -115,7 +116,7 @@ const SalesFinancialCard: React.FC<Props> = ({ orderId, transactions, totalOrder
 
                 {t.notes && (
                   <p className="text-[10px] text-slate-500 mt-2 italic border-t border-slate-100 pt-2 line-clamp-1 px-1">
-                    "{t.notes}"
+                    "{cleanNotes(t.notes)}"
                   </p>
                 )}
 

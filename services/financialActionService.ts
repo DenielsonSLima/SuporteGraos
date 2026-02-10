@@ -10,6 +10,7 @@ import { invalidateFinancialCache } from './financialCache';
 import { invalidateDashboardCache } from './dashboardCache';
 import { standaloneRecordsService } from './standaloneRecordsService';
 import { transfersService, Transfer } from './financial/transfersService';
+import { receivablesService, Receivable } from './financial/receivablesService';
 
 const getLogInfo = () => {
   const user = authService.getCurrentUser();
@@ -127,15 +128,36 @@ export const financialActionService = {
             });
         }
     } else if (subType === 'sales_order') {
-        const orderId = recordId.replace('so-', '');
+      const orderIdFromPrefix = recordId.startsWith('so-') ? recordId.replace('so-', '') : '';
+      const directReceivable = receivablesService.getById(recordId);
+      const orderId = orderIdFromPrefix || directReceivable?.salesOrderId || '';
+
+      const receivable = directReceivable || (orderId ? receivablesService.getAll().find(r => r.salesOrderId === orderId) : undefined);
+      if (receivable) {
+        const newReceived = (receivable.receivedAmount || 0) + transactionValue + discountValue;
+        const status: Receivable['status'] = newReceived >= receivable.amount - 0.01
+          ? 'received'
+          : newReceived > 0
+          ? 'partially_received'
+          : 'pending';
+
+        receivablesService.update({
+          ...receivable,
+          receivedAmount: Number(newReceived.toFixed(2)),
+          status
+        });
+      }
+
+      if (orderId) {
         const order = salesService.getById(orderId);
         if (order) {
-            salesService.update({
-                ...order,
-                paidValue: (order.paidValue || 0) + transactionValue,
-                transactions: [commonTx as any, ...(order.transactions || [])]
-            });
+          salesService.update({
+            ...order,
+            paidValue: (order.paidValue || 0) + transactionValue,
+            transactions: [commonTx as any, ...(order.transactions || [])]
+          });
         }
+      }
     } else if (subType === 'freight') {
         const loadingId = recordId.replace('fr-', '');
         const loading = loadingService.getAll().find(l => l.id === loadingId);

@@ -759,6 +759,13 @@ const PdfDocument: React.FC<Props> = ({ order, loadings, variant }) => {
     return `${day}/${month}/${year}`;
   };
 
+  const cleanNotes = (val?: string) => (val ? val.replace(/\s*\[ORIGIN:[^\]]+\]\s*/g, ' ').trim() : '');
+  const receiptAccountLabel = (accountName?: string, notes?: string) => {
+    if (accountName) return accountName;
+    const cleaned = cleanNotes(notes);
+    return cleaned || 'Conta nao informada';
+  };
+
   const stats = useMemo(() => {
     const safeLoadings = Array.isArray(loadings) ? loadings : [];
     const activeLoadings = safeLoadings.filter((l) => l?.status !== 'canceled');
@@ -1053,7 +1060,7 @@ const PdfDocument: React.FC<Props> = ({ order, loadings, variant }) => {
                 .slice(0, 4)
                 .map((t, i) => (
                   <View key={i} style={stylesInternal.panelListItem}>
-                    <Text style={stylesInternal.tableCellSmall}>{dateStr(t.date)} - {t.notes || 'Recebimento comercial'}</Text>
+                    <Text style={stylesInternal.tableCellSmall}>{dateStr(t.date)} - {receiptAccountLabel(t.accountName, t.notes)}</Text>
                     <Text style={stylesInternal.tableCell}>{currency(t.value)}</Text>
                   </View>
                 ))}
@@ -1285,7 +1292,7 @@ const PdfDocument: React.FC<Props> = ({ order, loadings, variant }) => {
               {stats.receipts.map((r, i) => (
                 <View key={i} style={[styles.receiptCard, (i + 1) % 3 === 0 && styles.receiptCardLast]}>
                   <Text style={styles.receiptLabel}>{dateStr(r.date)}</Text>
-                  <Text style={styles.receiptNote}>{r.notes || 'Recebimento comercial'}</Text>
+                  <Text style={styles.receiptNote}>CONTA: {receiptAccountLabel(r.accountName, r.notes)}</Text>
                   <Text style={styles.receiptValue}>{currency((Number(r.value) || 0) + (Number(r.discountValue) || 0))}</Text>
                 </View>
               ))}

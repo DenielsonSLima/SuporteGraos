@@ -17,6 +17,7 @@ const SalesOrderTemplate: React.FC<Props> = ({ order, loadings }) => {
   const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
   const number = (val: number) => new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(val || 0);
   const date = (val: string) => new Date(val).toLocaleDateString('pt-BR');
+  const cleanNotes = (val?: string) => val ? val.replace(/\s*\[ORIGIN:[^\]]+\]\s*/g, ' ').trim() : '';
 
   // --- CÁLCULOS ---
   const getEffectiveWeightKg = (l: Loading) => (l.unloadWeightKg && l.unloadWeightKg > 0) ? l.unloadWeightKg : l.weightKg;
@@ -250,7 +251,7 @@ const SalesOrderTemplate: React.FC<Props> = ({ order, loadings }) => {
                   <tr key={rec.id} className={`border-b border-slate-300 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}>
                     <td className="py-1 px-2 text-black text-[9px]">{date(rec.date)}</td>
                     <td className="py-1 px-2 text-black text-[9px]">{rec.accountName}</td>
-                    <td className="py-1 px-2 text-black italic text-[9px]">{rec.notes || '-'}</td>
+                    <td className="py-1 px-2 text-black italic text-[9px]">{cleanNotes(rec.notes) || '-'}</td>
                     <td className="py-1 px-2 text-right text-emerald-700 font-bold text-[9px]">{currency(rec.value)}</td>
                   </tr>
                 ))}

@@ -301,7 +301,7 @@ const InternalSalesTemplate: React.FC<Props> = ({ order, loadings }) => {
                 <div className="space-y-2">
                     {(order.transactions || []).filter(t => t.type === 'receipt').slice(0, 4).map((t, i) => (
                         <div key={i} className="flex justify-between items-center p-2 bg-slate-50 rounded-xl border border-slate-100">
-                            <span className="text-[8px] font-bold text-slate-600">{dateStr(t.date)} - {t.notes || 'Recebimento Comercial'}</span>
+                            <span className="text-[8px] font-bold text-slate-600">{dateStr(t.date)} - {t.accountName || (t.notes || 'Recebimento Comercial').replace(/\s*\[ORIGIN:[^\]]+\]\s*/g, ' ').trim()}</span>
                             <span className="font-black text-slate-900">{currency(t.value)}</span>
                         </div>
                     ))}
