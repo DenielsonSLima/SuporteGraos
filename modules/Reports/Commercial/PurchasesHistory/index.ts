@@ -6,6 +6,9 @@ import Template from './Template';
 import PdfDocument from './PdfDocument';
 import Filters from './Filters';
 
+const formatNumber = (val: number) =>
+  new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(val);
+
 const purchasesHistoryReport: ReportModule = {
   metadata: {
     id: 'purchases_history',
@@ -16,47 +19,59 @@ const purchasesHistoryReport: ReportModule = {
     needsDateFilter: true
   },
   initialFilters: {
-    startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0], // First day of month
-    endDate: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split('T')[0], // Last day of month
+    startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
+    endDate: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split('T')[0],
     partnerId: '',
     product: ''
   },
   FilterComponent: Filters,
   fetchData: ({ startDate, endDate, partnerId, product }) => {
-    let all = reportsCache.getAllPurchases();
-    
-    // Apply Filters
-    all = all.filter(p => {
-      // Date
+    // Buscar pedidos e carregamentos
+    let allOrders = reportsCache.getAllPurchases();
+    const allLoadings = reportsCache.getAllLoadings();
+
+    // Filtrar pedidos por data
+    allOrders = allOrders.filter(p => {
       if (startDate && endDate) {
         const d = new Date(p.date).getTime();
         const start = new Date(startDate).getTime();
         const end = new Date(endDate).getTime();
         if (d < start || d > end) return false;
       }
-      // Partner (using Name as ID for this mock)
       if (partnerId && p.partnerName !== partnerId) return false;
-      
-      // Product
       if (product) {
-        const hasProduct = p.items.some(i => i.productName === product);
+        const hasProduct = (p.items || []).some((i: any) => i.productName === product);
         if (!hasProduct) return false;
       }
-
       return true;
     });
 
-    // Build Report Data
-    const rows = all.map(p => ({
-      date: p.date,
-      number: p.number,
-      partnerName: p.partnerName,
-      product: p.items[0]?.productName || 'Grãos',
-      volume: `${p.items.reduce((a, b) => a + b.quantity, 0)} ${p.items[0]?.unit || 'SC'}`,
-      total: p.totalValue
-    }));
+    // Para cada pedido, calcular totais a partir dos carregamentos (loadings)
+    const rows = allOrders.map(p => {
+      const orderLoadings = allLoadings.filter(
+        (l: any) => l.purchaseOrderId === p.id && l.status !== 'canceled'
+      );
 
-    const totalVal = all.reduce((acc, r) => acc + r.totalValue, 0);
+      // Somar valores dos carregamentos (mesma lógica que usePurchaseOrderLogic)
+      const totalPurchaseValue = orderLoadings.reduce((acc: number, l: any) => acc + (l.totalPurchaseValue || 0), 0);
+      const totalSc = orderLoadings.reduce((acc: number, l: any) => acc + (l.weightSc || 0), 0);
+
+      // Produto: pegar do item do pedido ou do loading
+      const primaryProduct = (p.items && p.items[0]?.productName)
+        || (orderLoadings[0] as any)?.productName
+        || 'Grãos';
+
+      return {
+        date: p.date,
+        number: p.number,
+        partnerName: p.partnerName,
+        product: primaryProduct,
+        volume: totalSc > 0 ? `${formatNumber(totalSc)} SC` : '-',
+        total: totalPurchaseValue
+      };
+    });
+
+    const totalVal = rows.reduce((acc, r) => acc + (Number(r.total) || 0), 0);
 
     return {
       title: 'Histórico de Compras',

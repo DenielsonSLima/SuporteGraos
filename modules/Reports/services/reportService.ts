@@ -70,16 +70,24 @@ export const reportService = {
         ];
         
         const records = purchaseService.getAll().filter(p => filterByDate(p.date));
-        data.rows = records.map(p => ({
-          date: p.date,
-          number: p.number,
-          partnerName: p.partnerName,
-          product: p.items[0]?.productName || 'Grãos',
-          volume: `${p.items.reduce((a, b) => a + b.quantity, 0)} ${p.items[0]?.unit || 'SC'}`,
-          total: p.totalValue
-        }));
+        const allLoadings = loadingService.getAll();
+        const fmt = (v: number) => new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(v);
+
+        data.rows = records.map(p => {
+          const orderLoadings = allLoadings.filter(l => l.purchaseOrderId === p.id && l.status !== 'canceled');
+          const totalPurchaseValue = orderLoadings.reduce((acc, l) => acc + (l.totalPurchaseValue || 0), 0);
+          const totalSc = orderLoadings.reduce((acc, l) => acc + (l.weightSc || 0), 0);
+          return {
+            date: p.date,
+            number: p.number,
+            partnerName: p.partnerName,
+            product: p.items[0]?.productName || 'Grãos',
+            volume: totalSc > 0 ? `${fmt(totalSc)} SC` : '-',
+            total: totalPurchaseValue
+          };
+        });
         
-        const totalVal = records.reduce((acc, r) => acc + r.totalValue, 0);
+        const totalVal = data.rows.reduce((acc: number, r: any) => acc + (Number(r.total) || 0), 0);
         data.summary = [{ label: 'Total Comprado', value: totalVal, format: 'currency' }];
         break;
       }
