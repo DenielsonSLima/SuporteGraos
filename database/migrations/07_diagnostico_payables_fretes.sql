@@ -42,7 +42,7 @@ SELECT
   l.total_freight_value,
   l.freight_paid,
   l.status
-FROM loadings l
+FROM logistics_loadings l
 WHERE l.freight_paid > 0
 ORDER BY l.freight_paid DESC;
 
@@ -75,7 +75,7 @@ WHERE sub_type = 'freight'
 -- 6. REVERTER pagamentos de loadings (fretes) (SE NECESSÁRIO)
 -- Descomente e execute se os loadings estiverem com freight_paid errado:
 /*
-UPDATE loadings
+UPDATE logistics_loadings
 SET freight_paid = 0
 WHERE freight_paid > 0;
 */

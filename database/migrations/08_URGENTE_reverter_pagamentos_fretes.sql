@@ -15,7 +15,7 @@ SELECT
   total_freight_value,
   freight_paid,
   status
-FROM loadings
+FROM logistics_loadings
 WHERE freight_paid > 0
 ORDER BY freight_paid DESC;
 
@@ -57,11 +57,11 @@ FROM purchase_orders
 ORDER BY total_value DESC;
 
 -- ============================================================================
--- PASSO 2: REVERTER PAGAMENTOS DOS FRETES (loadings)
+-- PASSO 2: REVERTER PAGAMENTOS DOS FRETES (logistics_loadings)
 -- ============================================================================
 
 -- 2.1 ZERAR freight_paid de TODOS os loadings
-UPDATE loadings
+UPDATE logistics_loadings
 SET freight_paid = 0
 WHERE freight_paid > 0;
 
@@ -99,8 +99,8 @@ WHERE sub_type = 'purchase_order'
 -- ============================================================================
 
 -- Verificar que todos os pagamentos foram zerados
-SELECT 'loadings' as tabela, COUNT(*) as com_pagamento 
-FROM loadings WHERE freight_paid > 0
+SELECT 'logistics_loadings' as tabela, COUNT(*) as com_pagamento 
+FROM logistics_loadings WHERE freight_paid > 0
 UNION ALL
 SELECT 'payables_freight', COUNT(*) 
 FROM payables WHERE sub_type = 'freight' AND paid_amount > 0

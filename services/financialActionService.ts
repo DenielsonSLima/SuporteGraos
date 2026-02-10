@@ -118,15 +118,45 @@ export const financialActionService = {
     if (subType === 'purchase_order') {
         // CORREÇÃO: Detectar se recordId é UUID (do payable) ou formatado (po-grain-...)
         const isPayableUUID = !recordId.startsWith('po-grain-');
-        let orderId: string;
+        let orderId: string = '';
         let payable: Payable | undefined;
+        let order: any;
         
         // Se for UUID do payable, buscar primeiro para obter o purchaseOrderId
         if (isPayableUUID) {
             payable = payablesService.getById(recordId);
             if (payable) {
                 orderId = payable.purchaseOrderId || '';
-                console.log(`[PAGAMENTO] ID é UUID do payable: ${recordId.substring(0, 8)}..., purchaseOrderId=${orderId}`);
+                console.log(`[PAGAMENTO] ID é UUID do payable: ${recordId.substring(0, 8)}..., purchaseOrderId=${orderId || 'VAZIO'}`);
+                
+                // Se purchaseOrderId estiver vazio, tentar buscar pelo número do pedido na descrição
+                if (!orderId && payable.description) {
+                    const match = payable.description.match(/PC-\d{4}-\d+|#PC-\d+/i);
+                    if (match) {
+                        const orderNumber = match[0];
+                        order = purchaseService.getAll().find(o => o.number === orderNumber);
+                        if (order) {
+                            orderId = order.id;
+                            console.log(`[PAGAMENTO] Pedido encontrado pelo número ${orderNumber}: ${orderId}`);
+                            // Corrigir o purchaseOrderId no payable para futuras operações
+                            payablesService.update({ ...payable, purchaseOrderId: orderId });
+                        }
+                    }
+                }
+                
+                // Se ainda não encontrou, tentar pelo partnerId + valor
+                if (!orderId && payable.partnerId && payable.amount > 0) {
+                    order = purchaseService.getAll().find(o => 
+                        o.partnerId === payable!.partnerId && 
+                        Math.abs((o.totalValue || 0) - payable!.amount) < 1
+                    );
+                    if (order) {
+                        orderId = order.id;
+                        console.log(`[PAGAMENTO] Pedido encontrado pelo partnerId+valor: ${orderId}`);
+                        // Corrigir o purchaseOrderId no payable para futuras operações
+                        payablesService.update({ ...payable, purchaseOrderId: orderId });
+                    }
+                }
             } else {
                 orderId = recordId;
                 console.log(`[PAGAMENTO] ⚠️ Payable não encontrado pelo UUID: ${recordId}`);
@@ -137,7 +167,11 @@ export const financialActionService = {
         
         console.log(`[PAGAMENTO] processRecord: recordId=${recordId}, orderId=${orderId}, isPayableUUID=${isPayableUUID}`);
         
-        const order = purchaseService.getById(orderId);
+        // Buscar o pedido se ainda não foi encontrado
+        if (!order && orderId) {
+            order = purchaseService.getById(orderId);
+        }
+        
         if (order) {
             const newPaid = (order.paidValue || 0) + transactionValue;
             const newDiscount = (order.discountValue || 0) + discountValue;
@@ -153,42 +187,43 @@ export const financialActionService = {
         }
 
         // Atualizar o payable correspondente - BUSCA ROBUSTA (apenas purchase_order!)
-        const allPayables = payablesService.getAll().filter(p => p.subType === 'purchase_order');
-        console.log(`[PAGAMENTO] Total payables do tipo purchase_order: ${allPayables.length}`);
-        
-        // Log de todos os payables de purchase_order para debug
-        allPayables.filter(p => p.subType === 'purchase_order').forEach(p => {
-          console.log(`[PAGAMENTO] PayableDB: id=${p.id.substring(0, 8)}..., purchaseOrderId=${p.purchaseOrderId || 'VAZIO'}, desc=${p.description}, amount=${p.amount}, paidAmount=${p.paidAmount}`);
-        });
-        
-        // Estratégia 1: Por ID direto (recordId)
-        let payable = payablesService.getById(recordId);
-        console.log(`[PAGAMENTO] Busca 1 (ID direto ${recordId}): ${payable?.id || 'N/A'}`);
-        
-        // Estratégia 2: Por purchaseOrderId
+        // Se já encontramos o payable antes (quando veio como UUID), usar ele
         if (!payable) {
-          payable = allPayables.find(p => p.purchaseOrderId === orderId);
-          console.log(`[PAGAMENTO] Busca 2 (purchaseOrderId=${orderId}): ${payable?.id || 'N/A'}`);
-        }
-        
-        // Estratégia 3: Por número do pedido na descrição + partnerId
-        if (!payable && order) {
-          payable = allPayables.find(p => 
-            p.subType === 'purchase_order' && 
-            p.description.includes(order.number || '') &&
-            p.partnerId === order.partnerId
-          );
-          console.log(`[PAGAMENTO] Busca 3 (número ${order.number} + partnerId): ${payable?.id || 'N/A'}`);
-        }
-        
-        // Estratégia 4: Por valor total + partnerId (fallback)
-        if (!payable && order) {
-          payable = allPayables.find(p => 
-            p.subType === 'purchase_order' && 
-            Math.abs(p.amount - (order.totalValue || 0)) < 0.01 &&
-            p.partnerId === order.partnerId
-          );
-          console.log(`[PAGAMENTO] Busca 4 (valor ${order.totalValue} + partnerId): ${payable?.id || 'N/A'}`);
+          const allPayables = payablesService.getAll().filter(p => p.subType === 'purchase_order');
+          console.log(`[PAGAMENTO] Total payables do tipo purchase_order: ${allPayables.length}`);
+          
+          // Log de todos os payables de purchase_order para debug
+          allPayables.forEach(p => {
+            console.log(`[PAGAMENTO] PayableDB: id=${p.id.substring(0, 8)}..., purchaseOrderId=${p.purchaseOrderId || 'VAZIO'}, desc=${p.description}, amount=${p.amount}, paidAmount=${p.paidAmount}`);
+          });
+          
+          // Estratégia 1: Por ID direto (recordId)
+          payable = payablesService.getById(recordId);
+          console.log(`[PAGAMENTO] Busca 1 (ID direto ${recordId}): ${payable?.id || 'N/A'}`);
+          
+          // Estratégia 2: Por purchaseOrderId
+          if (!payable && orderId) {
+            payable = allPayables.find(p => p.purchaseOrderId === orderId);
+            console.log(`[PAGAMENTO] Busca 2 (purchaseOrderId=${orderId}): ${payable?.id || 'N/A'}`);
+          }
+          
+          // Estratégia 3: Por número do pedido na descrição + partnerId
+          if (!payable && order) {
+            payable = allPayables.find(p => 
+              p.description.includes(order.number || '') &&
+              p.partnerId === order.partnerId
+            );
+            console.log(`[PAGAMENTO] Busca 3 (número ${order.number} + partnerId): ${payable?.id || 'N/A'}`);
+          }
+          
+          // Estratégia 4: Por valor total + partnerId (fallback)
+          if (!payable && order) {
+            payable = allPayables.find(p => 
+              Math.abs(p.amount - (order.totalValue || 0)) < 0.01 &&
+              p.partnerId === order.partnerId
+            );
+            console.log(`[PAGAMENTO] Busca 4 (valor ${order.totalValue} + partnerId): ${payable?.id || 'N/A'}`);
+          }
         }
         
         if (payable) {
