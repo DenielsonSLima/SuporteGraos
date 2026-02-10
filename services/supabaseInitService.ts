@@ -467,13 +467,17 @@ export const initializeSupabaseData = async (): Promise<InitStats> => {
 
         _initCriticalCompleted = true;
 
-        // Reconcilia recebimentos antigos automaticamente (sem bloquear a UI)
+        // Reconcilia recebimentos e pagamentos antigos automaticamente (sem bloquear a UI)
+        // Delay de 1.5s para garantir que todos os serviços estejam carregados
         setTimeout(() => {
+          console.log('[RECONCILE] Iniciando reconciliação automática de financeiro...');
           void reconciliationModule.reconcileReceivablesFromHistory();
           void payablesReconciliationModule.reconcilePayablesFromHistory();
-          // Também reconciliar diretamente dos pedidos (para pagamentos sem histórico ORIGIN)
-          void payablesReconciliationModule.reconcilePayablesFromOrders();
-        }, 300);
+          // Reconciliar diretamente dos pedidos após 500ms extra
+          setTimeout(() => {
+            void payablesReconciliationModule.reconcilePayablesFromOrders();
+          }, 500);
+        }, 1500);
         emitInitEvent('supabase:init:critical', { diagnostics: _initDiagnostics });
         emitInitEvent('supabase:init:complete', { diagnostics: _initDiagnostics });
         emitInitEvent('data:updated');

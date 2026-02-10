@@ -174,13 +174,19 @@ export const reconcilePayablesFromHistory = async () => {
 
 // Reconciliar payables diretamente dos pedidos de compra (para pagamentos sem histórico ORIGIN)
 export const reconcilePayablesFromOrders = async () => {
-  console.log('🔄 Iniciando reconciliação de payables a partir dos pedidos de compra...');
+  console.log('🔄 [RECONCILE] Iniciando reconciliação de payables a partir dos pedidos de compra...');
   
-  const payables = payablesService.getAll().filter(p => p.subType === 'purchase_order');
+  const allPayables = payablesService.getAll();
+  const payables = allPayables.filter(p => p.subType === 'purchase_order');
   const orders = purchaseService.getAll();
   
-  console.log(`📊 Total de payables purchase_order: ${payables.length}`);
-  console.log(`📊 Total de pedidos de compra: ${orders.length}`);
+  console.log(`📊 [RECONCILE] Total de payables purchase_order: ${payables.length}`);
+  console.log(`📊 [RECONCILE] Total de pedidos de compra: ${orders.length}`);
+  
+  // Log todos os payables para debug
+  payables.forEach(p => {
+    console.log(`  💳 Payable: id=${p.id.substring(0,8)}, purchaseOrderId=${p.purchaseOrderId || 'VAZIO'}, desc=${p.description}, amount=${p.amount}, paidAmount=${p.paidAmount}, partnerId=${p.partnerId}`);
+  });
   
   let updated = 0;
   let fixed = 0;
@@ -190,45 +196,38 @@ export const reconcilePayablesFromOrders = async () => {
     if (!order.totalValue || order.totalValue <= 0) continue;
     
     const orderPaidValue = toNumber(order.paidValue) + toNumber(order.discountValue);
+    console.log(`\n🔍 [RECONCILE] Processando pedido ${order.number}: totalValue=${order.totalValue}, paidValue=${orderPaidValue}`);
     
-    // Buscar payable de múltiplas formas
+    // Estratégia 1: Buscar payable por purchaseOrderId
     let payable = payables.find(p => p.purchaseOrderId === order.id);
+    console.log(`  Busca 1 (purchaseOrderId=${order.id}): ${payable?.id || 'N/A'}`);
     
-    // Se não encontrou por purchaseOrderId, buscar por descrição + partnerId
+    // Estratégia 2: Buscar por número do pedido na descrição
     if (!payable) {
       payable = payables.find(p => 
         p.description.includes(order.number || '') && 
         p.partnerId === order.partnerId
       );
-      
-      // Se encontrou, corrigir o purchaseOrderId
-      if (payable && !payable.purchaseOrderId) {
-        console.log(`  🔧 Corrigindo purchaseOrderId do payable ${payable.id} para ${order.id}`);
-        payablesService.update({
-          ...payable,
-          purchaseOrderId: order.id
-        });
-        fixed++;
-      }
+      console.log(`  Busca 2 (desc contém ${order.number}): ${payable?.id || 'N/A'}`);
     }
     
-    // Se não encontrou por descrição, buscar por valor + partnerId
+    // Estratégia 3: Buscar por valor + partnerId (tolerância de 1 centavo)
     if (!payable) {
       payable = payables.find(p => 
-        Math.abs(p.amount - (order.totalValue || 0)) < 0.01 && 
-        p.partnerId === order.partnerId &&
-        !p.purchaseOrderId // Somente payables sem purchaseOrderId
+        Math.abs(p.amount - (order.totalValue || 0)) < 1 && 
+        p.partnerId === order.partnerId
       );
-      
-      // Se encontrou, corrigir o purchaseOrderId
-      if (payable) {
-        console.log(`  🔧 Associando payable ${payable.id} ao pedido ${order.id} (${order.number})`);
-        payablesService.update({
-          ...payable,
-          purchaseOrderId: order.id
-        });
-        fixed++;
-      }
+      console.log(`  Busca 3 (amount≈${order.totalValue} + partnerId): ${payable?.id || 'N/A'}`);
+    }
+    
+    // Estratégia 4: Buscar só por partnerId e status pendente
+    if (!payable) {
+      payable = payables.find(p => 
+        p.partnerId === order.partnerId &&
+        (p.status === 'pending' || p.status === 'partially_paid') &&
+        !p.purchaseOrderId
+      );
+      console.log(`  Busca 4 (partnerId + pending/partially_paid): ${payable?.id || 'N/A'}`);
     }
     
     if (!payable) {
@@ -236,17 +235,23 @@ export const reconcilePayablesFromOrders = async () => {
       continue;
     }
     
+    // Corrigir purchaseOrderId se estiver vazio
+    if (!payable.purchaseOrderId) {
+      console.log(`  🔧 Corrigindo purchaseOrderId do payable ${payable.id} para ${order.id}`);
+      fixed++;
+    }
+    
     const payablePaidAmount = toNumber(payable.paidAmount);
     
-    console.log(`  📝 Pedido ${order.number}: orderPaidValue=${orderPaidValue}, payablePaidAmount=${payablePaidAmount}`);
-    
     // Se há diferença entre o paidValue do pedido e o paidAmount do payable
-    if (Math.abs(orderPaidValue - payablePaidAmount) > 0.01) {
+    if (Math.abs(orderPaidValue - payablePaidAmount) > 0.01 || !payable.purchaseOrderId) {
       const newStatus: Payable['status'] = orderPaidValue >= payable.amount - 0.01
         ? 'paid'
         : orderPaidValue > 0
           ? 'partially_paid'
           : 'pending';
+      
+      console.log(`  ✅ Atualizando payable ${payable.id}: paidAmount ${payablePaidAmount} -> ${orderPaidValue}, status -> ${newStatus}`);
       
       payablesService.update({
         ...payable,
@@ -255,7 +260,6 @@ export const reconcilePayablesFromOrders = async () => {
         status: newStatus
       });
       
-      console.log(`  ✅ Payable ${payable.id} atualizado: ${payablePaidAmount} -> ${orderPaidValue} (status: ${newStatus})`);
       updated++;
     }
   }
