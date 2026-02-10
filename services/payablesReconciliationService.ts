@@ -283,4 +283,52 @@ if (typeof window !== 'undefined') {
     console.log('Histórico de pagamentos purchase_order:', records);
     return { payables, records };
   };
+  
+  // Função de correção direta para o payable do parceiro
+  (window as any).fixPayableForOrder = async (orderNumber: string) => {
+    const orders = purchaseService.getAll();
+    const order = orders.find(o => o.number === orderNumber);
+    
+    if (!order) {
+      console.log(`❌ Pedido ${orderNumber} não encontrado`);
+      return;
+    }
+    
+    console.log(`📝 Pedido encontrado: ${order.id}, paidValue=${order.paidValue}, totalValue=${order.totalValue}`);
+    
+    const payables = payablesService.getAll().filter(p => p.subType === 'purchase_order');
+    
+    // Buscar payable por descrição ou valor
+    let payable = payables.find(p => 
+      p.description.includes(orderNumber) ||
+      (Math.abs(p.amount - (order.totalValue || 0)) < 0.01 && p.partnerId === order.partnerId)
+    );
+    
+    if (!payable) {
+      console.log(`❌ Nenhum payable encontrado para pedido ${orderNumber}`);
+      console.log('Payables disponíveis:', payables.map(p => ({ id: p.id, desc: p.description, purchaseOrderId: p.purchaseOrderId })));
+      return;
+    }
+    
+    console.log(`✅ Payable encontrado: ${payable.id}, purchaseOrderId=${payable.purchaseOrderId || 'VAZIO'}, paidAmount=${payable.paidAmount}`);
+    
+    const orderPaidValue = (order.paidValue || 0) + (order.discountValue || 0);
+    const newStatus: Payable['status'] = orderPaidValue >= payable.amount - 0.01
+      ? 'paid'
+      : orderPaidValue > 0
+        ? 'partially_paid'
+        : 'pending';
+    
+    console.log(`🔧 Atualizando: purchaseOrderId=${order.id}, paidAmount=${orderPaidValue}, status=${newStatus}`);
+    
+    payablesService.update({
+      ...payable,
+      purchaseOrderId: order.id,
+      paidAmount: Number(orderPaidValue.toFixed(2)),
+      status: newStatus
+    });
+    
+    console.log('✅ Payable atualizado com sucesso!');
+    return payable;
+  };
 }
