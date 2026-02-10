@@ -385,11 +385,24 @@ export const loadingService = {
     if (shouldCreateReceivable) {
       const sale = salesService.getById(updatedLoading.salesOrderId!);
       const partnerId = sale?.customerId;
-      const unitPrice = updatedLoading.salesPrice || sale?.unitPrice || 0;
-      const totalSc = updatedLoading.weightSc || (updatedLoading.unloadWeightKg ? updatedLoading.unloadWeightKg / 60 : 0);
-      const amount = updatedLoading.totalSalesValue && updatedLoading.totalSalesValue > 0
-        ? updatedLoading.totalSalesValue
-        : Number((unitPrice * totalSc).toFixed(2));
+
+      const relatedLoadings = db
+        .getAll()
+        .filter(l => l.salesOrderId === updatedLoading.salesOrderId && l.status !== 'canceled' && l.unloadWeightKg && l.unloadWeightKg > 0);
+
+      const totals = relatedLoadings.reduce(
+        (acc, l) => {
+          const unitPrice = l.salesPrice || sale?.unitPrice || 0;
+          const sc = l.weightSc || (l.unloadWeightKg ? l.unloadWeightKg / 60 : 0);
+          const value = l.totalSalesValue && l.totalSalesValue > 0
+            ? l.totalSalesValue
+            : Number((unitPrice * sc).toFixed(2));
+          return { totalSc: acc.totalSc + sc, amount: acc.amount + value };
+        },
+        { totalSc: 0, amount: 0 }
+      );
+
+      const amount = Number(totals.amount.toFixed(2));
 
       if (partnerId && amount > 0) {
         const existingReceivable = receivablesService.getAll().find(r => r.salesOrderId === updatedLoading.salesOrderId);
@@ -409,7 +422,7 @@ export const loadingService = {
           amount,
           receivedAmount,
           status,
-          notes: `Carga ${updatedLoading.vehiclePlate || ''} | Peso destino ${updatedLoading.unloadWeightKg}kg`,
+          notes: `Consolidado ${relatedLoadings.length} cargas | Total destino ${totals.totalSc.toFixed(2)} SC`,
           companyId: (sale as any)?.companyId || undefined
         };
 
