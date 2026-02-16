@@ -278,7 +278,7 @@ const LoanPdfDocument: React.FC<Props> = ({ loan, history }) => {
   const accounts = bankAccountService.getBankAccounts();
 
   const currency = (val: number) => 
-    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
   
   const dateStr = (val: string) => 
     new Date(val).toLocaleDateString('pt-BR');

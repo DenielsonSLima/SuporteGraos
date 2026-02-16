@@ -199,7 +199,7 @@ const getLogInfo = () => {
 
 export const shareholderService = {
   getAll: () => {
-    // Simula verificação de recorrência ao ler dados (Trigger)
+    // Verifica recorrência com throttle (não roda a cada chamada)
     shareholderService.checkAndGenerateRecurring();
     return _shareholders;
   },
@@ -216,7 +216,7 @@ export const shareholderService = {
     }
     // Inicializa recorrência vazia
     shareholder.financial.recurrence = { active: false, amount: 0, day: 1 };
-    
+
     _shareholders = [..._shareholders, shareholder];
     _shareholdersDb.setAll(_shareholders);
 
@@ -282,51 +282,51 @@ export const shareholderService = {
     // 1. Cria a transação original (ex: Crédito de Pro-Labore)
     const newTx: ShareholderTransaction = {
       ...transaction,
-      id: Math.random().toString(36).substr(2, 9)
+      id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `txn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
     };
-    
-    shareholder.financial.currentBalance += transaction.value;
+
     shareholder.financial.history = [newTx, ...shareholder.financial.history];
+    recalcShareholderBalance(shareholder);
 
     // Save transaction to Supabase (background)
     if (_isSupabaseLoaded) {
-      Promise.resolve().then(() => 
+      Promise.resolve().then(() =>
         shareholderSupabaseSync.syncInsertTransaction(shareholderId, newTx)
       );
     }
 
     // 2. Se for "Lançar e Baixar", cria o débito imediatamente
     if (transaction.type === 'credit' && payImmediatelyData) {
-        const withdrawalTx: ShareholderTransaction = {
-            id: Math.random().toString(36).substr(2, 9),
-            date: transaction.date,
-            type: 'debit',
-            value: transaction.value,
-            description: `Retirada Imediata (Ref: ${transaction.description})`,
-            accountId: payImmediatelyData.accountName
-        };
+      const withdrawalTx: ShareholderTransaction = {
+        id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `txn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        date: transaction.date,
+        type: 'debit',
+        value: transaction.value,
+        description: `Retirada Imediata (Ref: ${transaction.description})`,
+        accountId: payImmediatelyData.accountName
+      };
 
-        shareholder.financial.currentBalance -= transaction.value;
-        shareholder.financial.history = [withdrawalTx, ...shareholder.financial.history];
+      shareholder.financial.history = [withdrawalTx, ...shareholder.financial.history];
+      recalcShareholderBalance(shareholder);
 
-        // Save withdrawal to Supabase (background)
-        if (_isSupabaseLoaded) {
-          Promise.resolve().then(() => 
-            shareholderSupabaseSync.syncInsertTransaction(shareholderId, withdrawalTx)
-          );
-        }
+      // Save withdrawal to Supabase (background)
+      if (_isSupabaseLoaded) {
+        Promise.resolve().then(() =>
+          shareholderSupabaseSync.syncInsertTransaction(shareholderId, withdrawalTx)
+        );
+      }
 
-        // Lança no financeiro global
-        financialActionService.processRecord(`imm-${withdrawalTx.id}`, {
-            date: transaction.date,
-            amount: transaction.value,
-            discount: 0,
-            accountId: payImmediatelyData.accountId,
-            accountName: payImmediatelyData.accountName,
-            notes: `Pagamento Sócio: ${shareholder.name} - ${transaction.description}`,
-            isAsset: false,
-            entityName: shareholder.name
-        }, 'shareholder');
+      // Lança no financeiro global
+      financialActionService.processRecord(`imm-${withdrawalTx.id}`, {
+        date: transaction.date,
+        amount: transaction.value,
+        discount: 0,
+        accountId: payImmediatelyData.accountId,
+        accountName: payImmediatelyData.accountName,
+        notes: `Pagamento Sócio: ${shareholder.name} - ${transaction.description}`,
+        isAsset: false,
+        entityName: shareholder.name
+      }, 'shareholder');
     }
 
     _shareholders = _shareholders.map(s => s.id === shareholderId ? shareholder : s);
@@ -334,7 +334,7 @@ export const shareholderService = {
 
     // Update balance in Supabase (background)
     if (_isSupabaseLoaded) {
-      Promise.resolve().then(() => 
+      Promise.resolve().then(() =>
         shareholderSupabaseSync.syncUpdateBalance(shareholderId, shareholder.financial.currentBalance)
       );
     }
@@ -353,7 +353,7 @@ export const shareholderService = {
     const shareholder = _shareholders.find(s => s.id === shareholderId);
     if (!shareholder) return;
 
-    shareholder.financial.history = shareholder.financial.history.map(t => 
+    shareholder.financial.history = shareholder.financial.history.map(t =>
       t.id === updatedTx.id ? updatedTx : t
     );
 
@@ -381,7 +381,7 @@ export const shareholderService = {
     if (!shareholder) return;
 
     shareholder.financial.history = shareholder.financial.history.filter(t => t.id !== txId);
-    
+
     // Recalcula Saldo
     const totalCredits = shareholder.financial.history.filter(t => t.type === 'credit').reduce((acc, t) => acc + t.value, 0);
     const totalDebits = shareholder.financial.history.filter(t => t.type === 'debit').reduce((acc, t) => acc + t.value, 0);
@@ -406,53 +406,57 @@ export const shareholderService = {
   updateRecurrence: (shareholderId: string, config: ShareholderRecurrence) => {
     const shareholder = _shareholders.find(s => s.id === shareholderId);
     if (!shareholder) return;
-    
+
     // Preserva o histórico de geração se não for passado
     const lastGen = shareholder.financial.recurrence?.lastGeneratedMonth;
     shareholder.financial.recurrence = { ...config, lastGeneratedMonth: lastGen };
-    
+
     _shareholders = _shareholders.map(s => s.id === shareholderId ? shareholder : s);
     _shareholdersDb.setAll(_shareholders);
-    
+
     const { userId, userName } = getLogInfo();
     logService.addLog({
-        userId, userName, action: 'update', module: 'Financeiro',
-        description: `Configurou recorrência para ${shareholder.name}: ${formatCurrency(config.amount)}`,
-        entityId: shareholderId
+      userId, userName, action: 'update', module: 'Financeiro',
+      description: `Configurou recorrência para ${shareholder.name}: ${formatCurrency(config.amount)}`,
+      entityId: shareholderId
     });
     invalidateFinancialCache();
     invalidateDashboardCache();
   },
 
-  checkAndGenerateRecurring: () => {
-    const today = new Date();
-    const currentMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
-    const dayOfMonth = today.getDate();
+  checkAndGenerateRecurring: (() => {
+    let _lastCheckTs = 0;
+    const THROTTLE_MS = 60_000; // 60 segundos
+    return () => {
+      const now = Date.now();
+      if (now - _lastCheckTs < THROTTLE_MS) return; // Throttle ativo
+      _lastCheckTs = now;
 
-    _shareholders.forEach(s => {
+      const today = new Date();
+      const currentMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+      const dayOfMonth = today.getDate();
+
+      _shareholders.forEach(s => {
         const rec = s.financial.recurrence;
         if (rec && rec.active && rec.amount > 0) {
-            // Se ainda não gerou este mês E hoje é >= dia agendado
-            if (rec.lastGeneratedMonth !== currentMonthKey && dayOfMonth >= rec.day) {
-                // Gera o crédito automático
-                const tx: ShareholderTransaction = {
-                    id: Math.random().toString(36).substr(2, 9),
-                    date: new Date().toISOString().split('T')[0],
-                    type: 'credit',
-                    value: rec.amount,
-                    description: `Crédito Recorrente Automático - ${new Date().toLocaleDateString('pt-BR', { month: 'long' })}`
-                };
-                
-                s.financial.history = [tx, ...s.financial.history];
-                s.financial.currentBalance += rec.amount;
-                s.financial.recurrence!.lastGeneratedMonth = currentMonthKey;
+          if (rec.lastGeneratedMonth !== currentMonthKey && dayOfMonth >= rec.day) {
+            const tx: ShareholderTransaction = {
+              id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `txn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              date: new Date().toISOString().split('T')[0],
+              type: 'credit',
+              value: rec.amount,
+              description: `Crédito Recorrente Automático - ${new Date().toLocaleDateString('pt-BR', { month: 'long' })}`
+            };
 
-                // Log silencioso (sistema)
-                console.log(`[Auto] Crédito gerado para ${s.name}`);
-            }
+            s.financial.history = [tx, ...s.financial.history];
+            recalcShareholderBalance(s);
+            s.financial.recurrence!.lastGeneratedMonth = currentMonthKey;
+            console.log(`[Auto] Crédito gerado para ${s.name}`);
+          }
         }
-    });
-  },
+      });
+    };
+  })(),
 
   updateProLabore: (shareholderId: string, value: number) => {
     // Mantido para compatibilidade, mas agora updateRecurrence é preferível
@@ -487,7 +491,7 @@ export const shareholderService = {
 
       // Sync to Supabase
       if (_isSupabaseLoaded) {
-        Promise.resolve().then(() => 
+        Promise.resolve().then(() =>
           shareholderSupabaseSync.syncInsertTransaction(shareholderId, initialTx)
         );
       }

@@ -1,14 +1,14 @@
 
 import React, { useState } from 'react';
-import { 
-  Printer, 
-  Calendar, 
-  Landmark, 
-  ArrowUpRight, 
-  ArrowDownLeft, 
-  TrendingUp, 
-  Truck, 
-  Users, 
+import {
+  Printer,
+  Calendar,
+  Landmark,
+  ArrowUpRight,
+  ArrowDownLeft,
+  TrendingUp,
+  Truck,
+  Users,
   Package,
   PiggyBank,
   Briefcase,
@@ -77,32 +77,32 @@ const CashierReportView: React.FC<Props> = ({ report, title }) => {
       {/* Detalhamento de Saldo Inicial do Mês */}
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden mb-8">
         <div className="bg-slate-50 px-6 py-4 border-b border-slate-100 flex justify-between items-center">
-            <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-600 rounded-lg text-white">
-                    <CalendarDays size={20} />
-                </div>
-                <div>
-                    <h3 className="text-sm font-black uppercase tracking-widest text-slate-700">Saldos de Abertura do Período</h3>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase">Posição de cada conta em 01/{new Date(report.referenceDate).getMonth() + 1}</p>
-                </div>
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-600 rounded-lg text-white">
+              <CalendarDays size={20} />
             </div>
-            <div className="text-right">
-                <span className="text-[10px] font-black text-slate-400 uppercase block mb-0.5">Soma Inicial Consolidada</span>
-                <span className="text-lg font-black text-blue-700">{currency(report.totalInitialMonthBalance)}</span>
+            <div>
+              <h3 className="text-sm font-black uppercase tracking-widest text-slate-700">Saldos de Abertura do Período</h3>
+              <p className="text-[10px] text-slate-400 font-bold uppercase">Posição de cada conta em 01/{new Date(report.referenceDate).getMonth() + 1}</p>
             </div>
+          </div>
+          <div className="text-right">
+            <span className="text-[10px] font-black text-slate-400 uppercase block mb-0.5">Soma Inicial Consolidada</span>
+            <span className="text-lg font-black text-blue-700">{currency(report.totalInitialMonthBalance)}</span>
+          </div>
         </div>
         <div className="p-2">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
-                {report.initialMonthBalances.map((acc) => (
-                    <div key={acc.id} className="flex items-center justify-between p-3 bg-slate-50/50 rounded-xl border border-slate-100 hover:bg-white transition-all group">
-                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                            <Landmark size={16} className="text-slate-300 group-hover:text-blue-500 transition-colors shrink-0" />
-                            <span className="text-xs font-bold text-slate-600 uppercase leading-tight">{acc.bankName}</span>
-                        </div>
-                        <span className="text-sm font-black text-slate-900 ml-2 shrink-0">{currency(acc.value)}</span>
-                    </div>
-                ))}
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
+            {report.initialMonthBalances.map((acc) => (
+              <div key={acc.id} className="flex items-center justify-between p-3 bg-slate-50/50 rounded-xl border border-slate-100 hover:bg-white transition-all group">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <Landmark size={16} className="text-slate-300 group-hover:text-blue-500 transition-colors shrink-0" />
+                  <span className="text-xs font-bold text-slate-600 uppercase leading-tight">{acc.bankName}</span>
+                </div>
+                <span className="text-sm font-black text-slate-900 ml-2 shrink-0">{currency(acc.value)}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -117,8 +117,11 @@ const CashierReportView: React.FC<Props> = ({ report, title }) => {
           <div className="space-y-3">
             {report.bankBalances.map(bank => (
               <div key={bank.id} className="flex justify-between items-center bg-white p-3 rounded-xl shadow-sm border border-slate-100">
-                <span className="text-sm font-medium text-slate-600">{bank.bankName}</span>
-                <span className="font-bold text-slate-800">{currency(bank.balance)}</span>
+                <div className="flex flex-col min-w-0">
+                  <span className="text-sm font-bold text-slate-700 leading-tight">{bank.bankName}</span>
+                  {bank.owner && <span className="text-[10px] text-slate-400 leading-tight mt-0.5">{bank.owner}</span>}
+                </div>
+                <span className="font-bold text-slate-800 shrink-0 ml-2">{currency(bank.balance)}</span>
               </div>
             ))}
             <div className="pt-3 border-t border-slate-200 mt-2 flex justify-between items-center">
@@ -136,12 +139,12 @@ const CashierReportView: React.FC<Props> = ({ report, title }) => {
           <div className="space-y-2">
             <ListItem label="Recebíveis de Vendas" value={report.pendingSalesReceipts} icon={TrendingUp} colorClass="bg-emerald-100 text-emerald-600" />
             <ListItem label="Patrimônio (Bens Ativos)" value={report.totalFixedAssetsValue} icon={Tractor} colorClass="bg-indigo-100 text-indigo-600" />
-            <ListItem 
-                label="Haveres de Sócios" 
-                value={report.shareholderReceivables} 
-                icon={Users} 
-                colorClass="bg-violet-100 text-violet-600" 
-                tooltip="Valores que os sócios retiraram a mais ou devem à empresa (Saldos Negativos)."
+            <ListItem
+              label="Haveres de Sócios"
+              value={report.shareholderReceivables}
+              icon={Users}
+              colorClass="bg-violet-100 text-violet-600"
+              tooltip="Valores que os sócios retiraram a mais ou devem à empresa (Saldos Negativos)."
             />
             <ListItem label="Empréstimos Concedidos" value={report.loansGranted} icon={Landmark} colorClass="bg-blue-100 text-blue-600" />
             <ListItem label="Mercadoria em Trânsito" value={report.merchandiseInTransitValue} icon={Truck} colorClass="bg-amber-100 text-amber-600" />
@@ -161,19 +164,19 @@ const CashierReportView: React.FC<Props> = ({ report, title }) => {
           <div className="space-y-2">
             <ListItem label="Fornecedores (Grãos)" value={report.pendingPurchasePayments} icon={Package} colorClass="bg-rose-100 text-rose-600" borderClass="border-rose-100" />
             <ListItem label="Fretes a Pagar" value={report.pendingFreightPayments} icon={Truck} colorClass="bg-orange-100 text-orange-600" borderClass="border-orange-100" />
-            <ListItem 
-                label="Comissões a Pagar" 
-                value={report.commissionsToPay} 
-                icon={Percent} 
-                colorClass="bg-purple-100 text-purple-600" 
-                tooltip="Valores devidos a corretores e intermediários externos."
+            <ListItem
+              label="Comissões a Pagar"
+              value={report.commissionsToPay}
+              icon={Percent}
+              colorClass="bg-purple-100 text-purple-600"
+              tooltip="Valores devidos a corretores e intermediários externos."
             />
-            <ListItem 
-                label="Obrigações com Sócios" 
-                value={report.shareholderPayables} 
-                icon={Users} 
-                colorClass="bg-indigo-100 text-indigo-700" 
-                tooltip="Saldos positivos de Pro-labore/Lucros a pagar aos donos."
+            <ListItem
+              label="Obrigações com Sócios"
+              value={report.shareholderPayables}
+              icon={Users}
+              colorClass="bg-indigo-100 text-indigo-700"
+              tooltip="Saldos positivos de Pro-labore/Lucros a pagar aos donos."
             />
             <ListItem label="Empréstimos Tomados" value={report.loansTaken} icon={Landmark} colorClass="bg-slate-100 text-slate-600" />
             <ListItem label="Adiant. de Clientes" value={report.advancesTaken} icon={PiggyBank} colorClass="bg-pink-100 text-pink-600" borderClass="border-pink-100" />

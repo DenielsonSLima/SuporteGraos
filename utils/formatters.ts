@@ -54,7 +54,8 @@ export const formatMoney = (value: number | null | undefined): string => {
 
 export const formatCurrency = (value: number | null | undefined): string => {
   if (value === null || value === undefined) return 'R$ 0';
-  return currencyFormatter.format(value);
+  const cleanValue = Math.abs(value) < 0.01 ? 0 : value;
+  return currencyFormatter.format(cleanValue);
 };
 
 export const formatDecimal = (value: number | null | undefined): string => {

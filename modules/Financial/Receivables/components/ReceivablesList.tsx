@@ -42,7 +42,7 @@ const ReceivablesList: React.FC<Props> = ({ records, onReceive, onRefresh }) => 
       .reduce((acc, r) => acc + (r.originalValue - r.paidValue), 0)
   , [records, selectedIds]);
 
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
 
   // --- HANDLERS ---
 

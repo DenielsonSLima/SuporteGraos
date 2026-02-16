@@ -7,8 +7,10 @@ import { loadingService } from './loadingService';
 import { supabase } from './supabase';
 import { payablesService } from './financial/payablesService';
 import { DashboardCache, invalidateDashboardCache } from './dashboardCache';
+import { invalidateFinancialCache } from './financialCache';
 import { auditService } from './auditService';
 import { supabaseWithRetry } from '../utils/fetchWithRetry';
+import { eventBus } from './eventBus';
 
 const INITIAL_ORDERS: PurchaseOrder[] = [];
 const db = new Persistence<PurchaseOrder>('purchase_orders', INITIAL_ORDERS, { useStorage: false });
@@ -118,7 +120,7 @@ const loadFromSupabase = async (): Promise<PurchaseOrder[]> => {
         .order('date', { ascending: false })
     );
 
-    const mapped = (data || []).map(mapOrderFromDb);
+    const mapped = (data as any[] || []).map(mapOrderFromDb);
     db.setAll(mapped);
     console.log('🔄 Pedidos de compra sincronizando em tempo real...');
     return mapped;
@@ -156,7 +158,7 @@ const syncExpenses = async (order: PurchaseOrder) => {
       .eq('purchase_order_id', order.id);
 
     const existingIds = (existingExpenses || []).map(e => e.id);
-    
+
     // Despesas do tipo 'expense' no metadata
     const expenseTransactions = (order.transactions || []).filter(t => t.type === 'expense');
     const metadataIds = expenseTransactions.map(t => t.id);
@@ -227,28 +229,82 @@ const syncFromSupabase = async () => {
 // SYNC DE PAYABLES PARA PEDIDOS EXISTENTES
 // ============================================================================
 
-// Sincronizar payables para pedidos que ainda não têm
+// Sincronizar payables para pedidos que ainda não têm (somente uma vez por sessão)
+let _syncPayablesDone = false;
 const syncPayablesForExistingOrders = () => {
+  if (_syncPayablesDone) return;
+  _syncPayablesDone = true;
   setTimeout(() => {
     const orders = db.getAll();
     const payables = payablesService.getAll();
-    
+
     orders.forEach(order => {
       if (order.totalValue && order.totalValue > 0 && order.partnerId) {
         const hasPayable = payables.some(
           p => p.purchaseOrderId === order.id && p.subType === 'purchase_order'
         );
-        
+
         if (!hasPayable) {
           console.log('🔄 Sincronizando payable para pedido existente:', order.number);
           createPayableForPurchaseOrder(order);
         }
       }
     });
-  }, 2000); // Aguarda 2s para garantir que tudo carregou
+  }, 2000);
 };
 
 syncPayablesForExistingOrders();
+
+// ============================================================================
+// SINCRONIZAÇÃO FINANCEIRA (Feedback do Financeiro -> Pedido)
+// ============================================================================
+const syncFinancialStatus = async (purchaseOrderId: string) => {
+  if (!purchaseOrderId) return;
+
+  // 1. Buscar todos os payables vinculados a este pedido
+  const allPayables = payablesService.getAll();
+  const linkedPayables = allPayables.filter(p =>
+    p.purchaseOrderId === purchaseOrderId &&
+    (p.subType === 'purchase_order' || p.subType === 'commission' || p.subType === 'freight')
+  );
+
+  if (linkedPayables.length === 0) return;
+
+  // 2. Calcular totais (apenas do subType 'purchase_order' para afetar o valor pago do PRODUTO)
+  // Fretes e Comissões não abatem do valor do pedido de compra do produto, são extras.
+  // MAS, se o pedido tiver transações de adiantamento, elas contam.
+
+  const productPayables = linkedPayables.filter(p => p.subType === 'purchase_order');
+
+  const totalPaid = productPayables.reduce((sum, p) => sum + (p.paidAmount || 0), 0);
+
+  // 3. Buscar o pedido
+  const order = db.getById(purchaseOrderId);
+  if (!order) return;
+
+  // 4. Verificar se precisa atualizar
+  // Nota: totalValue do pedido é mandatório. Se tiver zero, assume pendente.
+
+  // Se nada mudou, sai
+  if (Math.abs((order.paidValue || 0) - totalPaid) < 0.01) {
+    return;
+  }
+
+  console.log(`🔄 Sincronizando Pedido ${order.number}: Pago ${order.paidValue} -> ${totalPaid}`);
+
+  // 5. Atualizar pedido (local e banco)
+  const updatedOrder = {
+    ...order,
+    paidValue: totalPaid
+  };
+
+  db.update(updatedOrder);
+  await persistUpsert(updatedOrder);
+
+  // Notificar UI
+  invalidateDashboardCache();
+  window.dispatchEvent(new Event('purchase_orders:updated'));
+};
 
 const getLogInfo = () => {
   const user = authService.getCurrentUser();
@@ -270,7 +326,7 @@ const createPayableForPurchaseOrder = (order: PurchaseOrder) => {
       return v.toString(16);
     });
   };
-  
+
   // Debug: Validar dados antes de criar payable
   console.log('🔍 DEBUG - Criando payable do pedido de compra:', {
     orderId: order.id,
@@ -283,7 +339,7 @@ const createPayableForPurchaseOrder = (order: PurchaseOrder) => {
 
   const orderAmount = Number(order.totalValue) || 0;
   const orderPaidAmount = Number(order.paidValue) || 0;
-  
+
   if (orderAmount <= 0) {
     console.warn('⚠️ Valor do pedido inválido:', order.totalValue);
     return;
@@ -373,35 +429,36 @@ export const purchaseService = {
   add: (order: PurchaseOrder) => {
     db.add(order);
     void persistUpsert(order);
-    
+
     // ✅ Criar automaticamente um payable para o pedido de compra
     if (order.totalValue && order.totalValue > 0 && order.partnerId) {
       createPayableForPurchaseOrder(order);
     }
-    
+
     const { userId, userName } = getLogInfo();
     logService.addLog({ userId, userName, action: 'create', module: 'Compras', description: `Criou Pedido de Compra ${order.number}`, entityId: order.id });
-    
+
     // Audit Log
     void auditService.logAction('create', 'Compras', `Pedido de compra criado: #${order.number} - ${order.partnerName} - R$ ${order.totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, {
       entityType: 'PurchaseOrder',
       entityId: order.id,
       metadata: { partnerId: order.partnerId, totalValue: order.totalValue, status: order.status }
     });
-    
+
     invalidateDashboardCache();
   },
   update: (updatedOrder: PurchaseOrder) => {
     db.update(updatedOrder);
     void persistUpsert(updatedOrder);
-    
+    invalidateFinancialCache();
+
     // ✅ Verificar se já existe um payable para este pedido, se não, criar
     if (updatedOrder.totalValue && updatedOrder.totalValue > 0 && updatedOrder.partnerId) {
       const allPayables = payablesService.getAll();
       const existingPayable = allPayables.find(
         p => p.purchaseOrderId === updatedOrder.id && p.subType === 'purchase_order'
       );
-      
+
       if (!existingPayable) {
         console.log('🔄 Pedido atualizado sem payable - criando agora:', updatedOrder.id);
         createPayableForPurchaseOrder(updatedOrder);
@@ -409,7 +466,7 @@ export const purchaseService = {
         // Atualizar valores do payable existente
         const orderAmount = Number(updatedOrder.totalValue) || 0;
         const orderPaidAmount = Number(updatedOrder.paidValue) || 0;
-        
+
         payablesService.update({
           ...existingPayable,
           amount: orderAmount,
@@ -418,28 +475,30 @@ export const purchaseService = {
         });
       }
     }
-    
+
     const { userId, userName } = getLogInfo();
     logService.addLog({ userId, userName, action: 'update', module: 'Compras', description: `Atualizou Pedido ${updatedOrder.number}`, entityId: updatedOrder.id });
-    
+
     // Audit Log
     void auditService.logAction('update', 'Compras', `Pedido de compra atualizado: #${updatedOrder.number} - Status: ${updatedOrder.status}`, {
       entityType: 'PurchaseOrder',
       entityId: updatedOrder.id,
       metadata: { status: updatedOrder.status, totalValue: updatedOrder.totalValue, paidValue: updatedOrder.paidValue }
     });
-    
+
     invalidateDashboardCache();
   },
-  
+
   updateTransaction: (orderId: string, updatedTx: OrderTransaction) => {
     const order = db.getById(orderId);
     if (!order) return;
     const newTxs = (order.transactions || []).map(t => t.id === updatedTx.id ? updatedTx : t);
     const newPaidValue = newTxs.filter(t => t.type === 'payment' || t.type === 'advance').reduce((acc, t) => acc + t.value, 0);
-    const updated = { ...order, transactions: newTxs, paidValue: newPaidValue };
+    const newDiscountValue = newTxs.reduce((acc, t) => acc + (t.discountValue || 0), 0);
+    const updated = { ...order, transactions: newTxs, paidValue: newPaidValue, discountValue: newDiscountValue };
     db.update(updated);
     void persistUpsert(updated);
+    invalidateFinancialCache();
     const { userId, userName } = getLogInfo();
     logService.addLog({ userId, userName, action: 'update', module: 'Financeiro', description: `Editou pagamento no Pedido ${order.number}`, entityId: orderId });
     invalidateDashboardCache();
@@ -448,16 +507,18 @@ export const purchaseService = {
   deleteTransaction: (orderId: string, txId: string) => {
     const order = db.getById(orderId);
     if (!order) return;
-    
+
     // Note: Removed syncDeleteFromOrigin call to avoid circular dependency. 
     // Financial records should be managed via Financial module if needed.
 
     const newTxs = (order.transactions || []).filter(t => t.id !== txId);
     const newPaidValue = newTxs.filter(t => t.type === 'payment' || t.type === 'advance').reduce((acc, t) => acc + t.value, 0);
-    const updated = { ...order, transactions: newTxs, paidValue: newPaidValue };
+    const newDiscountValue = newTxs.reduce((acc, t) => acc + (t.discountValue || 0), 0);
+    const updated = { ...order, transactions: newTxs, paidValue: newPaidValue, discountValue: newDiscountValue };
     db.update(updated);
     void persistUpsert(updated);
-    
+    invalidateFinancialCache();
+
     const { userId, userName } = getLogInfo();
     logService.addLog({ userId, userName, action: 'delete', module: 'Financeiro', description: `Estornou pagamento do Pedido ${order.number}`, entityId: orderId });
   },
@@ -473,16 +534,16 @@ export const purchaseService = {
     const linkedLoadings = loadingService.getByPurchaseOrder(id);
     if (linkedLoadings.length > 0) {
       console.warn('⛔ Exclusão bloqueada: pedido tem carregamentos vinculados');
-      return { 
-        success: false, 
-        error: `Não é possível excluir. Este pedido possui ${linkedLoadings.length} carregamento(s) vinculado(s). Desvincule ou exclua os carregamentos primeiro.` 
+      return {
+        success: false,
+        error: `Não é possível excluir. Este pedido possui ${linkedLoadings.length} carregamento(s) vinculado(s). Desvincule ou exclua os carregamentos primeiro.`
       };
     }
 
     // ✅ Apagar payables vinculados ao pedido de compra
     const allPayables = payablesService.getAll();
     const linkedPayables = allPayables.filter(p => p.purchaseOrderId === id);
-    
+
     console.log(`🗑️ Apagando ${linkedPayables.length} payables vinculados ao pedido ${order.number}`);
     linkedPayables.forEach(p => {
       payablesService.delete(p.id);
@@ -508,29 +569,38 @@ export const purchaseService = {
 
     // ✅ Log de auditoria
     const { userId, userName } = getLogInfo();
-    logService.addLog({ 
-        userId, 
-        userName, 
-        action: 'delete', 
-        module: 'Compras', 
-        description: `Excluiu Pedido ${order.number} e ${linkedPayables.length} payable(s)`, 
-        entityId: id 
+    logService.addLog({
+      userId,
+      userName,
+      action: 'delete',
+      module: 'Compras',
+      description: `Excluiu Pedido ${order.number} e ${linkedPayables.length} payable(s)`,
+      entityId: id
     });
-    
+
     // Audit Log
     void auditService.logAction('delete', 'Compras', `Pedido de compra excluído: #${order.number} - ${order.partnerName}`, {
       entityType: 'PurchaseOrder',
       entityId: id,
       metadata: { totalValue: order.totalValue, status: order.status, linkedPayables: linkedPayables.length }
     });
-    
+
     console.log('✅ Pedido de compra excluído com sucesso:', order.number);
-    
+
     // 🎯 LIMPAR CACHE DO DASHBOARD IMEDIATAMENTE
     DashboardCache.clearAll();
     invalidateDashboardCache();
-    
+
     return { success: true };
   },
-  startRealtime
+  startRealtime,
+  syncFinancialStatus
 };
+
+// ✅ Inscrever no EventBus para atualizações financeiras
+eventBus.on('payable:updated', (data: { purchaseOrderId: string }) => {
+  if (data && data.purchaseOrderId) {
+    console.log('🔔 Evento recebido: payable:updated', data);
+    purchaseService.syncFinancialStatus(data.purchaseOrderId);
+  }
+});

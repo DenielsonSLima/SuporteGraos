@@ -2,12 +2,14 @@
 export interface BankBalance {
   id: string;
   bankName: string;
+  owner?: string;
   balance: number;
 }
 
 export interface AccountInitialBalance {
   id: string;
   bankName: string;
+  owner?: string;
   value: number;
 }
 
@@ -25,33 +27,33 @@ export interface CashierReport {
   // --- RECEITAS E DIREITOS (ATIVOS) ---
   bankBalances: BankBalance[];
   totalBankBalance: number;
-  totalInitialBalance: number; 
-  
-  totalInitialMonthBalance: number; 
+  totalInitialBalance: number;
+
+  totalInitialMonthBalance: number;
   initialMonthBalances: AccountInitialBalance[];
-  
-  pendingSalesReceipts: number; 
+
+  pendingSalesReceipts: number;
   merchandiseInTransitValue: number;
   loansGranted: number;
   advancesGiven: number;
-  
+
   // PATRIMÔNIO E HAVERES
-  totalFixedAssetsValue: number; 
-  pendingAssetSalesReceipts: number; 
+  totalFixedAssetsValue: number;
+  pendingAssetSalesReceipts: number;
   shareholderReceivables: number; // Haveres de Sócios (Saldos devedores de sócios com a empresa)
-  
-  totalAssets: number; 
+
+  totalAssets: number;
 
   // --- DÉBITOS E OBRIGAÇÕES (PASSIVOS) ---
-  pendingPurchasePayments: number; 
-  pendingFreightPayments: number; 
-  loansTaken: number; 
+  pendingPurchasePayments: number;
+  pendingFreightPayments: number;
+  loansTaken: number;
   commissionsToPay: number; // Comissões de corretores/terceiros
-  advancesTaken: number; 
+  advancesTaken: number;
   shareholderPayables: number; // Obrigações com Sócios (Pro-labore/Lucros a pagar)
 
-  totalLiabilities: number; 
+  totalLiabilities: number;
 
   // --- RESUMO ---
-  netBalance: number; 
+  netBalance: number;
 }

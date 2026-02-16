@@ -4,9 +4,10 @@ import { Persistence } from './persistence';
 import { logService } from './logService';
 import { authService } from './authService';
 import { supabase } from './supabase';
-import { receivablesService } from './financial/receivablesService';
+import { receivablesService, Receivable } from './financial/receivablesService';
 import { DashboardCache, invalidateDashboardCache } from './dashboardCache';
 import { auditService } from './auditService';
+
 
 const INITIAL_SALES: SalesOrder[] = [];
 const db = new Persistence<SalesOrder>('sales_orders', INITIAL_SALES, { useStorage: false });
@@ -97,7 +98,7 @@ const mapOrderFromDb = (row: any): SalesOrder => {
 // CARREGAMENTO INICIAL (SUPABASE)
 // ============================================================================
 
-const loadFromSupabase = async (): Promise<SalesOrder[]> => {
+const loadFromSupabase = async (retries = 2): Promise<SalesOrder[]> => {
   try {
     const { data, error } = await supabase
       .from('sales_orders')
@@ -110,6 +111,11 @@ const loadFromSupabase = async (): Promise<SalesOrder[]> => {
     console.log('🔄 Pedidos de venda sincronizando em tempo real...');
     return mapped;
   } catch (error) {
+    if (retries > 0) {
+      console.warn(`⚠️ Retry loadFromSupabase salesService (${retries} restantes)...`);
+      await new Promise(r => setTimeout(r, 1000));
+      return loadFromSupabase(retries - 1);
+    }
     console.error('❌ Erro ao carregar pedidos de venda:', error);
     return [];
   }
@@ -202,6 +208,63 @@ const getLogInfo = () => {
   return { userId: user?.id || 'system', userName: user?.name || 'Sistema' };
 };
 
+// ============================================================================
+// SINCRONIZAÇÃO FINANCEIRA (Feedback do Financeiro -> Venda)
+// ============================================================================
+const syncFinancialStatus = async (salesOrderId: string) => {
+  if (!salesOrderId) return;
+
+  // 1. Buscar todos os receivables vinculados a este pedido
+  const allReceivables = receivablesService.getAll();
+  const linkedReceivables = allReceivables.filter(r => r.salesOrderId === salesOrderId);
+
+  if (linkedReceivables.length === 0) return;
+
+  // 2. Calcular total recebido
+  const totalReceived = linkedReceivables.reduce((sum, r) => sum + (r.receivedAmount || 0), 0);
+
+  // 3. Buscar o pedido
+  const order = db.getById(salesOrderId);
+  if (!order) return;
+
+  // 4. Verificar se precisa atualizar
+  if (Math.abs((order.paidValue || 0) - totalReceived) < 0.01) {
+    return;
+  }
+
+  console.log(`🔄 Sincronizando Venda ${order.number}: Recebido ${order.paidValue} -> ${totalReceived}`);
+
+  // 5. Atualizar pedido
+  const updatedOrder = {
+    ...order,
+    paidValue: totalReceived
+  };
+
+  db.update(updatedOrder);
+  await persistUpsert(updatedOrder);
+
+  invalidateDashboardCache();
+  window.dispatchEvent(new Event('sales_orders:updated'));
+};
+
+const syncReceivableForOrder = (orderId: string, newPaidValue: number) => {
+  const receivable = receivablesService.getAll().find(r => r.salesOrderId === orderId);
+  if (!receivable) return;
+
+  const receivedAmount = Number(newPaidValue.toFixed(2));
+  const status: Receivable['status'] = receivedAmount >= receivable.amount - 0.01
+    ? 'received'
+    : receivedAmount > 0
+      ? 'partially_received'
+      : 'pending';
+
+  receivablesService.update({
+    ...receivable,
+    receivedAmount,
+    status
+  });
+};
+
 export const salesService = {
   getAll: () => db.getAll(),
 
@@ -245,15 +308,15 @@ export const salesService = {
       description: `Criou Pedido de Venda ${sale.number} para ${sale.customerName}`,
       entityId: sale.id
     });
-    
+
     // Audit Log
     void auditService.logAction('create', 'Vendas', `Pedido de venda criado: #${sale.number} - ${sale.customerName} - R$ ${sale.totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, {
       entityType: 'SalesOrder',
       entityId: sale.id,
       metadata: { customerId: sale.customerId, totalValue: sale.totalValue, status: sale.status }
     });
-    
-      invalidateDashboardCache();
+
+    invalidateDashboardCache();
   },
 
   update: (updatedSale: SalesOrder) => {
@@ -283,38 +346,44 @@ export const salesService = {
       description: desc,
       entityId: updatedSale.id
     });
-    
+
     // Audit Log
     void auditService.logAction(action as any, 'Vendas', `Pedido de venda: #${updatedSale.number} - ${desc}`, {
       entityType: 'SalesOrder',
       entityId: updatedSale.id,
       metadata: { status: updatedSale.status, totalValue: updatedSale.totalValue, paidValue: updatedSale.paidValue }
     });
-    
-      invalidateDashboardCache();
+
+    invalidateDashboardCache();
   },
 
   updateTransaction: (orderId: string, updatedTx: SalesTransaction) => {
     const order = db.getById(orderId);
     if (!order) return;
     const newTxs = (order.transactions || []).map(t => t.id === updatedTx.id ? updatedTx : t);
-    const newPaidValue = newTxs.filter(t => t.type === 'receipt').reduce((acc, t) => acc + t.value, 0);
+    const newPaidValue = newTxs
+      .filter(t => t.type === 'receipt')
+      .reduce((acc, t) => acc + t.value + (t.discountValue || 0), 0);
     const updated = { ...order, transactions: newTxs, paidValue: newPaidValue };
     db.update(updated);
     void persistUpsert(updated);
+    syncReceivableForOrder(orderId, newPaidValue);
     const { userId, userName } = getLogInfo();
     logService.addLog({ userId, userName, action: 'update', module: 'Financeiro', description: `Editou recebimento na Venda ${order.number}`, entityId: orderId });
-      invalidateDashboardCache();
+    invalidateDashboardCache();
   },
 
   deleteTransaction: (orderId: string, txId: string) => {
     const order = db.getById(orderId);
     if (!order) return;
     const newTxs = (order.transactions || []).filter(t => t.id !== txId);
-    const newPaidValue = newTxs.filter(t => t.type === 'receipt').reduce((acc, t) => acc + t.value, 0);
+    const newPaidValue = newTxs
+      .filter(t => t.type === 'receipt')
+      .reduce((acc, t) => acc + t.value + (t.discountValue || 0), 0);
     const updated = { ...order, transactions: newTxs, paidValue: newPaidValue };
     db.update(updated);
     void persistUpsert(updated);
+    syncReceivableForOrder(orderId, newPaidValue);
     const { userId, userName } = getLogInfo();
     logService.addLog({ userId, userName, action: 'delete', module: 'Financeiro', description: `Estornou recebimento da Venda ${order.number}`, entityId: orderId });
   },
@@ -325,19 +394,19 @@ export const salesService = {
       console.warn('⚠️ Pedido de venda não encontrado para exclusão:', id);
       return { success: false, error: 'Pedido não encontrado' };
     }
-    
+
     // ✅ Apagar receivables vinculados ao pedido de venda
     const allReceivables = receivablesService.getAll();
     const linkedReceivables = allReceivables.filter(r => r.salesOrderId === id);
-    
+
     console.log(`🗑️ Apagando ${linkedReceivables.length} receivables vinculados ao pedido ${order.number}`);
     linkedReceivables.forEach(r => {
       receivablesService.delete(r.id);
     });
-    
+
     // ✅ Apagar do cache local
     db.delete(id);
-    
+
     // ✅ Apagar do Supabase e aguardar resultado
     try {
       const { error } = await supabase.from('sales_orders').delete().eq('id', id);
@@ -363,20 +432,20 @@ export const salesService = {
       description: `Excluiu Pedido de Venda ${order.number}`,
       entityId: id
     });
-    
+
     // Audit Log
     void auditService.logAction('delete', 'Vendas', `Pedido de venda excluído: #${order.number} - ${order.customerName}`, {
       entityType: 'SalesOrder',
       entityId: id,
       metadata: { totalValue: order.totalValue, status: order.status, linkedReceivables: linkedReceivables.length }
     });
-    
+
     console.log('✅ Pedido de venda excluído com sucesso:', order.number);
-    
+
     // 🎯 LIMPAR CACHE DO DASHBOARD IMEDIATAMENTE
     DashboardCache.clearAll();
     invalidateDashboardCache();
-    
+
     return { success: true };
   },
 
@@ -396,11 +465,22 @@ export const salesService = {
   },
 
   subscribe: (callback: (items: SalesOrder[]) => void) => db.subscribe(callback),
-  
+
   reload: () => {
-    isLoaded = false;
+    db.clear();
     return loadFromSupabase();
   },
   loadFromSupabase,
-  startRealtime
+  startRealtime,
+  syncFinancialStatus
 };
+
+import { eventBus } from './eventBus';
+
+// ✅ Inscrever no EventBus para atualizações financeiras
+eventBus.on('receivable:updated', (data: { salesOrderId: string }) => {
+  if (data && data.salesOrderId) {
+    console.log('🔔 Evento recebido: receivable:updated', data);
+    salesService.syncFinancialStatus(data.salesOrderId);
+  }
+});

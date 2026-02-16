@@ -8,7 +8,7 @@ interface Props {
   orders: PurchaseOrder[];
 }
 
-const formatCurrency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+const formatCurrency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
 
 const KPIs: React.FC<Props> = ({ orders }) => {
   
@@ -18,7 +18,12 @@ const KPIs: React.FC<Props> = ({ orders }) => {
     const totalActiveValue = activeOrders.reduce((acc, curr) => acc + curr.totalValue, 0);
     
     // 2. Total Pago (Realizado)
-    const totalPaid = orders.reduce((acc, curr) => acc + curr.paidValue, 0);
+    const totalPaid = orders.reduce((acc, curr) => {
+      const txPaid = (curr.transactions || [])
+        .filter(t => t.type === 'payment' || t.type === 'advance')
+        .reduce((s, t) => s + (t.value || 0), 0);
+      return acc + Math.max(txPaid, curr.paidValue);
+    }, 0);
     
     // 3. Financeiro Pendente (A Pagar)
     // Lógica ajustada PEDIDO DE COMPRA: Valor do que foi CARREGADO (Peso Origem) - Valor Pago.

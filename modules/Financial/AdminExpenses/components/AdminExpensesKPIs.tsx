@@ -9,7 +9,7 @@ interface Props {
 }
 
 const AdminExpensesKPIs: React.FC<Props> = ({ total, paid, pending }) => {
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">

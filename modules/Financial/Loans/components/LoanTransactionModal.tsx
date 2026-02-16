@@ -26,7 +26,7 @@ const LoanTransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, loanTy
   const [accountId, setAccountId] = useState('');
   const [isHistorical, setIsHistorical] = useState(false);
 
-   const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+   const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
 
    const formatCurrencyInput = (val: string) => {
       const raw = val.replace(/\D/g, '');

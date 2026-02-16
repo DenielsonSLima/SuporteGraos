@@ -4,7 +4,7 @@ import ReportLayout from '../../components/ReportLayout';
 import { GeneratedReportData } from '../../types';
 
 const Template: React.FC<{ data: GeneratedReportData }> = ({ data }) => {
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
+  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(!val || Math.abs(val) < 0.005 ? 0 : val);
   const date = (val: string) => new Date(val).toLocaleDateString('pt-BR');
 
   const prevBalance = data.summary?.find(s => s.label === 'Saldo Anterior')?.value || 0;

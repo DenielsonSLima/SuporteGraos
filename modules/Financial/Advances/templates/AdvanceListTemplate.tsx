@@ -13,7 +13,7 @@ const AdvanceListTemplate: React.FC<Props> = ({ transactions, tab }) => {
   const company = settingsService.getCompanyData();
   const watermark = settingsService.getWatermark();
 
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
+  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(!val || Math.abs(val) < 0.005 ? 0 : val);
   const dateStr = (val: string) => new Date(val).toLocaleDateString('pt-BR');
 
   const titles = {

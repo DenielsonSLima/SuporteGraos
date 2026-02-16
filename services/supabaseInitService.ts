@@ -89,13 +89,13 @@ export const getInitDiagnostics = () => _initDiagnostics;
 const waitForSupabaseSession = async (maxWaitMs = 3000, intervalMs = 150) => {
   const start = performance.now();
   console.log('[SUPABASE_INIT] ⏳ waitForSupabaseSession() iniciado - maxWait:', maxWaitMs, 'ms');
-  
+
   let session = await getSupabaseSession();
   if (session) {
     console.log('[SUPABASE_INIT] ✅ Sessão encontrada imediatamente!');
     return session;
   }
-  
+
   let attempts = 0;
   while (performance.now() - start < maxWaitMs) {
     attempts++;
@@ -106,7 +106,7 @@ const waitForSupabaseSession = async (maxWaitMs = 3000, intervalMs = 150) => {
       return session;
     }
   }
-  
+
   console.error('[SUPABASE_INIT] ❌ TIMEOUT! Sessão NÃO encontrada após', attempts, 'tentativas,', Math.round(performance.now() - start), 'ms');
   return null;
 };
@@ -118,7 +118,7 @@ const waitForSupabaseSession = async (maxWaitMs = 3000, intervalMs = 150) => {
 export const initializeSupabaseData = async (): Promise<InitStats> => {
   console.log('\\n[SUPABASE_INIT] 🚀 initializeSupabaseData() chamado');
   console.log('[SUPABASE_INIT] ⏱️  Timestamp:', new Date().toISOString());
-  
+
   // ✅ Não iniciar se não estiver autenticado
   console.log('[SUPABASE_INIT] 🔍 Verificando autenticação...');
   const session = await waitForSupabaseSession();
@@ -321,7 +321,7 @@ export const initializeSupabaseData = async (): Promise<InitStats> => {
       }
 
       _isInitialized = true;
-      
+
       console.log('[SUPABASE_INIT] \\n✅ TODAS AS QUERIES COMPLETADAS!');
       console.log('[SUPABASE_INIT] 📊 Resumo de Carregamento:');
       console.log('[SUPABASE_INIT]   - Tabelas carregadas:', stats.tablesLoaded);
@@ -341,7 +341,7 @@ export const initializeSupabaseData = async (): Promise<InitStats> => {
       }
 
       console.log('[SUPABASE_INIT] _isInitialized = true');
-      
+
       if (stats.errors.length > 0) {
         console.warn('⚠️ Erros durante carregamento:', stats.errors);
       }
@@ -383,7 +383,11 @@ export const initializeSupabaseData = async (): Promise<InitStats> => {
         const locationModule = await import('./locationService');
         const reconciliationModule = await import('./receivablesReconciliationService');
         const payablesReconciliationModule = await import('./payablesReconciliationService');
-        
+        const creditModule = await import('./financial/creditService');
+        const loginScreenModule = await import('./loginScreenService');
+        const reportAuditModule = await import('./reportAuditService');
+        const loanServiceModule = await import('./loanService');
+
         // 📥 CARREGAR DADOS DE CADA SERVICE (em paralelo) - critico primeiro
         console.log('[SUPABASE_INIT] 📥 Iniciando carga paralela dos services (critico)...');
         const criticalStartTime = performance.now();
@@ -476,6 +480,8 @@ export const initializeSupabaseData = async (): Promise<InitStats> => {
           // Reconciliar diretamente dos pedidos após 500ms extra
           setTimeout(() => {
             void payablesReconciliationModule.reconcilePayablesFromOrders();
+            void payablesReconciliationModule.reconcilePayablesFromFreights();
+            void reconciliationModule.reconcileReceivablesFromOrders();
           }, 500);
         }, 1500);
         emitInitEvent('supabase:init:critical', { diagnostics: _initDiagnostics });
@@ -576,6 +582,14 @@ export const initializeSupabaseData = async (): Promise<InitStats> => {
             if (typeof initialBalanceModule.initialBalanceService?.startRealtime === 'function') initialBalanceModule.initialBalanceService.startRealtime();
             if (typeof locationModule.locationService?.startRealtime === 'function') locationModule.locationService.startRealtime();
 
+            // Novos serviços com realtime
+            startServiceRealtime(expenseCategoryModule, 'expenseCategoryService');
+            startServiceRealtime(classificationModule, 'classificationService');
+            if (typeof creditModule.default?.startRealtime === 'function') creditModule.default.startRealtime();
+            if (typeof loginScreenModule.loginScreenService?.startRealtime === 'function') loginScreenModule.loginScreenService.startRealtime();
+            if (typeof reportAuditModule.reportAuditService?.startRealtime === 'function') reportAuditModule.reportAuditService.startRealtime();
+            if (typeof loanServiceModule.loanService?.startRealtime === 'function') loanServiceModule.loanService.startRealtime();
+
             console.log('[SUPABASE_INIT] Realtime Subscriptions iniciadas');
 
             console.log('[SUPABASE_INIT] Disparando evento global: supabase:init:full');
@@ -639,7 +653,7 @@ export const waitForInit = async (): Promise<InitStats> => {
       data: {}
     };
   }
-  
+
   if (_isInitialized && _initPromise) {
     return _initPromise;
   }

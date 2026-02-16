@@ -9,7 +9,7 @@ import { PdfSummary } from '../../../../components/pdf/PdfSummary';
 import { GeneratedReportData } from '../../types';
 
 const PdfDocument: React.FC<{ data: GeneratedReportData }> = ({ data }) => {
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
   const numberInt = (val: number) => new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 }).format(val);
   const number = (val: number) => new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(val);
   const date = (val: string) => new Date(val).toLocaleDateString('pt-BR');
@@ -19,43 +19,16 @@ const PdfDocument: React.FC<{ data: GeneratedReportData }> = ({ data }) => {
   const totalBreakage = data.summary?.find(s => s.label.includes('Total Quebra'))?.value || 0;
 
   const columns = [
-    { header: 'Data', accessor: 'date', width: '10%', render: (row: any) => date(row.date) },
-    { 
-      header: 'Placa / Transp.', 
-      accessor: 'plate', 
-      width: '20%',
-      render: (row: any) => `${row.plate}\n${row.carrier}`
-    },
-    { header: 'Rota', accessor: 'route', width: '18%' },
-    { 
-      header: 'P. Origem (Kg)', 
-      accessor: 'weightOrigin', 
-      width: '13%', 
-      align: 'right' as const,
-      render: (row: any) => numberInt(row.weightOrigin)
-    },
-    { 
-      header: 'P. Destino (Kg)', 
-      accessor: 'weightDest', 
-      width: '13%', 
-      align: 'right' as const,
-      render: (row: any) => row.weightDest > 0 ? numberInt(row.weightDest) : '-'
-    },
-    { 
-      header: 'Quebra (Kg)', 
-      accessor: 'breakage', 
-      width: '13%', 
-      align: 'right' as const,
-      render: (row: any) => row.breakage > 0 ? numberInt(row.breakage) : '-',
-      style: (row: any) => row.breakage > 0 ? { color: '#dc2626' } : { color: '#94a3b8' }
-    },
-    { 
-      header: 'Valor Frete', 
-      accessor: 'value', 
-      width: '13%', 
-      align: 'right' as const,
-      render: (row: any) => currency(row.value)
-    }
+    { header: 'Data', width: '8%', render: (row: any) => date(row.date) },
+    { header: 'Transportadora', width: '14%', accessor: 'carrier' },
+    { header: 'Motorista', width: '14%', accessor: 'driver' },
+    { header: 'Origem', width: '12%', accessor: 'origin' },
+    { header: 'Destino', width: '12%', accessor: 'destination' },
+    { header: 'Frete/Ton', width: '8%', align: 'right' as const, render: (row: any) => currency(row.freightPerTon) },
+    { header: 'P. Origem', width: '8%', align: 'right' as const, render: (row: any) => numberInt(row.weightOrigin) },
+    { header: 'P. Destino', width: '8%', align: 'right' as const, render: (row: any) => row.weightDest > 0 ? numberInt(row.weightDest) : '-' },
+    { header: 'Base Cálc.', width: '8%', align: 'center' as const, accessor: 'weightBase' },
+    { header: 'V. Frete', width: '8%', align: 'right' as const, render: (row: any) => currency(row.value) }
   ];
 
   const summaryItems = [
@@ -66,7 +39,7 @@ const PdfDocument: React.FC<{ data: GeneratedReportData }> = ({ data }) => {
 
   return (
     <Document>
-      <Page size="A4" style={pdfStyles.page}>
+      <Page size="A4" orientation="landscape" style={pdfStyles.page}>
         <PdfWatermark />
         <PdfHeader title={data.title} subtitle={data.subtitle} />
         

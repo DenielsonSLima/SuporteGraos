@@ -155,7 +155,7 @@ const FinancialHistoryPdfDocument: React.FC<Props> = ({ records, groupBy, filter
   const company = settingsService.getCompanyData();
   const watermark = settingsService.getWatermark();
 
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
+  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(!val || Math.abs(val) < 0.005 ? 0 : val);
   const date = (val: string) => new Date(val).toLocaleDateString('pt-BR');
 
   const totalIn = records.filter(r => ['sales_order', 'loan_granted', 'receipt'].includes(r.subType || '')).reduce((acc, r) => acc + r.paidValue, 0);

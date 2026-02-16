@@ -16,7 +16,7 @@ interface Props {
 const SalesFinancialCard: React.FC<Props> = ({ orderId, transactions, totalOrderValue, onAddReceipt, onRefresh }) => {
   const [selectedTx, setSelectedTx] = useState<any>(null);
   
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
   const dateStr = (val: string) => {
     if (!val) return '-';
     if (val.includes('T')) return new Date(val).toLocaleDateString('pt-BR');

@@ -4,7 +4,7 @@ import ReportLayout from '../../components/ReportLayout';
 import { GeneratedReportData } from '../../types';
 
 const Template: React.FC<{ data: GeneratedReportData }> = ({ data }) => {
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
 
   const tCredits = data.summary?.[0]?.value || 0;
   const tDebits = data.summary?.[1]?.value || 0;

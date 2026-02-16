@@ -84,10 +84,10 @@ const ReportGeneratorModal: React.FC<Props> = ({ isOpen, onClose, reportId }) =>
         scale: 2, 
         useCORS: true, 
         letterRendering: true,
-        width: 794,
-        windowWidth: 794
+        width: reportData?.landscape ? 1123 : 794,
+        windowWidth: reportData?.landscape ? 1123 : 794
       },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: reportData?.landscape ? 'landscape' : 'portrait', compress: true },
       pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
     };
 
@@ -105,7 +105,7 @@ const ReportGeneratorModal: React.FC<Props> = ({ isOpen, onClose, reportId }) =>
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
-      <div className="w-full max-w-5xl bg-slate-200 rounded-xl shadow-2xl overflow-hidden flex flex-col h-[90vh]">
+      <div className={`w-full ${reportData?.landscape ? 'max-w-[95vw]' : 'max-w-5xl'} bg-slate-200 rounded-xl shadow-2xl overflow-hidden flex flex-col h-[90vh]`}>
         
         {/* Toolbar */}
         <div className="bg-slate-900 text-white px-4 py-3 flex justify-between items-center shadow-md z-20">
@@ -164,9 +164,12 @@ const ReportGeneratorModal: React.FC<Props> = ({ isOpen, onClose, reportId }) =>
           ) : reportData ? (
             <div 
               className="bg-white shadow-2xl origin-top" 
-              style={{ width: '210mm', minHeight: '297mm' }} 
+              style={{ 
+                width: reportData?.landscape ? '297mm' : '210mm', 
+                minHeight: reportData?.landscape ? undefined : '297mm' 
+              }} 
             >
-              <div ref={contentRef} style={{ width: '794px', margin: '0 auto' }}>
+              <div ref={contentRef} style={{ width: reportData?.landscape ? '1123px' : '794px', margin: '0 auto', overflow: 'hidden' }}>
                 <TemplateComponent data={reportData} />
               </div>
             </div>

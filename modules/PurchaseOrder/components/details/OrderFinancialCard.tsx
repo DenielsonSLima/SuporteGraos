@@ -19,7 +19,7 @@ interface Props {
 const OrderFinancialCard: React.FC<Props> = ({ orderId, transactions, totalOrderValue, onAddPayment, onAddAdvance, onRefresh, onDeleteTx }) => {
   const [selectedTx, setSelectedTx] = useState<OrderTransaction | null>(null);
   
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
   const date = (val: string) => formatDateBR(val);
 
   const financialTransactions = transactions.filter(t => t.type === 'payment' || t.type === 'advance' || t.type === 'receipt');

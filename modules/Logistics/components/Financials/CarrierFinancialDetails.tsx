@@ -16,7 +16,7 @@ const CarrierFinancialDetails: React.FC<Props> = ({ carrierName, allFreights, on
   const { carrierFreights, selectedFreightIds, totals, actions } = useCarrierFinancials(carrierName, allFreights, onRefresh);
   const [isPayModalOpen, setIsPayModalOpen] = useState(false);
 
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
   const dateStr = (val: string) => new Date(val).toLocaleDateString('pt-BR');
 
   const handleConfirmPayment = (data: any) => {

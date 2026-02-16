@@ -14,7 +14,7 @@ interface Props {
 }
 
 const HelpContent: React.FC<Props> = ({ section }) => {
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
 
   const SectionTitle = ({ title, icon: Icon }: { title: string, icon?: any }) => (
     <div className="mb-8 border-b-4 border-slate-100 pb-4">

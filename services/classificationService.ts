@@ -23,11 +23,11 @@ export interface ProductType {
 
 // Initial Data
 const INITIAL_PRODUCT_TYPES: ProductType[] = [
-  { 
-    id: '1', 
-    name: 'Milho em Grãos', 
-    description: 'Grãos de milho in natura destinados à comercialização ou consumo.', 
-    isSystem: true 
+  {
+    id: '1',
+    name: 'Milho em Grãos',
+    description: 'Grãos de milho in natura destinados à comercialização ou consumo.',
+    isSystem: true
   }
 ];
 
@@ -35,6 +35,7 @@ const INITIAL_PRODUCT_TYPES: ProductType[] = [
 const partnerTypesDb = new Persistence<PartnerType>('partner_types', DEFAULT_PARTNER_CATEGORIES as PartnerType[]);
 const productTypesDb = new Persistence<ProductType>('product_types', INITIAL_PRODUCT_TYPES);
 let _isSupabaseLoaded = false;
+let _realtimeStarted = false;
 
 // Load from optimized parallel Supabase loader
 const loadFromSupabase = async () => {
@@ -70,6 +71,33 @@ const loadFromSupabase = async () => {
   }
 };
 
+// ============================================================================
+// REALTIME
+// ============================================================================
+
+const startRealtime = () => {
+  if (_realtimeStarted) return;
+  _realtimeStarted = true;
+
+  supabase
+    .channel('realtime:classifications')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'partner_types' }, () => {
+      console.log('🔔 Realtime partner_types: mudança detectada');
+      _isSupabaseLoaded = false;
+      void loadFromSupabase();
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'product_types' }, () => {
+      console.log('🔔 Realtime product_types: mudança detectada');
+      _isSupabaseLoaded = false;
+      void loadFromSupabase();
+    })
+    .subscribe(status => {
+      if (status === 'SUBSCRIBED') {
+        console.log('✅ Realtime classifications ativo');
+      }
+    });
+};
+
 // Initialize
 // ❌ NÃO inicializar automaticamente - aguardar autenticação
 // loadFromSupabase();
@@ -84,9 +112,10 @@ const getLogInfo = () => {
 
 export const classificationService = {
   loadFromSupabase,
+  startRealtime,
   // --- PARTNER TYPES ---
   getPartnerTypes: () => partnerTypesDb.getAll(),
-  
+
   addPartnerType: async (type: PartnerType) => {
     partnerTypesDb.add(type);
     const { userId, userName } = getLogInfo();
@@ -269,10 +298,10 @@ export const classificationService = {
   // Restore
   importData: (partnerTypes: PartnerType[], productTypes: ProductType[]) => {
     if (partnerTypes && Array.isArray(partnerTypes)) {
-        partnerTypesDb.setAll(partnerTypes);
+      partnerTypesDb.setAll(partnerTypes);
     }
     if (productTypes && Array.isArray(productTypes)) {
-        productTypesDb.setAll(productTypes);
+      productTypesDb.setAll(productTypes);
     }
   }
 };

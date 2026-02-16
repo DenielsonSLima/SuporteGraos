@@ -3,6 +3,7 @@ import { salesService } from './salesService';
 import { standaloneRecordsService } from './standaloneRecordsService';
 
 let hasRun = false;
+let hasRunFromOrders = false;
 
 const toNumber = (value: any) => {
   const n = Number(value);
@@ -123,6 +124,41 @@ export const reconcileReceivablesFromHistory = async () => {
           });
         }
       }
+    }
+  });
+};
+
+export const reconcileReceivablesFromOrders = async () => {
+  if (hasRunFromOrders) return;
+  hasRunFromOrders = true;
+
+  const receivables = receivablesService.getAll();
+  if (receivables.length === 0) return;
+
+  const orders = salesService.getAll();
+  const orderById = new Map(orders.map(o => [o.id, o]));
+
+  receivables.forEach(receivable => {
+    if (!receivable.salesOrderId) return;
+    const order = orderById.get(receivable.salesOrderId);
+    if (!order) return;
+
+    const txs = order.transactions || [];
+    const totalFromTx = txs.reduce((acc, t) => acc + (t.value || 0) + (t.discountValue || 0), 0);
+    const totalReceived = Number(((txs.length > 0 ? totalFromTx : (order.paidValue || 0)) || 0).toFixed(2));
+
+    if (Math.abs((receivable.receivedAmount || 0) - totalReceived) > 0.01) {
+      const status: Receivable['status'] = totalReceived >= receivable.amount - 0.01
+        ? 'received'
+        : totalReceived > 0
+          ? 'partially_received'
+          : 'pending';
+
+      receivablesService.update({
+        ...receivable,
+        receivedAmount: totalReceived,
+        status
+      });
     }
   });
 };

@@ -28,7 +28,7 @@ const FinancialTable: React.FC<Props> = ({
   selectedIds = [],
   onToggleSelection 
 }) => {
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
   
   const getBankAccountName = (bankAccountId?: string, description?: string) => {
     if (!bankAccountId) {

@@ -27,7 +27,7 @@ interface MonthGroup {
 }
 
 const AdminExpenseGroupedList: React.FC<Props> = ({ records, onPay, onEdit, onDelete }) => {
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
   const date = (val: string) => new Date(val).toLocaleDateString('pt-BR');
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 

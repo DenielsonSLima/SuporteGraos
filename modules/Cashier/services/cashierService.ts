@@ -26,32 +26,32 @@ export const cashierService = {
     // Mapeamento de movimentações por conta (O(n))
     const txByAccount: Record<string, any[]> = {};
     const addTx = (accId: string, val: number, date: string, type: 'credit' | 'debit') => {
-        if (!txByAccount[accId]) txByAccount[accId] = [];
-        txByAccount[accId].push({ val, date, type });
+      if (!txByAccount[accId]) txByAccount[accId] = [];
+      txByAccount[accId].push({ val, date, type });
     };
 
     // 1. PROCESSA APENAS O HISTÓRICO CONSOLIDADO (Evita duplicar com transações internas de pedidos)
     standaloneRecords.forEach(r => {
-        if (r.status !== 'paid') return;
-        
-        // Log detalhado COMPLETO para TODOS os registros
-        console.log('📦 Registro:', {
-          description: r.description,
-          subType: r.subType,
-          category: r.category,
-          status: r.status,
-          paidValue: r.paidValue,
-          bankAccount: r.bankAccount
-        });
-        
-        // Encontra a conta (pode estar salva por ID ou por Nome no mock)
-        const acc = bankAccounts.find(a => a.id === r.bankAccount || a.bankName === r.bankAccount);
-        if (!acc) return;
+      if (r.status !== 'paid') return;
 
-        // CRÉDITOS reais que entram na conta
-        const isCredit = ['sales_order', 'receipt', 'loan_taken', 'credit_income', 'investment', 'Venda de Ativo'].includes(r.subType || '') || r.category === 'Venda de Ativo';
-        
-        addTx(acc.id, r.paidValue, r.issueDate, isCredit ? 'credit' : 'debit');
+      // Log detalhado COMPLETO para TODOS os registros
+      console.log('📦 Registro:', {
+        description: r.description,
+        subType: r.subType,
+        category: r.category,
+        status: r.status,
+        paidValue: r.paidValue,
+        bankAccount: r.bankAccount
+      });
+
+      // Encontra a conta (pode estar salva por ID ou por Nome no mock)
+      const acc = bankAccounts.find(a => a.id === r.bankAccount || a.bankName === r.bankAccount);
+      if (!acc) return;
+
+      // CRÉDITOS reais que entram na conta
+      const isCredit = ['sales_order', 'receipt', 'loan_taken', 'credit_income', 'investment', 'Venda de Ativo'].includes(r.subType || '') || r.category === 'Venda de Ativo';
+
+      addTx(acc.id, r.paidValue, r.issueDate, isCredit ? 'credit' : 'debit');
     });
 
     // 2. PROCESSA TRANSFERÊNCIAS (Movimentação entre contas)
@@ -63,20 +63,20 @@ export const cashierService = {
     // 3. CÁLCULO DOS SALDOS (Início do Mês e Atual)
     let totalInitialMonthBalance = 0;
     const initialMonthBalances: AccountInitialBalance[] = [];
-    
+
     const bankBalances: BankBalance[] = bankAccounts.map(account => {
       const initRecord = initialBalances.find(b => b.accountId === account.id);
       const initVal = initRecord ? initRecord.value : 0;
       const initDate = initRecord ? initRecord.date : '2000-01-01';
-      
+
       const accountTxs = txByAccount[account.id] || [];
-      
+
       // Saldo Início do Mês (Somente o que ocorreu entre a implantação e o dia 1º)
       const monthStartVal = accountTxs.reduce((acc, t) => {
-          if (t.date >= initDate && t.date < startOfMonth) {
-              return t.type === 'credit' ? acc + t.val : acc - t.val;
-          }
-          return acc;
+        if (t.date >= initDate && t.date < startOfMonth) {
+          return t.type === 'credit' ? acc + t.val : acc - t.val;
+        }
+        return acc;
       }, initVal);
 
       totalInitialMonthBalance += monthStartVal;
@@ -84,20 +84,21 @@ export const cashierService = {
 
       // Saldo Atual (Tudo até hoje)
       const currentVal = accountTxs.reduce((acc, t) => {
-          return t.type === 'credit' ? acc + t.val : acc - t.val;
+        return t.type === 'credit' ? acc + t.val : acc - t.val;
       }, initVal);
 
-      return { 
-        id: account.id, 
-        bankName: account.owner ? `${account.bankName} (${account.owner})` : account.bankName, 
-        balance: currentVal 
+      return {
+        id: account.id,
+        bankName: account.bankName,
+        owner: account.owner || undefined,
+        balance: currentVal
       };
     });
 
     // --- ATIVOS (DIREITOS) ---
     const totalBankBalance = bankBalances.reduce((acc, b) => acc + b.balance, 0);
     const receivables = FinancialCache.getReceivables();
-    
+
     const pendingSalesReceipts = receivables
       .filter(r => r.subType === 'sales_order' && r.status !== 'paid')
       .reduce((acc, r) => acc + (r.originalValue - r.paidValue - (r.discountValue || 0)), 0);
@@ -115,7 +116,7 @@ export const cashierService = {
       .filter(l => l.subType === 'loan_granted' && l.status !== 'paid')
       .reduce((acc, l) => acc + (l.originalValue - l.paidValue), 0);
     const advancesGiven = advanceService.getSummaries().filter(s => s.netBalance > 0).reduce((acc, s) => acc + s.netBalance, 0);
-    
+
     const totalAssets = totalBankBalance + pendingSalesReceipts + merchandiseInTransitValue + loansGranted + shareholderReceivables + advancesGiven + totalFixedAssetsValue;
 
     // --- PASSIVOS (OBRIGAÇÕES) ---
@@ -123,12 +124,12 @@ export const cashierService = {
     const pendingPurchasePayments = payables.filter(r => r.subType === 'purchase_order' && r.status !== 'paid').reduce((acc, r) => acc + (r.originalValue - r.paidValue - (r.discountValue || 0)), 0);
     const pendingFreightPayments = payables.filter(r => r.subType === 'freight' && r.status !== 'paid').reduce((acc, r) => acc + (r.originalValue - r.paidValue - (r.discountValue || 0)), 0);
     const commissionsToPay = payables.filter(r => r.subType === 'commission' && r.status !== 'paid').reduce((acc, r) => acc + (r.originalValue - r.paidValue - (r.discountValue || 0)), 0);
-    
+
     const loansTaken = loansService.getAll()
       .filter(l => l.subType === 'loan_taken' && l.status !== 'paid')
       .reduce((acc, l) => acc + (l.originalValue - l.paidValue), 0);
     const advancesTaken = advanceService.getSummaries().filter(s => s.netBalance < 0).reduce((acc, s) => acc + Math.abs(s.netBalance), 0);
-    
+
     const shareholderPayables = shareholderService.getAll()
       .filter(s => s.financial.currentBalance > 0)
       .reduce((acc, s) => acc + s.financial.currentBalance, 0);
@@ -136,10 +137,10 @@ export const cashierService = {
     const totalLiabilities = pendingPurchasePayments + pendingFreightPayments + loansTaken + commissionsToPay + shareholderPayables + advancesTaken;
 
     return {
-      id: 'current', referenceDate: new Date().toISOString(), isClosed: false, bankBalances, totalBankBalance, 
+      id: 'current', referenceDate: new Date().toISOString(), isClosed: false, bankBalances, totalBankBalance,
       totalInitialBalance: initialBalances.reduce((acc, b) => acc + b.value, 0), totalInitialMonthBalance, initialMonthBalances,
-      pendingSalesReceipts, merchandiseInTransitValue, loansGranted, advancesGiven, totalFixedAssetsValue, pendingAssetSalesReceipts: 0, 
-      shareholderReceivables, totalAssets, pendingPurchasePayments, pendingFreightPayments, loansTaken, commissionsToPay, advancesTaken, 
+      pendingSalesReceipts, merchandiseInTransitValue, loansGranted, advancesGiven, totalFixedAssetsValue, pendingAssetSalesReceipts: 0,
+      shareholderReceivables, totalAssets, pendingPurchasePayments, pendingFreightPayments, loansTaken, commissionsToPay, advancesTaken,
       shareholderPayables, totalLiabilities, netBalance: totalAssets - totalLiabilities
     };
   },
@@ -147,10 +148,10 @@ export const cashierService = {
     // 1. Obtém todos os meses (retroativos calculados)
     const monthlyHistoryItems = historyService.getMonthlyHistory();
     const reports = monthlyHistoryItems.map(item => item.report);
-    
+
     // 2. Enriquece com dados de snapshots (se existirem)
     const snapshots = snapshotService.getAll();
-    
+
     reports.forEach(report => {
       const snapshot = snapshots.find(s => s.monthKey === report.monthKey);
       if (snapshot) {
@@ -163,6 +164,6 @@ export const cashierService = {
       }
     });
 
-    return reports;
+    return reports as unknown as CashierReport[];
   }
 };

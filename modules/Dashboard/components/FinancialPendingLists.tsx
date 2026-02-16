@@ -12,7 +12,7 @@ interface Props {
 }
 
 const FinancialPendingLists: React.FC<Props> = ({ data }) => {
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
   const date = (val: string) => {
     const d = new Date(val);
     return `${d.getDate()}/${d.getMonth() + 1}`;

@@ -22,7 +22,7 @@ const OrderBrokerCard: React.FC<Props> = ({
   onEditTx, 
   onDeleteTx 
 }) => {
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
   const brokerTxs = transactions.filter(t => t.type === 'commission');
   
   // CORREÇÃO: Soma valor (dinheiro) + descontos para abater o total devido

@@ -23,7 +23,7 @@ const FreightSelectionModal: React.FC<Props> = ({
   onPay 
 }) => {
   
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
   const date = (val: string) => new Date(val).toLocaleDateString('pt-BR');
 
   // Calcula o total apenas dos itens selecionados

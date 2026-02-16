@@ -747,7 +747,7 @@ const PdfDocument: React.FC<Props> = ({ order, loadings, variant }) => {
   const watermark = settingsService.getWatermark();
 
   const currency = (val: number) =>
-    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(!val || Math.abs(val) < 0.005 ? 0 : val);
 
   const num = (val: number, dec = 2) =>
     new Intl.NumberFormat('pt-BR', { minimumFractionDigits: dec, maximumFractionDigits: dec }).format(val || 0);

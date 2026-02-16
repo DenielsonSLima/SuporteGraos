@@ -9,7 +9,7 @@ import { PdfSummary } from '../../../../components/pdf/PdfSummary';
 import { GeneratedReportData } from '../../types';
 
 const PdfDocument: React.FC<{ data: GeneratedReportData }> = ({ data }) => {
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
   const date = (val: string) => new Date(val).toLocaleDateString('pt-BR');
 
   const total = data.summary?.[0]?.value || 0;

@@ -32,7 +32,7 @@ interface Props {
 }
 
 const PurchaseLoadingsTable: React.FC<Props> = ({ loadings, onViewLoading, onAddNew, onDeleteLoading }) => {
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
+  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(!val || Math.abs(val) < 0.005 ? 0 : val);
   
   // CORREÇÃO DE FUSO HORÁRIO: Parse manual da string YYYY-MM-DD
   const dateStr = (val: string) => {

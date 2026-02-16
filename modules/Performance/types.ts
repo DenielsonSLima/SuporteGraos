@@ -35,13 +35,14 @@ export interface HarvestData {
   avgFreightPrice: number;
   totalPurchase: number;
   totalSales: number;
+  totalFreight: number; // Acumulador de soma de frete (dividido por tonelagem = avgFreightPrice)
 }
 
 // Interfaces para os 3 cards de despesas
-export interface ExpenseSubtypeValue { 
-  name: string; 
-  value: number; 
-  percentage: number; 
+export interface ExpenseSubtypeValue {
+  name: string;
+  value: number;
+  percentage: number;
 }
 
 export interface ExpenseCategorySummary {
@@ -89,11 +90,11 @@ export interface PerformanceReport {
   avgSalesPrice: number;
   avgFreightPriceTon: number;
   avgTotalCostPerSc: number;
-  
+
   // Métricas Segregadas por Saca
   avgFreightCostSc: number; // NOVO: Só frete por saca
   avgPureOpCostSc: number;  // NOVO: Só ADM/Fixo por saca (sem frete)
-  
+
   avgOtherExpensesMonthly: number;
 
   // Custo de Recusas/Redirecionamentos
@@ -102,7 +103,7 @@ export interface PerformanceReport {
   // Gráficos
   monthlyHistory: MonthlyData[];
   priceTrendHistory: PriceTrendData[];
-  
+
   // Tabelas
   harvests: HarvestData[];
 

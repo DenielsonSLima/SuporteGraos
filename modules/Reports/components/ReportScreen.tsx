@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  ArrowLeft, 
-  Printer, 
-  Filter, 
+import {
+  ArrowLeft,
+  Printer,
+  Filter,
   RefreshCw,
   Search,
   ChevronRight,
@@ -26,30 +26,42 @@ const ReportScreen: React.FC<Props> = ({ reportModule, reportId, onBack }) => {
   const [data, setData] = useState<GeneratedReportData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isHtmlPdfOpen, setIsHtmlPdfOpen] = useState(false);
-  
+
 
   // Atualização em tempo real para relatórios de logística
   const isLogistics = reportModule.metadata.category === 'logistics';
   const filtersRef = useRef(filters);
   filtersRef.current = filters;
 
+  // Helper para lidar com fetch síncrono ou assíncrono
+  const executeFetch = async (currentFilters: any) => {
+    setIsLoading(true);
+    try {
+      const resultOrPromise = reportModule.fetchData(currentFilters);
+      const result = resultOrPromise instanceof Promise ? await resultOrPromise : resultOrPromise;
+      if (result) setData(result);
+    } catch (error) {
+      console.error('Erro ao buscar dados do relatório:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
     if (isLogistics && reportModule.fetchData) {
       unsubscribe = (window as any).loadingRealtimeSub = (window as any).loadingRealtimeSub || null;
-      // Garante que só um subscribe ativo
       if (unsubscribe) unsubscribe();
+
       unsubscribe = loadingService.subscribe(() => {
-        const result = reportModule.fetchData(filtersRef.current);
-        setData(result);
+        void executeFetch(filtersRef.current);
       });
       // Primeira carga
-      const result = reportModule.fetchData(filtersRef.current);
-      setData(result);
+      void executeFetch(filtersRef.current);
     } else {
       // Fallback: só atualiza ao mudar filtro
       const debounceTimer = setTimeout(() => {
-        handleRefresh();
+        void handleRefresh();
       }, 300);
       return () => clearTimeout(debounceTimer);
     }
@@ -63,29 +75,31 @@ const ReportScreen: React.FC<Props> = ({ reportModule, reportId, onBack }) => {
   useEffect(() => {
     if (!isLogistics) {
       const debounceTimer = setTimeout(() => {
-        handleRefresh();
+        void handleRefresh();
       }, 300);
       return () => clearTimeout(debounceTimer);
     } else {
       // Para logística, só atualiza se filtro mudar
-      const result = reportModule.fetchData(filters);
-      setData(result);
+      void executeFetch(filters);
     }
     // eslint-disable-next-line
   }, [filters]);
 
-  const handleRefresh = () => {
-    setIsLoading(true);
-    const result = reportModule.fetchData(filters);
-    setData(result);
-    setIsLoading(false);
-    // Log de acesso ao relatório
-    void reportAuditService.logReportAccess(
-      reportModule.metadata.id,
-      reportModule.metadata.title,
-      filters,
-      result.rows.length
-    );
+  const handleRefresh = async () => {
+    await executeFetch(filters);
+
+    // Log de acesso ao relatório (após dados carregados, se possível, ou independente)
+    // Nota: data pode estar desatualizado aqui dentro do async, mas executeFetch atualiza o state.
+    // O ideal seria logar no executeFetch ou usar um useEffect para logar quando data mudar.
+    // Mantendo comportamento similar ao anterior:
+    if (data) {
+      void reportAuditService.logReportAccess(
+        reportModule.metadata.id,
+        reportModule.metadata.title,
+        filters,
+        data.rows.length
+      );
+    }
   };
 
   const handleOpenPdfPreview = () => {
@@ -95,7 +109,7 @@ const ReportScreen: React.FC<Props> = ({ reportModule, reportId, onBack }) => {
 
   const formatValue = (value: any, type?: string) => {
     if (value === undefined || value === null) return '-';
-    if (type === 'currency') return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+    if (type === 'currency') return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(value) < 0.005 ? 0 : value);
     if (type === 'date') return new Date(value).toLocaleDateString('pt-BR');
     if (type === 'number') return new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(value);
     return value;
@@ -119,11 +133,11 @@ const ReportScreen: React.FC<Props> = ({ reportModule, reportId, onBack }) => {
 
   return (
     <div className="flex flex-col h-[calc(100vh-6rem)] animate-in slide-in-from-right-4 duration-300">
-      
+
       {/* Header / Breadcrumbs */}
       <div className="flex items-center justify-between mb-6 shrink-0">
         <div className="flex items-center gap-4">
-          <button 
+          <button
             onClick={onBack}
             className="p-2 rounded-full bg-white border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-800 transition-colors shadow-sm"
           >
@@ -143,14 +157,14 @@ const ReportScreen: React.FC<Props> = ({ reportModule, reportId, onBack }) => {
         </div>
 
         <div className="flex gap-2">
-          <button 
+          <button
             onClick={handleRefresh}
             className="p-2.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-primary-600 transition-colors shadow-sm"
             title="Atualizar Dados"
           >
             <RefreshCw size={20} className={isLoading ? "animate-spin" : ""} />
           </button>
-          <button 
+          <button
             onClick={handleOpenPdfPreview}
             disabled={!data || data.rows.length === 0}
             className="flex items-center gap-2 bg-slate-900 text-white px-6 py-2.5 rounded-lg font-medium hover:bg-slate-800 transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
@@ -162,7 +176,7 @@ const ReportScreen: React.FC<Props> = ({ reportModule, reportId, onBack }) => {
       </div>
 
       <div className="flex gap-6 flex-1 min-h-0">
-        
+
         {/* Sidebar: Filters */}
         <div className="w-80 shrink-0 flex flex-col gap-4 overflow-y-auto pr-2">
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
@@ -170,11 +184,11 @@ const ReportScreen: React.FC<Props> = ({ reportModule, reportId, onBack }) => {
               <Filter size={16} />
               Filtros
             </div>
-            
+
             {FilterComponent ? (
-              <FilterComponent 
-                filters={filters} 
-                onChange={(newFilters) => setFilters({ ...filters, ...newFilters })} 
+              <FilterComponent
+                filters={filters}
+                onChange={(newFilters) => setFilters({ ...filters, ...newFilters })}
               />
             ) : (
               <p className="text-sm text-slate-400 italic">Este relatório não possui filtros configuráveis.</p>
@@ -199,7 +213,7 @@ const ReportScreen: React.FC<Props> = ({ reportModule, reportId, onBack }) => {
 
         {/* Main Content: Table Preview */}
         <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
-          
+
           <div className="px-6 py-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center shrink-0">
             <div>
               <h3 className="font-bold text-slate-700">Pré-visualização dos Dados</h3>

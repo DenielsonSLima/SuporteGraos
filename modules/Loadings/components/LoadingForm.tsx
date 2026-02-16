@@ -227,7 +227,7 @@ const LoadingForm: React.FC<Props> = ({ purchaseOrder, onSave, onClose }) => {
     s.number.includes(salesSearch)
   );
 
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
   const inputClass = 'w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-2.5 text-slate-900 font-bold focus:border-emerald-500 focus:ring-0 outline-none transition-all placeholder:text-slate-300 text-sm';
   const labelClass = 'block text-[10px] font-black text-slate-400 mb-1.5 uppercase tracking-widest ml-1';
 

@@ -4,7 +4,7 @@ import ReportLayout from '../../components/ReportLayout';
 import { GeneratedReportData } from '../../types';
 
 const Template: React.FC<{ data: GeneratedReportData }> = ({ data }) => {
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
   const date = (val: string) => new Date(val).toLocaleDateString('pt-BR');
 
   const totalGiven = data.summary?.find(s => s.label.includes('Total Concedido'))?.value || 0;

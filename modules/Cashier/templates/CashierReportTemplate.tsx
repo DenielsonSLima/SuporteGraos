@@ -92,7 +92,7 @@ const CashierReportTemplate: React.FC<Props> = ({ report, title }) => {
 
   return (
     <div id="cashier-report-pdf" className="relative w-full bg-white text-black p-10 text-[8px] leading-tight font-sans min-h-[285mm] flex flex-col box-border overflow-hidden">
-      
+
       {/* MARCA D'ÁGUA */}
       <div className="absolute inset-0 z-0 flex items-center justify-center pointer-events-none overflow-hidden opacity-[0.03]">
         {watermark.imageUrl ? (
@@ -103,7 +103,7 @@ const CashierReportTemplate: React.FC<Props> = ({ report, title }) => {
       </div>
 
       <div className="relative z-10 flex-1 flex flex-col">
-        
+
         {/* CABEÇALHO */}
         <div className="flex justify-between items-start border-b-2 border-slate-900 pb-6 mb-8">
           <div className="flex gap-6 items-center">
@@ -237,7 +237,10 @@ const CashierReportTemplate: React.FC<Props> = ({ report, title }) => {
               <tbody>
                 {report.bankBalances.map(acc => (
                   <tr key={acc.id} className="border-t border-slate-100 bg-white/80">
-                    <td className="px-3 py-1.5 font-black text-slate-700 uppercase">{acc.bankName}</td>
+                    <td className="px-3 py-1.5 font-black text-slate-700 uppercase">
+                      <span>{acc.bankName}</span>
+                      {acc.owner && <span className="block text-[6px] text-slate-400 font-bold normal-case">{acc.owner}</span>}
+                    </td>
                     <td className="px-3 py-1.5 text-right font-black text-slate-900">{currency(acc.balance)}</td>
                     <td className="px-3 py-1.5 text-right font-black text-slate-500">{bankPercent(acc.balance)}</td>
                   </tr>

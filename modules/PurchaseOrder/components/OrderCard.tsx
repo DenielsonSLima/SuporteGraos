@@ -55,10 +55,16 @@ const OrderCard: React.FC<Props> = React.memo(({ order, onClick, onFinalize, onD
     const contractQty = order.items.reduce((acc, i) => acc + i.quantity, 0);
     const totalLoadedValue = activeLoadings.reduce((acc, l) => acc + (l.totalPurchaseValue || 0), 0);
     
-    const cashPaid = order.paidValue || 0;
-    const directDiscounts = order.discountValue || 0;
+    const txs = order.transactions || [];
+    const cashPaidTx = txs
+      .filter(t => t.type === 'payment' || t.type === 'advance')
+      .reduce((acc, t) => acc + (t.value || 0), 0);
+    const discountTx = txs.reduce((acc, t) => acc + (t.discountValue || 0), 0);
+
+    const cashPaid = Math.max(cashPaidTx, order.paidValue || 0);
+    const directDiscounts = Math.max(discountTx, order.discountValue || 0);
     
-    const deductedExpenses = (order.transactions || [])
+    const deductedExpenses = txs
       .filter(t => (t.type === 'expense' || t.type === 'commission') && t.deductFromPartner)
       .reduce((acc, t) => acc + t.value + (t.discountValue || 0), 0);
 

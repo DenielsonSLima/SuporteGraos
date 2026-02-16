@@ -14,7 +14,7 @@ type GroupMode = 'month' | 'carrier';
 const AllFreights: React.FC<Props> = ({ freights, onFreightClick }) => {
   const [groupMode, setGroupMode] = useState<GroupMode>('month');
   
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
 
   // Lógica de Agrupamento
   const groups = useMemo(() => {

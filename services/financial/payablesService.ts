@@ -1,9 +1,12 @@
 import { Persistence } from '../persistence';
 import { supabase } from '../supabase';
 import { supabaseWithRetry } from '../../utils/fetchWithRetry';
-import { invalidateDashboardCache } from '../dashboardCache';
+import { DashboardCache, invalidateDashboardCache } from '../dashboardCache';
 import { invalidateFinancialCache } from '../financialCache';
 import { auditService } from '../auditService';
+import { logService } from '../logService';
+import { authService } from '../authService';
+// import { purchaseService } from '../purchaseService'; // Removido para evitar dependência circular
 
 const generateUUID = (): string => {
   if (typeof self !== 'undefined' && self.crypto && self.crypto.randomUUID) {
@@ -129,7 +132,7 @@ const fetchPage = async (options: PayablesPageOptions): Promise<Payable[]> => {
     if (endDate) query = query.lte('due_date', endDate);
 
     const data = await supabaseWithRetry(() => query);
-    return (data || []).map(mapFromDb);
+    return (data as any[] || []).map(mapFromDb);
   } catch (error) {
     console.error('❌ Erro ao paginar payables:', error);
     return [];
@@ -149,11 +152,14 @@ const loadFromSupabase = async (): Promise<Payable[]> => {
         .order('due_date', { ascending: true })
     );
 
-    const mapped = (data || []).map(mapFromDb);
-    db.setAll(mapped);
-    isLoaded = true;
-    console.log('🔄 Contas a pagar sincronizando em tempo real...');
-    return mapped;
+    if (data) {
+      const mapped = (data as any[]).map(mapFromDb);
+      db.setAll(mapped);
+      isLoaded = true;
+      console.log('🔄 Contas a pagar sincronizando em tempo real...');
+      return mapped;
+    }
+    return [];
   } catch (error) {
     console.error('❌ Erro ao carregar payables:', error);
     return [];
@@ -196,14 +202,13 @@ const persistUpsert = async (item: Payable) => {
   try {
     const payload = mapToDb(item);
     const { error } = await supabase.from('payables').upsert(payload).select();
-    
+
     if (error) {
-      console.error('❌ Erro ao salvar payable:', error);
+      console.error('Erro ao salvar conta a pagar no Supabase', error);
       return;
     }
-    
-    // silencioso
-    // Realtime irá atualizar automaticamente via subscription
+    // Atualiza cache local para refletir possíveis IDs gerados no banco
+    await loadFromSupabase(); // Changed from syncFromSupabase to loadFromSupabase as syncFromSupabase is not defined
   } catch (err) {
     console.error('❌ Erro inesperado ao salvar payable:', err);
   }
@@ -216,6 +221,14 @@ const persistDelete = async (id: string) => {
   } catch (err) {
     console.error('Erro inesperado ao excluir payable', err);
   }
+};
+
+const getLogInfo = () => {
+  const user = authService.getCurrentUser();
+  return {
+    userId: user?.id || 'unknown',
+    userName: user?.email || 'unknown'
+  };
 };
 
 // ❌ NÃO inicializar automaticamente - aguardar autenticação via supabaseInitService
@@ -238,7 +251,8 @@ export const payablesService = {
     db.add(item);
     void persistUpsert(item);
     invalidateDashboardCache();
-    
+    invalidateFinancialCache();
+
     // Audit Log
     void auditService.logAction('create', 'Financeiro', `Conta a pagar criada: ${item.description} - R$ ${item.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, {
       entityType: 'Payable',
@@ -251,34 +265,64 @@ export const payablesService = {
     const old = db.getById(item.id);
     db.update(item);
     void persistUpsert(item);
-    invalidateDashboardCache();
-    
+
     // Audit Log (detecta se é pagamento)
     const isPaying = old && old.paidAmount !== item.paidAmount;
     const action = isPaying ? 'update' : 'update';
-    const desc = isPaying 
+    const desc = isPaying
       ? `Pagamento registrado: ${item.description} - R$ ${(item.paidAmount - old.paidAmount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
       : `Conta a pagar atualizada: ${item.description}`;
-    
-    void auditService.logAction(action, 'Financeiro', desc, {
+
+    void auditService.logAction(action as any, 'Financeiro', `Conta a pagar: #${item.description} - ${desc}`, {
       entityType: 'Payable',
       entityId: item.id,
-      metadata: { paidAmount: item.paidAmount, status: item.status }
+      metadata: { status: item.status, amount: item.amount, paidAmount: item.paidAmount }
     });
+
+    invalidateDashboardCache();
+    invalidateFinancialCache();
+
+    // ✅ Sincronizar status financeiro via EventBus
+    if (item.purchaseOrderId && (item.subType === 'purchase_order' || item.subType === 'commission')) {
+      // Emite evento para quem estiver ouvindo (purchaseService)
+      import('../eventBus').then(({ eventBus }) => {
+        eventBus.emit('payable:updated', { purchaseOrderId: item.purchaseOrderId });
+      });
+    }
   },
 
-  delete: (id: string) => {
-    const item = db.getById(id);
+  delete: async (id: string) => {
+    const payable = db.getById(id);
+    if (!payable) return;
+
     db.delete(id);
     void persistDelete(id);
-    invalidateDashboardCache();
-    
+
+    const { userId, userName } = getLogInfo();
+    logService.addLog({
+      userId,
+      userName,
+      action: 'delete',
+      module: 'Financeiro',
+      description: `Excluiu conta a pagar: ${payable.description}`,
+      entityId: id
+    });
+
     // Audit Log
-    if (item) {
-      void auditService.logAction('delete', 'Financeiro', `Conta a pagar excluída: ${item.description} - R$ ${item.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, {
-        entityType: 'Payable',
-        entityId: id,
-        metadata: { amount: item.amount }
+    void auditService.logAction('delete', 'Financeiro', `Conta a pagar excluída: #${payable.description}`, {
+      entityType: 'Payable',
+      entityId: id,
+      metadata: { amount: payable.amount }
+    });
+
+    invalidateDashboardCache();
+    invalidateFinancialCache();
+
+    // ✅ Sincronizar status financeiro via EventBus
+    if (payable.purchaseOrderId && (payable.subType === 'purchase_order' || payable.subType === 'commission')) {
+      // Emite evento para quem estiver ouvindo (purchaseService)
+      import('../eventBus').then(({ eventBus }) => {
+        eventBus.emit('payable:updated', { purchaseOrderId: payable.purchaseOrderId });
       });
     }
   }

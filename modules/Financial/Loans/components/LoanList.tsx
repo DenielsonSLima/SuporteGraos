@@ -9,7 +9,7 @@ interface Props {
 }
 
 const LoanList: React.FC<Props> = ({ loans, onSelect }) => {
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
 
   // Ordenar empréstimos alfabeticamente por nome da entidade
   const sortedLoans = [...loans].sort((a, b) => 

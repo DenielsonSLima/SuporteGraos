@@ -1,10 +1,7 @@
-
-import { ModuleId } from '../types';
 import { Persistence } from './persistence';
-import { logService } from './logService';
 import { authService } from './authService';
-import { MENU_ITEMS, SUBMODULES } from '../constants';
-import { getSupabaseSession, supabase, supabaseAnonKey, supabaseUrl } from './supabase';
+import { logService } from './logService';
+import { getSupabaseSession, supabaseAnonKey, supabaseUrl } from './supabase';
 
 export interface UserData {
   id: string;
@@ -15,36 +12,13 @@ export interface UserData {
   phone: string;
   role: string;
   active: boolean;
-  permissions: string[]; // Alterado para string[] para suportar submódulos (ex: 'financial.payables')
-  password?: string; 
-  recoveryToken?: string; 
-  allowRecovery: boolean; // Flag individual para permitir recuperação via token
+  permissions: string[];
+  password?: string;
+  recoveryToken?: string;
+  allowRecovery: boolean;
 }
 
-// Gera todas as permissões possíveis (Módulos Pai + Submódulos Filhos)
-const getAllPermissions = () => {
-  const parentIds = MENU_ITEMS.map(i => i.id);
-  const childIds = Object.values(SUBMODULES).flat().map(s => s.id);
-  return [...parentIds, ...childIds];
-};
-
-const INITIAL_USERS: UserData[] = [
-  {
-    id: '1',
-    firstName: 'Administrador',
-    lastName: 'Sistema',
-    cpf: '000.000.000-00',
-    email: 'admin',
-    phone: '(66) 99999-9999',
-    role: 'Administrador',
-    active: true,
-    allowRecovery: true, // Habilitado por padrão para o Admin
-    password: '123', 
-    permissions: getAllPermissions() // Acesso Total Granular
-  }
-];
-
-const db = new Persistence<UserData>('users', INITIAL_USERS);
+const db = new Persistence<UserData>('users', []);
 
 const getLogInfo = () => {
   const user = authService.getCurrentUser();
@@ -55,111 +29,37 @@ const getLogInfo = () => {
 };
 
 /**
- * Helper para invocar a função centralizada do Supabase
- * Tenta chamar com a função separada primeiro, depois tenta com a centralizada
+ * Helper para invocar a função centralizada do Supabase 'manage-users'
  */
-const invokeAdminFunction = async (functionName: string, action: string, payload: any, session: any) => {
-  const centralFunctionName = 'manage-users';
-  const safePayload = payload && typeof payload === 'object' ? payload : {};
+const invokeAdminFunction = async (action: string, payload: any, session: any) => {
+  const functionName = 'manage-users';
   const headers = {
     Authorization: `Bearer ${session.access_token}`,
     apikey: supabaseAnonKey,
     'Content-Type': 'application/json'
   };
 
-  const callCentral = async () => {
-    const response = await fetch(`${supabaseUrl}/functions/v1/${centralFunctionName}`, {
+  try {
+    const response = await fetch(`${supabaseUrl}/functions/v1/${functionName}`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ action, ...safePayload })
+      body: JSON.stringify({ action, ...payload })
     });
 
     const text = await response.text();
     try {
       const data = JSON.parse(text);
-      return { data, error: response.ok ? null : { message: data?.error || 'Erro na Edge Function' } };
-    } catch {
-      return { data: null, error: { message: text || 'Resposta invalida da Edge Function' } };
-    }
-  };
-
-  try {
-    console.log(`[ADMIN] Tentando função centralizada: ${centralFunctionName}`);
-    const centralResult = await callCentral();
-    if (!centralResult.error && centralResult.data?.success) {
-      console.log(`[ADMIN] ✅ Sucesso com função centralizada`);
-      return { data: centralResult.data, error: null };
-    }
-
-    console.log(`[ADMIN] Função centralizada falhou, tentando função separada: ${functionName}`);
-    const { data, error } = await supabase.functions.invoke(functionName, {
-      headers,
-      throwOnError: false,
-      body: safePayload,
-      method: 'POST'
-    });
-
-    if (!error && data?.success) {
-      console.log(`[ADMIN] ✅ Sucesso com função separada: ${functionName}`);
-      return { data, error: null };
-    }
-
-    return { data, error: error || centralResult.error };
-  } catch (err) {
-    console.error(`[ADMIN] Erro ao invocar função:`, err);
-    return { data: null, error: err };
-  }
-};
-
-const extractEdgeFunctionError = async (error: any): Promise<string> => {
-  if (!error) {
-    return 'Falha ao executar Edge Function.';
-  }
-
-  const fallbackMessage = typeof error === 'string'
-    ? error
-    : error?.message || 'Falha ao executar Edge Function.';
-
-  const bodyContent = error?.context?.body;
-  if (typeof bodyContent === 'string' && bodyContent.trim().length > 0) {
-    try {
-      const parsed = JSON.parse(bodyContent);
-      if (parsed?.error) return parsed.error;
-      if (parsed?.message) return parsed.message;
-      return bodyContent;
-    } catch {
-      return bodyContent;
-    }
-  }
-
-  const response = error?.context?.response as Response | undefined;
-  if (!response) {
-    return fallbackMessage;
-  }
-
-  try {
-    const clone = response.clone();
-    const text = await clone.text();
-
-    if (text) {
-      try {
-        const json = JSON.parse(text);
-        if (typeof json?.error === 'string') {
-          return json.error;
-        }
-        if (typeof json?.message === 'string') {
-          return json.message;
-        }
-        return text;
-      } catch {
-        return text;
+      if (!response.ok || !data.success) {
+        return { data: null, error: { message: data?.error || data?.message || `Erro ${response.status} na Edge Function` } };
       }
+      return { data, error: null };
+    } catch {
+      return { data: null, error: { message: text || 'Resposta inválida da Edge Function' } };
     }
-  } catch (parseError) {
-    console.error('[USER] Falha ao interpretar erro da Edge Function:', parseError);
+  } catch (err: any) {
+    console.error(`[USER_SERVICE] Erro ao invocar função ${functionName}:`, err);
+    return { data: null, error: { message: err.message || 'Erro de conexão com o servidor' } };
   }
-
-  return fallbackMessage;
 };
 
 export const userService = {
@@ -167,84 +67,42 @@ export const userService = {
     try {
       const session = await getSupabaseSession();
       if (!session?.access_token) {
-        console.warn('[USER] Sem sessão, retornando usuários locais');
-        return db.getAll();
+        throw new Error('Sessão inválida. Faça login novamente.');
       }
 
-      console.log('[USER] Listando usuários via Supabase Auth...');
-      const { data, error } = await invokeAdminFunction('list-users', 'list', {}, session);
+      console.log('[USER_SERVICE] Listando usuários...');
+      const { data, error } = await invokeAdminFunction('list', {}, session);
 
-      if (error || !data?.success) {
-        console.error('❌ Erro ao listar usuários (Auth):', error?.message || data?.error);
-        console.warn('[USER] Retornando usuários locais como fallback');
-        return db.getAll();
+      if (error) {
+        throw new Error(error.message);
       }
 
-      console.log(`✅ ${(data.users || []).length} usuários carregados do Supabase Auth`);
-
-      const usersFromAuth = (data.users || []).map((u: any) => {
-        const metadata = u.user_metadata || {};
-        const firstName = metadata.first_name || u.first_name || (u.email ? u.email.split('@')[0] : 'Usuario');
-        const lastName = metadata.last_name || u.last_name || '';
-        const permissions = Array.isArray(metadata.permissions)
-          ? metadata.permissions
-          : (Array.isArray(u.permissions) ? u.permissions : []);
-
-        return {
-          id: u.id,
-          firstName,
-          lastName,
-          cpf: metadata.cpf || u.cpf || '',
-          email: u.email || '',
-          phone: metadata.phone || u.phone || '',
-          role: metadata.role || u.role || 'Operador',
-          active: metadata.active !== undefined ? !!metadata.active : (u.active !== undefined ? !!u.active : true),
-          permissions,
-          allowRecovery: metadata.allow_recovery !== undefined
-            ? !!metadata.allow_recovery
-            : (u.allow_recovery !== undefined ? !!u.allow_recovery : true)
-        } as UserData;
-      });
-
-      return usersFromAuth;
-    } catch (error) {
+      return (data.users || []).map((u: any) => ({
+        id: u.id,
+        firstName: u.first_name,
+        lastName: u.last_name,
+        cpf: u.cpf || '',
+        email: u.email || '',
+        phone: u.phone || '',
+        role: u.role || 'Operador',
+        active: !!u.active,
+        permissions: Array.isArray(u.permissions) ? u.permissions : [],
+        allowRecovery: !!u.allow_recovery
+      } as UserData));
+    } catch (error: any) {
       console.error('❌ Erro ao buscar usuários:', error);
-      console.warn('[USER] Retornando usuários locais como fallback');
-      return db.getAll();
+      throw error;
     }
-  },
-  getById: (id: string) => db.getById(id),
-  getByEmail: (email: string) => db.getAll().find(u => u.email === email),
-
-  // Valida o token mas também verifica se o usuário tem permissão de usá-lo
-  getByRecoveryToken: (token: string): UserData | undefined => {
-    const user = db.getAll().find(u => u.recoveryToken === token);
-    
-    if (user && !user.allowRecovery) {
-        // Se achou o usuário mas ele não tem permissão, retorna undefined como se o token fosse inválido
-        return undefined;
-    }
-    return user;
   },
 
   add: async (user: UserData, generatePassword: boolean = true) => {
     try {
-      if (!generatePassword && !user.password) {
-        throw new Error('Senha obrigatoria quando a geracao automatica esta desativada.');
-      }
       const session = await getSupabaseSession();
-      console.log('[USER] Sessao Supabase:', {
-        hasSession: !!session,
-        hasAccessToken: !!session?.access_token,
-        userId: session?.user?.id,
-        email: session?.user?.email
-      });
       if (!session?.access_token) {
-        throw new Error('Sessao invalida. Faca login novamente.');
+        throw new Error('Sessão inválida. Faça login novamente.');
       }
-      console.log('🔐 Criando usuario via Edge Function (auth.users)...');
 
-      const { data, error } = await invokeAdminFunction('create-user', 'create', {
+      const { data, error } = await invokeAdminFunction('create', {
         firstName: user.firstName,
         lastName: user.lastName,
         cpf: user.cpf,
@@ -258,27 +116,9 @@ export const userService = {
         password: user.password || null
       }, session);
 
-      console.log('[USER] Resposta Edge Function:', {
-        hasError: !!error,
-        errorMessage: error?.message,
-        data
-      });
-
-      const detailedMessageFromFunction = data?.error || data?.message;
-
-      if (error || !data?.success) {
-        const detailedMessage = detailedMessageFromFunction || (await extractEdgeFunctionError(error));
-        console.error('❌ Erro ao criar usuario:', detailedMessage, error);
-        throw new Error(detailedMessage || 'Erro ao criar usuario');
+      if (error) {
+        throw new Error(error.message);
       }
-
-      console.log('✅ Usuario criado em auth.users:', data.user_id);
-      if (data.generated_password) {
-        console.log('🔑 Senha temporaria gerada:', data.generated_password);
-      }
-
-      // Também salvar no localStorage para compatibilidade
-      db.add(user);
 
       const { userId, userName } = getLogInfo();
       logService.addLog({
@@ -286,8 +126,8 @@ export const userService = {
         userName,
         action: 'create',
         module: 'Configurações',
-        description: `Cadastrou novo usuário: ${user.firstName} ${user.lastName} (${user.email}) ${generatePassword ? 'com senha gerada automaticamente' : 'com senha definida'}`,
-        entityId: user.id
+        description: `Cadastrou novo usuário: ${user.firstName} ${user.lastName} (${user.email})`,
+        entityId: data.user_id
       });
 
       return {
@@ -295,9 +135,8 @@ export const userService = {
         generatedPassword: data.generated_password
       };
     } catch (error: any) {
-      const detailedMessage = await extractEdgeFunctionError(error);
-      console.error('❌ Erro ao adicionar usuário:', detailedMessage, error);
-      throw new Error(detailedMessage || error?.message || 'Erro ao adicionar usuário');
+      console.error('❌ Erro ao adicionar usuário:', error);
+      throw error;
     }
   },
 
@@ -305,10 +144,10 @@ export const userService = {
     try {
       const session = await getSupabaseSession();
       if (!session?.access_token) {
-        throw new Error('Sessao invalida. Faca login novamente.');
+        throw new Error('Sessão inválida. Faça login novamente.');
       }
 
-      const { data, error } = await invokeAdminFunction('update-user', 'update', {
+      const { error } = await invokeAdminFunction('update', {
         userId: user.id,
         email: user.email,
         password: user.password || null,
@@ -322,16 +161,10 @@ export const userService = {
         allowRecovery: user.allowRecovery
       }, session);
 
-      if (error || !data?.success) {
-        const detailedMessage = data?.error
-          || (error ? await extractEdgeFunctionError(error) : 'Erro ao atualizar usuario');
-        if (error) {
-          console.error('❌ Contexto erro update-user:', error);
-        }
-        throw new Error(detailedMessage);
+      if (error) {
+        throw new Error(error.message);
       }
 
-      db.update(user);
       const { userId, userName } = getLogInfo();
       logService.addLog({
         userId,
@@ -342,40 +175,61 @@ export const userService = {
         entityId: user.id
       });
     } catch (error: any) {
-      const detailedMessage = await extractEdgeFunctionError(error);
-      console.error('❌ Erro ao atualizar usuário:', detailedMessage, error);
-      throw new Error(detailedMessage || error?.message || 'Erro ao atualizar usuário');
+      console.error('❌ Erro ao atualizar usuário:', error);
+      throw error;
     }
   },
 
-  delete: async (id: string) => {
+  /**
+   * Inativa um usuário (muda status para active: false)
+   */
+  inactivate: async (id: string) => {
     try {
-      const u = db.getById(id);
-      console.log('🗑️ Desativando usuário no Supabase Auth...');
-
       const session = await getSupabaseSession();
       if (!session?.access_token) {
-        throw new Error('Sessao invalida. Faca login novamente.');
+        throw new Error('Sessão inválida. Faça login novamente.');
       }
 
-      const { data, error } = await invokeAdminFunction('update-user', 'update', {
+      const { error } = await invokeAdminFunction('update', {
         userId: id,
         active: false
       }, session);
 
-      if (error || !data?.success) {
-        const detailedMessage = data?.error
-          || (error ? await extractEdgeFunctionError(error) : 'Erro ao desativar usuario no Supabase Auth');
-        if (error) {
-          console.error('❌ Contexto erro delete-user:', error);
-        }
-        console.error('❌ Erro ao desativar no Supabase Auth:', detailedMessage);
-        throw new Error(detailedMessage);
+      if (error) {
+        throw new Error(error.message);
       }
 
-      console.log('✅ Usuário desativado no Supabase Auth');
-      if (u) {
-        db.update({ ...u, active: false });
+      const { userId, userName } = getLogInfo();
+      logService.addLog({
+        userId,
+        userName,
+        action: 'update',
+        module: 'Configurações',
+        description: `Inativou usuário ID: ${id}`,
+        entityId: id
+      });
+    } catch (error: any) {
+      console.error('❌ Erro ao inativar usuário:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Exclui definitivamente um usuário do Supabase Auth
+   */
+  delete: async (id: string) => {
+    try {
+      const session = await getSupabaseSession();
+      if (!session?.access_token) {
+        throw new Error('Sessão inválida. Faça login novamente.');
+      }
+
+      const { error } = await invokeAdminFunction('delete', {
+        userId: id
+      }, session);
+
+      if (error) {
+        throw new Error(error.message);
       }
 
       const { userId, userName } = getLogInfo();
@@ -384,40 +238,52 @@ export const userService = {
         userName,
         action: 'delete',
         module: 'Configurações',
-        description: `Desativou usuário: ${u?.firstName || 'Desconhecido'}`,
+        description: `Excluiu definitivamente o usuário ID: ${id}`,
         entityId: id
       });
     } catch (error: any) {
-      const detailedMessage = await extractEdgeFunctionError(error);
-      console.error('❌ Erro ao deletar usuário:', detailedMessage, error);
-      throw new Error(detailedMessage || error?.message || 'Erro ao deletar usuário');
+      console.error('❌ Erro ao excluir usuário:', error);
+      throw error;
     }
+  },
+
+  getById: (id: string) => db.getById(id),
+  getByEmail: (email: string) => db.getAll().find(u => u.email === email),
+
+  // Valida o token mas também verifica se o usuário tem permissão de usá-lo
+  getByRecoveryToken: (token: string): UserData | undefined => {
+    const user = db.getAll().find(u => u.recoveryToken === token);
+
+    if (user && !user.allowRecovery) {
+      return undefined;
+    }
+    return user;
   },
 
   // --- MÉTODOS DE SEGURANÇA E TOKEN ---
 
   generateRecoveryToken: (userId: string): string => {
+    // Busca na lista local (db) ou tenta buscar pelo ID se necessário
+    // Para simplificar e manter compatibilidade com o que existia:
     const user = db.getById(userId);
-    if (!user) throw new Error('Usuário não encontrado');
-    
+    if (!user) throw new Error('Usuário não encontrado localmente para gerar token');
+
     if (!user.allowRecovery) {
-        throw new Error('Este usuário não tem permissão para recuperação de senha via token. Ative a opção nas configurações.');
+      throw new Error('Este usuário não tem permissão para recuperação de senha via token.');
     }
 
-    // Gera um token curto e legível (Ex: AB12-CD34)
-    const token = Math.random().toString(36).substr(2, 4).toUpperCase() + '-' + 
-                  Math.random().toString(36).substr(2, 4).toUpperCase();
-    
+    const token = Math.random().toString(36).substr(2, 4).toUpperCase() + '-' +
+      Math.random().toString(36).substr(2, 4).toUpperCase();
+
     db.update({ ...user, recoveryToken: token });
 
-    // LOG DE GERAÇÃO
     const { userId: adminId, userName } = getLogInfo();
     logService.addLog({
       userId: adminId,
       userName,
       action: 'update',
       module: 'Segurança',
-      description: `Gerou token de recuperação para o usuário: ${user.firstName} ${user.lastName}`,
+      description: `Gerou token de recuperação para o usuário: ${user.firstName}`,
       entityId: userId
     });
 
@@ -428,18 +294,14 @@ export const userService = {
     const users = db.getAll();
     const user = users.find(u => u.recoveryToken === token);
 
-    // Verificação dupla: Token existe E usuário tem permissão
     if (!user || !user.allowRecovery) return false;
 
-    // Atualiza senha e remove o token (uso único)
-    db.update({ 
-      ...user, 
-      password: newPassword, 
-      recoveryToken: undefined 
+    db.update({
+      ...user,
+      password: newPassword,
+      recoveryToken: undefined
     });
 
-    // LOG DE REDEFINIÇÃO
-    // Como o usuário ainda não está logado (está na tela de login), usamos o ID do usuário recuperado
     logService.addLog({
       userId: user.id,
       userName: `${user.firstName} ${user.lastName}`,
@@ -450,5 +312,13 @@ export const userService = {
     });
 
     return true;
+  },
+
+  /**
+   * Mantido para compatibilidade, aponta para inactivate
+   * @deprecated Use inactivate() ou delete()
+   */
+  deleteLegacy: async (id: string) => {
+    return userService.inactivate(id);
   }
 };

@@ -11,7 +11,7 @@ interface Props {
 }
 
 const ShareholderCard: React.FC<Props> = ({ shareholder, onWithdraw, onViewHistory, onConfigureRecurrence }) => {
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
   
   const hasRecurrence = shareholder.financial.recurrence?.active;
   const recurrenceAmount = shareholder.financial.recurrence?.amount || 0;

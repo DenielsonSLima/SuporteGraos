@@ -8,7 +8,7 @@ interface Props {
 }
 
 const LoanKPIs: React.FC<Props> = ({ loans }) => {
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
 
   const stats = {
     takenTotal: loans.filter(l => l.type === 'taken' && l.status === 'active').reduce((acc, l) => acc + l.remainingValue, 0),

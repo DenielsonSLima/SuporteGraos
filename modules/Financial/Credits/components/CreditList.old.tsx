@@ -9,7 +9,7 @@ interface Props {
 }
 
 const CreditList: React.FC<Props> = ({ credits, onSelect }) => {
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
   const dateStr = (val: string) => new Date(val).toLocaleDateString('pt-BR');
 
   const getAccountLabel = (accountId?: string) => {

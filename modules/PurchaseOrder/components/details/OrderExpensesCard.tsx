@@ -12,7 +12,7 @@ interface Props {
 }
 
 const OrderExpensesCard: React.FC<Props> = ({ transactions, onAddExpense, onEditTx, onDeleteTx }) => {
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
   const expenses = transactions.filter(t => t.type === 'expense');
   const totalExpenses = expenses.reduce((acc, t) => acc + t.value, 0);
 

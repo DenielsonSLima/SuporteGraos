@@ -82,7 +82,7 @@ const mapLoadingToDb = (l: Loading) => ({
   company_id: null
 });
 
-const mapLoadingFromDb = (row: any): Loading => {
+export const mapLoadingFromDb = (row: any): Loading => {
   const meta: Loading | undefined = row?.metadata;
   const base: Loading = meta ? { ...meta } : {
     id: row?.id,
@@ -141,11 +141,11 @@ const loadFromSupabase = async () => {
         .select('*')
         .order('created_at', { ascending: false })
     );
-
-    const mapped = (data || []).map(mapLoadingFromDb);
+    const mapped = (data as any[] || []).map(mapLoadingFromDb);
     db.setAll(mapped);
     isLoaded = true;
-    console.log('🔄 Carregamentos sincronizando em tempo real...');
+    console.log('🔄 Carregamentos sincronizados em tempo real...');
+    return mapped;
   } catch (error) {
     console.error('❌ Erro ao carregar logistics_loadings:', error);
   }
@@ -182,7 +182,7 @@ const persistUpsert = async (loading: Loading) => {
       console.error('Erro ao salvar carregamento no Supabase', error);
       return;
     }
-    await loadFromSupabase();
+    // Realtime subscription já sincroniza automaticamente (não precisa recarregar tudo)
   } catch (err) {
     console.error('Erro inesperado ao salvar carregamento no Supabase', err);
   }
@@ -267,7 +267,7 @@ export const loadingService = {
         subType: 'freight',
         notes: `Carregamento: ${loading.weightKg}kg`
       });
-      
+
       showToast('success', `💰 Frete ${loading.carrierName} criado no financeiro`);
     }
 
@@ -276,10 +276,10 @@ export const loadingService = {
       console.log('🔍 DEBUG FORNECEDOR - Buscando pedido de compra:', loading.purchaseOrderId);
       const purchaseOrder = purchaseService.getById(loading.purchaseOrderId);
       console.log('🔍 DEBUG FORNECEDOR - Pedido encontrado?', purchaseOrder ? 'SIM' : 'NÃO', purchaseOrder);
-      
+
       if (purchaseOrder && purchaseOrder.partnerId) {
         console.log('✅ ENTROU NO IF - Tem partnerId:', purchaseOrder.partnerId);
-        
+
         // ✅ CORREÇÃO: Buscar TODAS as cargas do pedido e SOMAR os valores
         const allLoadingsFromOrder = loadingService.getByPurchaseOrder(loading.purchaseOrderId);
         const totalPurchaseAmount = allLoadingsFromOrder.reduce((sum, l) => sum + (Number(l.totalPurchaseValue) || 0), 0);
@@ -302,12 +302,12 @@ export const loadingService = {
         // Verifica se já existe um payable para este pedido de compra
         const existingPayables = payablesService.getAll();
         console.log('🔍 Total de payables existentes:', existingPayables.length);
-        
-        const existingPayable = existingPayables.find(p => 
-          p.purchaseOrderId === loading.purchaseOrderId && 
+
+        const existingPayable = existingPayables.find(p =>
+          p.purchaseOrderId === loading.purchaseOrderId &&
           p.subType === 'purchase_order'
         );
-              invalidateDashboardCache();
+        invalidateDashboardCache();
         console.log('🔍 Payable existente para este pedido?', existingPayable ? 'SIM' : 'NÃO');
 
         if (existingPayable) {
@@ -327,28 +327,66 @@ export const loadingService = {
               purchaseOrderId: loading.purchaseOrderId,
               partnerId: purchaseOrder.partnerId,
               partnerName: purchaseOrder.partnerName || loading.supplierName,
-              description: `Compra #${purchaseOrder.number} - ${loading.product}`,
-              dueDate: loading.date,
+              description: `Compra de Grãos - Pedido ${purchaseOrder.number}`,
+              dueDate: loading.date, // Data da primeira carga ou vencimento do pedido
               amount: totalPurchaseAmount,
               paidAmount: totalPurchasePaid,
               status: totalPurchasePaid >= totalPurchaseAmount ? 'paid' : 'pending',
               subType: 'purchase_order',
-              notes: `Total de ${allLoadingsFromOrder.length} carregamento(s)`
+              notes: `Gerado automaticamente via Logística. Total Cargas: ${allLoadingsFromOrder.length}`
             });
-            console.log('✅✅ Payable do fornecedor criado com sucesso!');
-          } catch (error) {
-            console.error('❌ ERRO ao criar payable do fornecedor:', error);
+            console.log('✅ Payable do fornecedor criado com sucesso!');
+          } catch (err) {
+            console.error('❌ Erro ao criar payable do fornecedor:', err);
+          }
+        }
+
+        // ✅ NOVO: Criar automaticamente um payable de COMISSÃO DE CORRETOR se houver no pedido
+        if (purchaseOrder.brokerId && purchaseOrder.brokerCommissionPerSc && purchaseOrder.brokerCommissionPerSc > 0) {
+          console.log('🤝 Verificando comissão de corretor...', {
+            brokerId: purchaseOrder.brokerId,
+            commissionPerSc: purchaseOrder.brokerCommissionPerSc,
+            weightKg: loading.weightKg
+          });
+
+          // Calcula o valor da comissão para ESTA carga
+          // Peso em sc = kg / 60
+          const weightSc = (loading.weightKg || 0) / 60;
+          const commissionValue = Number((weightSc * purchaseOrder.brokerCommissionPerSc).toFixed(2));
+
+          if (commissionValue > 0) {
+            console.log('💰 Criando payable de COMISSÃO:', {
+              brokerId: purchaseOrder.brokerId,
+              commissionValue
+            });
+
+            payablesService.add({
+              id: generateUUID(),
+              loadingId: loading.id, // Vincula à carga específica
+              purchaseOrderId: loading.purchaseOrderId, // Vincula ao pedido
+              partnerId: purchaseOrder.brokerId,
+              partnerName: purchaseOrder.brokerName || 'Corretor', // Tenta usar nome se tiver
+              description: `Comissão - Placa ${loading.vehiclePlate || 'N/A'} - Pedido ${purchaseOrder.number}`,
+              dueDate: loading.date,
+              amount: commissionValue,
+              paidAmount: 0,
+              status: 'pending',
+              subType: 'commission',
+              notes: `Comissão: ${weightSc.toFixed(2)} sc * R$ ${purchaseOrder.brokerCommissionPerSc.toFixed(2)}/sc`
+            });
+
+            showToast('success', `💰 Comissão criada: R$ ${commissionValue.toFixed(2)}`);
           }
         }
       } else {
-        console.log('⚠️ Condição não atendida - purchaseOrder:', !!purchaseOrder, 'partnerId:', purchaseOrder?.partnerId);
+        console.warn('⚠️ Pedido de compra encontrado mas SEM partnerId:', loading.purchaseOrderId);
       }
     } else {
       console.log('⚠️ Condição de fornecedor não atendida - purchaseOrderId:', loading.purchaseOrderId, 'totalPurchaseValue:', loading.totalPurchaseValue);
     }
 
     const { userId, userName } = getLogInfo();
-              invalidateDashboardCache();
+    invalidateDashboardCache();
     logService.addLog({
       userId,
       userName,
@@ -357,14 +395,14 @@ export const loadingService = {
       description: `Registrou carregamento: Placa ${loading.vehiclePlate} (${loading.weightKg}kg)`,
       entityId: loading.id
     });
-    
+
     // Audit Log
     void auditService.logAction('create', 'Logística', `Carregamento criado: ${loading.vehiclePlate} - ${loading.weightKg}kg - ${loading.product}`, {
       entityType: 'Loading',
       entityId: loading.id,
-      metadata: { 
-        vehiclePlate: loading.vehiclePlate, 
-        weightKg: loading.weightKg, 
+      metadata: {
+        vehiclePlate: loading.vehiclePlate,
+        weightKg: loading.weightKg,
         product: loading.product,
         purchaseOrderId: loading.purchaseOrderId,
         salesOrderId: loading.salesOrderId,
@@ -438,7 +476,7 @@ export const loadingService = {
 
         if (existingReceivable) receivablesService.update(receivablePayload);
         else receivablesService.add(receivablePayload);
-        
+
         showToast('success', `✅ Conta a Receber criada para ${(sale as any)?.partnerName || 'Cliente'}`);
         console.log('✅ Receivable salvo! Aguarde atualização em tempo real...');
       } else {
@@ -471,23 +509,51 @@ export const loadingService = {
       description,
       entityId: updatedLoading.id
     });
-    
+
     // Audit Log (detecta peso de descarrego)
     const isUnloadWeight = updatedLoading.unloadWeightKg && (!oldLoading || oldLoading.unloadWeightKg !== updatedLoading.unloadWeightKg);
     const auditDesc = isUnloadWeight
       ? `Peso de descarrego registrado: ${updatedLoading.vehiclePlate} - ${updatedLoading.unloadWeightKg}kg destino`
       : description;
-    
+
     void auditService.logAction('update', 'Logística', auditDesc, {
       entityType: 'Loading',
       entityId: updatedLoading.id,
-      metadata: { 
+      metadata: {
         status: updatedLoading.status,
         weightKg: updatedLoading.weightKg,
         unloadWeightKg: updatedLoading.unloadWeightKg,
         vehiclePlate: updatedLoading.vehiclePlate
       }
     });
+
+    // ✅ SYNC: Atualizar status do Payable de FRETE se houver pagamento no Logística
+    if (updatedLoading.totalFreightValue && updatedLoading.totalFreightValue > 0) {
+      const allPayables = payablesService.getAll();
+      const freightPayable = allPayables.find(
+        p => p.loadingId === updatedLoading.id && p.subType === 'freight'
+      );
+
+      if (freightPayable) {
+        const freightAmount = Number(updatedLoading.totalFreightValue) || 0;
+        const freightPaid = Number(updatedLoading.freightPaid) || 0;
+
+        // Se houve mudança significativa nos valores ou status
+        if (Math.abs(freightPayable.paidAmount - freightPaid) > 0.01 || Math.abs(freightPayable.amount - freightAmount) > 0.01) {
+          console.log(`🔄 Sincronizando Payable de Frete: ${freightPayable.description}`, {
+            antes: { amount: freightPayable.amount, paid: freightPayable.paidAmount },
+            agora: { amount: freightAmount, paid: freightPaid }
+          });
+
+          payablesService.update({
+            ...freightPayable,
+            amount: freightAmount,
+            paidAmount: freightPaid,
+            status: freightPaid >= freightAmount ? 'paid' : freightPaid > 0 ? 'partially_paid' : 'pending'
+          });
+        }
+      }
+    }
   },
 
   delete: (id: string) => {
@@ -495,19 +561,33 @@ export const loadingService = {
     db.delete(id);
     void persistDelete(id);
 
-    // ✅ DELETE EM CASCATA: Se o carregamento tinha um payable de frete, delete também
-    if (loading && loading.totalFreightValue && loading.totalFreightValue > 0) {
-      // Busca o payable associado ao frete deste carregamento
+    // ✅ DELETE EM CASCATA: Se o carregamento tinha um payable de frete OU comissão, delete também
+    if (loading) {
       const allPayables = payablesService.getAll();
-      const relatedPayable = allPayables.find(
-        p => p.purchaseOrderId === loading.purchaseOrderId && 
-             p.subType === 'freight' && 
-             p.partnerId === loading.carrierId
+
+      // Deletar payable de FRETE
+      if (loading.totalFreightValue && loading.totalFreightValue > 0) {
+        const freightPayable = allPayables.find(
+          p => p.purchaseOrderId === loading.purchaseOrderId &&
+            p.subType === 'freight' &&
+            p.partnerId === loading.carrierId &&
+            p.loadingId === loading.id // Garante que deleta apenas o frete DESTA carga (se tiver ID vinculado)
+        );
+
+        if (freightPayable) {
+          console.log(`🗑️ Deletando payable associado ao frete: ${freightPayable.id}`);
+          payablesService.delete(freightPayable.id);
+        }
+      }
+
+      // Deletar payable de COMISSÃO
+      const commissionPayable = allPayables.find(
+        p => p.loadingId === loading.id && p.subType === 'commission'
       );
-      
-      if (relatedPayable) {
-        console.log(`🗑️ Deletando payable associado ao frete: ${relatedPayable.id}`);
-        payablesService.delete(relatedPayable.id);
+
+      if (commissionPayable) {
+        console.log(`🗑️ Deletando payable associado à comissão: ${commissionPayable.id}`);
+        payablesService.delete(commissionPayable.id);
       }
     }
 
@@ -520,19 +600,19 @@ export const loadingService = {
       description: `Excluiu carregamento: Placa ${loading?.vehiclePlate || 'Desconhecida'}`,
       entityId: id
     });
-    
+
     // Audit Log
     void auditService.logAction('delete', 'Logística', `Carregamento excluído: ${loading?.vehiclePlate || 'Desconhecida'} - ${loading?.weightKg || 0}kg`, {
       entityType: 'Loading',
       entityId: id,
-      metadata: { 
+      metadata: {
         vehiclePlate: loading?.vehiclePlate,
         weightKg: loading?.weightKg,
         unloadWeightKg: loading?.unloadWeightKg,
         totalFreightValue: loading?.totalFreightValue
       }
     });
-    
+
     // 🎯 LIMPAR CACHE DO DASHBOARD IMEDIATAMENTE
     DashboardCache.clearAll();
     invalidateDashboardCache();
@@ -554,30 +634,30 @@ export const loadingService = {
   // ✅ FUNÇÃO DE CORREÇÃO: Recalcular todos os payables de pedidos de compra
   recalculateAllPurchasePayables: () => {
     console.log('🔧 INICIANDO RECÁLCULO DE PAYABLES DE COMPRA...');
-    
+
     const allPayables = payablesService.getAll();
     const purchasePayables = allPayables.filter(p => p.subType === 'purchase_order');
-    
+
     console.log(`📊 Total de payables de compra encontrados: ${purchasePayables.length}`);
-    
+
     purchasePayables.forEach(payable => {
       if (!payable.purchaseOrderId) {
         console.log(`⚠️ Payable ${payable.id} sem purchaseOrderId, pulando...`);
         return;
       }
-      
+
       // Buscar todas as cargas deste pedido
       const loadings = loadingService.getByPurchaseOrder(payable.purchaseOrderId);
-      
+
       if (loadings.length === 0) {
         console.log(`⚠️ Nenhuma carga encontrada para pedido ${payable.purchaseOrderId}`);
         return;
       }
-      
+
       // Somar valores de todas as cargas
       const totalPurchaseAmount = loadings.reduce((sum, l) => sum + (Number(l.totalPurchaseValue) || 0), 0);
       const totalPurchasePaid = loadings.reduce((sum, l) => sum + (Number(l.productPaid) || 0), 0);
-      
+
       // Verificar se o valor está diferente
       if (payable.amount !== totalPurchaseAmount || payable.paidAmount !== totalPurchasePaid) {
         console.log(`🔄 CORRIGINDO Payable ${payable.description}:`, {
@@ -587,7 +667,7 @@ export const loadingService = {
           pagoNovo: totalPurchasePaid,
           totalCargas: loadings.length
         });
-        
+
         // Atualizar com valores corretos
         payablesService.update({
           ...payable,
@@ -595,13 +675,13 @@ export const loadingService = {
           paidAmount: totalPurchasePaid,
           status: totalPurchasePaid >= totalPurchaseAmount ? 'paid' : totalPurchasePaid > 0 ? 'partially_paid' : 'pending'
         });
-        
+
         console.log(`✅ Payable corrigido com sucesso!`);
       } else {
         console.log(`✓ Payable ${payable.description} já está correto (${totalPurchaseAmount})`);
       }
     });
-    
+
     console.log('🎉 RECÁLCULO CONCLUÍDO!');
   },
 

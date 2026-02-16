@@ -21,6 +21,32 @@ const db = new Persistence<FinancialRecord>('credits', [], { useStorage: false }
 let realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
 let isLoaded = false;
 
+// ============================================================================
+// REALTIME
+// ============================================================================
+
+const startRealtime = () => {
+  if (realtimeChannel) return;
+
+  realtimeChannel = supabase
+    .channel('realtime:credits')
+    .on('postgres_changes', {
+      event: '*', schema: 'public', table: 'standalone_records',
+      filter: 'sub_type=in.(credit_income,investment)'
+    }, () => {
+      console.log('🔔 Realtime credits: mudança detectada');
+      isLoaded = false;
+      void loadFromSupabase();
+      invalidateFinancialCache();
+      invalidateDashboardCache();
+    })
+    .subscribe(status => {
+      if (status === 'SUBSCRIBED') {
+        console.log('✅ Realtime credits ativo');
+      }
+    });
+};
+
 const getLogInfo = () => {
   const user = authService.getCurrentUser();
   return {
@@ -134,7 +160,7 @@ export const create = async (credit: FinancialRecord): Promise<Credit | null> =>
       input: credit,
       converted: sbRecord
     });
-    
+
     const { data, error } = await supabase
       .from('standalone_records')
       .insert([sbRecord])
@@ -150,7 +176,7 @@ export const create = async (credit: FinancialRecord): Promise<Credit | null> =>
     console.log('✅ Crédito criado:', data);
     const mapped = fromSupabase(data);
     db.add(mapped);
-    
+
     const { userId, userName } = getLogInfo();
     logService.addLog({
       userId,
@@ -182,7 +208,7 @@ export const create = async (credit: FinancialRecord): Promise<Credit | null> =>
 export const update = async (id: string, updates: Partial<FinancialRecord>): Promise<Credit | null> => {
   try {
     const sbUpdates = toSupabase(updates as FinancialRecord);
-    
+
     const { data, error } = await supabase
       .from('standalone_records')
       .update(sbUpdates)
@@ -330,11 +356,11 @@ export const getCredits = (): FinancialRecord[] => {
  */
 export const groupByMonth = (credits: FinancialRecord[]): Record<string, FinancialRecord[]> => {
   const grouped: Record<string, FinancialRecord[]> = {};
-  
+
   credits.forEach(credit => {
     const date = new Date(credit.issueDate);
     const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-    
+
     if (!grouped[monthKey]) {
       grouped[monthKey] = [];
     }
@@ -350,7 +376,7 @@ export const groupByMonth = (credits: FinancialRecord[]): Record<string, Financi
 export const getCurrentMonthCredits = (): FinancialRecord[] => {
   const now = new Date();
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  
+
   const credits = getCredits();
   return credits.filter(credit => {
     const date = new Date(credit.issueDate);
@@ -365,7 +391,7 @@ export const getCurrentMonthCredits = (): FinancialRecord[] => {
 export const getOtherMonthsCredits = (): FinancialRecord[] => {
   const now = new Date();
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  
+
   const credits = getCredits();
   return credits.filter(credit => {
     const date = new Date(credit.issueDate);
@@ -383,10 +409,10 @@ export const getOtherMonthsCredits = (): FinancialRecord[] => {
  */
 export const getSummary = () => {
   const credits = getCredits();
-  
+
   const activeCredits = credits.filter(c => c.status === 'pending' || c.status === 'partial');
   const totalInvested = activeCredits.reduce((sum, c) => sum + (c.originalValue || 0), 0);
-  
+
   // Calcula rendimentos médios
   const totalEarnings = activeCredits.reduce((sum, c) => {
     const monthsElapsed = Math.max(1, Math.floor(
@@ -400,7 +426,7 @@ export const getSummary = () => {
     activeCount: activeCredits.length,
     totalInvested,
     totalEarnings,
-    averageRate: activeCredits.length > 0 
+    averageRate: activeCredits.length > 0
       ? activeCredits.reduce((sum, c) => sum + (c.paidValue || 0), 0) / activeCredits.length
       : 0,
   };
@@ -408,6 +434,7 @@ export const getSummary = () => {
 
 export default {
   loadFromSupabase,
+  startRealtime,
   create,
   update,
   remove,

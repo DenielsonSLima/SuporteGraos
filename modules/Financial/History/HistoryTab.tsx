@@ -531,7 +531,7 @@ const HistoryTab: React.FC = () => {
   const totalPaid = filteredRecords.reduce((acc, r) => acc + r.paidValue, 0);
   const totalPending = Math.max(0, totalOriginal - totalPaid);
 
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
 
   return (
     <div className="space-y-6">

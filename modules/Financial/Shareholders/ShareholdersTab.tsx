@@ -51,7 +51,7 @@ const ShareholdersTab: React.FC = () => {
     };
   }, []);
 
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
 
   // --- ACTIONS ---
 

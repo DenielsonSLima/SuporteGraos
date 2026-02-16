@@ -9,7 +9,7 @@ interface RankingItem {
 }
 
 const ShareholderRanking: React.FC<{ ranking: RankingItem[] }> = ({ ranking }) => {
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
   const maxTotal = Math.max(...ranking.map(r => r.total), 1); // Avoid div by 0
 
   return (

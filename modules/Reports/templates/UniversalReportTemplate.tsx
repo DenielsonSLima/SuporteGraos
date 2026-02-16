@@ -19,14 +19,14 @@ const UniversalReportTemplate: React.FC<Props> = ({ data }) => {
 
   const formatValue = (value: any, type?: string) => {
     if (value === undefined || value === null) return '-';
-    if (type === 'currency') return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+    if (type === 'currency') return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(value) < 0.005 ? 0 : value);
     if (type === 'date') return new Date(value).toLocaleDateString('pt-BR');
     if (type === 'number') return new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(value);
     return value;
   };
 
   return (
-    <div className="relative w-full bg-white text-slate-950 p-6 text-[9px] leading-tight font-sans min-h-[297mm]">
+    <div className={`relative w-full bg-white text-slate-950 p-6 text-[9px] leading-tight font-sans ${data.landscape ? 'min-h-[190mm]' : 'min-h-[297mm]'}`}>
       
       {/* WATERMARK */}
       <div className="absolute inset-0 z-0 flex items-center justify-center pointer-events-none overflow-hidden">

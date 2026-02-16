@@ -4,7 +4,7 @@ import ReportLayout from '../../components/ReportLayout';
 import { GeneratedReportData } from '../../types';
 
 const Template: React.FC<{ data: GeneratedReportData }> = ({ data }) => {
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
   const date = (val: string) => new Date(val).toLocaleDateString('pt-BR');
 
   const totalValue = data.summary?.find(s => s.label === 'Total Vendido')?.value || 0;
@@ -19,6 +19,7 @@ const Template: React.FC<{ data: GeneratedReportData }> = ({ data }) => {
             <th className="py-2 px-2 text-left font-bold uppercase text-slate-700">Cliente</th>
             <th className="py-2 px-2 text-left font-bold uppercase text-slate-700">Produto</th>
             <th className="py-2 px-2 text-right font-bold uppercase text-slate-700">Qtd.</th>
+            <th className="py-2 px-2 text-right font-bold uppercase text-slate-700">Carregado</th>
             <th className="py-2 px-2 text-right font-bold uppercase text-slate-700">Total</th>
           </tr>
         </thead>
@@ -30,6 +31,7 @@ const Template: React.FC<{ data: GeneratedReportData }> = ({ data }) => {
               <td className="py-1.5 px-2">{row.customerName}</td>
               <td className="py-1.5 px-2">{row.productName}</td>
               <td className="py-1.5 px-2 text-right">{row.qty}</td>
+              <td className="py-1.5 px-2 text-right">{row.loaded}</td>
               <td className="py-1.5 px-2 text-right">{currency(row.total)}</td>
             </tr>
           ))}

@@ -21,7 +21,10 @@ const salesHistoryReport: ReportModule = {
   },
   FilterComponent: DefaultFilters, // Use the default date range filter
   fetchData: ({ startDate, endDate }) => {
+    const fmt = (v: number) => new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(v);
     const all = reportsCache.getAllSales();
+    const allLoadings = reportsCache.getAllLoadings();
+
     const records = all.filter(s => {
       if (!startDate && !endDate) return true;
       const d = new Date(s.date).getTime();
@@ -30,7 +33,21 @@ const salesHistoryReport: ReportModule = {
       return d >= start && d <= end;
     });
 
-    const totalVal = records.reduce((acc, r) => acc + r.totalValue, 0);
+    const rows = records.map(s => {
+      const orderLoadings = allLoadings.filter(
+        (l: any) => l.salesOrderId === s.id && l.status !== 'canceled'
+      );
+      const loadedSc = orderLoadings.reduce((acc: number, l: any) => acc + (l.weightSc || 0), 0);
+      const totalSalesValue = orderLoadings.reduce((acc: number, l: any) => acc + (l.totalSalesValue || 0), 0);
+      return {
+        ...s,
+        qty: s.quantity ? `${fmt(s.quantity)} SC` : '-',
+        loaded: loadedSc > 0 ? `${fmt(loadedSc)} SC` : '-',
+        total: totalSalesValue || s.totalValue
+      };
+    });
+
+    const totalVal = rows.reduce((acc, r) => acc + (Number(r.total) || 0), 0);
 
     return {
       title: 'Histórico de Vendas',
@@ -41,13 +58,10 @@ const salesHistoryReport: ReportModule = {
         { header: 'Cliente', accessor: 'customerName' },
         { header: 'Produto', accessor: 'productName' },
         { header: 'Quantidade', accessor: 'qty', align: 'right' },
+        { header: 'Carregado', accessor: 'loaded', align: 'right' },
         { header: 'Valor Total', accessor: 'total', format: 'currency', align: 'right' }
       ],
-      rows: records.map(s => ({
-        ...s,
-        qty: s.quantity ? `${s.quantity} SC` : '-',
-        total: s.totalValue
-      })),
+      rows: rows,
       summary: [{ label: 'Total Vendido', value: totalVal, format: 'currency' }]
     };
   },

@@ -25,7 +25,7 @@ interface KPIProps {
 }
 
 const OperationalSummary: React.FC<KPIProps> = ({ data }) => {
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
   const number = (val: number) => new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 }).format(val);
 
   const KpiCard = ({ label, value, subValue, icon: Icon, color, trend }: any) => (

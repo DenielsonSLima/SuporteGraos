@@ -241,7 +241,7 @@ const LoadingManagement: React.FC<Props> = ({ loading, onClose, onUpdate, origin
     setIsTxModalOpen(false);
   };
 
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
   const labelClass = 'text-[10px] font-black text-slate-500 uppercase mb-1 block';
   const inputClass = 'w-full border-2 border-slate-300 bg-white px-2 py-1.5 text-slate-900 font-black focus:outline-none focus:border-blue-500 rounded-lg text-sm transition-all';
 

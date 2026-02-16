@@ -7,7 +7,7 @@ import { PdfFooter } from '../../../../components/pdf/PdfFooter';
 import { GeneratedReportData } from '../../types';
 
 const PdfDocument: React.FC<{ data: GeneratedReportData }> = ({ data }) => {
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
   const margin = data.summary?.[0]?.value || 0;
 
   return (

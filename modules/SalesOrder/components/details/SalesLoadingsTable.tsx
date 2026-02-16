@@ -11,7 +11,7 @@ interface Props {
 }
 
 const SalesLoadingsTable: React.FC<Props> = ({ loadings, onNavigateToPurchase, onViewLoading }) => {
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
+  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(!val || Math.abs(val) < 0.005 ? 0 : val);
   
   // CORREÇÃO DE FUSO HORÁRIO
   const dateStr = (val: string) => {

@@ -45,7 +45,7 @@ const FinancialPaymentModal: React.FC<Props> = ({ record, bulkTotal, bulkCount, 
   const isReceipt = record?.subType === 'sales_order' || record?.subType === 'receipt' || record?.category === 'Venda de Ativo';
 
   const formatBRL = (val: number) => {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
   };
 
   useEffect(() => {

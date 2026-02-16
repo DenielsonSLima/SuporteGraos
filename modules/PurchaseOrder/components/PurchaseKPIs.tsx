@@ -28,8 +28,17 @@ const PurchaseKPIs: React.FC<Props> = React.memo(({ orders }) => {
     const totalContractValue = orders.reduce((acc, curr) => acc + curr.totalValue, 0);
     
     // --- CÁLCULO DE TOTAL PAGO (PEDIDOS) ---
-    // Soma o que já foi liquidado (Dinheiro + Descontos)
-    const totalSettled = orders.reduce((acc, curr) => acc + (curr.paidValue || 0) + (curr.discountValue || 0), 0);
+    // Soma o que já foi liquidado (Dinheiro + Descontos), priorizando transações
+    const totalSettled = orders.reduce((acc, curr) => {
+      const txs = curr.transactions || [];
+      const paidTx = txs
+        .filter(t => t.type === 'payment' || t.type === 'advance')
+        .reduce((s, t) => s + (t.value || 0), 0);
+      const discTx = txs.reduce((s, t) => s + (t.discountValue || 0), 0);
+      const paid = Math.max(paidTx, curr.paidValue || 0);
+      const disc = Math.max(discTx, curr.discountValue || 0);
+      return acc + paid + disc;
+    }, 0);
     
     // --- CÁLCULO DE SALDO PENDENTE (BASEADO NO CARREGADO) ---
     // Dívida Real = (Valor de tudo que carregou nesses pedidos) - (O que paguei nesses pedidos)

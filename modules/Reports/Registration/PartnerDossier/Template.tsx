@@ -9,7 +9,7 @@ const Template: React.FC<{ data: GeneratedReportData }> = ({ data }) => {
 
   const { partner, purchases, sales, loadings, financial } = dossier;
 
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
   const date = (val: string) => new Date(val).toLocaleDateString('pt-BR');
 
   return (

@@ -144,6 +144,7 @@ const ReportsModule: React.FC = () => {
     'trial_balance': { title: 'Balancete Contábil', description: 'Movimentações detalhadas por categoria de despesa e receita.', icon: DollarSign },
     'account_statement': { title: 'Extrato de Conta Bancária', description: 'Movimentações e saldo de contas bancárias.', icon: DollarSign },
     'payables_report': { title: 'Contas a Pagar', description: 'Títulos em aberto e pagamentos realizados.', icon: DollarSign },
+    'receivables_report': { title: 'Contas a Receber', description: 'Títulos a receber em aberto e recebimentos realizados.', icon: DollarSign },
     'transfers_report': { title: 'Transferências Bancárias', description: 'Histórico de transferências entre contas.', icon: DollarSign },
     'loans_report': { title: 'Empréstimos e Financiamentos', description: 'Contratos tomados e concedidos.', icon: DollarSign },
     'advances_report': { title: 'Adiantamentos', description: 'Adiantamentos realizados fora de contratos.', icon: DollarSign },

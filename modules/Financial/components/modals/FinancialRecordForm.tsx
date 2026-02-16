@@ -36,7 +36,7 @@ const FinancialRecordForm: React.FC<Props> = ({ isOpen, onClose, onSave, type })
     notes: ''
   });
 
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
 
   const formatValueInput = (val: string) => {
     // Remove tudo que não é número

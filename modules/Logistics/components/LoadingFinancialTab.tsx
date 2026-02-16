@@ -23,7 +23,7 @@ const LoadingFinancialTab: React.FC<Props> = ({ loading, onUpdate }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [editPayment, setEditPayment] = useState<any>(null);
 
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
 
   const totalAdditions = loading.extraExpenses?.filter(e => e.type === 'addition').reduce((acc, e) => acc + e.value, 0) || 0;
   const totalDeductions = loading.extraExpenses?.filter(e => e.type === 'deduction').reduce((acc, e) => acc + e.value, 0) || 0;

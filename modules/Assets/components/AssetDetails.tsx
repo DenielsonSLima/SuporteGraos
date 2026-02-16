@@ -43,7 +43,7 @@ const AssetDetails: React.FC<Props> = ({ asset, onBack, onDelete, onEdit, onRefr
   // Forçar atualização do histórico local sem precisar sair e voltar
   const [refreshKey, setRefreshKey] = useState(0);
 
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
+  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(!val || Math.abs(val) < 0.005 ? 0 : val);
   
   // CORREÇÃO DE FUSO HORÁRIO
   const dateStr = (val: string) => {

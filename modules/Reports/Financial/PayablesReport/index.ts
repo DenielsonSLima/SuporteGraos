@@ -23,6 +23,10 @@ const payablesReport: ReportModule = {
   fetchData: ({ startDate, endDate }) => {
     const all = reportsCache.getPayables();
     const records = all.filter(r => {
+      // Empréstimos ativos sempre aparecem (são contratos de longo prazo)
+      const isActiveLoan = r.subType === 'loan_taken' && r.status !== 'paid' && r.status !== 'settled';
+      if (isActiveLoan) return true;
+      
       if (!startDate && !endDate) return true;
       const d = new Date(r.dueDate).getTime();
       const start = startDate ? new Date(startDate).getTime() : 0;

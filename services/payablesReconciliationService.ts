@@ -1,5 +1,6 @@
 import { payablesService, Payable } from './financial/payablesService';
 import { purchaseService } from './purchaseService';
+import { loadingService } from './loadingService';
 import { standaloneRecordsService } from './standaloneRecordsService';
 
 let hasRun = false;
@@ -268,12 +269,66 @@ export const reconcilePayablesFromOrders = async () => {
   return { updated, fixed };
 };
 
+export const reconcilePayablesFromFreights = async () => {
+  console.log('🔄 [RECONCILE] Iniciando reconciliação de fretes a partir dos carregamentos...');
+
+  const payables = payablesService.getAll().filter(p => p.subType === 'freight');
+  const loadings = loadingService.getAll().filter(l => l.totalFreightValue && l.totalFreightValue > 0 && l.status !== 'canceled');
+
+  const payableByLoading = new Map(
+    payables
+      .filter(p => p.loadingId)
+      .map(p => [p.loadingId!, p] as [string, Payable])
+  );
+
+  loadings.forEach(loading => {
+    const txs = loading.transactions || [];
+    const totalPaidTx = txs.reduce((acc, t) => acc + toNumber(t.value), 0);
+    const totalDiscountTx = txs.reduce((acc, t) => acc + toNumber(t.discountValue), 0);
+    const totalPaid = Number(((txs.length > 0 ? totalPaidTx : (loading.freightPaid || 0)) || 0).toFixed(2));
+
+    if (Math.abs((loading.freightPaid || 0) - totalPaid) > 0.01) {
+      loadingService.update({
+        ...loading,
+        freightPaid: totalPaid
+      });
+    }
+
+    let payable = payableByLoading.get(loading.id);
+    if (!payable) {
+      payable = payables.find(p => p.purchaseOrderId === loading.purchaseOrderId && p.partnerId === loading.carrierId && Math.abs(p.amount - (loading.totalFreightValue || 0)) < 0.01);
+    }
+    if (!payable && loading.vehiclePlate) {
+      payable = payables.find(p => p.description?.includes(loading.vehiclePlate!));
+    }
+
+    if (!payable) return;
+
+    const newPaidAmount = Number(((txs.length > 0 ? (totalPaidTx + totalDiscountTx) : (payable.paidAmount || 0)) || 0).toFixed(2));
+    if (Math.abs((payable.paidAmount || 0) - newPaidAmount) > 0.01 || !payable.loadingId) {
+      const status: Payable['status'] = newPaidAmount >= payable.amount - 0.01
+        ? 'paid'
+        : newPaidAmount > 0
+          ? 'partially_paid'
+          : 'pending';
+
+      payablesService.update({
+        ...payable,
+        loadingId: payable.loadingId || loading.id,
+        paidAmount: newPaidAmount,
+        status
+      });
+    }
+  });
+};
+
 // Função para forçar reconciliação (reseta o flag hasRun)
 export const forceReconcilePayables = async () => {
   hasRun = false;
   await reconcilePayablesFromHistory();
   // Também reconciliar diretamente dos pedidos (para pagamentos antigos)
   await reconcilePayablesFromOrders();
+  await reconcilePayablesFromFreights();
 };
 
 // Expor no window para debug via console do browser

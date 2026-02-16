@@ -205,7 +205,7 @@ const AssetsModule: React.FC = () => {
     );
   }, [assets, searchTerm, activeTab]);
 
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
   
   // CORREÇÃO DE DATA: Parseia a string YYYY-MM-DD diretamente para evitar conversão UTC
   const date = (val: string) => {

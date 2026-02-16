@@ -6,15 +6,16 @@ import { Sprout } from 'lucide-react';
 interface Props {
   title: string;
   subtitle?: string;
+  landscape?: boolean;
   children: React.ReactNode;
 }
 
-const ReportLayout: React.FC<Props> = ({ title, subtitle, children }) => {
+const ReportLayout: React.FC<Props> = ({ title, subtitle, landscape, children }) => {
   const company = settingsService.getCompanyData();
   const watermark = settingsService.getWatermark();
 
   return (
-    <div className="relative w-full bg-white text-slate-950 p-10 text-[9px] leading-tight font-sans min-h-[297mm]">
+    <div className={`relative w-full bg-white text-slate-950 p-10 text-[9px] leading-tight font-sans ${landscape ? 'min-h-[190mm]' : 'min-h-[297mm]'}`}>
       
       {/* WATERMARK LAYER - CENTRALIZADA E RETA */}
       {watermark.imageUrl ? (

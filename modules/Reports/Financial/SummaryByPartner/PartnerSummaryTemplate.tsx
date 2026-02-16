@@ -4,7 +4,7 @@ import ReportLayout from '../../components/ReportLayout';
 import { GeneratedReportData } from '../../types';
 
 const PartnerSummaryTemplate: React.FC<{ data: GeneratedReportData }> = ({ data }) => {
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
+  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(!val || Math.abs(val) < 0.005 ? 0 : val);
   const dateStr = (val: string) => new Date(val).toLocaleDateString('pt-BR');
 
   const grandTotal = data.summary?.[0]?.value || 0;

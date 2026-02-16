@@ -1,7 +1,7 @@
 import { logService } from './logService';
 import { authService } from './authService';
 import { Persistence } from './persistence';
-import { waitForInit } from './supabaseInitService';
+import { supabase } from './supabase';
 import { ExpenseCategory, ExpenseSubtype, DEFAULT_CATEGORIES_DATA } from './expenseCategory/types';
 import { getCategoryIcon, sortCategoriesByType } from './expenseCategory/utils';
 import { expenseCategorySupabaseSync } from './expenseCategory/supabaseSyncService';
@@ -13,6 +13,33 @@ const categoriesDb = new Persistence<Omit<ExpenseCategory, 'icon'>>('expense_cat
 let _isSupabaseCategoriesLoaded = false;
 let _realtimeStarted = false;
 
+// ============================================================================
+// REALTIME
+// ============================================================================
+
+const startRealtime = () => {
+  if (_realtimeStarted) return;
+  _realtimeStarted = true;
+
+  supabase
+    .channel('realtime:expense_categories')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'expense_types' }, () => {
+      console.log('🔔 Realtime expense_types: mudança detectada');
+      _isSupabaseCategoriesLoaded = false;
+      void loadFromSupabase();
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'expense_categories' }, () => {
+      console.log('🔔 Realtime expense_categories: mudança detectada');
+      _isSupabaseCategoriesLoaded = false;
+      void loadFromSupabase();
+    })
+    .subscribe(status => {
+      if (status === 'SUBSCRIBED') {
+        console.log('✅ Realtime expense_categories ativo');
+      }
+    });
+};
+
 const getLogInfo = () => {
   const user = authService.getCurrentUser();
   return { userId: user?.id || 'system', userName: user?.name || 'Sistema' };
@@ -20,34 +47,13 @@ const getLogInfo = () => {
 
 const loadFromSupabase = async () => {
   try {
-    const stats = await waitForInit();
-    if (stats.data.expenseTypes && stats.data.expenseCategories) {
-      const typesMap = new Map<string, any>();
-      stats.data.expenseTypes.forEach((type: any) => {
-        typesMap.set(type.id, {
-          id: type.id,
-          name: type.name,
-          type: type.type_key as 'fixed' | 'variable' | 'administrative' | 'custom',
-          color: type.color,
-          subtypes: []
-        });
-      });
-
-      stats.data.expenseCategories.forEach((cat: any) => {
-        const type = typesMap.get(cat.expense_type_id);
-        if (type) {
-          type.subtypes.push({
-            id: cat.id,
-            name: cat.name
-          });
-        }
-      });
-
-      // Ordena por tipo ANTES de salvar no cache local
-      const categories = sortCategoriesByType(Array.from(typesMap.values()));
+    // Busca dados FRESCOS diretamente do Supabase (não usa cache do initService)
+    const freshData = await expenseCategorySupabaseSync.syncLoadFromSupabase();
+    if (freshData && freshData.length > 0) {
+      const categories = sortCategoriesByType(freshData);
       categoriesDb.setAll(categories);
       _isSupabaseCategoriesLoaded = true;
-
+      console.log('✅ ExpenseCategoryService: Dados frescos carregados do Supabase:', categories.length, 'categorias');
     }
   } catch (error) {
     console.warn('⚠️ ExpenseCategoryService: Erro ao carregar do Supabase:', error);
@@ -61,6 +67,7 @@ const loadFromSupabase = async () => {
 
 export const expenseCategoryService = {
   loadFromSupabase,
+  startRealtime,
   subscribe: (callback: (items: ExpenseCategory[]) => void) => categoriesDb.subscribe(callback),
 
   getExpenseCategories: (): ExpenseCategory[] => {
@@ -120,7 +127,7 @@ export const expenseCategoryService = {
 
     // Sincroniza com Supabase em background (não-bloqueante)
     Promise.resolve().then(() => {
-      expenseCategorySupabaseSync.syncInsertCategory(category).catch(err => 
+      expenseCategorySupabaseSync.syncInsertCategory(category).catch(err =>
         console.error('❌ Erro crítico ao sincronizar categoria:', err)
       );
     });
@@ -195,7 +202,7 @@ export const expenseCategoryService = {
     // Sync em background
     Promise.resolve().then(() => {
       data.forEach(cat => {
-        expenseCategorySupabaseSync.syncInsertCategory(cat).catch(() => {});
+        expenseCategorySupabaseSync.syncInsertCategory(cat).catch(() => { });
       });
     });
   }

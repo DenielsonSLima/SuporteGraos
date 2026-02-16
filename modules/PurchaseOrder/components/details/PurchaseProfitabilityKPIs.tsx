@@ -12,7 +12,7 @@ interface Props {
 }
 
 const PurchaseProfitabilityKPIs: React.FC<Props> = ({ totalPurchase, totalFreight, totalSales, avgSalesPrice, transactions }) => {
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
 
   // Calcula Despesas Extras
   const expenseTxs = transactions.filter(t => t.type === 'expense');

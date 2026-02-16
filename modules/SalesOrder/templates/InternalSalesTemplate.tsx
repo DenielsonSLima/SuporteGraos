@@ -28,7 +28,7 @@ const InternalSalesTemplate: React.FC<Props> = ({ order, loadings }) => {
   const company = settingsService.getCompanyData();
   const watermark = settingsService.getWatermark();
   
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
+  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(!val || Math.abs(val) < 0.005 ? 0 : val);
   const num = (val: number, dec = 2) => new Intl.NumberFormat('pt-BR', { minimumFractionDigits: dec, maximumFractionDigits: dec }).format(val || 0);
   const dateStr = (val: string) => {
     if (!val) return '-';

@@ -8,7 +8,7 @@ import { GeneratedReportData, ReportColumn } from '../types';
 import { PARTNER_CATEGORY_IDS } from '../../../constants';
 
 // Helper Formats
-const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
 const number = (val: number) => new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(val);
 const date = (val: string) => new Date(val).toLocaleDateString('pt-BR');
 
@@ -100,41 +100,63 @@ export const reportService = {
           { header: 'Cliente', accessor: 'customerName' },
           { header: 'Produto', accessor: 'productName' },
           { header: 'Quantidade', accessor: 'qty', align: 'right' },
+          { header: 'Carregado', accessor: 'loaded', align: 'right' },
           { header: 'Valor Total', accessor: 'total', format: 'currency', align: 'right' }
         ];
-        const records = salesService.getAll().filter(s => filterByDate(s.date));
-        data.rows = records.map(s => ({
-          ...s,
-          qty: s.quantity ? `${s.quantity} SC` : '-',
-          total: s.totalValue
-        }));
-        data.summary = [{ label: 'Total Vendido', value: records.reduce((acc, r) => acc + r.totalValue, 0), format: 'currency' }];
+        const salesRecords = salesService.getAll().filter(s => filterByDate(s.date));
+        const salesLoadings = loadingService.getAll();
+        const fmtN = (v: number) => new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(v);
+        data.rows = salesRecords.map(s => {
+          const saleLoadings = salesLoadings.filter(l => l.salesOrderId === s.id && l.status !== 'canceled');
+          const loadedSc = saleLoadings.reduce((acc, l) => acc + (l.weightSc || 0), 0);
+          const totalSalesVal = saleLoadings.reduce((acc, l) => acc + (l.totalSalesValue || 0), 0);
+          return {
+            ...s,
+            qty: s.quantity ? `${fmtN(s.quantity)} SC` : '-',
+            loaded: loadedSc > 0 ? `${fmtN(loadedSc)} SC` : '-',
+            total: totalSalesVal || s.totalValue
+          };
+        });
+        data.summary = [{ label: 'Total Vendido', value: data.rows.reduce((acc: number, r: any) => acc + (Number(r.total) || 0), 0), format: 'currency' }];
         break;
       }
 
       // --- LOGÍSTICA ---
       case 'freight_general': {
-        data.title = 'Relatório Geral de Fretes e Transportes';
+        data.title = 'Relatório de Logística e Fretes';
+        data.landscape = true;
         data.columns = [
-          { header: 'Data', accessor: 'date', format: 'date', width: 'w-24' },
-          { header: 'Placa', accessor: 'plate', width: 'w-24' },
+          { header: 'Data', accessor: 'date', format: 'date', width: 'w-20' },
           { header: 'Transportadora', accessor: 'carrier' },
-          { header: 'Origem -> Destino', accessor: 'route' },
-          { header: 'Peso (Kg)', accessor: 'weight', format: 'number', align: 'right' },
+          { header: 'Motorista', accessor: 'driver' },
+          { header: 'Origem', accessor: 'origin' },
+          { header: 'Destino', accessor: 'destination' },
+          { header: 'Frete/Ton', accessor: 'freightPerTon', format: 'currency', align: 'right' },
+          { header: 'Peso Origem (Kg)', accessor: 'weightOrigin', format: 'number', align: 'right' },
+          { header: 'Peso Destino (Kg)', accessor: 'weightDest', format: 'number', align: 'right' },
+          { header: 'Base Cálculo', accessor: 'weightBase', align: 'center' },
           { header: 'Valor Frete', accessor: 'value', format: 'currency', align: 'right' }
         ];
         const records = loadingService.getAll().filter(l => filterByDate(l.date));
-        data.rows = records.map(l => ({
-          date: l.date,
-          plate: l.vehiclePlate,
-          carrier: l.carrierName,
-          route: `${l.supplierName.split(' ')[0]} -> ${l.customerName.split(' ')[0]}`,
-          weight: l.weightKg,
-          value: l.totalFreightValue
-        }));
+        data.rows = records.map(l => {
+          const usaDestino = l.unloadWeightKg && l.unloadWeightKg > 0;
+          return {
+            date: l.date,
+            carrier: l.carrierName,
+            driver: l.driverName,
+            origin: l.supplierName,
+            destination: l.customerName,
+            freightPerTon: l.freightPricePerTon || 0,
+            weightOrigin: l.weightKg,
+            weightDest: l.unloadWeightKg || 0,
+            weightBase: usaDestino ? 'Destino' : 'Origem',
+            value: l.totalFreightValue
+          };
+        });
         data.summary = [
             { label: 'Total Fretes (R$)', value: records.reduce((a,b) => a + b.totalFreightValue, 0), format: 'currency' },
-            { label: 'Total Volume (Ton)', value: records.reduce((a,b) => a + b.weightKg, 0) / 1000, format: 'number' }
+            { label: 'Total Volume Origem (Ton)', value: records.reduce((a,b) => a + b.weightKg, 0) / 1000, format: 'number' },
+            { label: 'Total Quebra (Kg)', value: records.reduce((a,b) => a + (b.breakageKg || 0), 0), format: 'number' }
         ];
         break;
       }
@@ -173,7 +195,12 @@ export const reportService = {
           { header: 'Saldo Devedor', accessor: 'balance', format: 'currency', align: 'right' }
         ];
         const records = financialIntegrationService.getPayables()
-            .filter(r => r.status !== 'paid' && filterByDate(r.dueDate));
+            .filter(r => {
+              if (r.status === 'paid') return false;
+              // Empréstimos ativos sempre aparecem
+              if (r.subType === 'loan_taken' && r.status !== 'settled') return true;
+              return filterByDate(r.dueDate);
+            });
         
         data.rows = records.map(r => ({ ...r, balance: r.originalValue - r.paidValue }));
         data.summary = [{ label: 'Total a Pagar', value: data.rows.reduce((a,b) => a + b.balance, 0), format: 'currency' }];
@@ -190,7 +217,12 @@ export const reportService = {
           { header: 'A Receber', accessor: 'balance', format: 'currency', align: 'right' }
         ];
         const records = financialIntegrationService.getReceivables()
-            .filter(r => r.status !== 'paid' && filterByDate(r.dueDate));
+            .filter(r => {
+              if (r.status === 'paid') return false;
+              // Empréstimos concedidos ativos sempre aparecem
+              if (r.subType === 'loan_granted' && r.status !== 'settled') return true;
+              return filterByDate(r.dueDate);
+            });
         
         data.rows = records.map(r => ({ ...r, balance: r.originalValue - r.paidValue }));
         data.summary = [{ label: 'Total a Receber', value: data.rows.reduce((a,b) => a + b.balance, 0), format: 'currency' }];

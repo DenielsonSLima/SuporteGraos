@@ -643,7 +643,7 @@ const CashierPdfDocument: React.FC<Props> = ({ report, title }) => {
             {report.initialMonthBalances.length > 0 ? (
               report.initialMonthBalances.slice(0, 6).map((acc, idx) => (
                 <View key={idx} style={styles.contextBalance}>
-                  <Text style={styles.contextBalanceBank}>{acc.bankName}</Text>
+                  <Text style={styles.contextBalanceBank}>{acc.bankName}{acc.owner ? ` (${acc.owner})` : ''}</Text>
                   <Text style={styles.contextBalanceValue}>{currency(acc.value)}</Text>
                 </View>
               ))
@@ -689,7 +689,7 @@ const CashierPdfDocument: React.FC<Props> = ({ report, title }) => {
               {report.bankBalances.map((acc) => (
                 <View key={acc.id} style={styles.tableRow}>
                   <Text style={[styles.tableCellBold, { width: '60%', color: '#475569', textTransform: 'uppercase' }]}>
-                    {acc.bankName}
+                    {acc.bankName}{acc.owner ? `\n${acc.owner}` : ''}
                   </Text>
                   <Text style={[styles.tableCellBold, { width: '25%', textAlign: 'right', color: '#0f172a' }]}>
                     {currency(acc.balance)}
@@ -811,7 +811,7 @@ const CashierPdfDocument: React.FC<Props> = ({ report, title }) => {
         {/* GRÁFICOS DE DISTRIBUIÇÃO */}
         <View style={styles.chartSection}>
           <Text style={styles.chartTitle}>Análise Visual de Distribuição Patrimonial</Text>
-          
+
           <View style={styles.chartGrid}>
             {/* Gráfico 1: Comparativo Ativos vs Passivos */}
             <View style={styles.chartBox}>
@@ -830,9 +830,9 @@ const CashierPdfDocument: React.FC<Props> = ({ report, title }) => {
                   <View key={idx} style={styles.barItem}>
                     <Text style={styles.barLabel}>{item.label}</Text>
                     <View style={styles.barContainer}>
-                      <View style={[styles.barFill, { 
+                      <View style={[styles.barFill, {
                         backgroundColor: item.color,
-                        width: `${(item.value / maxValue) * 100}%` 
+                        width: `${(item.value / maxValue) * 100}%`
                       }]} />
                     </View>
                     <Text style={styles.barValue}>{currency(item.value)}</Text>
@@ -861,9 +861,9 @@ const CashierPdfDocument: React.FC<Props> = ({ report, title }) => {
                       <View key={idx} style={styles.barItem}>
                         <Text style={styles.barLabel}>{item.label}</Text>
                         <View style={styles.barContainer}>
-                          <View style={[styles.barFill, { 
+                          <View style={[styles.barFill, {
                             backgroundColor: item.color,
-                            width: `${(item.value / maxAsset) * 100}%` 
+                            width: `${(item.value / maxAsset) * 100}%`
                           }]} />
                         </View>
                         <Text style={styles.barValue}>{currency(item.value)}</Text>
@@ -896,9 +896,9 @@ const CashierPdfDocument: React.FC<Props> = ({ report, title }) => {
                       <View key={idx} style={styles.barItem}>
                         <Text style={styles.barLabel}>{item.label}</Text>
                         <View style={styles.barContainer}>
-                          <View style={[styles.barFill, { 
+                          <View style={[styles.barFill, {
                             backgroundColor: item.color,
-                            width: `${(item.value / maxLiability) * 100}%` 
+                            width: `${(item.value / maxLiability) * 100}%`
                           }]} />
                         </View>
                         <Text style={styles.barValue}>{currency(item.value)}</Text>

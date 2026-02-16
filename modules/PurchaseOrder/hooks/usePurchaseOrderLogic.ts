@@ -46,12 +46,19 @@ export const usePurchaseOrderLogic = (initialOrder: PurchaseOrder, onFinalizeCal
     const totalFreightVal = activeLoadings.reduce((acc, l) => acc + (l.totalFreightValue || 0), 0);
     const totalSalesVal = activeLoadings.reduce((acc, l) => acc + (l.totalSalesValue || 0), 0);
     
-    const expensesDeducted = (currentOrder.transactions || [])
+    const txs = currentOrder.transactions || [];
+
+    const expensesDeducted = txs
       .filter(t => (t.type === 'expense' || t.type === 'commission') && t.deductFromPartner)
       .reduce((acc, t) => acc + t.value + (t.discountValue || 0), 0);
 
-    const totalPaidCash = currentOrder.paidValue || 0;
-    const totalDisc = currentOrder.discountValue || 0;
+    const paidFromTx = txs
+      .filter(t => t.type === 'payment' || t.type === 'advance')
+      .reduce((acc, t) => acc + (t.value || 0), 0);
+    const discFromTx = txs.reduce((acc, t) => acc + (t.discountValue || 0), 0);
+
+    const totalPaidCash = Math.max(paidFromTx, currentOrder.paidValue || 0);
+    const totalDisc = Math.max(discFromTx, currentOrder.discountValue || 0);
     
     const totalSettled = totalPaidCash + totalDisc + expensesDeducted;
     const balancePartner = Math.max(0, totalPurchaseVal - totalSettled);
@@ -75,14 +82,20 @@ export const usePurchaseOrderLogic = (initialOrder: PurchaseOrder, onFinalizeCal
   const actions = {
     // Exposed refreshLoadings to the actions object
     refreshLoadings,
-    handleConfirmTransaction: (data: any) => {
-        financialActionService.processRecord(`po-grain-${currentOrder.id}`, data, 'purchase_order');
-      invalidateLoadingCache();
-      SettingsCache.refreshBalances();
-      ledgerService.notifyAccountBalanceChange(data.accountId);
-      refreshLoadings();
+    handleConfirmTransaction: async (data: any) => {
+      try {
+        // Aguarda o lançamento financeiro antes de recarregar o estado local
+        await financialActionService.processRecord(`po-grain-${currentOrder.id}`, data, 'purchase_order');
+        invalidateLoadingCache();
+        SettingsCache.refreshBalances();
+        ledgerService.notifyAccountBalanceChange(data.accountId);
+        refreshLoadings();
         addToast('success', 'Pagamento Confirmado');
         if (stats.balancePartner <= data.amount + 1) setIsFinalizePromptOpen(true);
+      } catch (err) {
+        console.error('Erro ao confirmar pagamento', err);
+        addToast('error', 'Erro ao confirmar pagamento');
+      }
     },
     handleRegisterAdvance: (data: any) => {
         const tx: OrderTransaction = {

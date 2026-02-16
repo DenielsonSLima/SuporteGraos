@@ -30,9 +30,9 @@ import { MonthlyReport, HistoryListItem } from './types';
  */
 export const calculateMonthlyReport = (year: number, month: number): MonthlyReport => {
   const monthKey = `${year}-${String(month).padStart(2, '0')}`;
-  const monthLabel = new Date(year, month - 1).toLocaleDateString('pt-BR', { 
-    month: 'long', 
-    year: 'numeric' 
+  const monthLabel = new Date(year, month - 1).toLocaleDateString('pt-BR', {
+    month: 'long',
+    year: 'numeric'
   });
 
   const startOfMonth = new Date(year, month - 1, 1).toISOString().split('T')[0];
@@ -41,7 +41,7 @@ export const calculateMonthlyReport = (year: number, month: number): MonthlyRepo
   // ============================================================================
   // 1. FILTRA TRANSAÇÕES DO MÊS
   // ============================================================================
-  
+
   const standaloneRecords = financialActionService.getStandaloneRecords();
   const bankAccounts = financialService.getBankAccounts();
   const initialBalances = financialService.getInitialBalances();
@@ -66,7 +66,7 @@ export const calculateMonthlyReport = (year: number, month: number): MonthlyRepo
     const isCredit = ['sales_order', 'receipt', 'loan_taken', 'Venda de Ativo'].includes(
       r.subType || ''
     ) || r.category === 'Venda de Ativo';
-    
+
     addTx(acc.id, r.paidValue, r.issueDate, isCredit ? 'credit' : 'debit');
   });
 
@@ -100,10 +100,10 @@ export const calculateMonthlyReport = (year: number, month: number): MonthlyRepo
     }, initVal);
 
     totalInitialMonthBalance += monthStartVal;
-    initialMonthBalances.push({ 
-      id: account.id, 
-      bankName: account.bankName, 
-      value: monthStartVal 
+    initialMonthBalances.push({
+      id: account.id,
+      bankName: account.bankName,
+      value: monthStartVal
     });
 
     // Saldo FINAL do mês (início + transações do mês)
@@ -116,7 +116,8 @@ export const calculateMonthlyReport = (year: number, month: number): MonthlyRepo
 
     return {
       id: account.id,
-      bankName: account.owner ? `${account.bankName} (${account.owner})` : account.bankName,
+      bankName: account.bankName,
+      owner: account.owner || undefined,
       balance: monthEndVal
     };
   });
@@ -159,8 +160,8 @@ export const calculateMonthlyReport = (year: number, month: number): MonthlyRepo
     .filter(s => s.netBalance > 0)
     .reduce((acc, s) => acc + s.netBalance, 0);
 
-  const totalAssets = totalBankBalance + pendingSalesReceipts + merchandiseInTransitValue + 
-                      loansGranted + shareholderReceivables + advancesGiven + totalFixedAssetsValue;
+  const totalAssets = totalBankBalance + pendingSalesReceipts + merchandiseInTransitValue +
+    loansGranted + shareholderReceivables + advancesGiven + totalFixedAssetsValue;
 
   // Contas a pagar
   const pendingPurchasePayments = payables
@@ -190,8 +191,8 @@ export const calculateMonthlyReport = (year: number, month: number): MonthlyRepo
     .filter(s => s.financial.currentBalance > 0)
     .reduce((acc, s) => acc + s.financial.currentBalance, 0);
 
-  const totalLiabilities = pendingPurchasePayments + pendingFreightPayments + loansTaken + 
-                          commissionsToPay + shareholderPayables + advancesTaken;
+  const totalLiabilities = pendingPurchasePayments + pendingFreightPayments + loansTaken +
+    commissionsToPay + shareholderPayables + advancesTaken;
 
   // ============================================================================
   // 4. RETORNA RELATÓRIO MENSAL
@@ -207,13 +208,13 @@ export const calculateMonthlyReport = (year: number, month: number): MonthlyRepo
     isClosed: false,
     isSnapshot: false,
     generatedAt: new Date().toISOString(),
-    
+
     bankBalances,
     totalBankBalance,
     totalInitialBalance: initialBalances.reduce((acc, b) => acc + b.value, 0),
     totalInitialMonthBalance,
     initialMonthBalances,
-    
+
     pendingSalesReceipts,
     merchandiseInTransitValue,
     loansGranted,
@@ -222,7 +223,7 @@ export const calculateMonthlyReport = (year: number, month: number): MonthlyRepo
     pendingAssetSalesReceipts: 0,
     shareholderReceivables,
     totalAssets,
-    
+
     pendingPurchasePayments,
     pendingFreightPayments,
     loansTaken,
@@ -230,7 +231,7 @@ export const calculateMonthlyReport = (year: number, month: number): MonthlyRepo
     advancesTaken,
     shareholderPayables,
     totalLiabilities,
-    
+
     netBalance
   };
 
@@ -248,14 +249,14 @@ export const getMonthlyHistory = (): HistoryListItem[] => {
   // Busca todos os meses até 12 meses atrás (configurável)
   for (let i = 0; i < 12; i++) {
     const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-    
+
     // Pula mês atual
     if (d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear()) {
       continue;
     }
 
     const report = calculateMonthlyReport(d.getFullYear(), d.getMonth() + 1);
-    
+
     monthsList.push({
       monthKey: report.monthKey,
       label: report.monthLabel,

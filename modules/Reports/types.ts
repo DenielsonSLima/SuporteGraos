@@ -14,13 +14,13 @@ export interface ReportMetadata {
 
 export interface ReportModule {
   metadata: ReportMetadata;
-  
+
   /**
    * Componente React responsável por renderizar os inputs de filtro.
    * Recebe o estado atual dos filtros e uma função para atualizá-los.
    */
   FilterComponent?: React.FC<{ filters: any; onChange: (newFilters: any) => void }>;
-  
+
   /**
    * Estado inicial dos filtros para este relatório
    */
@@ -29,14 +29,14 @@ export interface ReportModule {
   /**
    * Função que busca e processa os dados com base nos filtros
    */
-  fetchData: (filters: any) => GeneratedReportData;
-  
+  fetchData: (filters: any) => GeneratedReportData | Promise<GeneratedReportData>;
+
   /**
    * Componente que renderiza o PDF (Layout de impressão)
    * DEPRECATED: Use PdfDocument ao invés disso
    */
   Template: React.FC<{ data: GeneratedReportData }>;
-  
+
   /**
    * Componente React-PDF para gerar PDF com texto pesquisável
    * Este substitui o Template antigo (html2canvas)
@@ -61,6 +61,7 @@ export interface ReportSummaryItem {
 export interface GeneratedReportData {
   title: string;
   subtitle?: string;
+  landscape?: boolean;
   columns: ReportColumn[];
   rows: any[];
   summary?: ReportSummaryItem[];

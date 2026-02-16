@@ -9,7 +9,7 @@ import { financialActionService } from './financialActionService';
  * - financialIntegrationService.getReceivables()
  * - financialActionService.getStandaloneRecords()
  * 
- * TTL: 45s - balança entre freshness e performance
+ * TTL: 10s - alinhado com DashboardCache para evitar dados stale
  * 
  * Componentes críticos que se beneficiam:
  * - PayablesTab (recarrega a cada mudança de sub-aba)
@@ -27,7 +27,7 @@ type CachedData = {
 
 export class FinancialCache {
   private static cache: CachedData | null = null;
-  private static readonly TTL = 45_000; // 45 segundos
+  private static readonly TTL = 10_000; // 10 segundos — alinhado com DashboardCache
 
   private static load(): void {
     this.cache = {

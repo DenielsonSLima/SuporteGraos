@@ -49,7 +49,7 @@ const PartnerCard: React.FC<Props> = ({
   const hasDedicatedView = isCarrier || isBroker;
   const isActive = partner.active !== false;
 
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
 
   const formatDocument = (doc: string) => {
     if (!doc || doc === 'NÃO INFORMADO') return 'Sem documento';

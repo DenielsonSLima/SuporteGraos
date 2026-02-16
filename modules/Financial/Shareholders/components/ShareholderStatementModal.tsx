@@ -15,7 +15,7 @@ const ShareholderStatementModal: React.FC<Props> = ({ shareholder, isOpen, onClo
 
   if (!isOpen || !shareholder) return null;
 
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
   const date = (val: string) => new Date(val).toLocaleDateString('pt-BR');
 
   return (

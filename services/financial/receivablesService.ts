@@ -4,6 +4,7 @@ import { supabaseWithRetry } from '../../utils/fetchWithRetry';
 import { invalidateDashboardCache } from '../dashboardCache';
 import { invalidateFinancialCache } from '../financialCache';
 import { auditService } from '../auditService';
+// import { salesService } from '../salesService'; // Removed circular dependency // Added salesService import
 
 export interface Receivable {
   id: string;
@@ -98,7 +99,7 @@ const fetchPage = async (options: ReceivablesPageOptions): Promise<Receivable[]>
     if (endDate) query = query.lte('due_date', endDate);
 
     const data = await supabaseWithRetry(() => query);
-    return (data || []).map(mapFromDb);
+    return (data as any[] || []).map(mapFromDb);
   } catch (error) {
     console.error('❌ Erro ao paginar receivables:', error);
     return [];
@@ -118,7 +119,7 @@ const loadFromSupabase = async (): Promise<Receivable[]> => {
         .order('due_date', { ascending: true })
     );
 
-    const mapped = (data || []).map(mapFromDb);
+    const mapped = (data as any[] || []).map(mapFromDb);
     db.setAll(mapped);
     isLoaded = true;
     console.log('🔄 Contas a receber sincronizando em tempo real...');
@@ -205,7 +206,7 @@ export const receivablesService = {
     db.add(item);
     void persistUpsert(item);
     invalidateDashboardCache();
-    
+
     // Audit Log
     void auditService.logAction('create', 'Financeiro', `Conta a receber criada: ${item.description} - R$ ${item.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, {
       entityType: 'Receivable',
@@ -218,33 +219,52 @@ export const receivablesService = {
     const old = db.getById(item.id);
     db.update(item);
     void persistUpsert(item);
-    invalidateDashboardCache();
-    
+
     // Audit Log (detecta se é recebimento)
     const isReceiving = old && old.receivedAmount !== item.receivedAmount;
-    const desc = isReceiving 
+    const desc = isReceiving
       ? `Recebimento registrado: ${item.description} - R$ ${(item.receivedAmount - old.receivedAmount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
       : `Conta a receber atualizada: ${item.description}`;
-    
-    void auditService.logAction('update', 'Financeiro', desc, {
+
+    void auditService.logAction('update', 'Financeiro', `Conta a receber: #${item.description} - ${desc}`, {
       entityType: 'Receivable',
       entityId: item.id,
-      metadata: { receivedAmount: item.receivedAmount, status: item.status }
+      metadata: { status: item.status, amount: item.amount, receivedAmount: item.receivedAmount }
     });
+
+    invalidateDashboardCache();
+    invalidateFinancialCache();
+
+    // ✅ Sincronizar status financeiro via EventBus
+    if (item.salesOrderId) {
+      // Emite evento para quem estiver ouvindo (salesService)
+      import('../eventBus').then(({ eventBus }) => {
+        eventBus.emit('receivable:updated', { salesOrderId: item.salesOrderId });
+      });
+    }
   },
 
   delete: (id: string) => {
     const item = db.getById(id);
+    if (!item) return; // Ensure item exists before proceeding
+
     db.delete(id);
     void persistDelete(id);
-    invalidateDashboardCache();
-    
+
     // Audit Log
-    if (item) {
-      void auditService.logAction('delete', 'Financeiro', `Conta a receber excluída: ${item.description} - R$ ${item.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, {
-        entityType: 'Receivable',
-        entityId: id,
-        metadata: { amount: item.amount }
+    void auditService.logAction('delete', 'Financeiro', `Conta a receber excluída: #${item.description}`, {
+      entityType: 'Receivable',
+      entityId: id,
+      metadata: { amount: item.amount }
+    });
+
+    invalidateDashboardCache();
+    invalidateFinancialCache();
+
+    // ✅ Sincronizar status financeiro via EventBus
+    if (item.salesOrderId) {
+      import('../eventBus').then(({ eventBus }) => {
+        eventBus.emit('receivable:updated', { salesOrderId: item.salesOrderId });
       });
     }
   }

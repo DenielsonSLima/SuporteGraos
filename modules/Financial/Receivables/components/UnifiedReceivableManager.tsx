@@ -10,10 +10,14 @@ interface Props {
   records: FinancialRecord[];
   onRefresh: () => void;
   viewMode: 'open' | 'all';
+  searchTerm?: string;
+  hideSearchBar?: boolean;
 }
 
-const UnifiedReceivableManager: React.FC<Props> = ({ records, onRefresh, viewMode }) => {
-  const [searchTerm, setSearchTerm] = useState('');
+const UnifiedReceivableManager: React.FC<Props> = ({ records, onRefresh, viewMode, searchTerm: externalSearch, hideSearchBar }) => {
+  const [internalSearch, setInternalSearch] = useState('');
+  const searchTerm = externalSearch !== undefined ? externalSearch : internalSearch;
+
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isPayModalOpen, setIsPayModalOpen] = useState(false);
   const [selectedRecordForSinglePay, setSelectedRecordForSinglePay] = useState<FinancialRecord | null>(null);
@@ -31,7 +35,7 @@ const UnifiedReceivableManager: React.FC<Props> = ({ records, onRefresh, viewMod
   };
 
   const groupedData = useMemo(() => {
-    const filtered = records.filter(r => 
+    const filtered = records.filter(r =>
       r.entityName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       r.description.toLowerCase().includes(searchTerm.toLowerCase())
     );
@@ -44,7 +48,7 @@ const UnifiedReceivableManager: React.FC<Props> = ({ records, onRefresh, viewMod
       }
       map[entityKey].items.push(r);
       map[entityKey].total += r.originalValue;
-      
+
       // Correção de precisão: garante que o saldo nunca seja negativo por arredondamento de float
       const rawBalance = r.originalValue - r.paidValue - (r.discountValue || 0);
       const itemBalance = rawBalance < 0.01 ? 0 : rawBalance;
@@ -67,16 +71,16 @@ const UnifiedReceivableManager: React.FC<Props> = ({ records, onRefresh, viewMod
   const handleNavigateToOrder = (e: React.MouseEvent, item: FinancialRecord) => {
     e.stopPropagation();
     const orderId = item.id.replace('so-', '');
-    window.dispatchEvent(new CustomEvent('app:navigate', { 
-      detail: { moduleId: ModuleId.SALES_ORDER, orderId } 
+    window.dispatchEvent(new CustomEvent('app:navigate', {
+      detail: { moduleId: ModuleId.SALES_ORDER, orderId }
     }));
   };
 
   const totalSelected = records
     .filter(r => selectedIds.includes(r.id))
     .reduce((acc, r) => {
-        const bal = r.originalValue - r.paidValue - (r.discountValue || 0);
-        return acc + (bal < 0.01 ? 0 : bal);
+      const bal = r.originalValue - r.paidValue - (r.discountValue || 0);
+      return acc + (bal < 0.01 ? 0 : bal);
     }, 0);
 
   const handleConfirmPayment = async (data: PaymentData) => {
@@ -86,9 +90,9 @@ const UnifiedReceivableManager: React.FC<Props> = ({ records, onRefresh, viewMod
       for (const id of selectedIds) {
         const record = records.find(r => r.id === id);
         if (record) {
-           const rawBalance = record.originalValue - record.paidValue - (record.discountValue || 0);
-           const balance = rawBalance < 0.01 ? 0 : rawBalance;
-           await financialActionService.processRecord(id, { ...data, amount: balance, discount: 0 }, record.subType);
+          const rawBalance = record.originalValue - record.paidValue - (record.discountValue || 0);
+          const balance = rawBalance < 0.01 ? 0 : rawBalance;
+          await financialActionService.processRecord(id, { ...data, amount: balance, discount: 0 }, record.subType);
         }
       }
     }
@@ -99,16 +103,20 @@ const UnifiedReceivableManager: React.FC<Props> = ({ records, onRefresh, viewMod
 
   return (
     <div className="space-y-6 animate-in fade-in">
-      <div className="px-4 pt-4 relative max-w-md">
-        <Search className="absolute left-7 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-        <input 
-          type="text" 
-          placeholder="Buscar por cliente ou venda..." 
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full pl-11 pr-4 py-3 rounded-2xl border-2 border-slate-100 bg-slate-50 text-sm focus:bg-white focus:border-emerald-500 focus:ring-0 outline-none transition-all font-bold"
-        />
-      </div>
+      {!hideSearchBar && (
+        <div className="px-4 pt-4 flex flex-col md:flex-row gap-4">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <input
+              type="text"
+              placeholder="Buscar por cliente ou venda..."
+              value={internalSearch}
+              onChange={(e) => setInternalSearch(e.target.value)}
+              className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:border-emerald-500 focus:ring-0 outline-none transition-all font-bold"
+            />
+          </div>
+        </div>
+      )}
 
       <div className="space-y-4 px-2 pb-4">
         {groupedData.length === 0 ? (
@@ -155,10 +163,10 @@ const UnifiedReceivableManager: React.FC<Props> = ({ records, onRefresh, viewMod
                       const rawPending = item.originalValue - totalLiquidated;
                       const pendingBalance = rawPending < 0.01 ? 0 : rawPending;
                       const isPaid = item.status === 'paid';
-                      
+
                       return (
-                        <tr 
-                          key={item.id} 
+                        <tr
+                          key={item.id}
                           className={`hover:bg-emerald-50/30 transition-colors cursor-pointer group/row ${selectedIds.includes(item.id) ? 'bg-emerald-50/50' : ''}`}
                           onClick={() => handleRowClick(item)}
                         >
@@ -167,10 +175,10 @@ const UnifiedReceivableManager: React.FC<Props> = ({ records, onRefresh, viewMod
                               <button className={`${selectedIds.includes(item.id) ? 'text-emerald-600' : 'text-slate-300'}`}>
                                 <CheckSquare size={18} />
                               </button>
-                            ) : <div className="w-5 h-5 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-600 mx-auto shadow-sm"><CheckCircle2 size={12}/></div>}
+                            ) : <div className="w-5 h-5 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-600 mx-auto shadow-sm"><CheckCircle2 size={12} /></div>}
                           </td>
                           <td className="px-4 py-4">
-                            <button 
+                            <button
                               onClick={(e) => handleNavigateToOrder(e, item)}
                               className="font-black text-emerald-600 hover:text-emerald-800 uppercase italic tracking-tighter text-xs"
                             >
@@ -208,20 +216,20 @@ const UnifiedReceivableManager: React.FC<Props> = ({ records, onRefresh, viewMod
                             )}
                           </td>
                           <td className="px-4 py-4 text-center">
-                             <div className="flex items-center justify-center gap-1.5 font-black text-indigo-700 uppercase text-[9px] bg-indigo-50/50 px-2 py-1 rounded-lg border border-indigo-100">
-                               <Wallet size={12} className="text-indigo-400" />
-                               <span className="truncate max-w-[120px]">{item.bankAccount || (isPaid ? 'CONCILIADO' : 'AGUARDANDO')}</span>
-                             </div>
+                            <div className="flex items-center justify-center gap-1.5 font-black text-indigo-700 uppercase text-[9px] bg-indigo-50/50 px-2 py-1 rounded-lg border border-indigo-100">
+                              <Wallet size={12} className="text-indigo-400" />
+                              <span className="truncate max-w-[120px]">{item.bankAccount || (isPaid ? 'CONCILIADO' : 'AGUARDANDO')}</span>
+                            </div>
                           </td>
                           <td className="px-4 py-4 text-right font-bold text-slate-500">{currency(item.originalValue)}</td>
                           <td className="px-4 py-4 text-right">
-                             <div className="flex flex-col items-end">
-                                <span className="font-black text-emerald-600">{currency(item.paidValue)}</span>
-                                {item.discountValue! > 0 && <span className="text-[8px] font-black text-amber-600 uppercase flex items-center gap-0.5"><MinusCircle size={8}/> Abatimento: {currency(item.discountValue!)}</span>}
-                             </div>
+                            <div className="flex flex-col items-end">
+                              <span className="font-black text-emerald-600">{currency(item.paidValue)}</span>
+                              {item.discountValue! > 0 && <span className="text-[8px] font-black text-amber-600 uppercase flex items-center gap-0.5"><MinusCircle size={8} /> Abatimento: {currency(item.discountValue!)}</span>}
+                            </div>
                           </td>
                           <td className="px-6 py-4 text-right font-black text-emerald-700 text-sm tracking-tighter">
-                            {pendingBalance <= 0.05 ? <span className="text-emerald-500 flex items-center justify-end gap-1"><CheckCircle2 size={12}/> QUITADO</span> : currency(pendingBalance)}
+                            {pendingBalance <= 0.05 ? <span className="text-emerald-500 flex items-center justify-end gap-1"><CheckCircle2 size={12} /> QUITADO</span> : currency(pendingBalance)}
                           </td>
                           <td className="px-4 py-4 text-center">
                             <ChevronRight size={16} className="text-slate-300 group-hover/row:text-emerald-500 group-hover/row:translate-x-1 transition-all" />
@@ -240,25 +248,25 @@ const UnifiedReceivableManager: React.FC<Props> = ({ records, onRefresh, viewMod
       {selectedIds.length > 0 && (
         <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[100] bg-slate-900 text-white p-5 rounded-[2rem] shadow-2xl flex items-center gap-8 border border-slate-700 animate-in slide-in-from-bottom-4 ring-4 ring-black/10">
           <div className="flex items-center gap-4 pr-8 border-r border-slate-700">
-             <div className="p-2.5 bg-emerald-600 rounded-2xl shadow-lg"><TrendingUp size={24} /></div>
-             <div>
-                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Selecionados ({selectedIds.length})</p>
-                <p className="text-2xl font-black text-emerald-400 tracking-tighter">{currency(totalSelected)}</p>
-             </div>
+            <div className="p-2.5 bg-emerald-600 rounded-2xl shadow-lg"><TrendingUp size={24} /></div>
+            <div>
+              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Selecionados ({selectedIds.length})</p>
+              <p className="text-2xl font-black text-emerald-400 tracking-tighter">{currency(totalSelected)}</p>
+            </div>
           </div>
           <div className="flex gap-3">
-             <button onClick={() => setSelectedIds([])} className="px-6 py-3 text-xs font-black uppercase tracking-widest text-slate-400 hover:text-white transition-colors">Cancelar</button>
-             <button 
-                onClick={() => { setSelectedRecordForSinglePay(null); setIsPayModalOpen(true); }} 
-                className="px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl transition-all active:scale-95"
-             >
-                Baixar em Lote
-             </button>
+            <button onClick={() => setSelectedIds([])} className="px-6 py-3 text-xs font-black uppercase tracking-widest text-slate-400 hover:text-white transition-colors">Cancelar</button>
+            <button
+              onClick={() => { setSelectedRecordForSinglePay(null); setIsPayModalOpen(true); }}
+              className="px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl transition-all active:scale-95"
+            >
+              Baixar em Lote
+            </button>
           </div>
         </div>
       )}
 
-      <FinancialPaymentModal 
+      <FinancialPaymentModal
         isOpen={isPayModalOpen}
         onClose={() => setIsPayModalOpen(false)}
         onConfirm={handleConfirmPayment}

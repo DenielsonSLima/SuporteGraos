@@ -10,16 +10,17 @@ import { GeneratedReportData } from '../../types';
 
 const PdfDocument: React.FC<{ data: GeneratedReportData }> = ({ data }) => {
   const currency = (val: number) => 
-    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
   const date = (val: string) => new Date(val).toLocaleDateString('pt-BR');
 
   const columns: PdfTableColumn[] = [
-    { header: 'Data', width: '12%', render: (row) => date(row.date) },
-    { header: 'Nº Venda', width: '15%', accessor: 'number', align: 'left' },
-    { header: 'Cliente', width: '28%', accessor: 'customerName' },
-    { header: 'Produto', width: '25%', accessor: 'productName' },
+    { header: 'Data', width: '11%', render: (row) => date(row.date) },
+    { header: 'Nº Venda', width: '13%', accessor: 'number', align: 'left' },
+    { header: 'Cliente', width: '24%', accessor: 'customerName' },
+    { header: 'Produto', width: '20%', accessor: 'productName' },
     { header: 'Qtd.', width: '10%', accessor: 'qty', align: 'right' },
-    { header: 'Total', width: '10%', align: 'right', render: (row) => currency(row.total) }
+    { header: 'Carregado', width: '10%', accessor: 'loaded', align: 'right' },
+    { header: 'Total', width: '12%', align: 'right', render: (row) => currency(row.total) }
   ];
 
   const totalValue = data.summary?.find(s => s.label === 'Total Vendido')?.value || 0;
