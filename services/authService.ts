@@ -87,7 +87,7 @@ export const authService = {
       console.log('[AUTH] 🔍 Buscando perfil em app_users...');
       const { data: userData, error: userError } = await supabase
         .from('app_users')
-        .select('company_id, role, active, name')
+        .select('company_id, role, active, first_name, last_name')
         .eq('auth_user_id', authData.user.id)
         .single();
 
@@ -107,7 +107,7 @@ export const authService = {
 
       const userSession: User = {
         id: authData.user.id,
-        name: userData?.name || `${firstName} ${lastName}`.trim(),
+        name: userData ? `${userData.first_name} ${userData.last_name}`.trim() : `${firstName} ${lastName}`.trim(),
         email: authData.user.email || email,
         role: roleValue,
         companyId: companyId,
@@ -269,7 +269,7 @@ export const authService = {
       // Buscar do app_users para garantir dados atualizados e company_id
       const { data: userData } = await supabase
         .from('app_users')
-        .select('company_id, role, active, name')
+        .select('company_id, role, active, first_name, last_name')
         .eq('auth_user_id', session.user.id)
         .single();
 
@@ -291,7 +291,7 @@ export const authService = {
 
       const userSession: User = {
         id: session.user.id,
-        name: userData?.name || `${firstName} ${lastName}`.trim(),
+        name: userData ? `${userData.first_name} ${userData.last_name}`.trim() : `${firstName} ${lastName}`.trim(),
         email: session.user.email || '',
         role: roleValue,
         companyId: companyId,

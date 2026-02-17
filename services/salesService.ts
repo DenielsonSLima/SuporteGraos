@@ -133,6 +133,12 @@ const loadFromSupabase = async (retries = 2): Promise<SalesOrder[]> => {
 
 const persistUpsert = async (order: SalesOrder) => {
   try {
+    const user = authService.getCurrentUser();
+    if (!user?.companyId) {
+      console.error('❌ Erro: Tentativa de salvar pedido de venda sem company_id');
+      return { success: false, error: 'Sessão inválida ou empresa não identificada' };
+    }
+
     const payload: any = mapOrderToDb(order);
     const isValidUuid = (v?: string) => !!v && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
     if (!isValidUuid(payload.id)) {
@@ -140,13 +146,15 @@ const persistUpsert = async (order: SalesOrder) => {
     }
     const { error } = await supabase.from('sales_orders').upsert(payload).select();
     if (error) {
-      console.error('Erro ao salvar pedido de venda no Supabase', error);
-      return;
+      console.error('❌ Erro ao salvar pedido de venda no Supabase:', error.message);
+      return { success: false, error: error.message };
     }
     // Atualiza cache local para refletir possíveis IDs gerados no banco
     await syncFromSupabase();
-  } catch (err) {
-    console.error('Erro inesperado ao salvar pedido de venda no Supabase', err);
+    return { success: true };
+  } catch (err: any) {
+    console.error('❌ Erro inesperado ao salvar pedido de venda no Supabase:', err);
+    return { success: false, error: err.message || 'Erro inesperado' };
   }
 };
 
@@ -277,9 +285,13 @@ export const salesService = {
 
   getById: (id: string) => db.getById(id),
 
-  add: (sale: SalesOrder) => {
+  add: async (sale: SalesOrder) => {
+    // 1. Tentar persistir no Supabase primeiro
+    const result = await persistUpsert(sale);
+    if (!result.success) return result;
+
+    // 2. Se sucesso, atualizar cache local
     db.add(sale);
-    void persistUpsert(sale);
 
     // ✅ Criar automaticamente um receivable para o pedido de venda
     if (sale.totalValue && sale.totalValue > 0 && sale.customerId) {
@@ -324,12 +336,17 @@ export const salesService = {
     });
 
     invalidateDashboardCache();
+    return { success: true };
   },
 
-  update: (updatedSale: SalesOrder) => {
+  update: async (updatedSale: SalesOrder) => {
+    // 1. Tentar persistir no Supabase primeiro
+    const result = await persistUpsert(updatedSale);
+    if (!result.success) return result;
+
+    // 2. Se sucesso, atualizar cache local
     const oldSale = db.getById(updatedSale.id);
     db.update(updatedSale);
-    void persistUpsert(updatedSale);
 
     const { userId, userName } = getLogInfo();
     let action = 'update';
@@ -362,6 +379,7 @@ export const salesService = {
     });
 
     invalidateDashboardCache();
+    return { success: true };
   },
 
   updateTransaction: (orderId: string, updatedTx: SalesTransaction) => {

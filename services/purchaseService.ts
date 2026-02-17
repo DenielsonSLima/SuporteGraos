@@ -142,17 +142,29 @@ const loadFromSupabase = async (): Promise<PurchaseOrder[]> => {
 
 const persistUpsert = async (order: PurchaseOrder) => {
   try {
-    const { error } = await supabase.from('purchase_orders').upsert(mapOrderToDb(order));
-    if (error) {
-      console.error('Erro ao salvar pedido no Supabase', error);
-      return;
+    const user = authService.getCurrentUser();
+    if (!user?.companyId) {
+      console.error('❌ Erro: Tentativa de salvar pedido sem company_id');
+      return { success: false, error: 'Sessão inválida ou empresa não identificada' };
     }
+
+    const payload = mapOrderToDb(order);
+    const { error } = await supabase.from('purchase_orders').upsert(payload);
+
+    if (error) {
+      console.error('❌ Erro ao salvar pedido no Supabase:', error.message);
+      return { success: false, error: error.message };
+    }
+
     // Sincroniza despesas extras (não-bloqueante)
     syncExpenses(order).catch(err => {
       console.warn('⚠️ Falha ao sincronizar despesas extras (não-crítico):', err);
     });
-  } catch (err) {
-    console.error('Erro inesperado ao salvar pedido no Supabase', err);
+
+    return { success: true };
+  } catch (err: any) {
+    console.error('❌ Erro inesperado ao salvar pedido no Supabase:', err);
+    return { success: false, error: err.message || 'Erro inesperado' };
   }
 };
 
@@ -456,9 +468,13 @@ export const purchaseService = {
       }
     })();
   },
-  add: (order: PurchaseOrder) => {
+  add: async (order: PurchaseOrder) => {
+    // 1. Tentar persistir no Supabase primeiro
+    const result = await persistUpsert(order);
+    if (!result.success) return result;
+
+    // 2. Se sucesso, atualizar cache local
     db.add(order);
-    void persistUpsert(order);
 
     // ✅ Criar automaticamente um payable para o pedido de compra
     if (order.totalValue && order.totalValue > 0 && order.partnerId) {
@@ -476,10 +492,16 @@ export const purchaseService = {
     });
 
     invalidateDashboardCache();
+    invalidateFinancialCache();
+    return { success: true };
   },
-  update: (updatedOrder: PurchaseOrder) => {
+  update: async (updatedOrder: PurchaseOrder) => {
+    // 1. Tentar persistir no Supabase primeiro
+    const result = await persistUpsert(updatedOrder);
+    if (!result.success) return result;
+
+    // 2. Se sucesso, atualizar cache local
     db.update(updatedOrder);
-    void persistUpsert(updatedOrder);
     invalidateFinancialCache();
 
     // ✅ Verificar se já existe um payable para este pedido, se não, criar
@@ -517,6 +539,7 @@ export const purchaseService = {
     });
 
     invalidateDashboardCache();
+    return { success: true };
   },
 
   updateTransaction: (orderId: string, updatedTx: OrderTransaction) => {
