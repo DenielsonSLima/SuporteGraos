@@ -547,16 +547,12 @@ export const financialActionService = {
   importData: async (expenses: FinancialRecord[], transfers: TransferRecord[]) => {
     if (expenses) await standaloneRecordsService.importData(expenses);
     if (transfers && transfers.length > 0) {
-      transfers.forEach(t => {
-        const mapped = mapRecordToTransfer(t);
-        const existing = transfersService.getById(mapped.id);
-        if (existing) transfersService.update(mapped);
-        else transfersService.add(mapped);
-      });
-      invalidateFinancialCache();
-      invalidateDashboardCache();
+      // Usar a nova função de importação em lote para eficiência
+      const items = transfers.map(mapRecordToTransfer);
+      await (transfersService as any).importData(items);
     }
-    // Cache já é invalidado no standaloneRecordsService para expenses
+    invalidateFinancialCache();
+    invalidateDashboardCache();
   },
 
   syncDeleteFromOrigin: async (originTxId: string) => {

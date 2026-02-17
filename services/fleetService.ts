@@ -3,6 +3,8 @@ import { Driver, Vehicle } from '../modules/Partners/types';
 import { Persistence } from './persistence';
 import { logService } from './logService';
 import { authService } from './authService';
+import { driverService } from './driverService';
+import { vehicleService } from './vehicleService';
 
 // Dados iniciais vazios
 const INITIAL_DRIVERS: Driver[] = [];
@@ -35,7 +37,7 @@ export const fleetService = {
 
   addDriver: (driver: Driver) => {
     driversDb.add(driver);
-    
+
     const { userId, userName } = getLogInfo();
     logService.addLog({
       userId,
@@ -120,6 +122,10 @@ export const fleetService = {
 
   // --- RESTORE ---
   importData: (drivers: Driver[], vehicles: Vehicle[]) => {
+    if (drivers) driverService.importData(drivers as any);
+    if (vehicles) vehicleService.importData(vehicles as any);
+
+    // Mantém compatibilidade com db local se ainda usado em algum lugar
     if (drivers) driversDb.setAll(drivers);
     if (vehicles) vehiclesDb.setAll(vehicles);
   }

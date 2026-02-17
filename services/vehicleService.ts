@@ -260,5 +260,27 @@ export const vehicleService = {
     return loadFromSupabase();
   },
   loadFromSupabase,
-  startRealtime
+  startRealtime,
+
+  importData: (vehicles: Vehicle[]) => {
+    if (!vehicles) return;
+    db.setAll(vehicles);
+    const companyId = authService.getCurrentUser()?.companyId;
+    if (!companyId) return;
+
+    void (async () => {
+      try {
+        const payload = vehicles.map(v => ({
+          ...v,
+          company_id: companyId,
+          plate: (v.plate || '').toUpperCase()
+        }));
+        const { error } = await supabase.from('vehicles').upsert(payload, { onConflict: 'id' });
+        if (error) console.error('❌ Erro ao sincronizar veículos:', error);
+        else console.log('✅ Veículos sincronizados no Supabase via ImportData');
+      } catch (err) {
+        console.error('❌ Erro inesperado ao importar veículos:', err);
+      }
+    })();
+  }
 };

@@ -115,5 +115,27 @@ export const initialBalanceService = {
 
   importData: (initialBalances: InitialBalanceRecord[]) => {
     if (initialBalances) balancesDb.setAll(initialBalances);
+
+    const companyId = authService.getCurrentUser()?.companyId;
+    if (!companyId) return;
+
+    const payload = initialBalances.map(balance => ({
+      id: balance.id,
+      account_id: balance.accountId,
+      account_name: balance.accountName,
+      date: balance.date,
+      value: balance.value,
+      company_id: companyId
+    }));
+
+    void (async () => {
+      try {
+        const { error } = await supabase.from('initial_balances').upsert(payload, { onConflict: 'id' });
+        if (error) console.error('❌ Erro ao sincronizar saldos iniciais:', error);
+        else console.log('✅ Saldos iniciais sincronizados no Supabase via ImportData');
+      } catch (err) {
+        console.error('❌ Erro inesperado ao importar saldos iniciais:', err);
+      }
+    })();
   }
 };

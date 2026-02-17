@@ -432,8 +432,30 @@ export const purchaseService = {
   getAll: () => db.getAll(),
   getById: (id: string) => db.getById(id),
   subscribe: (callback: (items: PurchaseOrder[]) => void) => db.subscribe(callback),
-  subscribeToUpdates,
+  reload: () => {
+    return loadFromSupabase();
+  },
   loadFromSupabase,
+  importData: (data: PurchaseOrder[]) => {
+    if (!data) return;
+    db.setAll(data);
+    const companyId = authService.getCurrentUser()?.companyId;
+    if (!companyId) return;
+
+    void (async () => {
+      try {
+        const payload = data.map(order => ({
+          ...mapOrderToDb(order),
+          company_id: companyId
+        }));
+        const { error } = await supabase.from('purchase_orders').upsert(payload, { onConflict: 'id' });
+        if (error) console.error('❌ Erro ao sincronizar pedidos de compra:', error);
+        else console.log('✅ Pedidos de compra sincronizados no Supabase via ImportData');
+      } catch (err) {
+        console.error('❌ Erro inesperado ao importar pedidos de compra:', err);
+      }
+    })();
+  },
   add: (order: PurchaseOrder) => {
     db.add(order);
     void persistUpsert(order);

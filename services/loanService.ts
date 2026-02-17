@@ -26,16 +26,18 @@ const loadFromSupabase = async () => {
         .order('contract_date', { ascending: false })
     );
 
-    const transformed = (loans || []).map((l: any) => ({
+    const transformed = ((loans as any[]) || []).map((l: any) => ({
       id: l.id,
       type: l.type as 'taken' | 'granted',
       entityName: l.entity_name,
       contractDate: l.contract_date,
       totalValue: l.total_value,
+      interestRate: l.interest_rate || 0,
+      installments: l.installments || 1,
       remainingValue: l.remaining_value,
       accountId: l.account_id,
       accountName: l.account_name,
-      status: l.status as 'active' | 'settled' | 'cancelled',
+      status: l.status as 'active' | 'settled' | 'default',
       nextDueDate: l.next_due_date,
       isHistorical: l.is_historical || false,
       transactions: l.transactions || []
@@ -71,6 +73,8 @@ const startRealtime = () => {
             entityName: raw.entity_name,
             contractDate: raw.contract_date,
             totalValue: raw.total_value,
+            interestRate: raw.interest_rate || 0,
+            installments: raw.installments || 1,
             remainingValue: raw.remaining_value,
             accountId: raw.account_id,
             accountName: raw.account_name,
@@ -137,6 +141,8 @@ export const loanService = {
         entity_name: loan.entityName,
         contract_date: loan.contractDate,
         total_value: loan.totalValue,
+        interest_rate: loan.interestRate,
+        installments: loan.installments,
         remaining_value: loan.remainingValue,
         account_id: loan.accountId,
         account_name: loan.accountName,
@@ -240,5 +246,36 @@ export const loanService = {
     logService.addLog({ userId, userName, action: 'delete', module: 'Financeiro', description: `Excluiu contrato de empréstimo ID: ${id}` });
   },
 
-  importData: (data: LoanRecord[]) => db.setAll(data)
+  importData: (data: LoanRecord[]) => {
+    db.setAll(data);
+    const companyId = authService.getCurrentUser()?.companyId;
+    if (!companyId) return;
+
+    void (async () => {
+      try {
+        const payload = data.map(l => ({
+          id: l.id,
+          type: l.type,
+          entity_name: l.entityName,
+          contract_date: l.contractDate,
+          total_value: l.totalValue,
+          interest_rate: l.interestRate || 0,
+          installments: l.installments || 1,
+          remaining_value: l.remainingValue,
+          account_id: l.accountId,
+          account_name: l.accountName,
+          status: l.status,
+          next_due_date: l.nextDueDate,
+          is_historical: l.isHistorical,
+          transactions: l.transactions,
+          company_id: companyId
+        }));
+        const { error } = await supabase.from('loans').upsert(payload, { onConflict: 'id' });
+        if (error) console.error('❌ Erro ao sincronizar empréstimos:', error);
+        else console.log('✅ Empréstimos sincronizados no Supabase via ImportData');
+      } catch (err) {
+        console.error('❌ Erro inesperado ao importar empréstimos:', err);
+      }
+    })();
+  }
 };

@@ -508,6 +508,65 @@ export const shareholderService = {
     _shareholdersDb.setAll(data);
     invalidateFinancialCache();
     invalidateDashboardCache();
+
+    const companyId = authService.getCurrentUser()?.companyId;
+    if (!companyId) return;
+
+    void (async () => {
+      try {
+        const sPayload = data.map(s => ({
+          id: s.id,
+          name: s.name,
+          cpf: s.cpf || null,
+          email: s.email || null,
+          phone: s.phone || null,
+          address_street: s.address?.street || null,
+          address_number: s.address?.number || null,
+          address_neighborhood: s.address?.neighborhood || null,
+          address_city: s.address?.city || null,
+          address_state: s.address?.state || null,
+          address_zip: s.address?.zip || null,
+          pro_labore_value: s.financial.proLaboreValue,
+          current_balance: s.financial.currentBalance,
+          last_pro_labore_date: s.financial.lastProLaboreDate || null,
+          recurrence_active: s.financial.recurrence?.active || false,
+          recurrence_amount: s.financial.recurrence?.amount || 0,
+          recurrence_day: s.financial.recurrence?.day || 1,
+          recurrence_last_generated_month: s.financial.recurrence?.lastGeneratedMonth || null,
+          company_id: companyId
+        }));
+
+        const tPayload: any[] = [];
+        data.forEach(s => {
+          if (s.financial.history) {
+            s.financial.history.forEach(t => {
+              tPayload.push({
+                id: t.id,
+                shareholder_id: s.id,
+                date: t.date,
+                type: t.type,
+                value: t.value,
+                description: t.description,
+                account_name: t.accountId || null,
+                company_id: companyId
+              });
+            });
+          }
+        });
+
+        const { error: sError } = await supabase.from('shareholders').upsert(sPayload, { onConflict: 'id' });
+        if (sError) console.error('❌ Erro ao sincronizar sócios:', sError);
+
+        if (tPayload.length > 0) {
+          const { error: tError } = await supabase.from('shareholder_transactions').upsert(tPayload, { onConflict: 'id' });
+          if (tError) console.error('❌ Erro ao sincronizar transações de sócios:', tError);
+        }
+
+        console.log('✅ Sócios e transações sincronizados no Supabase via ImportData');
+      } catch (err) {
+        console.error('❌ Erro inesperado ao importar sócios:', err);
+      }
+    })();
   },
 
   reload: () => {

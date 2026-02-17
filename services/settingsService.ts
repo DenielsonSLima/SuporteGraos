@@ -455,6 +455,7 @@ export const settingsService = {
 
   updateWatermark: async (data: WatermarkSettings) => {
     try {
+      const currentUser = authService.getCurrentUser();
       _watermarkSettings = { ..._watermarkSettings, ...data };
       localStorage.setItem(WATERMARK_KEY, JSON.stringify(_watermarkSettings));
 
@@ -470,7 +471,8 @@ export const settingsService = {
           image_url: _watermarkSettings.imageUrl,
           opacity: _watermarkSettings.opacity,
           orientation: _watermarkSettings.orientation,
-          active: true
+          active: true,
+          company_id: currentUser?.companyId || null
         };
 
         const { data: upserted, error } = await supabase

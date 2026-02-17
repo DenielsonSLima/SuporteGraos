@@ -303,5 +303,39 @@ export const classificationService = {
     if (productTypes && Array.isArray(productTypes)) {
       productTypesDb.setAll(productTypes);
     }
+
+    const companyId = authService.getCurrentUser()?.companyId;
+    if (!companyId) return;
+
+    void (async () => {
+      try {
+        if (partnerTypes?.length > 0) {
+          const pPayload = partnerTypes.map(t => ({
+            id: t.id,
+            name: t.name,
+            description: t.description || null,
+            is_system: t.isSystem || false,
+            company_id: companyId
+          }));
+          const { error } = await supabase.from('partner_types').upsert(pPayload, { onConflict: 'id' });
+          if (error) console.error('❌ Erro ao sincronizar tipos de parceiros:', error);
+        }
+
+        if (productTypes?.length > 0) {
+          const prPayload = productTypes.map(t => ({
+            id: t.id,
+            name: t.name,
+            description: t.description || null,
+            is_system: t.isSystem || false,
+            company_id: companyId
+          }));
+          const { error } = await supabase.from('product_types').upsert(prPayload, { onConflict: 'id' });
+          if (error) console.error('❌ Erro ao sincronizar tipos de produtos:', error);
+        }
+        console.log('✅ Classificações sincronizadas no Supabase');
+      } catch (err) {
+        console.error('❌ Erro inesperado ao importar classificações:', err);
+      }
+    })();
   }
 };

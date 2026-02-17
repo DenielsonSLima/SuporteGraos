@@ -161,5 +161,28 @@ export const bankAccountService = {
   importData: (bankAccounts: BankAccount[]) => {
     if (bankAccounts) accountsDb.setAll(bankAccounts);
     syncWindowAccounts();
+
+    const companyId = authService.getCurrentUser()?.companyId;
+    if (!companyId) return;
+
+    const payload = bankAccounts.map(account => ({
+      id: account.id,
+      bank_name: account.bankName,
+      owner: account.owner || '',
+      agency: account.agency || '',
+      account_number: account.accountNumber || '',
+      active: account.active !== false,
+      company_id: companyId
+    }));
+
+    void (async () => {
+      try {
+        const { error } = await supabase.from('contas_bancarias').upsert(payload, { onConflict: 'id' });
+        if (error) console.error('❌ Erro ao sincronizar contas bancárias:', error);
+        else console.log('✅ Contas bancárias sincronizadas no Supabase via ImportData');
+      } catch (err) {
+        console.error('❌ Erro inesperado ao importar contas bancárias:', err);
+      }
+    })();
   }
 };

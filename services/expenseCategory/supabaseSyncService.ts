@@ -14,7 +14,7 @@ export const expenseCategorySupabaseSync = {
     try {
       const companyId = authService.getCurrentUser()?.companyId || null;
 
-      await supabase.from('expense_types').insert({
+      await supabase.from('expense_types').upsert({
         id: category.id,
         name: category.name,
         type_key: category.type,
@@ -22,7 +22,7 @@ export const expenseCategorySupabaseSync = {
         icon: null,
         is_system: false,
         company_id: companyId
-      });
+      }, { onConflict: 'id' });
 
       if (category.subtypes && category.subtypes.length > 0) {
         const categoriesToInsert = category.subtypes.map(sub => ({
@@ -33,7 +33,7 @@ export const expenseCategorySupabaseSync = {
           is_system: false,
           company_id: companyId
         }));
-        await supabase.from('expense_categories').insert(categoriesToInsert);
+        await supabase.from('expense_categories').upsert(categoriesToInsert, { onConflict: 'id' });
       }
 
       console.log(`✅ Categoria ${category.name} sincronizada no Supabase`);

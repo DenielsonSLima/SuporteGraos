@@ -336,15 +336,17 @@ export const standaloneRecordsService = {
   },
 
   /**
-   * Importa múltiplos registros (bulk insert)
+   * Importa múltiplos registros (bulk insert/upsert)
    */
   importData: async (records: FinancialRecord[]): Promise<void> => {
     try {
+      if (!records || records.length === 0) return;
+
       const supabaseRecords = records.map(toSupabase);
 
       const { error } = await supabase
         .from('standalone_records')
-        .insert(supabaseRecords);
+        .upsert(supabaseRecords, { onConflict: 'id' });
 
       if (error) throw error;
 

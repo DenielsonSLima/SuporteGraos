@@ -178,16 +178,16 @@ export const initializeSupabaseData = async (): Promise<InitStats> => {
         supabase.from('cities').select('id, name, uf_id, code').order('name'),
         supabase.from('partner_types').select('id, name, description, is_system').order('name'),
         supabase.from('product_types').select('id, name, description, is_system').order('name'),
-        supabase.from('contas_bancarias').select('id, bank_name, owner, agency, account_number, account_type, active').eq('active', true).eq('company_id', companyId).order('bank_name'),
-        supabase.from('initial_balances').select('*').eq('company_id', companyId).order('date'),
-        supabase.from('expense_types').select('*').eq('company_id', companyId).order('id'),
-        supabase.from('expense_categories').select('*').eq('company_id', companyId).order('expense_type_id, name'),
-        supabase.from('shareholders').select('*').eq('company_id', companyId).order('name'),
-        supabase.from('shareholder_transactions').select('*').eq('company_id', companyId).order('date', { ascending: false }),
-        supabase.from('transporters').select('*').eq('company_id', companyId).order('name'),
-        supabase.from('vehicles').select('*').eq('company_id', companyId).order('plate'),
-        supabase.from('drivers').select('*').eq('company_id', companyId).order('name'),
-        supabase.from('partners').select('*').eq('company_id', companyId).order('name')
+        supabase.from('contas_bancarias').select('id, bank_name, owner, agency, account_number, account_type, active').eq('active', true).order('bank_name'),
+        supabase.from('initial_balances').select('*').order('date'),
+        supabase.from('expense_types').select('*').order('id'),
+        supabase.from('expense_categories').select('*').order('expense_type_id, name'),
+        supabase.from('shareholders').select('*').order('name'),
+        supabase.from('shareholder_transactions').select('*').order('date', { ascending: false }),
+        supabase.from('transporters').select('*').order('name'),
+        supabase.from('vehicles').select('*').order('plate'),
+        supabase.from('drivers').select('*').order('name'),
+        supabase.from('partners').select('*').order('name')
       ]);
 
       // Processar UFs

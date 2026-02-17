@@ -346,7 +346,26 @@ export const partnerService = {
     }
   },
 
-  importData: (data: Partner[]) => db.setAll(data),
+  importData: (data: Partner[]) => {
+    db.setAll(data);
+    const companyId = authService.getCurrentUser()?.companyId;
+    if (!companyId) return;
+
+    const payload = data.map(p => ({
+      ...transformPartnerToSupabase(p),
+      company_id: companyId
+    }));
+
+    void (async () => {
+      try {
+        const { error } = await supabase.from('partners').upsert(payload, { onConflict: 'id' });
+        if (error) console.error('❌ Erro ao sincronizar parceiros:', error);
+        else console.log('✅ Parceiros sincronizados no Supabase via ImportData');
+      } catch (err) {
+        console.error('❌ Erro inesperado ao importar parceiros:', err);
+      }
+    })();
+  },
 
   reload: () => {
     isLoaded = false;

@@ -251,5 +251,28 @@ export const driverService = {
     return loadFromSupabase();
   },
   loadFromSupabase,
-  startRealtime
+  startRealtime,
+
+  importData: (drivers: Driver[]) => {
+    if (!drivers) return;
+    db.setAll(drivers);
+    const companyId = authService.getCurrentUser()?.companyId;
+    if (!companyId) return;
+
+    void (async () => {
+      try {
+        const payload = drivers.map(d => ({
+          ...d,
+          company_id: companyId,
+          document: d.document === 'NÃO INFORMADO' ? `TEMP-DOC-${generateUUID()}` : d.document,
+          license_number: d.license_number === 'NÃO INFORMADO' ? `TEMP-CNH-${generateUUID()}` : d.license_number
+        }));
+        const { error } = await supabase.from('drivers').upsert(payload, { onConflict: 'id' });
+        if (error) console.error('❌ Erro ao sincronizar motoristas:', error);
+        else console.log('✅ Motoristas sincronizados no Supabase via ImportData');
+      } catch (err) {
+        console.error('❌ Erro inesperado ao importar motoristas:', err);
+      }
+    })();
+  }
 };

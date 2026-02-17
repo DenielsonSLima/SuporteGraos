@@ -239,5 +239,30 @@ export const transfersService = {
         metadata: { amount: item.amount }
       });
     }
+  },
+
+  importData: async (data: Transfer[]): Promise<void> => {
+    if (!data || data.length === 0) return;
+    db.setAll(data);
+    const companyId = authService.getCurrentUser()?.companyId;
+    if (!companyId) return;
+
+    try {
+      const payload = data.map(t => ({
+        ...mapToDb(t),
+        company_id: companyId
+      }));
+      const { error } = await supabase.from('transfers').upsert(payload, { onConflict: 'id' });
+      if (error) {
+        console.error('❌ Erro ao sincronizar transferências no Supabase:', error);
+      } else {
+        console.log(`✅ [TransfersService] ${data.length} transferências sincronizadas via ImportData`);
+      }
+    } catch (err) {
+      console.error('❌ Erro inesperado ao importar transferências:', err);
+    }
+    invalidateFinancialCache();
+    invalidateDashboardCache();
+    window.dispatchEvent(new Event('financial:updated'));
   }
 };
