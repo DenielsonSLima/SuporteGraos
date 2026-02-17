@@ -57,7 +57,7 @@ const mapOrderToDb = (order: SalesOrder) => ({
   discount: 0,
   notes: order.notes || null,
   metadata: order,
-  company_id: null
+  company_id: authService.getCurrentUser()?.companyId || null
 });
 
 const mapOrderFromDb = (row: any): SalesOrder => {
@@ -100,9 +100,16 @@ const mapOrderFromDb = (row: any): SalesOrder => {
 
 const loadFromSupabase = async (retries = 2): Promise<SalesOrder[]> => {
   try {
-    const { data, error } = await supabase
+    const user = authService.getCurrentUser();
+    let query = supabase
       .from('sales_orders')
-      .select('*')
+      .select('*');
+
+    if (user?.companyId) {
+      query = query.eq('company_id', user.companyId);
+    }
+
+    const { data, error } = await query
       .order('date', { ascending: false });
 
     if (error) throw error;

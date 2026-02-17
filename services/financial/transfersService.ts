@@ -1,4 +1,5 @@
 import { Persistence } from '../persistence';
+import { authService } from '../authService';
 import { supabase } from '../supabase';
 import { supabaseWithRetry } from '../../utils/fetchWithRetry';
 import { invalidateDashboardCache } from '../dashboardCache';
@@ -67,9 +68,13 @@ const TRANSFERS_SELECT_FIELDS = [
 const fetchPage = async (options: TransfersPageOptions): Promise<Transfer[]> => {
   try {
     const { limit, beforeDate, startDate, endDate } = options;
+    const user = authService.getCurrentUser();
+    const companyId = user?.companyId;
+
     let query = supabase
       .from('transfers')
       .select(TRANSFERS_SELECT_FIELDS)
+      .eq('company_id', companyId)
       .order('transfer_date', { ascending: false })
       .limit(limit);
 
@@ -78,7 +83,7 @@ const fetchPage = async (options: TransfersPageOptions): Promise<Transfer[]> => 
     if (endDate) query = query.lte('transfer_date', endDate);
 
     const data = await supabaseWithRetry(() => query);
-    return (data || []).map(mapFromDb);
+    return (data as any[] || []).map(mapFromDb);
   } catch (error) {
     console.error('❌ Erro ao paginar transfers:', error);
     return [];
@@ -91,14 +96,18 @@ const fetchPage = async (options: TransfersPageOptions): Promise<Transfer[]> => 
 
 const loadFromSupabase = async (): Promise<Transfer[]> => {
   try {
+    const user = authService.getCurrentUser();
+    const companyId = user?.companyId;
+
     const data = await supabaseWithRetry(() =>
       supabase
         .from('transfers')
         .select('*')
+        .eq('company_id', companyId)
         .order('transfer_date', { ascending: false })
     );
 
-    const mapped = (data || []).map(mapFromDb);
+    const mapped = (data as any[] || []).map(mapFromDb);
     db.setAll(mapped);
     isLoaded = true;
     console.log('🔄 Transferências sincronizando em tempo real...');
@@ -134,7 +143,7 @@ const startRealtime = () => {
 
       invalidateFinancialCache();
       invalidateDashboardCache();
-      
+
       // Disparar evento para o histórico atualizar
       window.dispatchEvent(new Event('financial:updated'));
     })
@@ -190,7 +199,7 @@ export const transfersService = {
     invalidateFinancialCache();
     invalidateDashboardCache();
     window.dispatchEvent(new Event('financial:updated'));
-    
+
     // Audit Log
     void auditService.logAction('create', 'Financeiro', `Transferência criada: R$ ${item.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} - ${item.description}`, {
       entityType: 'Transfer',
@@ -205,7 +214,7 @@ export const transfersService = {
     invalidateFinancialCache();
     invalidateDashboardCache();
     window.dispatchEvent(new Event('financial:updated'));
-    
+
     // Audit Log
     void auditService.logAction('update', 'Financeiro', `Transferência alterada: R$ ${item.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} - ${item.description}`, {
       entityType: 'Transfer',
@@ -221,7 +230,7 @@ export const transfersService = {
     invalidateFinancialCache();
     invalidateDashboardCache();
     window.dispatchEvent(new Event('financial:updated'));
-    
+
     // Audit Log
     if (item) {
       void auditService.logAction('delete', 'Financeiro', `Transferência excluída: R$ ${item.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} - ${item.description}`, {

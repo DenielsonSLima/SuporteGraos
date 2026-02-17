@@ -45,6 +45,43 @@ serve(async (req) => {
     return jsonResponse({ success: false, error: 'Missing env vars' }, 500);
   }
 
+  // 1. Verificar Autorização do Chamador
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader) {
+    return jsonResponse({ success: false, error: 'Authorization header missing' }, 401);
+  }
+
+  const userClient = createClient(supabaseUrl, serviceRoleKey, {
+    global: { headers: { Authorization: authHeader } }
+  });
+
+  // Extrair o JWT (remover 'Bearer ')
+  const token = authHeader.replace('Bearer ', '');
+  const { data: { user: caller }, error: authError } = await userClient.auth.getUser(token);
+
+  if (authError || !caller) {
+    console.error('❌ AUTH ERROR:', authError);
+    return jsonResponse({ success: false, error: 'Unauthorized: Invalid token' }, 401);
+  }
+
+  // Verificar se o chamador é administrativo e está ativo
+  const callerMetadata = caller.user_metadata || {};
+  const callerCompanyId = callerMetadata.company_id;
+  const isCallerAdmin = callerMetadata.role === 'Admin';
+  const isCallerActive = callerMetadata.active !== false;
+
+  if (!isCallerActive) {
+    return jsonResponse({ success: false, error: 'Chamador está inativo' }, 403);
+  }
+
+  if (!isCallerAdmin) {
+    return jsonResponse({ success: false, error: 'Permissão negada: Apenas administradores podem gerenciar usuários' }, 403);
+  }
+
+  if (!callerCompanyId) {
+    return jsonResponse({ success: false, error: 'Chamador sem empresa vinculada' }, 403);
+  }
+
   const { payload, error: bodyError } = await readJsonBody(req);
   if (bodyError) {
     return jsonResponse({ success: false, error: bodyError }, 400);
@@ -56,7 +93,7 @@ serve(async (req) => {
     return jsonResponse({ success: false, error: 'Missing action field' }, 400);
   }
 
-  console.log('📢 manage-users invoked:', { action, payloadKeys: Object.keys(payload) });
+  console.log('📢 manage-users invoked by:', { callerEmail: caller.email, companyId: callerCompanyId, action });
 
   const supabase = createClient(supabaseUrl, serviceRoleKey);
 
@@ -78,8 +115,7 @@ serve(async (req) => {
       } = payload;
 
       if (!firstName || !lastName || !cpf || !email) {
-        console.error('❌ CREATE: Missing required fields:', { firstName, lastName, cpf, email });
-        return jsonResponse({ success: false, error: 'Missing required fields' }, 400);
+        return jsonResponse({ success: false, error: 'Campos obrigatórios ausentes' }, 400);
       }
 
       const passwordToUse = generatePassword
@@ -87,10 +123,8 @@ serve(async (req) => {
         : password;
 
       if (!passwordToUse) {
-         return jsonResponse({ success: false, error: 'Senha é obrigatória' }, 400);
+        return jsonResponse({ success: false, error: 'Senha é obrigatória' }, 400);
       }
-
-      console.log('📝 CREATE: Attempting to create user:', { email: email.toLowerCase().trim(), firstName, lastName });
 
       const { data, error } = await supabase.auth.admin.createUser({
         email: email.toLowerCase().trim(),
@@ -101,23 +135,21 @@ serve(async (req) => {
           last_name: lastName,
           cpf,
           phone,
-          role,
-          permissions,
+          role: role || 'Operador',
+          permissions: permissions || [],
           active: active !== undefined ? active : true,
-          allow_recovery: allowRecovery !== undefined ? allowRecovery : true
+          allow_recovery: allowRecovery !== undefined ? allowRecovery : true,
+          company_id: callerCompanyId // 🔒 Vínculo forçado à empresa do chamador
         }
       });
 
       if (error) {
-        console.error('❌ CREATE ERROR:', error);
-        // Special handling for duplicate email to be more user-friendly
         if (error.message?.includes('already exists')) {
-            return jsonResponse({ success: false, error: 'Este e-mail já está em uso.' }, 409);
+          return jsonResponse({ success: false, error: 'Este e-mail já está em uso.' }, 409);
         }
         return jsonResponse({ success: false, error: error.message }, 400);
       }
 
-      console.log('✅ CREATE SUCCESS:', data.user.id);
       return jsonResponse({
         success: true,
         user_id: data.user.id,
@@ -143,12 +175,21 @@ serve(async (req) => {
       } = payload;
 
       if (!userId) {
-        console.error('❌ UPDATE: Missing userId');
-        return jsonResponse({ success: false, error: 'Missing userId' }, 400);
+        return jsonResponse({ success: false, error: 'userId ausente' }, 400);
+      }
+
+      // 1. Verificar se o usuário alvo pertence à mesma empresa
+      const { data: targetUser, error: getError } = await supabase.auth.admin.getUserById(userId);
+      if (getError || !targetUser?.user) {
+        return jsonResponse({ success: false, error: 'Usuário não encontrado' }, 404);
+      }
+
+      if (targetUser.user.user_metadata?.company_id !== callerCompanyId) {
+        return jsonResponse({ success: false, error: 'Acesso negado: Usuário pertence a outra empresa' }, 403);
       }
 
       const updateData: any = {
-        user_metadata: {}
+        user_metadata: { ...targetUser.user.user_metadata }
       };
 
       if (firstName) updateData.user_metadata.first_name = firstName;
@@ -159,24 +200,16 @@ serve(async (req) => {
       if (permissions) updateData.user_metadata.permissions = permissions;
       if (active !== undefined) updateData.user_metadata.active = active;
       if (allowRecovery !== undefined) updateData.user_metadata.allow_recovery = allowRecovery;
-      
+
       if (email) updateData.email = email.toLowerCase().trim();
       if (password) updateData.password = password;
-
-      console.log('📝 UPDATE: Attempting to update user:', {
-        userId,
-        updateDataKeys: Object.keys(updateData),
-        metadataKeys: Object.keys(updateData.user_metadata)
-      });
 
       const { error } = await supabase.auth.admin.updateUserById(userId, updateData);
 
       if (error) {
-        console.error('❌ UPDATE ERROR:', error);
         return jsonResponse({ success: false, error: error.message }, 400);
       }
 
-      console.log('✅ UPDATE SUCCESS:', userId);
       return jsonResponse({ success: true });
     }
 
@@ -185,58 +218,64 @@ serve(async (req) => {
       const { userId } = payload;
 
       if (!userId) {
-        console.error('❌ DELETE: Missing userId');
-        return jsonResponse({ success: false, error: 'Missing userId' }, 400);
+        return jsonResponse({ success: false, error: 'userId ausente' }, 400);
       }
 
-      console.log('🗑️ DELETE: Attempting to delete user:', { userId });
+      // 1. Verificar se o usuário alvo pertence à mesma empresa
+      const { data: targetUser, error: getError } = await supabase.auth.admin.getUserById(userId);
+      if (getError || !targetUser?.user) {
+        return jsonResponse({ success: false, error: 'Usuário não encontrado' }, 404);
+      }
+
+      if (targetUser.user.user_metadata?.company_id !== callerCompanyId) {
+        return jsonResponse({ success: false, error: 'Acesso negado: Usuário pertence a outra empresa' }, 403);
+      }
 
       const { error } = await supabase.auth.admin.deleteUser(userId);
 
       if (error) {
-        console.error('❌ DELETE ERROR:', error);
         return jsonResponse({ success: false, error: error.message }, 400);
       }
 
-      console.log('✅ DELETE SUCCESS:', userId);
       return jsonResponse({ success: true });
     }
 
     // LIST USERS
     if (action === 'list') {
-      let allUsers: any[] = [];
+      let filteredUsers: any[] = [];
       let page = 1;
       const perPage = 100;
 
       while (true) {
         const { data, error } = await supabase.auth.admin.listUsers({ page, perPage });
         if (error) {
-           console.error('❌ LIST ERROR:', error);
-           return jsonResponse({ success: false, error: error.message }, 400);
+          return jsonResponse({ success: false, error: error.message }, 400);
         }
 
-        const users = (data?.users || []).map((u: any) => ({
-          id: u.id,
-          email: u.email,
-          phone: u.phone,
-          first_name: u.user_metadata?.first_name || u.email?.split('@')[0],
-          last_name: u.user_metadata?.last_name || '',
-          cpf: u.user_metadata?.cpf || '',
-          role: u.user_metadata?.role || 'Operador',
-          permissions: u.user_metadata?.permissions || [],
-          active: u.user_metadata?.active !== undefined ? u.user_metadata.active : true,
-          allow_recovery: u.user_metadata?.allow_recovery !== undefined ? u.user_metadata.allow_recovery : true,
-          last_sign_in_at: u.last_sign_in_at,
-          created_at: u.created_at
-        }));
+        const users = (data?.users || [])
+          .filter((u: any) => u.user_metadata?.company_id === callerCompanyId) // 🔒 Filtro por empresa
+          .map((u: any) => ({
+            id: u.id,
+            email: u.email,
+            phone: u.phone,
+            first_name: u.user_metadata?.first_name || u.email?.split('@')[0],
+            last_name: u.user_metadata?.last_name || '',
+            cpf: u.user_metadata?.cpf || '',
+            role: u.user_metadata?.role || 'Operador',
+            permissions: u.user_metadata?.permissions || [],
+            active: u.user_metadata?.active !== undefined ? u.user_metadata.active : true,
+            allow_recovery: u.user_metadata?.allow_recovery !== undefined ? u.user_metadata.allow_recovery : true,
+            last_sign_in_at: u.last_sign_in_at,
+            created_at: u.created_at
+          }));
 
-        allUsers = [...allUsers, ...users];
+        filteredUsers = [...filteredUsers, ...users];
 
-        if (users.length < perPage) break;
+        if (data?.users.length < perPage) break;
         page++;
       }
 
-      return jsonResponse({ success: true, users: allUsers });
+      return jsonResponse({ success: true, users: filteredUsers });
     }
 
     return jsonResponse({ success: false, error: 'Invalid action' }, 400);

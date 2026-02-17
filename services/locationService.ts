@@ -7,7 +7,7 @@ import { Persistence } from './persistence';
 
 // Initial Data - simulated database
 interface StateData {
-  id?: string; // Opcional para compatibilidade com Persistence
+  id: string;
   uf: string;
   name: string;
   cities: string[];
@@ -32,51 +32,61 @@ const sortCities = (cities: string[]) => cities.sort((a, b) => a.localeCompare(b
 // Fallback data if Supabase is unavailable
 const FALLBACK_STATE_DATABASE: StateData[] = [
   {
+    id: 'SE',
     uf: 'SE',
     name: 'Sergipe',
     cities: sortCities(['Aracaju', 'Nossa Senhora do Socorro', 'Lagarto', 'Itabaiana', 'São Cristóvão', 'Estância', 'Tobias Barreto', 'Simão Dias', 'Nossa Senhora da Glória', 'Poço Verde'])
   },
   {
+    id: 'MA',
     uf: 'MA',
     name: 'Maranhão',
     cities: sortCities(['São Luís', 'Imperatriz', 'São José de Ribamar', 'Timon', 'Caxias', 'Codó', 'Paço do Lumiar', 'Açailândia', 'Bacabal', 'Balsas'])
   },
   {
+    id: 'PE',
     uf: 'PE',
     name: 'Pernambuco',
     cities: sortCities(['Recife', 'Jaboatão dos Guararapes', 'Olinda', 'Caruaru', 'Petrolina', 'Paulista', 'Cabo de Santo Agostinho', 'Camaragibe', 'Garanhuns', 'Vitória de Santo Antão'])
   },
   {
+    id: 'BA',
     uf: 'BA',
     name: 'Bahia',
     cities: sortCities(['Salvador', 'Feira de Santana', 'Vitória da Conquista', 'Camaçari', 'Juazeiro', 'Lauro de Freitas', 'Itabuna', 'Ilhéus', 'Porto Seguro', 'Jequié'])
   },
   {
+    id: 'TO',
     uf: 'TO',
     name: 'Tocantins',
     cities: sortCities(['Palmas', 'Araguaína', 'Gurupi', 'Porto Nacional', 'Paraíso do Tocantins', 'Araguatins', 'Colinas do Tocantins', 'Guaraí', 'Tocantinópolis', 'Dianópolis'])
   },
   {
+    id: 'PI',
     uf: 'PI',
     name: 'Piauí',
     cities: sortCities(['Teresina', 'Parnaíba', 'Picos', 'Piripiri', 'Floriano', 'Barras', 'Campo Maior', 'União', 'Altos', 'Esperantina'])
   },
   {
+    id: 'PB',
     uf: 'PB',
     name: 'Paraíba',
     cities: sortCities(['João Pessoa', 'Campina Grande', 'Santa Rita', 'Patos', 'Bayeux', 'Sousa', 'Cabedelo', 'Cajazeiras', 'Guarabira', 'Sapé'])
   },
   {
+    id: 'MT',
     uf: 'MT',
     name: 'Mato Grosso',
     cities: sortCities(['Sinop', 'Sorriso', 'Lucas do Rio Verde', 'Nova Mutum', 'Cuiabá', 'Rondonópolis', 'Primavera do Leste', 'Tangará da Serra'])
   },
   {
+    id: 'PR',
     uf: 'PR',
     name: 'Paraná',
     cities: sortCities(['Cascavel', 'Londrina', 'Maringá', 'Ponta Grossa', 'Curitiba', 'Foz do Iguaçu'])
   },
   {
+    id: 'GO',
     uf: 'GO',
     name: 'Goiás',
     cities: sortCities(['Rio Verde', 'Jataí', 'Cristalina', 'Goiânia', 'Anápolis'])
@@ -94,7 +104,7 @@ let _realtimeStarted = false;
 const loadFromSupabase = async () => {
   try {
     const stats = await waitForInit();
-    
+
     if (!stats.data.ufs || !stats.data.cities) {
       throw new Error('UFs ou Cities não carregadas');
     }
@@ -102,10 +112,11 @@ const loadFromSupabase = async () => {
     // Build state database from pre-loaded data
     const newStateDatabase: StateData[] = [];
     const ufsMap = new Map<number, SupabaseUF>();
-    
+
     stats.data.ufs.forEach((uf: any) => {
       ufsMap.set(uf.id, uf);
       newStateDatabase.push({
+        id: uf.uf,
         uf: uf.uf,
         name: uf.name,
         cities: []
@@ -131,7 +142,7 @@ const loadFromSupabase = async () => {
     _stateDatabase = newStateDatabase;
     statesDb.setAll(newStateDatabase);
     _isSupabaseLoaded = true;
-    
+
   } catch (error) {
     console.warn('⚠️ LocationService: Usando fallback:', error);
     _stateDatabase = [...FALLBACK_STATE_DATABASE];
@@ -160,7 +171,7 @@ const refreshLocationDataFromSupabase = async () => {
 
     (ufsRes.data || []).forEach((uf: any) => {
       ufsMap.set(uf.id, uf);
-      newStateDatabase.push({ uf: uf.uf, name: uf.name, cities: [] });
+      newStateDatabase.push({ id: uf.uf, uf: uf.uf, name: uf.name, cities: [] });
     });
 
     (citiesRes.data || []).forEach((city: any) => {
@@ -181,7 +192,7 @@ const refreshLocationDataFromSupabase = async () => {
     try {
       const event = new CustomEvent('location:states-changed', { detail: { timestamp: Date.now() } });
       window.dispatchEvent(event);
-    } catch {}
+    } catch { }
   } catch (err) {
     console.warn('⚠️ Realtime: falha ao atualizar UFs/Cities:', err);
   }
@@ -264,14 +275,14 @@ export const locationService = {
   // Add a city (updates both local DB and Supabase)
   addCity: async (uf: string, cityName: string) => {
     const stateIndex = _stateDatabase.findIndex(s => s.uf === uf);
-    
+
     if (stateIndex >= 0) {
       const state = _stateDatabase[stateIndex];
       if (!state.cities.includes(cityName)) {
         state.cities = sortCities([...state.cities, cityName]);
         _stateDatabase[stateIndex] = state;
         statesDb.setAll([..._stateDatabase]);
-        
+
         const { userId, userName } = getLogInfo();
         logService.addLog({
           userId,
@@ -298,7 +309,7 @@ export const locationService = {
                   name: cityName,
                   uf_id: ufData.id,
                   code: null,
-                  company_id: null
+                  company_id: authService.getCurrentUser()?.companyId || null
                 });
               console.log(`✅ Cidade ${cityName} salva no Supabase`);
             }
@@ -312,12 +323,12 @@ export const locationService = {
 
   removeCity: async (uf: string, cityName: string) => {
     const stateIndex = _stateDatabase.findIndex(s => s.uf === uf);
-    
+
     if (stateIndex >= 0) {
       const state = _stateDatabase[stateIndex];
       state.cities = state.cities.filter(c => c !== cityName);
       _stateDatabase[stateIndex] = state;
-      
+
       const { userId, userName } = getLogInfo();
       logService.addLog({
         userId,

@@ -98,7 +98,7 @@ const PurchaseOrderModule: React.FC = () => {
   const handleSave = (order: PurchaseOrder) => {
     if (selectedOrder && selectedOrder.id === order.id) {
       purchaseService.update(order);
-      setOrders(prev => prev.map(o => o.id === order.id ? order : o));
+      // O subscriber já atualiza o state via purchaseService.subscribe(setOrders)
       setSelectedOrder(order);
       setViewMode('details');
       addToast('success', 'Pedido Atualizado');
@@ -106,7 +106,7 @@ const PurchaseOrderModule: React.FC = () => {
       const newId = generateUuid();
       const newOrder = { ...order, id: newId };
       purchaseService.add(newOrder);
-      setOrders(prev => [...prev, newOrder]);
+      // O subscriber já atualiza o state via purchaseService.subscribe(setOrders)
       setViewMode('list');
       setSelectedOrder(undefined);
       addToast('success', 'Pedido Criado');
@@ -124,7 +124,7 @@ const PurchaseOrderModule: React.FC = () => {
     
     if (result?.success) {
       addToast('success', 'Pedido Excluído', 'Pedido, pagamentos e contas a pagar removidos com sucesso.');
-      setOrders(prev => prev.filter(o => o.id !== orderToDelete.id));
+      // O subscriber já atualiza o state via purchaseService.subscribe(setOrders)
       setOrderToDelete(null);
       if (viewMode === 'details') setViewMode('list');
     } else {
@@ -144,7 +144,7 @@ const PurchaseOrderModule: React.FC = () => {
         if (freshOrder) {
             const updated = { ...freshOrder, status: 'completed' as const };
             purchaseService.update(updated);
-            setOrders(prev => prev.map(o => o.id === updated.id ? updated : o));
+            // O subscriber já atualiza o state via purchaseService.subscribe(setOrders)
             if (viewMode === 'details') setSelectedOrder(updated);
             addToast('success', 'Pedido Finalizado');
         } else {

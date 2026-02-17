@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import { authService } from '../authService';
 import { ExpenseCategory } from './types';
 
 /**
@@ -8,9 +9,11 @@ import { ExpenseCategory } from './types';
  */
 
 export const expenseCategorySupabaseSync = {
-  
+
   syncInsertCategory: async (category: ExpenseCategory) => {
     try {
+      const companyId = authService.getCurrentUser()?.companyId || null;
+
       await supabase.from('expense_types').insert({
         id: category.id,
         name: category.name,
@@ -18,7 +21,7 @@ export const expenseCategorySupabaseSync = {
         color: category.color || 'bg-gray-50 text-gray-700 border-gray-200',
         icon: null,
         is_system: false,
-        company_id: null
+        company_id: companyId
       });
 
       if (category.subtypes && category.subtypes.length > 0) {
@@ -28,7 +31,7 @@ export const expenseCategorySupabaseSync = {
           name: sub.name,
           description: null,
           is_system: false,
-          company_id: null
+          company_id: companyId
         }));
         await supabase.from('expense_categories').insert(categoriesToInsert);
       }
@@ -53,13 +56,14 @@ export const expenseCategorySupabaseSync = {
       await supabase.from('expense_categories').delete().eq('expense_type_id', category.id);
 
       if (category.subtypes && category.subtypes.length > 0) {
+        const companyId = authService.getCurrentUser()?.companyId || null;
         const categoriesToInsert = category.subtypes.map(sub => ({
           id: sub.id,
           expense_type_id: category.id,
           name: sub.name,
           description: null,
           is_system: false,
-          company_id: null
+          company_id: companyId
         }));
         await supabase.from('expense_categories').insert(categoriesToInsert);
       }

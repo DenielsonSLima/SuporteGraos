@@ -1,7 +1,7 @@
-
 import { Persistence } from './persistence';
 import { supabase } from './supabase';
 import { waitForInit } from './supabaseInitService';
+import { authService } from './authService';
 
 export type LogAction = 'create' | 'update' | 'delete' | 'login' | 'logout' | 'approve' | 'cancel' | 'export';
 
@@ -15,6 +15,7 @@ export interface LogEntry {
   description: string;
   timestamp: string;
   metadata?: any;
+  companyId?: string;
 }
 
 // Dados iniciais zerados conforme solicitado
@@ -50,6 +51,7 @@ const mapLogToDb = (log: LogEntry) => ({
   entity_id: log.entityId,
   description: log.description,
   metadata: log.metadata,
+  company_id: log.companyId || authService.getCurrentUser()?.companyId,
   created_at: log.timestamp
 });
 
@@ -80,14 +82,14 @@ const loadFromSupabase = async () => {
       .select('*')
       .order('created_at', { ascending: false })
       .limit(1000);
-    
+
     if (error) {
       if (error.code !== 'PGRST25') {
         console.warn('⚠️ Erro ao carregar logs:', error);
       }
       return;
     }
-    
+
     const mapped = data.map(mapLogFromDb);
     db.setAll(mapped);
   } catch (err) {
@@ -102,7 +104,7 @@ const loadFromSupabase = async () => {
 const startRealtime = () => {
   if (!logChannel && !_realtimeStarted) {
     logChannel = supabase.channel('audit_logs_realtime_logs');
-    
+
     logChannel
       .on('postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'audit_logs' },
@@ -142,18 +144,18 @@ export const logService = {
   },
 
   // Filtro avançado
-  getFiltered: (filters: { 
-    search?: string; 
-    startDate?: string; 
-    endDate?: string; 
-    module?: string 
+  getFiltered: (filters: {
+    search?: string;
+    startDate?: string;
+    endDate?: string;
+    module?: string
   }) => {
     let logs = logService.getAll();
 
     if (filters.search) {
       const term = filters.search.toLowerCase();
-      logs = logs.filter(l => 
-        l.description.toLowerCase().includes(term) || 
+      logs = logs.filter(l =>
+        l.description.toLowerCase().includes(term) ||
         l.userName.toLowerCase().includes(term) ||
         l.action.toLowerCase().includes(term)
       );
@@ -178,7 +180,7 @@ export const logService = {
   },
 
   importData: (data: LogEntry[]) => db.setAll(data),
-  
+
   startRealtime
 };
 

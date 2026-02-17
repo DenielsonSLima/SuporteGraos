@@ -112,9 +112,13 @@ const STANDALONE_SELECT_FIELDS = [
 const fetchPage = async (options: StandaloneRecordsPageOptions): Promise<FinancialRecord[]> => {
   try {
     const { limit, beforeDate, startDate, endDate } = options;
+    const user = authService.getCurrentUser();
+    const companyId = user?.companyId;
+
     let query = supabase
       .from('standalone_records')
       .select(STANDALONE_SELECT_FIELDS)
+      .eq('company_id', companyId)
       .order('issue_date', { ascending: false })
       .limit(limit);
 
@@ -136,9 +140,13 @@ const fetchPage = async (options: StandaloneRecordsPageOptions): Promise<Financi
  */
 const loadFromSupabase = async (): Promise<void> => {
   try {
+    const user = authService.getCurrentUser();
+    const companyId = user?.companyId;
+
     const { data, error } = await supabase
       .from('standalone_records')
       .select('*')
+      .eq('company_id', companyId)
       .order('issue_date', { ascending: false });
 
     if (error) throw error;
@@ -170,10 +178,10 @@ const setupRealtimeSubscription = (): void => {
       { event: '*', schema: 'public', table: 'standalone_records' },
       (payload) => {
         console.log('🔄 [StandaloneRecordsService] Mudança detectada:', payload.eventType);
-        
+
         // Recarregar dados do Supabase
         loadFromSupabase();
-        
+
         // Invalidar caches
         invalidateFinancialCache();
         invalidateDashboardCache();
@@ -219,7 +227,7 @@ export const standaloneRecordsService = {
   add: async (record: FinancialRecord): Promise<void> => {
     try {
       const supabaseRecord = toSupabase(record);
-      
+
       const { error } = await supabase
         .from('standalone_records')
         .insert([supabaseRecord]);
@@ -257,7 +265,7 @@ export const standaloneRecordsService = {
   update: async (record: FinancialRecord): Promise<void> => {
     try {
       const supabaseRecord = toSupabase(record);
-      
+
       const { error } = await supabase
         .from('standalone_records')
         .update(supabaseRecord)
@@ -333,7 +341,7 @@ export const standaloneRecordsService = {
   importData: async (records: FinancialRecord[]): Promise<void> => {
     try {
       const supabaseRecords = records.map(toSupabase);
-      
+
       const { error } = await supabase
         .from('standalone_records')
         .insert(supabaseRecords);

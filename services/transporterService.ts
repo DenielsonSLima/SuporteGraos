@@ -33,9 +33,13 @@ let isLoaded = false;
 const loadFromSupabase = async () => {
   if (isLoaded) return;
   try {
+    const user = authService.getCurrentUser();
+    const companyId = user?.companyId;
+
     const { data, error } = await supabase
       .from('transporters')
       .select('*')
+      .eq('company_id', companyId)
       .order('name');
 
     if (error) throw error;
@@ -125,8 +129,16 @@ export const transporterService = {
     });
 
     try {
+      const user = authService.getCurrentUser();
+      const companyId = user?.companyId;
+
       // Deixa o Supabase gerar o UUID
-      const insertPayload = { ...transporter, created_at: now, updated_at: now } as any;
+      const insertPayload = {
+        ...transporter,
+        company_id: companyId,
+        created_at: now,
+        updated_at: now
+      } as any;
       const { data, error } = await supabase
         .from('transporters')
         .insert(insertPayload)

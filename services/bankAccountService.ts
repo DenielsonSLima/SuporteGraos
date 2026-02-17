@@ -93,6 +93,7 @@ export const bankAccountService = {
   loadFromSupabase,
   startRealtime: startBankAccountRealtime,
   getBankAccounts: () => accountsDb.getAll(),
+  getById: (id: string) => accountsDb.getById(id),
 
   subscribe: (callback: (items: BankAccount[]) => void) => {
     startBankAccountRealtime();
@@ -135,7 +136,7 @@ export const bankAccountService = {
     if (bankAccountService.isAccountInUse(id)) {
       throw new Error("Não é possível excluir uma conta com movimentações. Inative-a em vez disso.");
     }
-    
+
     accountsDb.delete(id);
     syncWindowAccounts();
     invalidateSettingsCache();

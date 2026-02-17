@@ -30,6 +30,7 @@ export interface User {
   name: string;
   email: string;
   role: 'admin' | 'user' | 'manager';
+  companyId?: string; // ID da empresa vinculada
   avatar?: string;
   token?: string;
 }

@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import { authService } from '../authService';
 import { Shareholder, ShareholderTransaction } from './types';
 
 /**
@@ -6,10 +7,10 @@ import { Shareholder, ShareholderTransaction } from './types';
  */
 
 export const shareholderSupabaseSync = {
-  
+
   syncInsertShareholder: async (shareholder: Shareholder) => {
     try {
-      await supabase.from('shareholders').insert({
+      const supabaseData = {
         id: shareholder.id,
         name: shareholder.name,
         cpf: shareholder.cpf || null,
@@ -28,8 +29,10 @@ export const shareholderSupabaseSync = {
         recurrence_amount: shareholder.financial.recurrence?.amount || 0,
         recurrence_day: shareholder.financial.recurrence?.day || 1,
         recurrence_last_generated_month: shareholder.financial.recurrence?.lastGeneratedMonth || null,
-        company_id: null
-      });
+        company_id: authService.getCurrentUser()?.companyId || null
+      };
+
+      await supabase.from('shareholders').insert(supabaseData);
       console.log(`✅ Sócio ${shareholder.name} salvo no Supabase`);
     } catch (error) {
       console.warn('⚠️ Erro ao salvar sócio no Supabase:', error);
@@ -82,7 +85,7 @@ export const shareholderSupabaseSync = {
         value: transaction.value,
         description: transaction.description,
         account_name: transaction.accountId || null,
-        company_id: null
+        company_id: authService.getCurrentUser()?.companyId || null
       });
     } catch (error) {
       console.warn('⚠️ Erro ao salvar transação no Supabase:', error);

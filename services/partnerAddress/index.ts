@@ -173,7 +173,11 @@ export const partnerAddressService = {
             // cria cidade vinculada à UF se não encontrada
             const { data: created, error: cityCreateErr } = await supabase
               .from('cities')
-              .insert({ name: cityStr, uf_id: resolvedStateId })
+              .insert({
+                name: cityStr,
+                uf_id: resolvedStateId,
+                company_id: authService.getCurrentUser()?.companyId
+              })
               .select('id')
               .single();
             if (!cityCreateErr && created?.id) {
@@ -257,7 +261,11 @@ export const partnerAddressService = {
           } else {
             const { data: created, error: cityCreateErr } = await supabase
               .from('cities')
-              .insert({ name: cityStr, uf_id: resolvedStateId })
+              .insert({
+                name: cityStr,
+                uf_id: resolvedStateId,
+                company_id: authService.getCurrentUser()?.companyId
+              })
               .select('id')
               .single();
             if (!cityCreateErr && created?.id) {

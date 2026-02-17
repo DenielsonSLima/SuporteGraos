@@ -79,7 +79,7 @@ const mapLoadingToDb = (l: Loading) => ({
   original_destination: l.originalDestination || null,
   redirect_displacement_value: l.redirectDisplacementValue || null,
   metadata: l,
-  company_id: null
+  company_id: authService.getCurrentUser()?.companyId || null
 });
 
 export const mapLoadingFromDb = (row: any): Loading => {

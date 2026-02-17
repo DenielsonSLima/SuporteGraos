@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import { authService } from '../authService';
 import { BankAccount } from '../../modules/Financial/types';
 
 export const bankAccountSupabaseSync = {
@@ -13,7 +14,7 @@ export const bankAccountSupabaseSync = {
           agency: account.agency || null,
           account_number: account.accountNumber || null,
           active: account.active !== false,
-          company_id: null
+          company_id: authService.getCurrentUser()?.companyId || null
         });
       if (error) throw error;
       console.log(`✅ Conta ${account.bankName} salva no Supabase`);
@@ -48,7 +49,7 @@ export const bankAccountSupabaseSync = {
         .delete()
         .eq('id', id)
         .select();
-      
+
       if (error) throw error;
       console.log(`✅ Conta excluída do Supabase`, data);
     } catch (error) {

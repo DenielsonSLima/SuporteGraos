@@ -3,10 +3,10 @@ export type FinancialStatus = 'pending' | 'paid' | 'overdue' | 'partial';
 
 export interface FinancialRecord {
   id: string;
-  description: string; 
-  entityName: string; 
-  driverName?: string; 
-  category: string; 
+  description: string;
+  entityName: string;
+  driverName?: string;
+  category: string;
   dueDate: string;
   issueDate: string;
   settlementDate?: string;
@@ -15,9 +15,9 @@ export interface FinancialRecord {
   discountValue?: number;
   status: FinancialStatus;
   subType?: 'purchase_order' | 'freight' | 'commission' | 'sales_order' | 'loan_taken' | 'loan_granted' | 'admin' | 'shareholder' | 'receipt' | 'credit_income' | 'investment';
-  bankAccount?: string; 
+  bankAccount?: string;
   notes?: string;
-  assetId?: string; 
+  assetId?: string;
   isAssetReceipt?: boolean;
   assetName?: string;
   weightSc?: number; // legado: usado em algumas telas
@@ -42,11 +42,11 @@ export interface LoanTransaction {
 
 export interface LoanRecord {
   id: string;
-  entityName: string; 
+  entityName: string;
   contractDate: string;
   originalValue?: number; // Valor original do contrato
   totalValue: number; // Valor original do contrato
-  interestRate: number; 
+  interestRate: number;
   installments: number;
   remainingValue: number; // Saldo atual calculado
   nextDueDate: string;
@@ -68,6 +68,7 @@ export interface BankAccount {
   active?: boolean;
   agency?: string;
   accountNumber?: string;
+  balance?: number;
 }
 
 export interface TransferRecord {
@@ -77,5 +78,5 @@ export interface TransferRecord {
   destinationAccount: string;
   value: number;
   description: string;
-  user: string; 
+  user: string;
 }

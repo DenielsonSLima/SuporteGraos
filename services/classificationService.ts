@@ -138,7 +138,7 @@ export const classificationService = {
             name: type.name,
             description: type.description || null,
             is_system: type.isSystem || false,
-            company_id: null
+            company_id: authService.getCurrentUser()?.companyId || null
           });
         console.log(`✅ Tipo de parceiro ${type.name} salvo no Supabase`);
       } catch (error) {
@@ -229,7 +229,7 @@ export const classificationService = {
             name: type.name,
             description: type.description || null,
             is_system: type.isSystem || false,
-            company_id: null
+            company_id: authService.getCurrentUser()?.companyId || null
           });
         console.log(`✅ Tipo de produto ${type.name} salvo no Supabase`);
       } catch (error) {

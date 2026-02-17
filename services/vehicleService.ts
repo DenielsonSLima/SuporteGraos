@@ -50,9 +50,13 @@ let isLoaded = false;
 const loadFromSupabase = async () => {
   if (isLoaded) return;
   try {
+    const user = authService.getCurrentUser();
+    const companyId = user?.companyId;
+
     const { data, error } = await supabase
       .from('vehicles')
       .select('*')
+      .eq('company_id', companyId)
       .order('plate');
 
     if (error) throw error;
@@ -162,6 +166,7 @@ export const vehicleService = {
         type: normalizedType,
         plate: (vehicle.plate || '').toUpperCase(),
         owner_type: vehicle.owner_type || 'third_party',
+        company_id: vehicle.company_id || authService.getCurrentUser()?.companyId,
         created_at: now,
         updated_at: now
       } as any;

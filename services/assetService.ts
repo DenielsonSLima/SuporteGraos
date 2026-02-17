@@ -79,9 +79,13 @@ const mapAssetFromDb = (row: any): Asset => {
 const loadFromSupabase = async () => {
   if (isLoaded) return;
   try {
+    const user = authService.getCurrentUser();
+    const companyId = user?.companyId;
+
     const { data, error } = await supabase
       .from('assets')
       .select('*')
+      .eq('company_id', companyId)
       .order('acquisition_date', { ascending: false });
 
     if (error) throw error;
@@ -161,7 +165,7 @@ const persistDelete = async (id: string) => {
 
 export const assetService = {
   getAll: () => db.getAll(),
-  
+
   getById: (id: string) => db.getById(id),
 
   subscribe: (callback: (items: Asset[]) => void) => db.subscribe(callback),
@@ -186,20 +190,20 @@ export const assetService = {
     const old = db.getById(asset.id);
     db.update(asset);
     void persistUpsert(asset);
-    
+
     const { userId, userName } = getLogInfo();
     if (old && old.status !== 'sold' && asset.status === 'sold') {
-        logService.addLog({
-            userId, userName, action: 'update', module: 'Patrimônio',
-            description: `Venda de Ativo: ${asset.name} vendido para ${asset.buyerName}`,
-            entityId: asset.id
-        });
+      logService.addLog({
+        userId, userName, action: 'update', module: 'Patrimônio',
+        description: `Venda de Ativo: ${asset.name} vendido para ${asset.buyerName}`,
+        entityId: asset.id
+      });
     } else if (old && old.status !== 'write_off' && asset.status === 'write_off') {
-        logService.addLog({
-            userId, userName, action: 'cancel', module: 'Patrimônio',
-            description: `BAIXA PATRIMONIAL (Avaria/Perda): ${asset.name}. Motivo: ${asset.writeOffReason}`,
-            entityId: asset.id
-        });
+      logService.addLog({
+        userId, userName, action: 'cancel', module: 'Patrimônio',
+        description: `BAIXA PATRIMONIAL (Avaria/Perda): ${asset.name}. Motivo: ${asset.writeOffReason}`,
+        entityId: asset.id
+      });
     }
   },
 
@@ -217,8 +221,14 @@ export const assetService = {
   },
 
   importData: (data: Asset[]) => {
+    const user = authService.getCurrentUser();
+    const companyId = user?.companyId;
+
     db.setAll(data);
-    const payload = data.map(mapAssetToDb);
+    const payload = data.map(asset => ({
+      ...mapAssetToDb(asset),
+      company_id: companyId
+    }));
     void (async () => {
       try {
         const { error } = await supabase.from('assets').upsert(payload);
@@ -228,7 +238,7 @@ export const assetService = {
       }
     })();
   },
-  
+
   reload: () => {
     isLoaded = false;
     return loadFromSupabase();

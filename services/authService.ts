@@ -43,7 +43,7 @@ export const authService = {
     console.log('[AUTH] 🧭 Trace ID:', loginTraceId);
     console.log('[AUTH] 📧 Email recebido:', email);
     console.log('[AUTH] 🕐 Timestamp:', new Date().toISOString());
-    
+
     try {
       console.log('[AUTH] 🔐 Autenticando via Supabase Auth...');
 
@@ -79,14 +79,25 @@ export const authService = {
       }
 
       console.log('[AUTH] ✅ Autenticação Supabase bem-sucedida!');
-      console.log('[AUTH] 👤 User ID:', authData.user.id);
-      console.log('[AUTH] 🎫 Access Token (20 primeiros chars):', authData.session.access_token.substring(0, 20) + '...');
-
       const metadata = (authData.user.user_metadata || {}) as Record<string, any>;
       const firstName = metadata.first_name || authData.user.email?.split('@')[0] || 'Usuario';
       const lastName = metadata.last_name || '';
-      const roleValue = normalizeRole(metadata.role);
-      const isActive = metadata.active !== undefined ? !!metadata.active : true;
+
+      // 2. Buscar dados adicionais na tabela app_users (incluindo company_id)
+      console.log('[AUTH] 🔍 Buscando perfil em app_users...');
+      const { data: userData, error: userError } = await supabase
+        .from('app_users')
+        .select('company_id, role, active, name')
+        .eq('auth_user_id', authData.user.id)
+        .single();
+
+      if (userError) {
+        console.warn('[AUTH] ⚠️ Nao foi possivel buscar dados em app_users:', userError.message);
+      }
+
+      const roleValue = normalizeRole(userData?.role || metadata.role);
+      const isActive = userData?.active ?? (metadata.active !== undefined ? !!metadata.active : true);
+      const companyId = userData?.company_id || metadata.company_id || null;
 
       if (!isActive) {
         await supabase.auth.signOut();
@@ -96,9 +107,10 @@ export const authService = {
 
       const userSession: User = {
         id: authData.user.id,
-        name: `${firstName} ${lastName}`.trim(),
+        name: userData?.name || `${firstName} ${lastName}`.trim(),
         email: authData.user.email || email,
         role: roleValue,
+        companyId: companyId,
         token: authData.session.access_token,
         avatar: `https://ui-avatars.com/api/?name=${firstName}+${lastName}&background=0D8ABC&color=fff`
       };
@@ -107,7 +119,8 @@ export const authService = {
         id: userSession.id,
         name: userSession.name,
         email: userSession.email,
-        role: userSession.role
+        role: userSession.role,
+        companyId: userSession.companyId
       });
 
       // 5. Salvar sessão
@@ -142,7 +155,7 @@ export const authService = {
       console.log('[AUTH] ✅ Duração total do login (ms):', Math.round(elapsedMs));
       console.log('[AUTH] 🧭 Trace ID final:', loginTraceId);
       console.log('[AUTH] 📤 Retornando userSession completo:', userSession);
-      
+
       return userSession;
 
     } catch (error: any) {
@@ -225,7 +238,7 @@ export const authService = {
     try {
       console.log('[AUTH] 🔁 RestoreSession iniciado:', restoreTraceId);
       const session = await getSupabaseSession();
-      
+
       if (!session || !session.user) {
         const elapsedMs = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - restoreStart;
         console.log('[AUTH] ℹ️ Nenhuma sessão Supabase encontrada:', {
@@ -252,12 +265,20 @@ export const authService = {
         traceId: restoreTraceId,
         email: session.user.email
       });
-      
+
+      // Buscar do app_users para garantir dados atualizados e company_id
+      const { data: userData } = await supabase
+        .from('app_users')
+        .select('company_id, role, active, name')
+        .eq('auth_user_id', session.user.id)
+        .single();
+
       const metadata = (session.user.user_metadata || {}) as Record<string, any>;
       const firstName = metadata.first_name || session.user.email?.split('@')[0] || 'Usuario';
       const lastName = metadata.last_name || '';
-      const roleValue = normalizeRole(metadata.role);
-      const isActive = metadata.active !== undefined ? !!metadata.active : true;
+      const roleValue = normalizeRole(userData?.role || metadata.role);
+      const isActive = userData?.active ?? (metadata.active !== undefined ? !!metadata.active : true);
+      const companyId = userData?.company_id || metadata.company_id || null;
 
       if (!isActive) {
         const elapsedMs = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - restoreStart;
@@ -270,9 +291,10 @@ export const authService = {
 
       const userSession: User = {
         id: session.user.id,
-        name: `${firstName} ${lastName}`.trim(),
+        name: userData?.name || `${firstName} ${lastName}`.trim(),
         email: session.user.email || '',
         role: roleValue,
+        companyId: companyId,
         token: session.access_token,
         avatar: `https://ui-avatars.com/api/?name=${firstName}+${lastName}&background=0D8ABC&color=fff`
       };
@@ -283,6 +305,7 @@ export const authService = {
       const elapsedMs = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - restoreStart;
       console.log('✅ Sessão restaurada com sucesso', {
         traceId: restoreTraceId,
+        companyId: userSession.companyId,
         elapsedMs: Math.round(elapsedMs)
       });
       return userSession;

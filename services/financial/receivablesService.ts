@@ -1,4 +1,5 @@
 import { Persistence } from '../persistence';
+import { authService } from '../authService';
 import { supabase } from '../supabase';
 import { supabaseWithRetry } from '../../utils/fetchWithRetry';
 import { invalidateDashboardCache } from '../dashboardCache';
@@ -50,7 +51,7 @@ const mapToDb = (item: Receivable) => ({
   bank_account_id: item.bankAccountId || null,
   receipt_date: item.receiptDate || null,
   notes: item.notes || null,
-  company_id: item.companyId || null
+  company_id: item.companyId || authService.getCurrentUser()?.companyId || null
 });
 
 const mapFromDb = (row: any): Receivable => ({
@@ -88,9 +89,13 @@ const RECEIVABLES_SELECT_FIELDS = [
 const fetchPage = async (options: ReceivablesPageOptions): Promise<Receivable[]> => {
   try {
     const { limit, beforeDate, startDate, endDate } = options;
+    const user = authService.getCurrentUser();
+    const companyId = user?.companyId;
+
     let query = supabase
       .from('receivables')
       .select(RECEIVABLES_SELECT_FIELDS)
+      .eq('company_id', companyId)
       .order('due_date', { ascending: false })
       .limit(limit);
 
@@ -112,11 +117,17 @@ const fetchPage = async (options: ReceivablesPageOptions): Promise<Receivable[]>
 
 const loadFromSupabase = async (): Promise<Receivable[]> => {
   try {
+    const user = authService.getCurrentUser();
+    let query = supabase
+      .from('receivables')
+      .select('*');
+
+    if (user?.companyId) {
+      query = query.eq('company_id', user.companyId);
+    }
+
     const data = await supabaseWithRetry(() =>
-      supabase
-        .from('receivables')
-        .select('*')
-        .order('due_date', { ascending: true })
+      query.order('due_date', { ascending: true })
     );
 
     const mapped = (data as any[] || []).map(mapFromDb);

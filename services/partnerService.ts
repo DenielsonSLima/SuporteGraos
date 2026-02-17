@@ -41,7 +41,7 @@ const loadFromSupabase = async () => {
         .select(`*, city:cities(name), state:ufs(uf, name)`) // join para trazer nomes
         .order('is_primary', { ascending: false })
         .order('created_at')
-    );
+    ) as any[];
 
     const primaryMap: Record<string, any> = {};
     (addresses || []).forEach((a) => {
@@ -49,13 +49,13 @@ const loadFromSupabase = async () => {
       if (!primaryMap[a.partner_id]) primaryMap[a.partner_id] = a;
     });
 
-    const transformedData = await Promise.all((partners || []).map(async (p) => {
+    const transformedData = await Promise.all(((partners as any[]) || []).map(async (p) => {
       const partner = transformPartnerFromSupabase(p);
       const addr = primaryMap[p.id];
       if (addr) {
         let cityName = addr.city?.name || '';
         let stateUf = addr.state?.uf || addr.state?.name || '';
-        
+
         // Fallback: se join não trouxe dados, buscar diretamente por ID
         if (!cityName && addr.city_id) {
           cityName = await locationService.getCityNameById(addr.city_id) || '';
@@ -63,7 +63,7 @@ const loadFromSupabase = async () => {
         if (!stateUf && addr.state_id) {
           stateUf = await locationService.getStateUfById(addr.state_id) || '';
         }
-        
+
         partner.address = {
           zip: addr.zip_code || '',
           street: addr.street || '',
@@ -161,8 +161,8 @@ const transformPartnerToSupabase = (frontendPartner: Partner) => {
   const type = frontendPartner.type === 'PF' || frontendPartner.type === 'PJ' ? frontendPartner.type : 'PJ';
 
   // Gera UUID único se document for "NÃO INFORMADO" (evita violação de UNIQUE constraint)
-  const document = frontendPartner.document === 'NÃO INFORMADO' 
-    ? `TEMP-${generateUUID()}` 
+  const document = frontendPartner.document === 'NÃO INFORMADO'
+    ? `TEMP-${generateUUID()}`
     : frontendPartner.document;
 
   return {
@@ -179,7 +179,7 @@ const transformPartnerToSupabase = (frontendPartner: Partner) => {
     website: null,
     notes: null,
     active: frontendPartner.active !== false,
-    company_id: null
+    company_id: authService.getCurrentUser()?.companyId || null
   };
 };
 
@@ -190,8 +190,8 @@ const transformPartnerToSupabase = (frontendPartner: Partner) => {
  */
 const transformPartnerFromSupabase = (supabasePartner: any): Partner => {
   // Converte TEMP-{uuid} de volta para "NÃO INFORMADO" na interface
-  const document = supabasePartner.document?.startsWith('TEMP-') 
-    ? 'NÃO INFORMADO' 
+  const document = supabasePartner.document?.startsWith('TEMP-')
+    ? 'NÃO INFORMADO'
     : supabasePartner.document;
 
   return {
@@ -216,7 +216,7 @@ const transformPartnerFromSupabase = (supabasePartner: any): Partner => {
 
 export const partnerService = {
   getAll: () => db.getAll(),
-  
+
   getById: (id: string) => db.getById(id),
 
   // Atualiza somente o cache local com endereço (sem tocar Supabase)
@@ -226,7 +226,7 @@ export const partnerService = {
       db.update({ ...existing, address });
     }
   },
-  
+
   // Assinatura reativa de mudanças (usando Persistence.subscribe)
   subscribe: (callback: (items: Partner[]) => void) => db.subscribe(callback),
   startRealtime,
@@ -237,7 +237,7 @@ export const partnerService = {
     db.add(partner);
 
     let transformedSaved: Partner | null = null;
-    
+
     // Log
     const { userId, userName } = getLogInfo();
     logService.addLog({
@@ -248,21 +248,21 @@ export const partnerService = {
       description: `Cadastrou novo parceiro: ${partner.name}`,
       entityId: partner.id
     });
-    
+
     // Audit Log
     void auditService.logAction('create', 'Parceiros', `Parceiro cadastrado: ${partner.name}`, {
       entityType: 'Partner',
       entityId: partner.id,
-      metadata: { category: partner.category, document: partner.document }
+      metadata: { category: partner.categories?.[0] || '1', document: partner.document }
     });
 
     // Transformar para formato Supabase e salvar
     try {
       const supabasePartner = transformPartnerToSupabase(partner);
       delete (supabasePartner as any).id;
-      
+
       const savedPartner = await partnerSupabaseSync.syncInsertPartner(partner, supabasePartner);
-      
+
       // Substitui o registro temporário pelo retorno real do Supabase (novo id)
       transformedSaved = transformPartnerFromSupabase(savedPartner);
       db.delete(originalId);
@@ -291,12 +291,12 @@ export const partnerService = {
       description: `Atualizou dados do parceiro: ${updatedPartner.name}`,
       entityId: updatedPartner.id
     });
-    
+
     // Audit Log
     void auditService.logAction('update', 'Parceiros', `Parceiro atualizado: ${updatedPartner.name}`, {
       entityType: 'Partner',
       entityId: updatedPartner.id,
-      metadata: { category: updatedPartner.category }
+      metadata: { category: updatedPartner.categories?.[0] || '1' }
     });
 
     // Transformar para formato Supabase e atualizar
@@ -327,12 +327,12 @@ export const partnerService = {
       description: `Removeu o parceiro: ${partner.name}`,
       entityId: id
     });
-    
+
     // Audit Log
     void auditService.logAction('delete', 'Parceiros', `Parceiro removido: ${partner.name}`, {
       entityType: 'Partner',
       entityId: id,
-      metadata: { category: partner.category, document: partner.document }
+      metadata: { category: partner.categories?.[0] || '1', document: partner.document }
     });
 
     // Deletar do Supabase

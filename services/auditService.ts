@@ -99,24 +99,24 @@ const getBrowserInfo = (): string => {
   if (typeof window === 'undefined') return '';
   const ua = navigator.userAgent;
   let browserName = 'Unknown';
-  
+
   if (ua.indexOf('Chrome') > -1) browserName = 'Chrome';
   else if (ua.indexOf('Safari') > -1) browserName = 'Safari';
   else if (ua.indexOf('Firefox') > -1) browserName = 'Firefox';
   else if (ua.indexOf('Edge') > -1) browserName = 'Edge';
-  
+
   return browserName;
 };
 
 const getDeviceInfo = (): string => {
   if (typeof window === 'undefined') return '';
   const ua = navigator.userAgent.toLowerCase();
-  
+
   if (/mobile|android|iphone|ipad|tablet/.test(ua)) return 'Mobile';
   if (/mac|macintosh/.test(ua)) return 'macOS';
   if (/windows|win32/.test(ua)) return 'Windows';
   if (/linux/.test(ua)) return 'Linux';
-  
+
   return 'Unknown';
 };
 
@@ -335,14 +335,14 @@ const loadAuditLogsFromSupabase = async () => {
       .select('*')
       .order('created_at', { ascending: false })
       .limit(1000);
-    
+
     if (error) {
       if (error.code !== 'PGRST25') {
         console.warn('⚠️ Erro ao carregar audit logs:', error);
       }
       return;
     }
-    
+
     const mapped = data.map(mapAuditLogFromDb);
     auditLogsDb.setAll(mapped);
   } catch (err) {
@@ -358,14 +358,14 @@ const loadUserSessionsFromSupabase = async () => {
       .select('*')
       .order('session_start', { ascending: false })
       .limit(500);
-    
+
     if (error) {
       if (error.code !== 'PGRST25') {
         console.warn('⚠️ Erro ao carregar sessões:', error);
       }
       return;
     }
-    
+
     const mapped = data.map(mapUserSessionFromDb);
     userSessionsDb.setAll(mapped);
   } catch (err) {
@@ -381,14 +381,14 @@ const loadLoginHistoryFromSupabase = async () => {
       .select('*')
       .order('created_at', { ascending: false })
       .limit(500);
-    
+
     if (error) {
       if (error.code !== 'PGRST25') {
         console.warn('⚠️ Erro ao carregar login history:', error);
       }
       return;
     }
-    
+
     const mapped = data.map(mapLoginHistoryFromDb);
     loginHistoryDb.setAll(mapped);
   } catch (err) {
@@ -567,9 +567,9 @@ const fetchRecentLoginsCount = async (limit: number) => {
 const startRealtimeAuditLogs = () => {
   if (!auditChannel) {
     auditChannel = supabase.channel('audit_logs_realtime');
-    
+
     auditChannel
-      .on('postgres_changes', 
+      .on('postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'audit_logs' },
         (payload: any) => {
           const log = mapAuditLogFromDb(payload.new);
@@ -594,7 +594,7 @@ const startRealtimeAuditLogs = () => {
 const startRealtimeUserSessions = () => {
   if (!sessionsChannel) {
     sessionsChannel = supabase.channel('user_sessions_realtime');
-    
+
     sessionsChannel
       .on('postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'user_sessions' },
@@ -621,7 +621,7 @@ const startRealtimeUserSessions = () => {
 const startRealtimeLoginHistory = () => {
   if (!loginChannel) {
     loginChannel = supabase.channel('login_history_realtime');
-    
+
     loginChannel
       .on('postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'login_history' },
@@ -672,10 +672,10 @@ export const auditService = {
   closeStaleSessions,
   heartbeatSession,
   // === AUDIT LOGS ===
-  getAuditLogs: () => auditLogsDb.getAll().sort((a, b) => 
+  getAuditLogs: () => auditLogsDb.getAll().sort((a, b) =>
     new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   ),
-  
+
   subscribeAuditLogs: (callback: (logs: AuditLog[]) => void) => {
     startAllRealtime();
     return auditLogsDb.subscribe(callback);
@@ -688,7 +688,7 @@ export const auditService = {
   }) => {
     const { userId, userName, userEmail } = getCurrentUser();
     const clientInfo = getClientInfo();
-    
+
     const log: AuditLog = {
       id: crypto.randomUUID(),
       userId,
@@ -702,9 +702,10 @@ export const auditService = {
       ipAddress: clientInfo.ipAddress,
       userAgent: clientInfo.userAgent,
       metadata: options?.metadata,
+      companyId: authService.getCurrentUser()?.companyId,
       createdAt: new Date().toISOString()
     };
-    
+
     auditLogsDb.add(log);
     void persistAuditLog(log);
   },
@@ -724,7 +725,7 @@ export const auditService = {
     const clientInfo = getClientInfo();
 
     await enforceActiveSessionLimit(userId);
-    
+
     const session: UserSession = {
       id: crypto.randomUUID(),
       userId,
@@ -736,13 +737,14 @@ export const auditService = {
       browserInfo: clientInfo.browserInfo,
       deviceInfo: clientInfo.deviceInfo,
       status: 'active',
+      companyId: authService.getCurrentUser()?.companyId,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
-    
+
     userSessionsDb.add(session);
     void persistUserSession(session);
-    
+
     return session;
   },
 
@@ -772,7 +774,7 @@ export const auditService = {
 
   recordLogin: async (userEmail: string, success: boolean, failureReason?: string): Promise<LoginHistory> => {
     const clientInfo = getClientInfo();
-    
+
     const login: LoginHistory = {
       id: crypto.randomUUID(),
       userEmail,
@@ -784,18 +786,19 @@ export const auditService = {
       userAgent: clientInfo.userAgent,
       browserInfo: clientInfo.browserInfo,
       deviceInfo: clientInfo.deviceInfo,
+      companyId: authService.getCurrentUser()?.companyId,
       createdAt: new Date().toISOString()
     };
-    
+
     loginHistoryDb.add(login);
     void persistLoginHistory(login);
-    
+
     return login;
   },
 
   // === UTILS ===
   startRealtime: startAllRealtime,
-  
+
   getStats: () => ({
     totalAuditLogs: auditLogsDb.getAll().length,
     activeSessions: userSessionsDb.getAll().filter(s => s.status === 'active').length,

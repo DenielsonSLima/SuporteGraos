@@ -199,9 +199,13 @@ const startWatermarkRealtime = () => {
 };
 
 const fetchCompanyFromSupabase = async (): Promise<boolean> => {
+  const user = authService.getCurrentUser();
+  const companyId = user?.companyId;
+
   const { data, error } = await supabase
     .from('companies')
     .select('id, razao_social, nome_fantasia, cnpj, ie, endereco, numero, bairro, cidade, uf, cep, telefone, email, website, logo_url')
+    .eq('id', companyId)
     .order('created_at', { ascending: true })
     .limit(1)
     .maybeSingle();
@@ -224,9 +228,13 @@ const fetchCompanyFromSupabase = async (): Promise<boolean> => {
 };
 
 const fetchWatermarkFromSupabase = async (): Promise<boolean> => {
+  const user = authService.getCurrentUser();
+  const companyId = user?.companyId;
+
   const { data, error } = await supabase
     .from('watermarks')
     .select('id, image_url, opacity, orientation')
+    .eq('company_id', companyId)
     .order('created_at', { ascending: true })
     .limit(1)
     .maybeSingle();
@@ -354,11 +362,11 @@ export const settingsService = {
       // Atualiza em memória e localStorage primeiro
       _companyData = { ..._companyData, ...data };
       localStorage.setItem(COMPANY_KEY, JSON.stringify(_companyData));
-      
+
       const { userId, userName } = getLogInfo();
-      logService.addLog({ 
-        userId, userName, action: 'update', module: 'Configurações', 
-        description: 'Atualizou dados cadastrais da empresa.' 
+      logService.addLog({
+        userId, userName, action: 'update', module: 'Configurações',
+        description: 'Atualizou dados cadastrais da empresa.'
       });
 
       // Persistir no Supabase
@@ -403,7 +411,7 @@ export const settingsService = {
           });
           throw error;
         }
-        
+
         if (upserted?.id) {
           _companyId = upserted.id;
           console.log('✅ Company salva no Supabase com ID:', _companyId);
@@ -416,7 +424,7 @@ export const settingsService = {
       } catch (dbErr: any) {
         console.error('❌ Erro CRÍTICO ao salvar company no Supabase:', dbErr);
         console.error('❌ Stack trace:', dbErr.stack);
-        
+
         // Mensagens de erro mais específicas
         if (dbErr.code === '23505') {
           throw new Error('CNPJ já cadastrado no sistema.');
@@ -449,11 +457,11 @@ export const settingsService = {
     try {
       _watermarkSettings = { ..._watermarkSettings, ...data };
       localStorage.setItem(WATERMARK_KEY, JSON.stringify(_watermarkSettings));
-      
+
       const { userId, userName } = getLogInfo();
-      logService.addLog({ 
-        userId, userName, action: 'update', module: 'Configurações', 
-        description: 'Atualizou configurações de marca d\'água.' 
+      logService.addLog({
+        userId, userName, action: 'update', module: 'Configurações',
+        description: 'Atualizou configurações de marca d\'água.'
       });
 
       try {
@@ -496,16 +504,16 @@ export const settingsService = {
 
   // --- TELA DE LOGIN ---
   getLoginSettings: () => _loginScreenSettings,
-  
+
   updateLoginSettings: (settings: Partial<LoginScreenSettings>) => {
     try {
       _loginScreenSettings = { ..._loginScreenSettings, ...settings };
       localStorage.setItem(LOGIN_KEY, JSON.stringify(_loginScreenSettings));
-      
+
       const { userId, userName } = getLogInfo();
-      logService.addLog({ 
-        userId, userName, action: 'update', module: 'Configurações', 
-        description: 'Atualizou configurações de fundo da tela de login.' 
+      logService.addLog({
+        userId, userName, action: 'update', module: 'Configurações',
+        description: 'Atualizou configurações de fundo da tela de login.'
       });
     } catch (error) {
       console.error("Erro ao salvar imagens de login:", error);

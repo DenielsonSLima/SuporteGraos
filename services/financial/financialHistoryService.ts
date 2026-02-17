@@ -1,4 +1,5 @@
 import { Persistence } from '../persistence';
+import { authService } from '../authService';
 import { supabase } from '../supabase';
 import { invalidateDashboardCache } from '../dashboardCache';
 import { invalidateFinancialCache } from '../financialCache';
@@ -49,7 +50,7 @@ const mapToDb = (item: FinancialHistory) => ({
   balance_after: item.balanceAfter || null,
   bank_account_id: item.bankAccountId || null,
   notes: item.notes || null,
-  company_id: item.companyId || null
+  company_id: item.companyId || authService.getCurrentUser()?.companyId || null
 });
 
 const mapFromDb = (row: any): FinancialHistory => ({
@@ -89,9 +90,13 @@ const FINANCIAL_HISTORY_SELECT_FIELDS = [
 const fetchPage = async (options: FinancialHistoryPageOptions): Promise<FinancialHistory[]> => {
   try {
     const { limit, beforeDate, startDate, endDate } = options;
+    const user = authService.getCurrentUser();
+    const companyId = user?.companyId;
+
     let query = supabase
       .from('financial_history')
       .select(FINANCIAL_HISTORY_SELECT_FIELDS)
+      .eq('company_id', companyId)
       .order('date', { ascending: false })
       .limit(limit);
 
@@ -114,9 +119,13 @@ const fetchPage = async (options: FinancialHistoryPageOptions): Promise<Financia
 
 const loadFromSupabase = async (): Promise<FinancialHistory[]> => {
   try {
+    const user = authService.getCurrentUser();
+    const companyId = user?.companyId;
+
     const { data, error } = await supabase
       .from('financial_history')
       .select('*')
+      .eq('company_id', companyId)
       .order('date', { ascending: false });
 
     if (error) throw error;

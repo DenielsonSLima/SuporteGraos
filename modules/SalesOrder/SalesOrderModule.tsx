@@ -99,17 +99,25 @@ const SalesOrderModule: React.FC = () => {
       setViewMode('details');
       addToast('success', 'Venda Atualizada');
     } else {
+      const generateUuid = () => {
+        if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+          const r = (Math.random() * 16) | 0;
+          const v = c === 'x' ? r : (r & 0x3) | 0x8;
+          return v.toString(16);
+        });
+      };
       const newOrder = { 
         ...order, 
-        id: Math.random().toString(36).substr(2, 9),
+        id: generateUuid(),
         transactions: [], 
         paidValue: 0
       };
       salesService.add(newOrder);
+      // O subscriber já atualiza o state via salesService.subscribe()
       setViewMode('list');
       addToast('success', 'Venda Criada');
     }
-    loadSales();
   };
 
   const handleDeleteRequest = (order: SalesOrder) => {
@@ -164,7 +172,7 @@ const SalesOrderModule: React.FC = () => {
         
         if (result?.success) {
           addToast('success', 'Venda Excluída', 'Pedido e recebimentos removidos com sucesso.');
-          setSales(prev => prev.filter(s => s.id !== order.id));
+          // O subscriber já atualiza o state via salesService.subscribe()
           if (viewMode === 'details') setViewMode('list');
         } else {
           addToast('error', 'Erro ao Excluir', result?.error || 'Falha ao excluir pedido no banco de dados.');
@@ -186,7 +194,7 @@ const SalesOrderModule: React.FC = () => {
         if (freshOrder) {
             const updated = { ...freshOrder, status: 'completed' as const };
             salesService.update(updated);
-            setSales(prev => prev.map(s => s.id === updated.id ? updated : s));
+            // O subscriber já atualiza o state via salesService.subscribe()
             if (viewMode === 'details') setSelectedOrder(updated);
             addToast('success', 'Venda Finalizada');
         } else {

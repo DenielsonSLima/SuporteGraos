@@ -90,6 +90,7 @@ const toSupabase = (record: FinancialRecord): any => ({
   sub_type: record.subType,
   bank_account: record.bankAccount,
   notes: record.notes,
+  company_id: authService.getCurrentUser()?.companyId || null
 });
 
 const LOANS_SELECT_FIELDS = [
@@ -113,9 +114,13 @@ const LOANS_SELECT_FIELDS = [
 const fetchPage = async (options: LoansPageOptions): Promise<FinancialRecord[]> => {
   try {
     const { limit, beforeDate, startDate, endDate } = options;
+    const user = authService.getCurrentUser();
+    const companyId = user?.companyId;
+
     let query = supabase
       .from('standalone_records')
       .select(LOANS_SELECT_FIELDS)
+      .eq('company_id', companyId)
       .in('sub_type', ['loan_taken', 'loan_granted'])
       .order('issue_date', { ascending: false })
       .limit(limit);
@@ -139,9 +144,13 @@ const fetchPage = async (options: LoansPageOptions): Promise<FinancialRecord[]> 
 
 const loadFromSupabase = async (): Promise<FinancialRecord[]> => {
   try {
+    const user = authService.getCurrentUser();
+    const companyId = user?.companyId;
+
     const { data, error } = await supabase
       .from('standalone_records')
       .select('*')
+      .eq('company_id', companyId)
       .in('sub_type', ['loan_taken', 'loan_granted'])
       .order('issue_date', { ascending: false });
 
@@ -208,14 +217,14 @@ const startRealtime = () => {
 const persistUpsert = async (item: FinancialRecord) => {
   try {
     const payload = toSupabase(item);
-    
+
     console.log('🔥 Salvando empréstimo no Supabase:', payload);
-    
+
     const { error } = await supabase
       .from('standalone_records')
       .upsert(payload)
       .select();
-    
+
     if (error) {
       console.error('❌ Erro ao salvar loan no Supabase:', error);
       return;
@@ -232,7 +241,7 @@ const persistDelete = async (id: string) => {
       .from('standalone_records')
       .delete()
       .eq('id', id);
-    
+
     if (error) console.error('Erro ao excluir loan', error);
     else await loadFromSupabase();
   } catch (err) {
@@ -259,7 +268,7 @@ export const loansService = {
   add: (item: FinancialRecord) => {
     // Criar dois registros: o empréstimo em si + o crédito/débito na conta
     const records: FinancialRecord[] = [item];
-    
+
     // Segundo registro: o impacto no saldo da conta (criar DO ZERO)
     if (item.subType === 'loan_taken') {
       // Empréstimo tomado = crédito na conta (entrada de dinheiro)
@@ -294,7 +303,7 @@ export const loansService = {
         bankAccount: item.bankAccount
       });
     }
-    
+
     // Salvar ambos os registros
     records.forEach(rec => {
       db.add(rec);
@@ -349,14 +358,14 @@ export const loansService = {
     // Remover o registro principal
     db.delete(id);
     void persistDelete(id);
-    
+
     // Remover também o registro auxiliar (credit ou debit)
     const creditId = `${id}-credit`;
     const debitId = `${id}-debit`;
-    
+
     db.delete(creditId);
     void persistDelete(creditId);
-    
+
     db.delete(debitId);
     void persistDelete(debitId);
 
@@ -373,7 +382,7 @@ export const loansService = {
       entityType: 'loan',
       entityId: id
     });
-    
+
     invalidateFinancialCache();
     invalidateDashboardCache();
   }
@@ -390,11 +399,11 @@ const updateBankAccountBalance = async (loan: FinancialRecord) => {
   try {
     console.log('🔄 Iniciando atualização de saldo para:', loan.bankAccount);
     const { bankAccountService } = await import('../bankAccountService');
-    
+
     const currentAccount = bankAccountService.getById(loan.bankAccount as string);
     if (!currentAccount) {
       console.warn('⚠️ Conta bancária não encontrada:', loan.bankAccount);
-      console.log('📋 Contas disponíveis:', bankAccountService.getAll().map(a => ({ id: a.id, name: a.bankName, balance: a.balance })));
+      console.log('📋 Contas disponíveis:', bankAccountService.getBankAccounts().map(a => ({ id: a.id, name: a.bankName, balance: a.balance })));
       return;
     }
 
@@ -402,7 +411,7 @@ const updateBankAccountBalance = async (loan: FinancialRecord) => {
 
     // Calcular novo saldo
     let newBalance = (currentAccount.balance || 0);
-    
+
     if (loan.subType === 'loan_taken') {
       // Empréstimo tomado = saldo aumenta
       newBalance += loan.originalValue;

@@ -55,9 +55,13 @@ let isLoaded = false;
 const loadFromSupabase = async () => {
   if (isLoaded) return;
   try {
+    const user = authService.getCurrentUser();
+    const companyId = user?.companyId;
+
     const { data, error } = await supabase
       .from('drivers')
       .select('*')
+      .eq('company_id', companyId)
       .order('name');
 
     if (error) throw error;
@@ -159,12 +163,13 @@ export const driverService = {
       const license_number = driver.license_number === 'NÃO INFORMADO' ? `TEMP-CNH-${generateUUID()}` : driver.license_number;
 
       // Deixa o Supabase gerar o UUID
-      const insertPayload = { 
-        ...driver, 
-        document, 
+      const insertPayload = {
+        ...driver,
+        document,
         license_number,
-        created_at: now, 
-        updated_at: now 
+        company_id: driver.company_id || authService.getCurrentUser()?.companyId,
+        created_at: now,
+        updated_at: now
       } as any;
       const { data, error } = await supabase
         .from('drivers')

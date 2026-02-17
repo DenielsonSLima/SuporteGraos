@@ -73,7 +73,13 @@ export class Persistence<T extends { id: string }> {
   }
 
   add(item: T): void {
-    this.inMemoryData = [item, ...this.inMemoryData];
+    // Evita duplicação: se já existe item com mesmo ID, atualiza ao invés de adicionar
+    const existingIndex = this.inMemoryData.findIndex(existing => existing.id === item.id);
+    if (existingIndex !== -1) {
+      this.inMemoryData[existingIndex] = item;
+    } else {
+      this.inMemoryData = [item, ...this.inMemoryData];
+    }
     this.save();
   }
 

@@ -1,4 +1,5 @@
 import { Persistence } from '../persistence';
+import { authService } from '../authService';
 import { supabase } from '../supabase';
 import { invalidateDashboardCache } from '../dashboardCache';
 import { invalidateFinancialCache } from '../financialCache';
@@ -36,7 +37,7 @@ const mapToDb = (item: Advance) => ({
   related_id: item.relatedId || null,
   status: item.status,
   notes: item.notes || null,
-  company_id: item.companyId || null
+  company_id: item.companyId || authService.getCurrentUser()?.companyId || null
 });
 
 const mapFromDb = (row: any): Advance => ({
@@ -59,9 +60,13 @@ const mapFromDb = (row: any): Advance => ({
 
 const loadFromSupabase = async (): Promise<Advance[]> => {
   try {
+    const user = authService.getCurrentUser();
+    const companyId = user?.companyId;
+
     const { data, error } = await supabase
       .from('advances')
       .select('*')
+      .eq('company_id', companyId)
       .order('advance_date', { ascending: false });
 
     if (error) throw error;

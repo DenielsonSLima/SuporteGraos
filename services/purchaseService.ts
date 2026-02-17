@@ -58,7 +58,7 @@ const mapOrderToDb = (order: PurchaseOrder) => ({
   received_value: order.paidValue ?? 0,
   notes: order.notes || null,
   metadata: order,
-  company_id: null
+  company_id: authService.getCurrentUser()?.companyId || null
 });
 
 const mapOrderFromDb = (row: any): PurchaseOrder => {
@@ -113,11 +113,18 @@ const mapOrderFromDb = (row: any): PurchaseOrder => {
 
 const loadFromSupabase = async (): Promise<PurchaseOrder[]> => {
   try {
+    const user = authService.getCurrentUser();
+    let query = supabase
+      .from('purchase_orders')
+      .select('*');
+
+    // Aplicar filtro de empresa se disponivel
+    if (user?.companyId) {
+      query = query.eq('company_id', user.companyId);
+    }
+
     const data = await supabaseWithRetry(() =>
-      supabase
-        .from('purchase_orders')
-        .select('*')
-        .order('date', { ascending: false })
+      query.order('date', { ascending: false })
     );
 
     const mapped = (data as any[] || []).map(mapOrderFromDb);
@@ -179,7 +186,7 @@ const syncExpenses = async (order: PurchaseOrder) => {
       expense_date: tx.date,
       paid: false,
       notes: tx.notes || null,
-      company_id: null
+      company_id: authService.getCurrentUser()?.companyId || null
     }));
 
     if (expensesPayload.length > 0) {
@@ -382,11 +389,12 @@ const subscribeToUpdates = (callback: (order: PurchaseOrder, eventType: 'INSERT'
           const newData = payload.new;
           if (newData) {
             const order = mapOrderFromDb(newData);
-            // Atualizar cache local
-            if (payload.eventType === 'INSERT') {
-              db.add(order);
-            } else {
+            // Atualizar cache local - verificar se já existe para evitar duplicação
+            const existing = db.getById(order.id);
+            if (existing) {
               db.update(order);
+            } else {
+              db.add(order);
             }
             // Notificar subscribers
             callback(order, payload.eventType);

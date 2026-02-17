@@ -71,7 +71,7 @@ const mapToDb = (item: Payable) => ({
   bank_account_id: item.bankAccountId || null,
   payment_date: item.paymentDate || null,
   notes: item.notes || null,
-  company_id: item.companyId || null,
+  company_id: item.companyId || authService.getCurrentUser()?.companyId || null,
   driver_name: item.driverName || null,
   weight_kg: item.weightKg || null
 });
@@ -121,9 +121,13 @@ const PAYABLES_SELECT_FIELDS = [
 const fetchPage = async (options: PayablesPageOptions): Promise<Payable[]> => {
   try {
     const { limit, beforeDate, startDate, endDate } = options;
+    const user = authService.getCurrentUser();
+    const companyId = user?.companyId;
+
     let query = supabase
       .from('payables')
       .select(PAYABLES_SELECT_FIELDS)
+      .eq('company_id', companyId)
       .order('due_date', { ascending: false })
       .limit(limit);
 
@@ -145,11 +149,17 @@ const fetchPage = async (options: PayablesPageOptions): Promise<Payable[]> => {
 
 const loadFromSupabase = async (): Promise<Payable[]> => {
   try {
+    const user = authService.getCurrentUser();
+    let query = supabase
+      .from('payables')
+      .select('*');
+
+    if (user?.companyId) {
+      query = query.eq('company_id', user.companyId);
+    }
+
     const data = await supabaseWithRetry(() =>
-      supabase
-        .from('payables')
-        .select('*')
-        .order('due_date', { ascending: true })
+      query.order('due_date', { ascending: true })
     );
 
     if (data) {
