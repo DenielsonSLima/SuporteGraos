@@ -181,9 +181,14 @@ const loadFromSupabase = async (retries = 2): Promise<SalesOrder[]> => {
   if (isSqlCanonicalOpsEnabled()) {
     try {
       // Usa VIEW enriquecida com delivered_value/delivered_qty_sc pré-calculados
-      const query = supabase
+      const user = authService.getCurrentUser();
+      let query = supabase
         .from('vw_sales_orders_enriched')
         .select('*');
+
+      if (user?.companyId) {
+        query = query.eq('company_id', user.companyId);
+      }
 
       const { data, error } = await query.order('order_date', { ascending: false });
       if (error) throw error;

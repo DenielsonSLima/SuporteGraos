@@ -31,9 +31,14 @@ const db = new Persistence<PurchaseOrder>('purchase_orders', INITIAL_ORDERS, { u
 const loadFromSupabase = async (): Promise<PurchaseOrder[]> => {
   if (isSqlCanonicalOpsEnabled()) {
     try {
-      const query = supabase
+      const user = authService.getCurrentUser();
+      let query = supabase
         .from('ops_purchase_orders')
         .select('*');
+
+      if (user?.companyId) {
+        query = query.eq('company_id', user.companyId);
+      }
 
       const data = await supabaseWithRetry(() =>
         query.order('order_date', { ascending: false })
@@ -202,7 +207,7 @@ export const purchaseService = {
         }));
         const { error } = await supabase.from('purchase_orders').upsert(payload, { onConflict: 'id' });
         if (error) console.error('❌ Erro ao sincronizar pedidos de compra:', error);
-        
+
       } catch (err) {
         console.error('[purchaseService] Erro na sincronização batch:', err);
       }
@@ -336,11 +341,11 @@ export const purchaseService = {
     const updated = isSqlCanonicalOpsEnabled()
       ? { ...order, transactions: newTxs }
       : {
-          ...order,
-          transactions: newTxs,
-          paidValue: newTxs.filter(t => t.type === 'payment' || t.type === 'advance').reduce((acc, t) => acc + t.value, 0),
-          discountValue: newTxs.reduce((acc, t) => acc + (t.discountValue || 0), 0)
-        };
+        ...order,
+        transactions: newTxs,
+        paidValue: newTxs.filter(t => t.type === 'payment' || t.type === 'advance').reduce((acc, t) => acc + t.value, 0),
+        discountValue: newTxs.reduce((acc, t) => acc + (t.discountValue || 0), 0)
+      };
     db.update(updated);
     void persistUpsert(updated);
     // ❌ REMOVIDO: void financialSyncService.syncPurchaseOrder(orderId);
@@ -369,11 +374,11 @@ export const purchaseService = {
     const updated = isSqlCanonicalOpsEnabled()
       ? { ...order, transactions: newTxs }
       : {
-          ...order,
-          transactions: newTxs,
-          paidValue: newTxs.filter(t => t.type === 'payment' || t.type === 'advance').reduce((acc, t) => acc + t.value, 0),
-          discountValue: newTxs.reduce((acc, t) => acc + (t.discountValue || 0), 0)
-        };
+        ...order,
+        transactions: newTxs,
+        paidValue: newTxs.filter(t => t.type === 'payment' || t.type === 'advance').reduce((acc, t) => acc + t.value, 0),
+        discountValue: newTxs.reduce((acc, t) => acc + (t.discountValue || 0), 0)
+      };
     db.update(updated);
     void persistUpsert(updated);
     // ❌ REMOVIDO: void financialSyncService.syncPurchaseOrder(orderId);

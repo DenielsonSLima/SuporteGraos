@@ -246,14 +246,20 @@ const loadFromSupabase = async () => {
     // Schema real: ops_loadings tem FK para ops_purchase_orders mas NÃO para ops_sales_orders.
     // Tabela logistics_loadings NÃO existe.
     // Sempre usar ops_loadings com JOIN apenas para purchase_order.
+    const user = authService.getCurrentUser();
+    let query = supabase
+      .from('ops_loadings')
+      .select(`
+        *,
+        purchase_order:ops_purchase_orders(id, legacy_id, number, partner_id, partner_name)
+      `);
+
+    if (user?.companyId) {
+      query = query.eq('company_id', user.companyId);
+    }
+
     const data = await supabaseWithRetry(() =>
-      supabase
-        .from('ops_loadings')
-        .select(`
-          *,
-          purchase_order:ops_purchase_orders(id, legacy_id, number, partner_id, partner_name)
-        `)
-        .order('loading_date', { ascending: false })
+      query.order('loading_date', { ascending: false })
     );
 
     const mapped = (data as any[] || []).map(mapLoadingFromOpsRow);
@@ -716,8 +722,8 @@ export const loadingService = {
                 void syncReceivableFromLoading(loading, allLoadings, showToast);
               }
               */
-            });
-          });
+        });
+      });
     }
 
     const { userId, userName } = getLogInfo();

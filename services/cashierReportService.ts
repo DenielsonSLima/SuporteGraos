@@ -24,16 +24,15 @@ export interface CashierReportPayload {
 }
 
 const getCompanyId = async (): Promise<string> => {
-  const { data, error } = await supabase
-    .from('app_users')
-    .select('company_id')
-    .single();
+  const { authService } = await import('./authService');
+  const user = authService.getCurrentUser();
+  const companyId = user?.companyId;
 
-  if (error || !data?.company_id) {
+  if (!companyId) {
     throw new Error('Empresa não encontrada');
   }
 
-  return data.company_id as string;
+  return companyId;
 };
 
 export const cashierReportService = {

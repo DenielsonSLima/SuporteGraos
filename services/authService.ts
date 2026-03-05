@@ -81,19 +81,9 @@ export const authService = {
       if (companyId === 'null') companyId = null;
 
       if (!companyId) {
-        const { data: companyData } = await supabase
-          .from('companies')
-          .select('id')
-          .limit(1)
-          .single();
-
-        if (companyData?.id) {
-          companyId = companyData.id;
-
-          // Self-healing: Atualizar usuário com company_id
-          await supabase.from('app_users').update({ company_id: companyId }).eq('auth_user_id', authData.user.id);
-        } else {
-        }
+        // SEGURANÇA: Não buscar "qualquer" empresa. Se não tem vinculada, o usuário está incompleto.
+        void auditService.recordLogin(email, false, 'Usuário sem empresa vinculada');
+        throw new Error('Seu usuário não está vinculado a nenhuma empresa. Contate o suporte.');
       }
 
       if (!isActive) {
@@ -114,8 +104,10 @@ export const authService = {
       };
 
 
-      // 5. Salvar sessão
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(userSession));
+      // 5. Salvar sessão - APENAS se não precisar trocar senha
+      if (!userSession.mustChangePassword) {
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(userSession));
+      }
 
       // 6. Log de auditoria + sessão — fire-and-forget (não bloqueia login)
       logService.addLog({
@@ -141,6 +133,25 @@ export const authService = {
     } catch (error: any) {
       const elapsedMs = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - loginStart;
       throw error;
+    }
+  },
+
+  /**
+   * Atualiza a senha do usuário logado (usado no primeiro acesso ou recuperação)
+   */
+  updatePassword: async (newPassword: string): Promise<void> => {
+    const { data, error } = await supabase.auth.updateUser({
+      password: newPassword,
+      data: { must_change_password: false }
+    });
+
+    if (error) throw error;
+
+    // Sincronizar com app_users também
+    if (data.user) {
+      await supabase.from('app_users')
+        .update({ must_change_password: false })
+        .eq('auth_user_id', data.user.id);
     }
   },
 
@@ -252,15 +263,8 @@ export const authService = {
       if (companyId === 'null') companyId = null;
 
       if (!companyId) {
-        const { data: companyData } = await supabase
-          .from('companies')
-          .select('id')
-          .limit(1)
-          .single();
-
-        if (companyData?.id) {
-          companyId = companyData.id;
-        }
+        // Se não tem empresa no restore, a sessão está inválida
+        return null;
       }
 
       if (!isActive) {
@@ -281,8 +285,7 @@ export const authService = {
 
       if (userSession.mustChangePassword) {
         // Impede que um usuário com senha temporária pule a tela de troca de senha no refresh
-        await supabase.auth.signOut();
-        sessionStorage.removeItem(STORAGE_KEY);
+        // Não limpamos sessionStorage aqui porque o login com mustChangePassword já não salva
         return null;
       }
 

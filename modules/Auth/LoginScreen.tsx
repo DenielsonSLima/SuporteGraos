@@ -4,6 +4,7 @@ import logo2 from '../../Logo2.png';
 import { Mail, Lock, ArrowRight, Loader2, AlertCircle, MapPin, Clock, Calendar, Quote as QuoteIcon, ArrowLeft, KeyRound, ShieldCheck, UserCheck, Eye, EyeOff } from 'lucide-react';
 import { quoteService } from '../../services/quoteService';
 import { User } from '../../types';
+import { authService } from '../../services/authService';
 import { useLoginBackground } from '../../hooks/useLoginBackground';
 import { useLoginClock } from '../../hooks/useLoginClock';
 import { useLoginForm } from '../../hooks/useLoginForm';
@@ -240,91 +241,108 @@ const LoginScreen: React.FC<Props> = ({ onLoginSuccess }) => {
                 )
               ) : loginForm.requirePasswordChange ? (
                 /* ETAPA: FORÇAR NOVA SENHA */
-                <form onSubmit={async (e) => {
-                  e.preventDefault();
-                  if (loginForm.isLoading) return;
+                <div className="animate-in fade-in slide-in-from-right-4">
+                  <form onSubmit={async (e) => {
+                    e.preventDefault();
+                    if (loginForm.isLoading) return;
 
-                  if (recovery.newPassword !== recovery.confirmNewPassword) {
-                    loginForm.setError('As senhas não conferem.');
-                    return;
-                  }
-                  if (recovery.newPassword.length < 6) {
-                    loginForm.setError('A senha deve ter no mínimo 6 caracteres.');
-                    return;
-                  }
+                    const newPwd = (e.currentTarget.elements.namedItem('new_password') as HTMLInputElement).value;
+                    const confirmPwd = (e.currentTarget.elements.namedItem('confirm_password') as HTMLInputElement).value;
 
-                  try {
-                    loginForm.setError('');
-                    const { supabase } = await import('../../services/supabase');
-                    const { error } = await supabase.auth.updateUser({
-                      password: recovery.newPassword,
-                      data: { must_change_password: false }
-                    });
+                    if (newPwd !== confirmPwd) {
+                      loginForm.setError('As senhas não conferem.');
+                      return;
+                    }
+                    if (newPwd.length < 6) {
+                      loginForm.setError('A senha deve ter no mínimo 6 caracteres.');
+                      return;
+                    }
 
-                    if (error) throw error;
+                    try {
+                      loginForm.setError('');
+                      loginForm.setIsLoading(true);
 
-                    const user = loginForm.requirePasswordChange;
-                    user.mustChangePassword = false;
-                    sessionStorage.setItem('sg_user', JSON.stringify(user));
+                      // 1. Atualizar senha via serviço centralizado
+                      await authService.updatePassword(newPwd);
 
-                    const { loginScreenService } = await import('../../services/loginScreenService');
-                    loginScreenService.startRealtime();
-                    onLoginSuccess(user);
-                  } catch (err: any) {
-                    loginForm.setError(err.message || 'Erro ao redefinir senha.');
-                  }
-                }} className="space-y-4 animate-in fade-in slide-in-from-right-4">
-                  <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 mb-4">
-                    <p className="text-xs text-amber-800 font-medium leading-relaxed">
-                      <ShieldCheck className="inline w-4 h-4 mr-1 -mt-0.5 text-amber-600" />
-                      Por questões de segurança, você precisa definir uma nova senha para o seu primeiro acesso.
-                    </p>
-                  </div>
+                      // 2. Agora que a senha foi trocada e metadados atualizados,
+                      // o usuário retornado pelo login original (que está no state) agora é válido.
+                      const user = { ...loginForm.requirePasswordChange!, mustChangePassword: false };
 
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600 uppercase ml-1 tracking-wide">Nova Senha</label>
-                    <div className="relative group">
-                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                        <Lock className="h-5 w-5 text-slate-400 group-focus-within:text-emerald-600 transition-colors" />
-                      </div>
-                      <input
-                        type="password"
-                        required
-                        value={recovery.newPassword}
-                        onChange={(e) => recovery.setNewPassword(e.target.value)}
-                        className={inputClass}
-                        placeholder="Mínimo 6 caracteres"
-                      />
+                      // 3. Salvar no storage
+                      sessionStorage.setItem('sg_user', JSON.stringify(user));
+
+                      const { loginScreenService } = await import('../../services/loginScreenService');
+                      loginScreenService.startRealtime();
+                      onLoginSuccess(user);
+                    } catch (err: any) {
+                      loginForm.setError(err.message || 'Erro ao redefinir senha.');
+                    } finally {
+                      loginForm.setIsLoading(false);
+                    }
+                  }} className="space-y-4">
+                    <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 mb-4">
+                      <p className="text-xs text-amber-800 font-medium leading-relaxed">
+                        <ShieldCheck className="inline w-4 h-4 mr-1 -mt-0.5 text-amber-600" />
+                        Por questões de segurança, você precisa definir uma nova senha para o seu primeiro acesso.
+                      </p>
                     </div>
-                  </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600 uppercase ml-1 tracking-wide">Confirmar Senha</label>
-                    <div className="relative group">
-                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                        <Lock className="h-5 w-5 text-slate-400 group-focus-within:text-emerald-600 transition-colors" />
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-600 uppercase ml-1 tracking-wide">Nova Senha</label>
+                      <div className="relative group">
+                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                          <Lock className="h-5 w-5 text-slate-400 group-focus-within:text-emerald-600 transition-colors" />
+                        </div>
+                        <input
+                          name="new_password"
+                          type="password"
+                          required
+                          className={inputClass}
+                          placeholder="Mínimo 6 caracteres"
+                          autoComplete="new-password"
+                        />
                       </div>
-                      <input
-                        type="password"
-                        required
-                        value={recovery.confirmNewPassword}
-                        onChange={(e) => recovery.setConfirmNewPassword(e.target.value)}
-                        className={inputClass}
-                        placeholder="Repita a senha"
-                      />
                     </div>
-                  </div>
 
-                  <div className="pt-2 flex flex-col gap-3">
-                    <button
-                      type="submit"
-                      disabled={loginForm.isLoading}
-                      className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold text-base hover:bg-slate-800 hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed group"
-                    >
-                      {loginForm.isLoading ? <Loader2 size={20} className="animate-spin" /> : 'Confirmar e Acessar'}
-                    </button>
-                  </div>
-                </form>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-600 uppercase ml-1 tracking-wide">Confirmar Senha</label>
+                      <div className="relative group">
+                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                          <Lock className="h-5 w-5 text-slate-400 group-focus-within:text-emerald-600 transition-colors" />
+                        </div>
+                        <input
+                          name="confirm_password"
+                          type="password"
+                          required
+                          className={inputClass}
+                          placeholder="Repita a senha"
+                          autoComplete="new-password"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="pt-2 flex flex-col gap-3">
+                      <button
+                        type="submit"
+                        disabled={loginForm.isLoading}
+                        className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold text-base hover:bg-slate-800 hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed group"
+                      >
+                        {loginForm.isLoading ? (
+                          <>
+                            <Loader2 size={20} className="animate-spin" />
+                            <span>Processando...</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>Confirmar e Acessar</span>
+                            <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                </div>
               ) : (
                 /* FORMULÁRIO DE LOGIN (PADRÃO) */
                 <form onSubmit={loginForm.handleSubmit} className="space-y-5 animate-in fade-in slide-in-from-left-4">

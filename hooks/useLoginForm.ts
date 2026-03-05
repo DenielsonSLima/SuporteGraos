@@ -66,7 +66,7 @@ export function useLoginForm(onLoginSuccess: (user: User) => void) {
     email, setEmail,
     password, setPassword,
     showPassword, setShowPassword,
-    isLoading,
+    isLoading, setIsLoading,
     error, setError,
     rememberMe, setRememberMe,
     requirePasswordChange, setRequirePasswordChange,

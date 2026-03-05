@@ -2,16 +2,14 @@ import { supabase } from '../../../services/supabase';
 import { PerformanceReport } from '../types';
 
 async function getCompanyId(): Promise<string> {
-  const { data, error } = await supabase
-    .from('app_users')
-    .select('company_id')
-    .single();
+  const user = (await import('../../../services/authService')).authService.getCurrentUser();
+  const companyId = user?.companyId;
 
-  if (error || !data?.company_id) {
+  if (!companyId) {
     throw new Error('Empresa não encontrada para o usuário logado.');
   }
 
-  return data.company_id as string;
+  return companyId;
 }
 
 function emptyReport(): PerformanceReport {
