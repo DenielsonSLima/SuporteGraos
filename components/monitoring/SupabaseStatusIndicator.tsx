@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Database, Cloud, CloudOff, RefreshCw, Clock } from 'lucide-react';
-import { supabase } from '../../services/supabase';
+import { useCurrentUser } from '../../hooks/useCurrentUser';
+import { useSystemHealth } from '../../hooks/useSystemHealth';
 
 type ConnectionStatus = 'connected' | 'syncing' | 'offline' | 'error';
 
@@ -20,6 +21,8 @@ const SupabaseStatusIndicator: React.FC<SupabaseStatusIndicatorProps> = ({
   size = 'md',
   cacheInfo
 }) => {
+  const currentUser = useCurrentUser();
+  const { checkSupabaseDatabase } = useSystemHealth();
   const [status, setStatus] = useState<ConnectionStatus>('offline');
   const [isSyncing, setIsSyncing] = useState(false);
   const [isReady, setIsReady] = useState(false);
@@ -31,27 +34,22 @@ const SupabaseStatusIndicator: React.FC<SupabaseStatusIndicatorProps> = ({
     // 🔌 Verificar conexão inicial
     const checkConnection = async () => {
       try {
-        // Verificar se há sessão ativa antes de tentar consultar
-        const { data: { session } } = await supabase.auth.getSession();
-        
         if (!mounted) return;
 
-        if (!session) {
+        if (!currentUser) {
           setStatus('offline');
           setIsReady(true);
           return;
         }
 
-        // Tentar uma query simples
-        const { error } = await supabase.from('users').select('id').limit(1);
-        
-        if (!mounted) return;
-        
-        if (error) {
-          console.warn('Supabase connection check error:', error);
-          setStatus('error');
-        } else {
+        // Tentar uma query simples via service (SKIL: .tsx nunca acessa supabase.from() direto)
+        try {
+          await checkSupabaseDatabase();
+          if (!mounted) return;
           setStatus('connected');
+        } catch {
+          if (!mounted) return;
+          setStatus('error');
         }
         
         setIsReady(true);
@@ -92,7 +90,7 @@ const SupabaseStatusIndicator: React.FC<SupabaseStatusIndicatorProps> = ({
       window.removeEventListener('financial:updated', handleDataUpdate);
       if (checkInterval) clearInterval(checkInterval);
     };
-  }, []);
+  }, [currentUser, checkSupabaseDatabase]);
 
   // 🎨 Configurações visuais baseadas no status
   const getStatusConfig = (currentStatus: ConnectionStatus) => {

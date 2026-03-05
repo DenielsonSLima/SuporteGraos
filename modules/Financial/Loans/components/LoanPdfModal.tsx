@@ -5,6 +5,8 @@ import { LoanRecord, FinancialRecord } from '../../types';
 import LoanPdfDocument from './LoanPdfDocument';
 import { pdf } from '@react-pdf/renderer';
 import { saveAs } from 'file-saver';
+import type { Account } from '../../../../services/accountsService';
+import { useAccounts } from '../../../../hooks/useAccounts';
 
 interface Props {
   isOpen: boolean;
@@ -16,6 +18,7 @@ interface Props {
 const LoanPdfModal: React.FC<Props> = ({ isOpen, onClose, loan, history }) => {
   const [pdfUrl, setPdfUrl] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(true);
+  const { data: accounts = [] } = useAccounts();
 
   useEffect(() => {
     if (!isOpen) return;
@@ -24,13 +27,12 @@ const LoanPdfModal: React.FC<Props> = ({ isOpen, onClose, loan, history }) => {
       try {
         setIsGenerating(true);
         const blob = await pdf(
-          <LoanPdfDocument loan={loan} history={history} />
+          <LoanPdfDocument loan={loan} history={history} accounts={accounts} />
         ).toBlob();
         const url = URL.createObjectURL(blob);
         setPdfUrl(url);
         setIsGenerating(false);
       } catch (error) {
-        console.error('Erro ao gerar PDF:', error);
         setIsGenerating(false);
       }
     };
@@ -51,11 +53,10 @@ const LoanPdfModal: React.FC<Props> = ({ isOpen, onClose, loan, history }) => {
       setIsGenerating(true);
       const filename = `Extrato_Emprestimo_${loan.entityName.replace(/\s+/g, '_')}_${Date.now()}.pdf`;
       const blob = await pdf(
-        <LoanPdfDocument loan={loan} history={history} />
+        <LoanPdfDocument loan={loan} history={history} accounts={accounts} />
       ).toBlob();
       saveAs(blob, filename);
     } catch (error) {
-      console.error('Erro ao baixar PDF:', error);
     } finally {
       setIsGenerating(false);
     }

@@ -8,21 +8,25 @@ interface Props {
 }
 
 const CashierCharts: React.FC<Props> = ({ data }) => {
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { 
-    style: 'currency', 
+  const currency = (val: number) => new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
     currency: 'BRL',
-    maximumFractionDigits: 0 
+    maximumFractionDigits: 0
   }).format(val);
 
   const incomeData = [
     { name: 'Em Contas', value: data.totalBankBalance, color: '#3b82f6' },
     { name: 'Vendas a Receber', value: data.pendingSalesReceipts, color: '#10b981' },
     { name: 'Patrimônio', value: data.totalFixedAssetsValue, color: '#6366f1' },
+    { name: 'Vendas de Bens', value: data.pendingAssetSalesReceipts, color: '#14b8a6' },
     { name: 'Empréstimos', value: data.loansGranted, color: '#06b6d4' },
-    { name: 'Outros Créditos', value: data.merchandiseInTransitValue + data.shareholderReceivables + data.advancesGiven + data.pendingAssetSalesReceipts, color: '#f59e0b' },
+    { name: 'Mercad. em Trânsito', value: data.merchandiseInTransitValue, color: '#f59e0b' },
+    { name: 'Haveres de Sócios', value: data.shareholderReceivables, color: '#eab308' },
+    { name: 'Adiant. Concedidos', value: data.advancesGiven, color: '#d97706' },
   ].filter(d => d.value > 0);
 
-  const totalIncome = incomeData.reduce((acc, d) => acc + d.value, 0);
+  // Total de ativos vem pré-calculado do SQL — frontend NÃO recalcula
+  const totalIncome = data.totalAssets;
 
   const expenseData = [
     { name: 'Fornecedores (Grãos)', value: data.pendingPurchasePayments, color: '#ef4444' },
@@ -33,14 +37,15 @@ const CashierCharts: React.FC<Props> = ({ data }) => {
     { name: 'Obrigações com Sócios', value: data.shareholderPayables, color: '#64748b' },
   ].filter(d => d.value > 0);
 
-  const totalExpense = expenseData.reduce((acc, d) => acc + d.value, 0);
+  // Total de passivos vem pré-calculado do SQL — frontend NÃO recalcula
+  const totalExpense = data.totalLiabilities;
 
   const ChartCard = ({ title, chartData, total }: any) => (
     <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col h-auto min-h-[450px]">
       <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 text-center">{title}</h4>
-      
+
       <div className="h-64 w-full relative mb-6">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
           <PieChart>
             <Pie
               data={chartData}
@@ -57,7 +62,7 @@ const CashierCharts: React.FC<Props> = ({ data }) => {
                 <Cell key={`cell-${index}`} fill={entry.color} stroke="none" className="hover:opacity-80 transition-opacity" />
               ))}
             </Pie>
-            <Tooltip 
+            <Tooltip
               formatter={(value: number) => [currency(value), 'Valor']}
               contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontWeight: 'bold' }}
             />
@@ -71,21 +76,21 @@ const CashierCharts: React.FC<Props> = ({ data }) => {
       </div>
 
       <div className="flex-1 space-y-3 px-2 overflow-y-auto max-h-[300px]">
-         {chartData.map((entry: any, index: number) => {
-            const percentage = total > 0 ? ((entry.value / total) * 100).toFixed(1) : 0;
-            return (
-                <div key={index} className="flex items-center justify-between text-xs border-b border-slate-50 pb-2 last:border-0 hover:bg-slate-50 p-1 rounded transition-colors">
-                    <div className="flex items-center gap-3 overflow-hidden">
-                        <div className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm" style={{ backgroundColor: entry.color }}></div>
-                        <span className="font-bold text-slate-700 truncate" title={entry.name}>{entry.name}</span>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0 ml-2">
-                        <span className="text-slate-400 font-medium text-[10px]">{currency(entry.value)}</span>
-                        <span className="text-slate-900 font-black w-10 text-right bg-slate-100 px-1 py-0.5 rounded">{percentage}%</span>
-                    </div>
-                </div>
-            );
-         })}
+        {chartData.map((entry: any, index: number) => {
+          const percentage = total > 0 ? ((entry.value / total) * 100).toFixed(1) : 0;
+          return (
+            <div key={index} className="flex items-center justify-between text-xs border-b border-slate-50 pb-2 last:border-0 hover:bg-slate-50 p-1 rounded transition-colors">
+              <div className="flex items-center gap-3 overflow-hidden">
+                <div className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm" style={{ backgroundColor: entry.color }}></div>
+                <span className="font-bold text-slate-700 truncate" title={entry.name}>{entry.name}</span>
+              </div>
+              <div className="flex items-center gap-3 shrink-0 ml-2">
+                <span className="text-slate-400 font-medium text-[10px]">{currency(entry.value)}</span>
+                <span className="text-slate-900 font-black w-10 text-right bg-slate-100 px-1 py-0.5 rounded">{percentage}%</span>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

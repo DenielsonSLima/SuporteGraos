@@ -1,7 +1,8 @@
 import React from 'react';
 import { Calendar, Edit2, Trash2 } from 'lucide-react';
 import { FinancialRecord } from '../../types';
-import { bankAccountService } from '../../../../services/bankAccountService';
+import type { Account } from '../../../../services/accountsService';
+import { useAccounts } from '../../../../hooks/useAccounts';
 
 interface Props {
   credits: FinancialRecord[];
@@ -11,15 +12,14 @@ interface Props {
 }
 
 const CreditList: React.FC<Props> = ({ credits, onEdit, onDelete, groupBy = 'none' }) => {
+  const { data: accounts = [] } = useAccounts();
   const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
   const dateStr = (val: string) => new Date(val).toLocaleDateString('pt-BR');
 
   const getAccountLabel = (accountId?: string) => {
     if (!accountId) return 'Conta não informada';
-    const accounts = bankAccountService.getBankAccounts();
     const account = accounts.find(a => a.id === accountId);
-    if (!account) return accountId;
-    return `${account.bankName}${account.owner ? ` - ${account.owner}` : ''}`;
+    return account ? account.account_name : accountId;
   };
 
   const sortedCredits = [...credits].sort((a, b) =>

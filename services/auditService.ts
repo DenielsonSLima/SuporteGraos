@@ -2,6 +2,17 @@ import { supabase } from './supabase';
 import { authService } from './authService';
 import { waitForInit } from './supabaseInitService';
 import { Persistence } from './persistence';
+import { isSqlCanonicalOpsEnabled, sqlCanonicalOpsLog } from './sqlCanonicalOps';
+import { shouldSkipLegacyTableOps } from './realtimeTableAvailability';
+import {
+  isValidUuid, getCurrentUser, getClientInfo,
+  mapAuditLogFromDb, mapAuditLogToDb,
+  mapUserSessionFromDb, mapUserSessionToDb,
+  mapLoginHistoryFromDb, mapLoginHistoryToDb,
+  MAX_ACTIVE_SESSIONS_PER_USER,
+  AUDIT_LOG_FIELDS, USER_SESSION_FIELDS, LOGIN_HISTORY_FIELDS,
+  buildDateRangeFilters, buildSearchOr
+} from './auditServiceHelpers';
 
 export interface AuditLog {
   id: string;
@@ -69,182 +80,21 @@ let sessionsChannel: ReturnType<typeof supabase.channel> | null = null;
 let loginChannel: ReturnType<typeof supabase.channel> | null = null;
 
 let _realtimeStarted = false;
+let _loginHistoryUnavailable = shouldSkipLegacyTableOps('login_history');
 
-// ============================================================================
-// HELPERS
-// ============================================================================
+const isMissingRelationError = (error: any) => {
+  const code = String(error?.code || '');
+  const status = Number(error?.status || error?.statusCode || 0);
+  const message = String(error?.message || '').toLowerCase();
+  const details = String(error?.details || '').toLowerCase();
 
-const isValidUuid = (value?: string) => !!value && /^[0-9a-fA-F-]{36}$/.test(value);
-
-const getCurrentUser = () => {
-  const user = authService.getCurrentUser();
-  return {
-    userId: isValidUuid(user?.id) ? user!.id : null,
-    userName: user?.name || 'Sistema',
-    userEmail: user?.email || 'system@system.com'
-  };
-};
-
-const getClientInfo = () => {
-  if (typeof window === 'undefined') return {};
-  return {
-    ipAddress: 'localhost',
-    userAgent: navigator.userAgent,
-    browserInfo: getBrowserInfo(),
-    deviceInfo: getDeviceInfo()
-  };
-};
-
-const getBrowserInfo = (): string => {
-  if (typeof window === 'undefined') return '';
-  const ua = navigator.userAgent;
-  let browserName = 'Unknown';
-
-  if (ua.indexOf('Chrome') > -1) browserName = 'Chrome';
-  else if (ua.indexOf('Safari') > -1) browserName = 'Safari';
-  else if (ua.indexOf('Firefox') > -1) browserName = 'Firefox';
-  else if (ua.indexOf('Edge') > -1) browserName = 'Edge';
-
-  return browserName;
-};
-
-const getDeviceInfo = (): string => {
-  if (typeof window === 'undefined') return '';
-  const ua = navigator.userAgent.toLowerCase();
-
-  if (/mobile|android|iphone|ipad|tablet/.test(ua)) return 'Mobile';
-  if (/mac|macintosh/.test(ua)) return 'macOS';
-  if (/windows|win32/.test(ua)) return 'Windows';
-  if (/linux/.test(ua)) return 'Linux';
-
-  return 'Unknown';
-};
-
-// ============================================================================
-// MAPEAMENTO SUPABASE <-> FRONTEND
-// ============================================================================
-
-const mapAuditLogFromDb = (record: any): AuditLog => ({
-  id: record.id,
-  userId: record.user_id || 'system',
-  userName: record.user_name || 'Sistema',
-  userEmail: record.user_email || 'system@system.com',
-  action: record.action,
-  module: record.module,
-  description: record.description,
-  entityType: record.entity_type,
-  entityId: record.entity_id,
-  ipAddress: record.ip_address,
-  userAgent: record.user_agent,
-  metadata: record.metadata,
-  companyId: record.company_id,
-  createdAt: record.created_at
-});
-
-const mapAuditLogToDb = (log: AuditLog) => ({
-  id: log.id,
-  user_id: isValidUuid(log.userId) ? log.userId : null,
-  user_name: log.userName,
-  user_email: log.userEmail,
-  action: log.action,
-  module: log.module,
-  description: log.description,
-  entity_type: log.entityType,
-  entity_id: log.entityId,
-  ip_address: log.ipAddress,
-  user_agent: log.userAgent,
-  metadata: log.metadata,
-  company_id: log.companyId,
-  created_at: log.createdAt
-});
-
-const mapUserSessionFromDb = (record: any): UserSession => ({
-  id: record.id,
-  userId: record.user_id,
-  userName: record.user_name,
-  userEmail: record.user_email,
-  sessionStart: record.session_start,
-  sessionEnd: record.session_end,
-  durationMinutes: record.duration_minutes,
-  ipAddress: record.ip_address,
-  userAgent: record.user_agent,
-  browserInfo: record.browser_info,
-  deviceInfo: record.device_info,
-  status: record.status,
-  companyId: record.company_id,
-  createdAt: record.created_at,
-  updatedAt: record.updated_at
-});
-
-const mapUserSessionToDb = (session: UserSession) => ({
-  id: session.id,
-  user_id: isValidUuid(session.userId) ? session.userId : null,
-  user_name: session.userName,
-  user_email: session.userEmail,
-  session_start: session.sessionStart,
-  session_end: session.sessionEnd,
-  duration_minutes: session.durationMinutes,
-  ip_address: session.ipAddress,
-  user_agent: session.userAgent,
-  browser_info: session.browserInfo,
-  device_info: session.deviceInfo,
-  status: session.status,
-  company_id: session.companyId,
-  created_at: session.createdAt,
-  updated_at: session.updatedAt
-});
-
-const mapLoginHistoryFromDb = (record: any): LoginHistory => ({
-  id: record.id,
-  userEmail: record.user_email,
-  userName: record.user_name,
-  userId: record.user_id,
-  loginType: record.login_type,
-  failureReason: record.failure_reason,
-  ipAddress: record.ip_address,
-  userAgent: record.user_agent,
-  browserInfo: record.browser_info,
-  deviceInfo: record.device_info,
-  location: record.location,
-  twoFactorUsed: record.two_factor_used,
-  sessionId: record.session_id,
-  companyId: record.company_id,
-  createdAt: record.created_at
-});
-
-const mapLoginHistoryToDb = (login: LoginHistory) => ({
-  id: login.id,
-  user_email: login.userEmail,
-  user_name: login.userName,
-  user_id: isValidUuid(login.userId) ? login.userId : null,
-  login_type: login.loginType,
-  failure_reason: login.failureReason,
-  ip_address: login.ipAddress,
-  user_agent: login.userAgent,
-  browser_info: login.browserInfo,
-  device_info: login.deviceInfo,
-  location: login.location,
-  two_factor_used: login.twoFactorUsed,
-  session_id: login.sessionId,
-  company_id: login.companyId,
-  created_at: login.createdAt
-});
-
-const MAX_ACTIVE_SESSIONS_PER_USER = 4;
-
-const AUDIT_LOG_FIELDS = 'id,user_id,user_name,user_email,action,module,description,entity_type,entity_id,ip_address,user_agent,metadata,company_id,created_at';
-const USER_SESSION_FIELDS = 'id,user_id,user_name,user_email,session_start,session_end,duration_minutes,ip_address,user_agent,browser_info,device_info,status,company_id,created_at,updated_at';
-const LOGIN_HISTORY_FIELDS = 'id,user_email,user_name,user_id,login_type,failure_reason,ip_address,user_agent,browser_info,device_info,location,two_factor_used,session_id,company_id,created_at';
-
-const buildDateRangeFilters = (query: any, startDate?: string, endDate?: string) => {
-  if (startDate) query = query.gte('created_at', `${startDate}T00:00:00.000Z`);
-  if (endDate) query = query.lte('created_at', `${endDate}T23:59:59.999Z`);
-  return query;
-};
-
-const buildSearchOr = (fields: string[], term: string) => {
-  const sanitized = term.replace(/%/g, '\\%');
-  return fields.map((field) => `${field}.ilike.%${sanitized}%`).join(',');
+  return (
+    code === 'PGRST205'
+    || code === '42P01'
+    || status === 404
+    || message.includes('could not find the table')
+    || details.includes('could not find the table')
+  );
 };
 
 // ============================================================================
@@ -252,39 +102,60 @@ const buildSearchOr = (fields: string[], term: string) => {
 // ============================================================================
 
 const persistAuditLog = async (log: AuditLog) => {
+  if (isSqlCanonicalOpsEnabled()) {
+    return;
+  }
+
   try {
     await waitForInit();
     const payload = mapAuditLogToDb(log);
     const { error } = await supabase.from('audit_logs').insert(payload);
-    if (error) console.error('❌ Erro ao salvar audit log:', error);
+    if (error && error.code !== 'PGRST205' && error.code !== 'PGRST25') {
+      console.error('❌ Erro ao salvar audit log:', error);
+    }
   } catch (err) {
-    console.error('❌ Erro inesperado ao salvar audit log:', err);
+    console.warn('[auditService] persistAuditLog:', err);
   }
 };
 
 const persistUserSession = async (session: UserSession) => {
+  if (isSqlCanonicalOpsEnabled()) {
+    return;
+  }
+
   try {
     await waitForInit();
     const payload = mapUserSessionToDb(session);
     const { error } = await supabase.from('user_sessions').upsert(payload);
     if (error) console.error('❌ Erro ao salvar sessão:', error);
   } catch (err) {
-    console.error('❌ Erro inesperado ao salvar sessão:', err);
+    console.warn('[auditService] persistUserSession:', err);
   }
 };
 
 const persistLoginHistory = async (login: LoginHistory) => {
+  if (_loginHistoryUnavailable) {
+    return;
+  }
+
   try {
     await waitForInit();
     const payload = mapLoginHistoryToDb(login);
     const { error } = await supabase.from('login_history').insert(payload);
-    if (error) console.error('❌ Erro ao salvar login history:', error);
+    if (error) {
+      if (isMissingRelationError(error)) {
+        _loginHistoryUnavailable = true;
+        return;
+      }
+      console.error('❌ Erro ao salvar login history:', error);
+    }
   } catch (err) {
-    console.error('❌ Erro inesperado ao salvar login history:', err);
+    console.warn('[auditService] persistLoginHistory:', err);
   }
 };
 
 const enforceActiveSessionLimit = async (userId?: string | null) => {
+  if (isSqlCanonicalOpsEnabled()) return;
   if (!userId) return;
   try {
     await waitForInit();
@@ -296,7 +167,6 @@ const enforceActiveSessionLimit = async (userId?: string | null) => {
       .order('session_start', { ascending: true });
 
     if (error) {
-      console.error('❌ Erro ao carregar sessões ativas:', error);
       return;
     }
 
@@ -319,80 +189,7 @@ const enforceActiveSessionLimit = async (userId?: string | null) => {
       void persistUserSession(updated);
     });
   } catch (err) {
-    console.error('❌ Erro ao aplicar limite de sessões:', err);
-  }
-};
-
-// ============================================================================
-// LOAD FROM SUPABASE
-// ============================================================================
-
-const loadAuditLogsFromSupabase = async () => {
-  try {
-    await waitForInit();
-    const { data, error } = await supabase
-      .from('audit_logs')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(1000);
-
-    if (error) {
-      if (error.code !== 'PGRST25') {
-        console.warn('⚠️ Erro ao carregar audit logs:', error);
-      }
-      return;
-    }
-
-    const mapped = data.map(mapAuditLogFromDb);
-    auditLogsDb.setAll(mapped);
-  } catch (err) {
-    console.warn('⚠️ AuditService: Usando fallback para audit logs:', err);
-  }
-};
-
-const loadUserSessionsFromSupabase = async () => {
-  try {
-    await waitForInit();
-    const { data, error } = await supabase
-      .from('user_sessions')
-      .select('*')
-      .order('session_start', { ascending: false })
-      .limit(500);
-
-    if (error) {
-      if (error.code !== 'PGRST25') {
-        console.warn('⚠️ Erro ao carregar sessões:', error);
-      }
-      return;
-    }
-
-    const mapped = data.map(mapUserSessionFromDb);
-    userSessionsDb.setAll(mapped);
-  } catch (err) {
-    console.warn('⚠️ AuditService: Usando fallback para sessões:', err);
-  }
-};
-
-const loadLoginHistoryFromSupabase = async () => {
-  try {
-    await waitForInit();
-    const { data, error } = await supabase
-      .from('login_history')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(500);
-
-    if (error) {
-      if (error.code !== 'PGRST25') {
-        console.warn('⚠️ Erro ao carregar login history:', error);
-      }
-      return;
-    }
-
-    const mapped = data.map(mapLoginHistoryFromDb);
-    loginHistoryDb.setAll(mapped);
-  } catch (err) {
-    console.warn('⚠️ AuditService: Usando fallback para login history:', err);
+    console.warn('[auditService] enforceActiveSessionLimit:', err);
   }
 };
 
@@ -408,6 +205,14 @@ const fetchAuditLogsPage = async (options: {
   startDate?: string;
   endDate?: string;
 }) => {
+  if (isSqlCanonicalOpsEnabled()) {
+    return {
+      items: [],
+      nextCursor: undefined,
+      hasMore: false
+    };
+  }
+
   await waitForInit();
   let query = supabase
     .from('audit_logs')
@@ -439,6 +244,14 @@ const fetchUserSessionsPage = async (options: {
   startDate?: string;
   endDate?: string;
 }) => {
+  if (isSqlCanonicalOpsEnabled()) {
+    return {
+      items: [],
+      nextCursor: undefined,
+      hasMore: false
+    };
+  }
+
   await waitForInit();
   let query = supabase
     .from('user_sessions')
@@ -470,6 +283,14 @@ const fetchLoginHistoryPage = async (options: {
   startDate?: string;
   endDate?: string;
 }) => {
+  if (_loginHistoryUnavailable) {
+    return {
+      items: [],
+      nextCursor: undefined,
+      hasMore: false
+    };
+  }
+
   await waitForInit();
   let query = supabase
     .from('login_history')
@@ -482,7 +303,17 @@ const fetchLoginHistoryPage = async (options: {
   query = buildDateRangeFilters(query, options.startDate, options.endDate);
 
   const { data, error } = await query;
-  if (error) throw error;
+  if (error) {
+    if (isMissingRelationError(error)) {
+      _loginHistoryUnavailable = true;
+      return {
+        items: [],
+        nextCursor: undefined,
+        hasMore: false
+      };
+    }
+    throw error;
+  }
   const items = (data || []).map(mapLoginHistoryFromDb);
   const nextCursor = items.length > 0 ? items[items.length - 1].createdAt : undefined;
 
@@ -494,6 +325,7 @@ const fetchLoginHistoryPage = async (options: {
 };
 
 const fetchActiveSessionsCount = async (options?: { minutes?: number }) => {
+  if (isSqlCanonicalOpsEnabled()) return 0;
   const minutes = options?.minutes ?? 60;
   const thresholdIso = new Date(Date.now() - minutes * 60 * 1000).toISOString();
   await waitForInit();
@@ -508,6 +340,7 @@ const fetchActiveSessionsCount = async (options?: { minutes?: number }) => {
 };
 
 const closeStaleSessions = async (minutes: number) => {
+  if (isSqlCanonicalOpsEnabled()) return;
   await waitForInit();
   const thresholdIso = new Date(Date.now() - minutes * 60 * 1000).toISOString();
   const nowIso = new Date().toISOString();
@@ -522,6 +355,7 @@ const closeStaleSessions = async (minutes: number) => {
 };
 
 const heartbeatSession = async (sessionId: string) => {
+  if (isSqlCanonicalOpsEnabled()) return;
   await waitForInit();
   const nowIso = new Date().toISOString();
   const { error } = await supabase
@@ -533,6 +367,13 @@ const heartbeatSession = async (sessionId: string) => {
 };
 
 const fetchFailedLoginsLast30 = async () => {
+  if (_loginHistoryUnavailable) {
+    return {
+      failed: 0,
+      total: 0
+    };
+  }
+
   await waitForInit();
   const { data, error } = await supabase
     .from('login_history')
@@ -540,7 +381,16 @@ const fetchFailedLoginsLast30 = async () => {
     .order('created_at', { ascending: false })
     .limit(30);
 
-  if (error) throw error;
+  if (error) {
+    if (isMissingRelationError(error)) {
+      _loginHistoryUnavailable = true;
+      return {
+        failed: 0,
+        total: 0
+      };
+    }
+    throw error;
+  }
   const failed = (data || []).filter((item) => item.login_type === 'failed').length;
   return {
     failed,
@@ -549,6 +399,10 @@ const fetchFailedLoginsLast30 = async () => {
 };
 
 const fetchRecentLoginsCount = async (limit: number) => {
+  if (_loginHistoryUnavailable) {
+    return 0;
+  }
+
   await waitForInit();
   const { data, error } = await supabase
     .from('login_history')
@@ -556,7 +410,13 @@ const fetchRecentLoginsCount = async (limit: number) => {
     .order('created_at', { ascending: false })
     .limit(limit);
 
-  if (error) throw error;
+  if (error) {
+    if (isMissingRelationError(error)) {
+      _loginHistoryUnavailable = true;
+      return 0;
+    }
+    throw error;
+  }
   return (data || []).length;
 };
 
@@ -565,6 +425,10 @@ const fetchRecentLoginsCount = async (limit: number) => {
 // ============================================================================
 
 const startRealtimeAuditLogs = () => {
+  if (isSqlCanonicalOpsEnabled()) {
+    return;
+  }
+
   if (!auditChannel) {
     auditChannel = supabase.channel('audit_logs_realtime');
 
@@ -585,13 +449,17 @@ const startRealtimeAuditLogs = () => {
       )
       .subscribe((status) => {
         if (status === 'CHANNEL_ERROR') {
-          console.error('❌ Erro no canal audit_logs realtime');
         }
       });
   }
 };
 
 const startRealtimeUserSessions = () => {
+  if (isSqlCanonicalOpsEnabled()) {
+    sqlCanonicalOpsLog('auditService.startRealtimeUserSessions ignorado (modo canônico)');
+    return;
+  }
+
   if (!sessionsChannel) {
     sessionsChannel = supabase.channel('user_sessions_realtime');
 
@@ -612,13 +480,16 @@ const startRealtimeUserSessions = () => {
       )
       .subscribe((status) => {
         if (status === 'CHANNEL_ERROR') {
-          console.error('❌ Erro no canal user_sessions realtime');
         }
       });
   }
 };
 
 const startRealtimeLoginHistory = () => {
+  if (_loginHistoryUnavailable) {
+    return;
+  }
+
   if (!loginChannel) {
     loginChannel = supabase.channel('login_history_realtime');
 
@@ -632,7 +503,7 @@ const startRealtimeLoginHistory = () => {
       )
       .subscribe((status) => {
         if (status === 'CHANNEL_ERROR') {
-          console.error('❌ Erro no canal login_history realtime');
+          _loginHistoryUnavailable = true;
         }
       });
   }
@@ -647,16 +518,21 @@ const startAllRealtime = () => {
   }
 };
 
-// ============================================================================
-// INITIALIZATION
-// ============================================================================
-
-// ❌ NÃO inicializar automaticamente - aguardar autenticação via supabaseInitService
-// void Promise.all([
-//   loadAuditLogsFromSupabase(),
-//   loadUserSessionsFromSupabase(),
-//   loadLoginHistoryFromSupabase()
-// ]);
+const stopAllRealtime = () => {
+  if (auditChannel) {
+    supabase.removeChannel(auditChannel);
+    auditChannel = null;
+  }
+  if (sessionsChannel) {
+    supabase.removeChannel(sessionsChannel);
+    sessionsChannel = null;
+  }
+  if (loginChannel) {
+    supabase.removeChannel(loginChannel);
+    loginChannel = null;
+  }
+  _realtimeStarted = false;
+};
 
 // ============================================================================
 // EXPORT SERVICE
@@ -798,6 +674,7 @@ export const auditService = {
 
   // === UTILS ===
   startRealtime: startAllRealtime,
+  stopRealtime: stopAllRealtime,
 
   getStats: () => ({
     totalAuditLogs: auditLogsDb.getAll().length,

@@ -41,9 +41,8 @@ const AllPartnersPdfModal: React.FC<Props> = ({ isOpen, onClose, partners, balan
 
     try {
       await new Promise(r => setTimeout(r, 600));
-      await html2pdf().set(options).from(contentRef.current).save();
+      await html2pdf().set(options as any).from(contentRef.current).save();
     } catch (err) {
-      console.error(err);
       alert("Erro ao gerar relatório.");
     } finally {
       setIsGenerating(false);

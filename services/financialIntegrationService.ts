@@ -1,203 +1,150 @@
 
 import { FinancialRecord, FinancialStatus } from '../modules/Financial/types';
-import { purchaseService } from './purchaseService';
-import { salesService } from './salesService';
-import { loadingService } from './loadingService';
 import { financialActionService } from './financialActionService';
 import { loansService } from './financial/loansService';
+import { payablesService, Payable } from './financial/payablesService';
+import { receivablesService, Receivable } from './financial/receivablesService';
 
-// Função segura para adicionar dias a uma data string YYYY-MM-DD
-const addDaysLocal = (dateStr: string, days: number): string => {
-  const [year, month, day] = dateStr.split('-').map(Number);
-  const date = new Date(year, month - 1, day);
-  date.setDate(date.getDate() + days);
+// ❌ REMOVIDO (Fase 2 - Modularização):
+// import { purchaseService } from './purchaseService';
+// import { salesService } from './salesService';
+// import { loadingService } from './loadingService';
+// Motivo: financialIntegrationService agora lê APENAS das tabelas financeiras
+// (payables, receivables, standalone_records, loans)
 
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-};
-
-// Lógica de Status: Considera (Pago + Desconto) >= Total
-const getStatus = (total: number, paid: number, discount: number = 0, dueDate: string): FinancialStatus => {
-  const settledAmount = paid + discount;
-  if (total <= 0) return 'pending';
-  if (settledAmount >= total - 0.05) return 'paid';
-  if (settledAmount > 0) return 'partial';
-
-  const todayStr = new Date().toLocaleDateString('sv-SE'); // YYYY-MM-DD
-  if (dueDate < todayStr) return 'overdue';
-
+const mapPayableStatusToFinancialStatus = (status: Payable['status']): FinancialStatus => {
+  if (status === 'paid') return 'paid';
+  if (status === 'partially_paid') return 'partial';
+  if (status === 'overdue') return 'overdue';
   return 'pending';
 };
 
-export const financialIntegrationService = {
+const mapReceivableStatusToFinancialStatus = (status: Receivable['status']): FinancialStatus => {
+  if (status === 'received') return 'paid';
+  if (status === 'partially_received') return 'partial';
+  if (status === 'overdue') return 'overdue';
+  return 'pending';
+};
 
+// ============================================================================
+// MAPEAMENTO: Payable → FinancialRecord
+// ============================================================================
+
+const mapPayableToFinancialRecord = (p: Payable): FinancialRecord => ({
+  id: p.id,
+  description: p.description,
+  entityName: p.partnerName || 'Parceiro Desconhecido',
+  driverName: p.driverName,
+  category: p.subType === 'purchase_order' ? 'Matéria Prima'
+    : p.subType === 'freight' ? 'Logística'
+      : p.subType === 'commission' ? 'Comissões'
+        : 'Outros',
+  issueDate: p.dueDate, // Usando dueDate como issueDate (payable não tem issueDate separado)
+  dueDate: p.dueDate,
+  originalValue: p.amount,
+  paidValue: p.paidAmount || 0,
+  remainingValue: Math.max(0, p.amount - (p.paidAmount || 0)),
+  discountValue: 0,
+  status: mapPayableStatusToFinancialStatus(p.status),
+  subType: (p.subType === 'other' ? 'admin' : p.subType) as FinancialRecord['subType'],
+  bankAccount: p.paymentMethod || undefined,
+  notes: p.notes,
+  weightKg: p.weightKg,
+  weightSc: p.weightKg ? p.weightKg / 60 : undefined,
+  unitPriceSc: (p.weightKg && p.weightKg > 0) ? p.amount / (p.weightKg / 60) : undefined
+});
+
+// ============================================================================
+// MAPEAMENTO: Singleton Entry → FinancialRecord
+// ============================================================================
+
+const mapEntryToFinancialRecord = (entry: any): FinancialRecord => ({
+  id: entry.id,
+  description: entry.description,
+  entityName: 'Carregando...', // Nome do parceiro precisa de join ou resolve posterior
+  category: entry.origin_type === 'purchase' ? 'Matéria Prima'
+    : entry.origin_type === 'sales' ? 'Receita Operacional'
+      : entry.origin_type === 'freight' ? 'Logística'
+        : entry.origin_type === 'commission' ? 'Comissões'
+          : 'Outros',
+  issueDate: entry.due_date,
+  dueDate: entry.due_date,
+  originalValue: entry.total_amount,
+  paidValue: 0,
+  remainingValue: entry.total_amount,
+  discountValue: 0,
+  status: entry.status === 'paid' ? 'paid' : entry.status === 'partial' ? 'partial' : entry.status === 'overdue' ? 'overdue' : 'pending',
+  subType: entry.origin_type as any,
+  bankAccount: undefined,
+  notes: `[ORIGIN:${entry.origin_type}:${entry.origin_id}]`
+});
+
+// ✅ Novo fetch unificado do Single Ledger
+const fetchEntriesSync = async (type: 'payable' | 'receivable'): Promise<FinancialRecord[]> => {
+  const { supabase } = await import('./supabase');
+  const types = type === 'payable'
+    ? ['purchase_payable', 'freight_payable', 'commission_payable', 'expense_payable', 'loan_payable', 'partner_withdrawal']
+    : ['sales_receivable', 'loan_receivable', 'partner_contribution', 'other_receivable'];
+
+  const { data, error } = await supabase
+    .from('financial_entries')
+    .select('*')
+    .in('type', types)
+    .order('due_date', { ascending: true });
+
+  if (error) {
+    return [];
+  }
+
+  return (data || []).map(mapEntryToFinancialRecord);
+};
+
+// ============================================================================
+// MAPEAMENTO: Receivable → FinancialRecord
+// ============================================================================
+
+const mapReceivableToFinancialRecord = (r: Receivable): FinancialRecord => ({
+  id: r.id,
+  description: r.description,
+  entityName: r.partnerName || (r.notes?.replace('Cliente: ', '') || 'Cliente Desconhecido'),
+  category: 'Receita Operacional',
+  issueDate: r.dueDate,
+  dueDate: r.dueDate,
+  originalValue: r.amount,
+  paidValue: r.receivedAmount || 0,
+  remainingValue: Math.max(0, r.amount - (r.receivedAmount || 0)),
+  discountValue: 0,
+  status: mapReceivableStatusToFinancialStatus(r.status),
+  subType: 'sales_order',
+  bankAccount: r.paymentMethod || undefined,
+  notes: r.notes
+});
+
+export const financialIntegrationService = {
   // Consolida tudo que a empresa DEVE (Passivo)
   getPayables: (): FinancialRecord[] => {
+    // ⚠️ Atenção: getAll() do Persistence é síncrono, mas o fetch supahase é asíncrono.
+    // Para manter a assinatura legada, retornamos o que está no cache ou fazemos o sync em background.
+
+    // Como os dados financeiros agora são reativos e cacheados globalmente,
+    // podemos continuar usando os services locais se preferirmos estabilidade UI imediata,
+    // ou migrar tudo para async.
+
+    // Por enquanto, manteremos a lógica híbrida para não quebrar a UI síncrona:
     const records: FinancialRecord[] = [];
-    const allLoadings = loadingService.getAll();
-    const allPurchases = purchaseService.getAll();
-
-    // 1. FORNECEDORES DE GRÃOS (Dívida gerada pelo que foi carregado)
-    allPurchases.forEach(order => {
-      if (order.status === 'canceled') return;
-
-      const orderLoadings = allLoadings.filter(l => l.purchaseOrderId === order.id && l.status !== 'canceled');
-      const totalLoadedValue = orderLoadings.reduce((acc, l) => acc + (l.totalPurchaseValue || 0), 0);
-
-      const txs = order.transactions || [];
-      const totalPaidTx = txs
-        .filter(t => t.type === 'payment' || t.type === 'advance')
-        .reduce((acc, t) => acc + (t.value || 0), 0);
-      const totalPaid = Math.max(totalPaidTx, order.paidValue || 0);
-      const totalFinancialDiscount = Math.max(
-        txs.reduce((acc, t) => acc + (t.discountValue || 0), 0),
-        order.discountValue || 0
-      );
-
-      // Despesas debitadas do produtor também abatem a dívida
-      const deductions = (order.transactions || [])
-        .filter(t => (t.type === 'expense' || t.type === 'commission') && t.deductFromPartner)
-        .reduce((acc, t) => acc + t.value + (t.discountValue || 0), 0);
-
-      const finalDiscount = totalFinancialDiscount + deductions;
-
-      if (totalLoadedValue > 0 || totalPaid > 0) {
-        records.push({
-          id: `po-grain-${order.id}`,
-          description: `Pedido de Compra ${order.number}`,
-          entityName: order.partnerName,
-          category: 'Matéria Prima',
-          issueDate: order.date,
-          dueDate: order.date,
-          originalValue: totalLoadedValue,
-          paidValue: totalPaid,
-          discountValue: finalDiscount,
-          status: getStatus(totalLoadedValue, totalPaid, finalDiscount, order.date),
-          subType: 'purchase_order',
-          bankAccount: `${orderLoadings.length} Cargas Realizadas`,
-          notes: `Saldo calculado sobre romaneios físicos. Abatimentos inclusos.`
-        });
-      }
+    payablesService.getAll().forEach(p => records.push(mapPayableToFinancialRecord(p)));
+    financialActionService.getStandaloneRecords().forEach(r => {
+      if (['admin', 'commission', 'loan_taken', 'shareholder'].includes(r.subType || '')) records.push(r);
     });
-
-    // 2. FRETES (Dívida com transportadoras)
-    allLoadings.forEach(l => {
-      if (l.status === 'canceled' || l.totalFreightValue <= 0) return;
-
-      const totalPaid = l.freightPaid || 0;
-      const totalDiscount = (l.transactions || []).reduce((acc, t) => acc + (t.discountValue || 0), 0);
-      const dueDate = addDaysLocal(l.date, 15);
-
-      records.push({
-        id: `fr-${l.id}`,
-        description: `Frete ${l.carrierName}${l.vehiclePlate ? ` - ${l.vehiclePlate}` : ''}`,
-        entityName: l.carrierName,
-        driverName: l.driverName,
-        category: 'Logística',
-        issueDate: l.date,
-        dueDate: dueDate,
-        originalValue: l.totalFreightValue,
-        paidValue: totalPaid,
-        discountValue: totalDiscount,
-        status: getStatus(l.totalFreightValue, totalPaid, totalDiscount, dueDate),
-        subType: 'freight',
-        bankAccount: l.supplierName,
-        notes: `Frete referente ao Pedido ${l.purchaseOrderNumber}`,
-        weightSc: l.weightKg / 60,
-        unitPriceSc: (l.weightKg / 60) > 0 ? l.totalFreightValue / (l.weightKg / 60) : 0
-      });
-    });
-
-    // 3. DESPESAS ADMINISTRATIVAS E COMISSÕES AVULSAS
-    const standalone = financialActionService.getStandaloneRecords();
-    standalone.forEach(r => {
-      const isDebit = ['admin', 'commission', 'loan_taken', 'shareholder'].includes(r.subType || '');
-      if (!isDebit) return;
-
-      // Excluir débitos de empréstimos concedidos (são apenas movimentação de caixa, não dívida real)
-      if (r.subType === 'admin' && r.category === 'Empréstimos' && r.description?.startsWith('Débito de Empréstimo')) return;
-
-      records.push(r);
-    });
-
-    // 4. EMPRÉSTIMOS TOMADOS (Dívida com credores)
-    const allLoans = loansService.getAll();
-    allLoans.forEach(loan => {
-      if (loan.subType !== 'loan_taken') return;
-      if (loan.status === 'paid' || loan.status === 'settled') return;
-      // Evitar duplicatas - o loan_taken pode já ter vindo do standalone
-      if (records.some(r => r.id === loan.id)) return;
-      records.push(loan);
-    });
-
-    return records.sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+    return records.sort((a, b) => (a.dueDate ?? '').localeCompare(b.dueDate ?? ''));
   },
 
-  // Consolida tudo que a empresa tem a RECEBER (Ativo)
   getReceivables: (): FinancialRecord[] => {
     const records: FinancialRecord[] = [];
-    const sales = salesService.getAll();
-    const allLoadings = loadingService.getAll();
-    const standalone = financialActionService.getStandaloneRecords();
-
-    // 1. VENDAS DE GRÃOS (Receita gerada pelo que foi entregue no destino)
-    sales.forEach(sale => {
-      if (sale.status === 'canceled') return;
-
-      const deliveredLoadings = allLoadings.filter(l => l.salesOrderId === sale.id && l.status !== 'canceled' && (l.unloadWeightKg && l.unloadWeightKg > 0));
-      const totalDeliveredValue = deliveredLoadings.reduce((acc, l) => {
-        const weightSc = l.unloadWeightKg! / 60;
-        const price = l.salesPrice || sale.unitPrice || 0;
-        return acc + (weightSc * price);
-      }, 0);
-
-      const totalReceived = (sale.transactions || []).filter(t => t.type === 'receipt').reduce((acc, t) => acc + t.value, 0);
-      const totalDiscount = (sale.transactions || []).filter(t => t.type === 'receipt').reduce((acc, t) => acc + (t.discountValue || 0), 0);
-
-      // Busca o nome da última conta bancária utilizada para este recebimento
-      const lastTx = (sale.transactions || [])
-        .filter(t => t.type === 'receipt')
-        .sort((a, b) => b.date.localeCompare(a.date))[0];
-
-      if (totalDeliveredValue > 0 || totalReceived > 0) {
-        const dueDate = addDaysLocal(sale.date, 15);
-        records.push({
-          id: `so-${sale.id}`,
-          description: `Venda ${sale.number}`,
-          entityName: sale.customerName,
-          category: 'Receita Operacional',
-          issueDate: sale.date,
-          dueDate: dueDate,
-          originalValue: totalDeliveredValue,
-          paidValue: totalReceived,
-          discountValue: totalDiscount,
-          status: getStatus(totalDeliveredValue, totalReceived, totalDiscount, dueDate),
-          subType: 'sales_order',
-          bankAccount: lastTx ? lastTx.accountName : undefined,
-          notes: `Faturamento baseado em peso de destino.`
-        });
-      }
+    receivablesService.getAll().forEach(r => records.push(mapReceivableToFinancialRecord(r)));
+    financialActionService.getStandaloneRecords().forEach(r => {
+      if (['receipt', 'loan_granted'].includes(r.subType || '')) records.push(r);
     });
-
-    // 2. RECEBIMENTOS AVULSOS (Empréstimos concedidos, Venda de Ativos)
-    standalone.forEach(r => {
-      const isCredit = ['receipt', 'loan_granted'].includes(r.subType || '') || r.category === 'Venda de Ativo';
-      // Excluir créditos de empréstimos tomados (são apenas movimentação de caixa, não crédito real)
-      if (r.subType === 'receipt' && r.category === 'Empréstimos' && r.description?.startsWith('Crédito de Empréstimo')) return;
-      if (isCredit) records.push(r);
-    });
-
-    // 3. EMPRÉSTIMOS CONCEDIDOS (Crédito a receber)
-    const allLoans = loansService.getAll();
-    allLoans.forEach(loan => {
-      if (loan.subType !== 'loan_granted') return;
-      if (loan.status === 'paid' || loan.status === 'settled') return;
-      if (records.some(r => r.id === loan.id)) return;
-      records.push(loan);
-    });
-
-    return records.sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+    return records.sort((a, b) => (a.dueDate ?? '').localeCompare(b.dueDate ?? ''));
   }
 };

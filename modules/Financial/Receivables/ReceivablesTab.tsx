@@ -1,111 +1,66 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { TrendingUp, RefreshCw, Layers, Filter, Calendar, X, Search } from 'lucide-react';
+import { TrendingUp, Layers, Filter, Calendar, X, Search } from 'lucide-react';
 import UnifiedReceivableManager from './components/UnifiedReceivableManager';
 import { FinancialRecord } from '../types';
-import { receivablesService, Receivable } from '../../../services/financial/receivablesService';
-import { partnerService } from '../../../services/partnerService';
-import { loadingService } from '../../../services/loadingService';
-import { waitForInit } from '../../../services/supabaseInitService';
+import { useReceivables } from '../../../hooks/useFinancialEntries';
+import type { EnrichedReceivableEntry } from '../../../services/financialEntriesService';
+import { useQueryClient } from '@tanstack/react-query';
+import { QUERY_KEYS } from '../../../hooks/queryKeys';
 
-// Converter Receivable → FinancialRecord
-const convertToFinancialRecord = (receivable: Receivable): FinancialRecord => {
-  // Busca o nome do parceiro (cliente)
-  const partner = partnerService.getById(receivable.partnerId);
-  const partnerName = partner?.name || 'Cliente Desconhecido';
+// ============================================================================
+// Adaptador: EnrichedReceivableEntry (VIEW SQL) → FinancialRecord (UI)
+// Zero cálculo no frontend — tudo vem pronto do banco de dados
+// ============================================================================
+const toFinancialRecord = (entry: EnrichedReceivableEntry): FinancialRecord => {
+  const status = entry.status === 'paid' ? 'paid'
+    : entry.status === 'partially_paid' ? 'partial'
+    : entry.status === 'overdue' ? 'overdue'
+    : 'pending';
 
-  // Busca informações dos carregamentos vinculados ao pedido de venda
-  const loadings = receivable.salesOrderId ? loadingService.getBySalesOrder(receivable.salesOrderId) : [];
-
-  // IMPORTANTE: Usa PESO DE DESCARGA, não peso de carregamento
-  let totalWeightKg = 0;
-  let totalSc = 0;
-
-  for (const l of loadings) {
-    const weightKg = l.unloadWeightKg || l.weightKg || 0;
-    totalWeightKg += weightKg;
-    totalSc += (weightKg / 60); // Converte KG em sacas (60kg = 1 saca)
-  }
-
-  const loadCount = loadings.length;
-
-  // Calcula o preço unitário por saca usando o TOTAL CORRETO de sacas de descarga
-  const unitPriceSc = totalSc > 0.01 ? receivable.amount / totalSc : 0;
-
-  console.log('📊 convertToFinancialRecord:', {
-    id: receivable.id.substring(0, 8),
-    loadings: loadCount,
-    totalWeightKg,
-    totalSc: totalSc.toFixed(2),
-    amount: receivable.amount,
-    unitPriceSc: unitPriceSc.toFixed(2)
-  });
+  // Dados vindos do SQL (partner_name já resolvido pela VIEW)
+  const partnerName = entry.partner_name;
 
   return {
-    id: receivable.id,
-    description: receivable.description,
+    id: entry.id,
+    originId: entry.origin_id,
+    description: partnerName,
     entityName: partnerName,
     category: 'Vendas',
-    dueDate: receivable.dueDate,
-    issueDate: receivable.dueDate,
-    originalValue: receivable.amount,
-    paidValue: receivable.receivedAmount,
-    status: receivable.status === 'received' ? 'paid' : receivable.status === 'overdue' ? 'overdue' : receivable.status === 'partially_received' ? 'partial' : 'pending',
+    dueDate: entry.due_date || entry.created_date,
+    issueDate: entry.created_date,
+    originalValue: entry.total_amount,
+    paidValue: entry.paid_amount,
+    remainingValue: entry.remaining_amount,
+    status,
     subType: 'sales_order',
-    notes: receivable.notes,
-    weightKg: totalWeightKg > 0 ? totalWeightKg : undefined,
-    totalSc: totalSc > 0 ? totalSc : undefined,
-    loadCount: loadCount > 0 ? loadCount : undefined,
-    unitPriceSc: unitPriceSc > 0 ? unitPriceSc : undefined,
-    totalTon: totalWeightKg > 0 ? totalWeightKg / 1000 : undefined
+    weightKg: entry.loading_weight_kg,
+    totalTon: entry.loading_weight_ton,
+    totalSc: entry.loading_weight_sc,
+    unitPriceSc: entry.unit_price_sc,
+    orderNumber: entry.sales_order_number,
   };
 };
 
 const ReceivablesTab: React.FC = () => {
+  const queryClient = useQueryClient();
   const [activeSubTab, setActiveSubTab] = useState<'open' | 'all'>('open');
-  const [records, setRecords] = useState<FinancialRecord[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  // Filtros de período (apenas Visão Geral)
+  // Filtros
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Paginação (apenas Visão Geral)
   const PAGE_SIZE = 100;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      const data = await receivablesService.loadFromSupabase();
-      const converted = (data || []).map(convertToFinancialRecord);
-      setRecords(converted);
-    } finally {
-      setLoading(false);
-    }
+  // TanStack Query: dados + realtime automático (VIEW já vem enriquecida)
+  const { data: rawReceivables = [], isLoading: loading } = useReceivables();
+  const records = useMemo(() => rawReceivables.map(toFinancialRecord), [rawReceivables]);
+
+  const refreshData = () => {
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_RECEIVABLES });
   };
-
-  useEffect(() => {
-    const initTab = async () => {
-      await waitForInit();
-      receivablesService.startRealtime();
-      await loadData();
-    };
-
-    void initTab();
-
-    // Subscribe to real-time updates
-    const unsubscribe = receivablesService.subscribe((updatedRecords) => {
-      console.log('🔔 REALTIME: Contas a Receber atualizado!', updatedRecords.length, 'registros');
-      const converted = updatedRecords.map(convertToFinancialRecord);
-      setRecords(converted);
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, []);
 
   const filteredRecords = useMemo(() => {
     let result = records;
@@ -171,13 +126,7 @@ const ReceivablesTab: React.FC = () => {
           </button>
         </div>
 
-        <button
-          onClick={loadData}
-          className="p-2.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all border border-transparent hover:border-emerald-100"
-          title="Atualizar Banco de Dados"
-        >
-          <RefreshCw size={20} />
-        </button>
+
       </div>
 
       <div className="bg-white p-2 rounded-3xl border border-slate-200 shadow-sm">
@@ -239,7 +188,7 @@ const ReceivablesTab: React.FC = () => {
 
         <UnifiedReceivableManager
           records={paginatedRecords}
-          onRefresh={loadData}
+          onRefresh={refreshData}
           viewMode={activeSubTab}
           searchTerm={activeSubTab === 'all' ? searchTerm : undefined}
           hideSearchBar={activeSubTab === 'all'}

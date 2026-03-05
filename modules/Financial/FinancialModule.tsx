@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   ArrowDownCircle, 
   ArrowUpCircle, 
@@ -110,6 +110,9 @@ const FINANCIAL_MODULES = [
 
 const FinancialModule: React.FC = () => {
   const [activeTabId, setActiveTabId] = useState<string>(FINANCIAL_MODULES[0].id);
+
+  // Dados financeiros são carregados via TanStack Query nos hooks
+  // (usePayables, useReceivables, etc.) — com realtime automático
 
   // Find the active component based on state
   const activeModule = FINANCIAL_MODULES.find(m => m.id === activeTabId) || FINANCIAL_MODULES[0];

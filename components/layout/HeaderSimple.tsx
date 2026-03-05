@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Search, Bell, Menu, HelpCircle, ShoppingCart, Truck, ChevronRight, User, DollarSign, LayoutGrid, FileText, Loader2 } from 'lucide-react';
 import { ModuleId } from '../../types';
 import { searchService, SearchResult } from '../../services/searchService';
-import LatencyIndicator from '../monitoring/LatencyIndicator';
 
 interface HeaderProps {
   toggleSidebar: () => void;
@@ -141,9 +140,6 @@ const HeaderSimple: React.FC<HeaderProps> = ({ toggleSidebar, title, onNavigate 
         </div>
         
         <div className="flex items-center gap-x-4 lg:gap-x-6">
-          {/* ⚡ Indicador de Latência */}
-          <LatencyIndicator size="md" showLabel={true} />
-          
           {/* 🔧 Botão de Ajuda */}
           <button 
             type="button" 

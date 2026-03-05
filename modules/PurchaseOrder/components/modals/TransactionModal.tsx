@@ -1,10 +1,13 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { X, Save, Calendar, DollarSign, Wallet, FileText, Tags, CheckSquare, Square, ArrowDown, MinusCircle, AlertTriangle } from 'lucide-react';
 import { TransactionType } from '../../types';
-import { financialService, ExpenseCategory } from '../../../../services/financialService';
+import type { ExpenseCategory } from '../../../../services/expenseCategoryService';
 import { getLocalDateString } from '../../../../utils/dateUtils';
-import { BankAccount } from '../../../../Financial/types';
+import type { Account } from '../../../../services/accountsService';
+import { useAccounts } from '../../../../hooks/useAccounts';
+import { useExpenseCategories } from '../../../../hooks/useExpenseCategories';
+import { useToast } from '../../../../contexts/ToastContext';
 
 interface Props {
   isOpen: boolean;
@@ -15,8 +18,20 @@ interface Props {
 }
 
 const TransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, type, title }) => {
-  const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
-  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const { addToast } = useToast();
+  const { data: allExpenseCategories = [] } = useExpenseCategories();
+
+  // Filtra categorias variáveis para despesas de pedido
+  const expenseCategories = useMemo(
+    () => allExpenseCategories.filter(cat => cat.type === 'variable'),
+    [allExpenseCategories]
+  );
+
+  const { data: allAccounts = [] } = useAccounts();
+  const bankAccounts = useMemo(() =>
+    allAccounts.filter((a: Account) => a.is_active !== false).sort((a: Account, b: Account) => a.account_name.localeCompare(b.account_name)),
+    [allAccounts]
+  );
   
   const [formData, setFormData] = useState({
     date: getLocalDateString(),
@@ -39,18 +54,8 @@ const TransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, type, titl
         expenseSubtypeId: '',
         deductFromPartner: false
       });
-      // CRITICAL: Filter only ACTIVE accounts AND SORT ALPHABETICALLY
-      const sorted = financialService.getBankAccounts()
-        .filter(acc => acc.active !== false)
-        .sort((a, b) => a.bankName.localeCompare(b.bankName));
-      setBankAccounts(sorted);
-      
-      if (type === 'expense') {
-        const variableExpenses = financialService.getExpenseCategories().filter(cat => cat.type === 'variable');
-        setExpenseCategories(variableExpenses);
-      }
     }
-  }, [isOpen, type]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -59,16 +64,14 @@ const TransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, type, titl
   const totalOperation = valAmount + valDiscount;
   const isCashMovement = valAmount > 0;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (totalOperation <= 0) {
-        // Se for despesa, só precisa de valor se não for tracking. Mas aqui assumimos financeiro.
-        // Alert handled by HTML5 required usually, but custom check:
         return; 
     }
 
-    if (isCashMovement && !formData.accountId) return; // Conta required if cash involved
+    if (isCashMovement && !formData.accountId) return;
 
     const account = bankAccounts.find(a => a.id === formData.accountId);
     let finalNotes = formData.notes;
@@ -86,7 +89,7 @@ const TransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, type, titl
 
     // Lógica para conta virtual de abatimento
     const finalAccountId = isCashMovement ? formData.accountId : 'discount_virtual';
-    const finalAccountName = isCashMovement ? (account?.bankName || 'Caixa Central') : 'ABATIMENTO/ACORDO';
+    const finalAccountName = isCashMovement ? (account?.account_name || 'Caixa Central') : 'ABATIMENTO/ACORDO';
     
     if (!isCashMovement && valDiscount > 0 && !finalNotes) {
         finalNotes = `Abatimento / Desconto Comercial`;
@@ -179,7 +182,7 @@ const TransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, type, titl
                       <Wallet className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
                       <select required value={formData.accountId} onChange={e => setFormData({...formData, accountId: e.target.value})} className={`${inputClass} pl-10 appearance-none pr-10`}>
                           <option value="">Selecione o Banco...</option>
-                          {bankAccounts.map(acc => <option key={acc.id} value={acc.id}>{acc.bankName} - {acc.owner}</option>)}
+                          {bankAccounts.map(acc => <option key={acc.id} value={acc.id}>{acc.account_name}</option>)}
                       </select>
                       <ArrowDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" size={16} />
                   </div>

@@ -1,141 +1,111 @@
-import { logService } from './logService';
+/**
+ * initialBalanceService.ts
+ *
+ * CRUD de saldos iniciais (marco zero) por conta bancária.
+ *
+ * Tabela: public.initial_balances
+ * RLS: company_id = public.my_company_id() — isolamento automático por empresa.
+ * Constraint UNIQUE (company_id, account_id): cada conta tem apenas 1 saldo inicial.
+ */
+
 import { supabase } from './supabase';
-import { invalidateSettingsCache } from './settingsCache';
-import { waitForInit } from './supabaseInitService';
-import { Persistence } from './persistence';
-import { authService } from './authService';
-import { InitialBalanceRecord, initialBalanceSupabaseSync } from './initialBalance/supabaseSyncService';
 
-export type { InitialBalanceRecord } from './initialBalance/supabaseSyncService';
+// ─── TIPO EXPORTADO ───────────────────────────────────────────────────────────
 
-const balancesDb = new Persistence<InitialBalanceRecord>('initial_balances', [], { useStorage: false });
-let initialBalancesChannel: ReturnType<typeof supabase.channel> | null = null;
-let _realtimeStarted = false;
+export interface InitialBalanceRecord {
+  id: string;
+  accountId: string;
+  accountName: string;
+  date: string;
+  value: number;
+}
 
-const getLogInfo = () => {
-  const user = authService.getCurrentUser();
-  return { userId: user?.id || 'system', userName: user?.name || 'Sistema' };
-};
+// ─── MAPEADOR ─────────────────────────────────────────────────────────────────
 
-const mapInitialBalanceRecord = (record: any): InitialBalanceRecord => ({
-  id: record.id,
-  accountId: record.account_id,
-  accountName: record.account_name,
-  date: record.date,
-  value: typeof record.value === 'number' ? record.value : parseFloat(record.value)
-});
+function mapRow(row: any): InitialBalanceRecord {
+  return {
+    id:          row.id,
+    accountId:   row.account_id   ?? '',
+    accountName: row.account_name ?? '',
+    date:        row.date         ?? '',
+    value:       typeof row.value === 'number' ? row.value : parseFloat(row.value ?? '0'),
+  };
+}
 
-const loadFromSupabase = async () => {
-  try {
-    const stats = await waitForInit();
-    if (stats.data.initialBalances) {
-      const initialBalances: InitialBalanceRecord[] = (stats.data.initialBalances || []).map((balance: any) => ({
-        id: balance.id,
-        accountId: balance.account_id,
-        accountName: balance.account_name,
-        date: balance.date,
-        value: parseFloat(balance.value)
-      }));
-      balancesDb.setAll(initialBalances);
+// ─── OPERAÇÕES CRUD ───────────────────────────────────────────────────────────
 
+async function getAll(): Promise<InitialBalanceRecord[]> {
+  const { data, error } = await supabase
+    .from('initial_balances')
+    .select('*')
+    .order('created_at');
+  if (error) throw error;
+  return (data ?? []).map(mapRow);
+}
+
+async function _getCompanyId(): Promise<string> {
+  const { data } = await supabase.rpc('my_company_id');
+  if (!data) throw new Error('Empresa não encontrada para o usuário logado.');
+  return data as string;
+}
+
+async function add(balance: InitialBalanceRecord): Promise<void> {
+  const { error } = await supabase.rpc('rpc_set_initial_balance', {
+    p_account_id: balance.accountId,
+    p_account_name: balance.accountName,
+    p_date: balance.date,
+    p_value: balance.value,
+  });
+  if (error) {
+    if (error.code === '23505') throw new Error(`A conta ${balance.accountName} já possui um saldo inicial cadastrado.`);
+    throw error;
+  }
+}
+
+async function remove(id: string): Promise<void> {
+  const { error } = await supabase.rpc('rpc_remove_initial_balance', {
+    p_balance_id: id,
+  });
+  if (error) throw error;
+}
+
+// ─── REALTIME (singleton channel) ─────────────────────────────────────────────────────────
+
+const subscribeRealtime = (() => {
+  const listeners = new Set<() => void>();
+  let channel: ReturnType<typeof supabase.channel> | null = null;
+  return (callback: () => void): (() => void) => {
+    listeners.add(callback);
+    if (!channel) {
+      channel = supabase
+        .channel('initial-balances-changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'initial_balances' }, () => listeners.forEach(fn => fn()))
+        .subscribe();
     }
-  } catch (error) {
-    console.warn('⚠️ InitialBalanceService: Erro ao carregar do Supabase:', error);
-  }
-};
+    return () => {
+      listeners.delete(callback);
+      if (listeners.size === 0 && channel) { supabase.removeChannel(channel); channel = null; }
+    };
+  };
+})();
 
-const startInitialBalanceRealtime = () => {
-  if (_realtimeStarted) return;
-  _realtimeStarted = true;
-
-  if (!initialBalancesChannel) {
-    initialBalancesChannel = supabase
-      .channel('realtime:initial_balances')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'initial_balances' }, payload => {
-        const rec = payload.new || payload.old;
-        if (!rec) return;
-        const balance = mapInitialBalanceRecord(rec);
-
-        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-          const existing = balancesDb.getById(balance.id);
-          if (existing) balancesDb.update(balance);
-          else balancesDb.add(balance);
-        } else if (payload.eventType === 'DELETE') {
-          balancesDb.delete(balance.id);
-        }
-
-        invalidateSettingsCache();
-        console.log(`🔔 Realtime initial_balances: ${payload.eventType}`);
-      })
-      .subscribe(status => {
-        // Realtime subscribed
-      });
-  }
-};
-
-// ❌ NÃO inicializar automaticamente - aguardar autenticação
-// loadFromSupabase();
-startInitialBalanceRealtime();
+// ─── INTERFACE PÚBLICA ────────────────────────────────────────────────────────
 
 export const initialBalanceService = {
-  loadFromSupabase,
-  startRealtime: startInitialBalanceRealtime,
-  getInitialBalances: () => balancesDb.getAll(),
+  // ── Novo padrão (usado pelos hooks TanStack Query) ──
+  getAll,
+  subscribeRealtime,
 
-  subscribe: (callback: (items: InitialBalanceRecord[]) => void) => {
-    startInitialBalanceRealtime();
-    return balancesDb.subscribe(callback);
-  },
+  // ── Usado pelos componentes diretamente ──
+  add,
+  delete: remove,
 
-  addInitialBalance: async (balance: InitialBalanceRecord) => {
-    const existing = balancesDb.getAll().find(b => b.accountId === balance.accountId);
-    if (existing) {
-      throw new Error(`A conta ${balance.accountName} já possui um saldo inicial cadastrado.`);
-    }
-    balancesDb.add(balance);
-    invalidateSettingsCache();
-    const { userId, userName } = getLogInfo();
-    logService.addLog({
-      userId, userName, action: 'create', module: 'Configurações',
-      description: `Definiu saldo inicial (${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(balance.value)}) para conta: ${balance.accountName}`,
-      entityId: balance.id
-    });
-
-    // Sync to Supabase (background)
-    Promise.resolve().then(() => initialBalanceSupabaseSync.syncInsertBalance(balance));
-  },
-
-  removeInitialBalance: async (id: string) => {
-    balancesDb.delete(id);
-    invalidateSettingsCache();
-
-    // Sync to Supabase (background)
-    Promise.resolve().then(() => initialBalanceSupabaseSync.syncDeleteBalance(id));
-  },
-
-  importData: (initialBalances: InitialBalanceRecord[]) => {
-    if (initialBalances) balancesDb.setAll(initialBalances);
-
-    const companyId = authService.getCurrentUser()?.companyId;
-    if (!companyId) return;
-
-    const payload = initialBalances.map(balance => ({
-      id: balance.id,
-      account_id: balance.accountId,
-      account_name: balance.accountName,
-      date: balance.date,
-      value: balance.value,
-      company_id: companyId
-    }));
-
-    void (async () => {
-      try {
-        const { error } = await supabase.from('initial_balances').upsert(payload, { onConflict: 'id' });
-        if (error) console.error('❌ Erro ao sincronizar saldos iniciais:', error);
-        else console.log('✅ Saldos iniciais sincronizados no Supabase via ImportData');
-      } catch (err) {
-        console.error('❌ Erro inesperado ao importar saldos iniciais:', err);
-      }
-    })();
-  }
+  // ── Shims de compatibilidade legados ──
+  getInitialBalances:   (): InitialBalanceRecord[] => [],
+  addInitialBalance:    add,
+  removeInitialBalance: remove,
+  subscribe:            (_cb: (items: InitialBalanceRecord[]) => void): (() => void) => () => {},
+  loadFromSupabase:     async (): Promise<void> => {},
+  startRealtime:        (): void => {},
+  importData:           (_data: InitialBalanceRecord[]): void => {},
 };

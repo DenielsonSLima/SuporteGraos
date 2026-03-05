@@ -7,6 +7,8 @@ import FreightPaymentModal from '../../../Logistics/components/modals/FreightPay
 import FinancialPaymentModal, { PaymentData } from '../../components/modals/FinancialPaymentModal'; // Mantém para despesas administrativas
 
 import { financialActionService } from '../../../../services/financialActionService';
+import { useAccounts } from '../../../../hooks/useAccounts';
+import { useToast } from '../../../../contexts/ToastContext';
 import { ModuleId } from '../../../../types';
 
 interface Props {
@@ -22,6 +24,11 @@ const UnifiedPayableManager: React.FC<Props> = ({ records, onRefresh, type, sear
   const searchTerm = externalSearch !== undefined ? externalSearch : internalSearch;
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
+  // Contas bancárias via TanStack Query (cache + realtime)
+  const { data: rawAccounts = [] } = useAccounts();
+  const accountsList = rawAccounts.filter(a => a.is_active !== false);
+  const { addToast } = useToast();
 
   // Controle de qual modal abrir
   const [modalType, setModalType] = useState<'purchase' | 'freight' | 'generic' | null>(null);
@@ -50,8 +57,7 @@ const UnifiedPayableManager: React.FC<Props> = ({ records, onRefresh, type, sear
 
       map[entityKey].items.push(r);
       map[entityKey].total += r.originalValue;
-      // Saldo = Original - Pago - Abatimentos
-      map[entityKey].balance += (r.originalValue - r.paidValue - (r.discountValue || 0));
+      map[entityKey].balance += (r.remainingValue || 0);
     });
 
     return Object.values(map).sort((a, b) => b.balance - a.balance);
@@ -73,7 +79,9 @@ const UnifiedPayableManager: React.FC<Props> = ({ records, onRefresh, type, sear
 
   const handleNavigateToOrder = (e: React.MouseEvent, item: FinancialRecord) => {
     e.stopPropagation();
-    const orderId = item.id.replace('po-grain-', '');
+    const orderId = item.originId || item.id;
+    // Store pending navigation so the target module can pick it up on mount
+    (window as any).__pendingOrderNav = { moduleId: ModuleId.PURCHASE_ORDER, orderId };
     window.dispatchEvent(new CustomEvent('app:navigate', {
       detail: { moduleId: ModuleId.PURCHASE_ORDER, orderId }
     }));
@@ -82,24 +90,36 @@ const UnifiedPayableManager: React.FC<Props> = ({ records, onRefresh, type, sear
   // Cálculo do total selecionado para pagamento em lote (Saldo Pendente)
   const totalSelected = records
     .filter(r => selectedIds.includes(r.id))
-    .reduce((acc, r) => acc + (r.originalValue - r.paidValue - (r.discountValue || 0)), 0);
+    .reduce((acc, r) => acc + (r.remainingValue || 0), 0);
 
   const handleConfirmPayment = async (data: any) => {
-    if (selectedRecordForSinglePay) {
-      await financialActionService.processRecord(selectedRecordForSinglePay.id, data, selectedRecordForSinglePay.subType);
-    } else {
-      // Lógica de lote simplificada para protótipo
-      for (const id of selectedIds) {
-        const record = records.find(r => r.id === id);
-        if (record) {
-          const balance = record.originalValue - record.paidValue - (record.discountValue || 0);
-          await financialActionService.processRecord(id, { ...data, amount: balance, discount: 0 }, record.subType);
+    if (isProcessing) return;
+    setIsProcessing(true);
+    try {
+      if (selectedRecordForSinglePay) {
+        await financialActionService.processRecord(selectedRecordForSinglePay.id, data, selectedRecordForSinglePay.subType);
+        addToast('success', 'Pagamento registrado com sucesso!');
+      } else {
+        // Lógica de lote
+        for (const id of selectedIds) {
+          const record = records.find(r => r.id === id);
+          if (record) {
+            const balance = record.remainingValue || 0;
+            await financialActionService.processRecord(id, { ...data, amount: balance, discount: 0 }, record.subType);
+          }
         }
+        addToast('success', `${selectedIds.length} pagamentos registrados!`);
       }
+    } catch (err) {
+      addToast('error', 'Erro ao processar pagamento');
+    } finally {
+      // SEMPRE fecha o modal e reseta o estado, mesmo em caso de erro
+      setModalType(null);
+      setSelectedRecordForSinglePay(null);
+      setSelectedIds([]);
+      setIsProcessing(false);
+      onRefresh();
     }
-    setModalType(null);
-    setSelectedIds([]);
-    onRefresh();
   };
 
   return (
@@ -149,8 +169,8 @@ const UnifiedPayableManager: React.FC<Props> = ({ records, onRefresh, type, sear
                       <th className="px-4 py-2">{type === 'purchase' ? 'Nº Pedido' : 'Data Carga'}</th>
                       <th className="px-4 py-2">{type === 'purchase' ? 'Info / Cargas' : 'Transporte / Motorista'}</th>
                       <th className="px-4 py-2 text-right">Volume / Preço</th>
-                      <th className="px-4 py-2 text-center">Info / Cargas</th>
-                      <th className="px-4 py-2 text-right">Volume / Preço</th>
+                      <th className="px-4 py-2 text-center">Conta / Status</th>
+                      <th className="px-4 py-2 text-right">Valor Original</th>
                       <th className="px-4 py-2 text-right">Liquidado</th>
                       <th className="px-6 py-2 text-right text-rose-600">Saldo Aberto</th>
                       <th className="px-6 py-2 text-center w-10"></th>
@@ -159,7 +179,7 @@ const UnifiedPayableManager: React.FC<Props> = ({ records, onRefresh, type, sear
                   <tbody className="divide-y divide-slate-50">
                     {entity.items.map((item: FinancialRecord) => {
                       const totalLiquidated = item.paidValue + (item.discountValue || 0);
-                      const pendingBalance = item.originalValue - totalLiquidated;
+                      const pendingBalance = item.remainingValue || 0;
 
                       return (
                         <tr
@@ -222,7 +242,12 @@ const UnifiedPayableManager: React.FC<Props> = ({ records, onRefresh, type, sear
                           <td className="px-4 py-3 text-center">
                             <div className="flex items-center justify-center gap-1.5 font-bold text-indigo-600">
                               <Wallet size={12} className="text-slate-400" />
-                              {item.bankAccount || (item.status === 'paid' ? 'Caixa Interno' : 'Pendente')}
+                              {(() => {
+                                if (!item.bankAccount) return item.status === 'paid' ? '—' : 'Pendente';
+                                if (item.bankAccount === 'ABATIMENTO' || item.bankAccount === 'discount_virtual') return 'Desconto';
+                                const acc = accountsList.find(a => a.id === item.bankAccount) || accountsList.find(a => a.account_name === item.bankAccount);
+                                return acc?.account_name || item.bankAccount;
+                              })()}
                             </div>
                           </td>
                           <td className="px-4 py-3 text-right font-bold text-slate-500">{currency(item.originalValue)}</td>
@@ -265,25 +290,27 @@ const UnifiedPayableManager: React.FC<Props> = ({ records, onRefresh, type, sear
 
       <PurchasePaymentModal
         isOpen={modalType === 'purchase'}
-        onClose={() => setModalType(null)}
+        onClose={() => { setModalType(null); setSelectedRecordForSinglePay(null); }}
         onConfirm={handleConfirmPayment}
-        totalPending={selectedRecordForSinglePay ? selectedRecordForSinglePay.originalValue - (selectedRecordForSinglePay.paidValue + (selectedRecordForSinglePay.discountValue || 0)) : 0}
+        totalPending={selectedRecordForSinglePay ? (selectedRecordForSinglePay.remainingValue || 0) : 0}
         recordDescription={selectedRecordForSinglePay?.description}
+        isProcessing={isProcessing}
       />
 
       <FreightPaymentModal
         isOpen={modalType === 'freight'}
-        onClose={() => setModalType(null)}
+        onClose={() => { setModalType(null); setSelectedRecordForSinglePay(null); }}
         onConfirm={handleConfirmPayment}
-        totalPending={selectedRecordForSinglePay ? selectedRecordForSinglePay.originalValue - (selectedRecordForSinglePay.paidValue + (selectedRecordForSinglePay.discountValue || 0)) : 0}
+        totalPending={selectedRecordForSinglePay ? (selectedRecordForSinglePay.remainingValue || 0) : 0}
         recordDescription={selectedRecordForSinglePay?.description}
+        isProcessing={isProcessing}
       />
 
       <FinancialPaymentModal
         isOpen={modalType === 'generic'}
-        onClose={() => setModalType(null)}
+        onClose={() => { setModalType(null); setSelectedRecordForSinglePay(null); }}
         onConfirm={handleConfirmPayment}
-        record={selectedRecordForSinglePay} // Usado para fallback
+        record={selectedRecordForSinglePay}
         bulkTotal={totalSelected > 0 ? totalSelected : undefined}
       />
 

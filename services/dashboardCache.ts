@@ -66,8 +66,8 @@ export class DashboardCache {
       standaloneRecords: FinancialCache.getStandaloneRecords(),
       transfers: financialActionService.getTransfers(),
       
-      // Cashier report (via CashierCache para compartilhar cache)
-      cashierReport: CashierCache.getCurrentMonthReport(),
+      // Cashier report (já deve estar previamente carregado de forma assíncrona)
+      cashierReport: CashierCache.getCachedReport(),
       
       // Metadata
       timestamp: now

@@ -87,7 +87,7 @@ export const advanceService = {
   addTransaction: (transaction: Omit<AdvanceTransaction, 'id' | 'status'>) => {
     const newTx: AdvanceTransaction = {
       ...transaction,
-      id: Math.random().toString(36).substr(2, 9),
+      id: crypto.randomUUID(),
       status: 'active'
     };
     manualDb.add(newTx);

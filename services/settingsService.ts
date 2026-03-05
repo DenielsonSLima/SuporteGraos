@@ -128,7 +128,6 @@ const notifyCompanyListeners = () => {
     try {
       listener(_companyData);
     } catch (err) {
-      console.error('Erro ao notificar listener de empresa:', err);
     }
   });
 };
@@ -138,7 +137,6 @@ const notifyWatermarkListeners = () => {
     try {
       listener(_watermarkSettings);
     } catch (err) {
-      console.error('Erro ao notificar listener de marca d\'água:', err);
     }
   });
 };
@@ -166,11 +164,9 @@ const startCompanyRealtime = () => {
       localStorage.setItem(COMPANY_KEY, JSON.stringify(_companyData));
       notifyCompanyListeners();
 
-      console.log(`🔔 Atualização em companies via realtime (${payload.eventType})`);
     })
     .subscribe(status => {
       if (status === 'SUBSCRIBED') {
-        console.log('✅ Realtime de companies ativo');
       }
     });
 };
@@ -189,11 +185,9 @@ const startWatermarkRealtime = () => {
       localStorage.setItem(WATERMARK_KEY, JSON.stringify(_watermarkSettings));
       notifyWatermarkListeners();
 
-      console.log(`🔔 Atualização em watermarks via realtime (${payload.eventType})`);
     })
     .subscribe(status => {
       if (status === 'SUBSCRIBED') {
-        console.log('✅ Realtime de watermarks ativo');
       }
     });
 };
@@ -201,6 +195,10 @@ const startWatermarkRealtime = () => {
 const fetchCompanyFromSupabase = async (): Promise<boolean> => {
   const user = authService.getCurrentUser();
   const companyId = user?.companyId;
+
+  if (!companyId) {
+    return false;
+  }
 
   const { data, error } = await supabase
     .from('companies')
@@ -215,7 +213,6 @@ const fetchCompanyFromSupabase = async (): Promise<boolean> => {
   }
 
   if (!data) {
-    console.log('⚠️ settingsService: nenhuma empresa encontrada no Supabase. Mantendo dados locais.');
     return false;
   }
 
@@ -223,13 +220,16 @@ const fetchCompanyFromSupabase = async (): Promise<boolean> => {
   _companyData = mapCompanyRecord(data);
   localStorage.setItem(COMPANY_KEY, JSON.stringify(_companyData));
   notifyCompanyListeners();
-  console.log('✅ settingsService: company sincronizada com Supabase');
   return true;
 };
 
 const fetchWatermarkFromSupabase = async (): Promise<boolean> => {
   const user = authService.getCurrentUser();
   const companyId = user?.companyId;
+
+  if (!companyId) {
+    return false;
+  }
 
   const { data, error } = await supabase
     .from('watermarks')
@@ -244,7 +244,6 @@ const fetchWatermarkFromSupabase = async (): Promise<boolean> => {
   }
 
   if (!data) {
-    console.log('⚠️ settingsService: nenhuma marca d\'água encontrada no Supabase. Mantendo dados locais.');
     return false;
   }
 
@@ -252,22 +251,18 @@ const fetchWatermarkFromSupabase = async (): Promise<boolean> => {
   _watermarkSettings = mapWatermarkRecord(data);
   localStorage.setItem(WATERMARK_KEY, JSON.stringify(_watermarkSettings));
   notifyWatermarkListeners();
-  console.log('✅ settingsService: watermark sincronizada com Supabase');
   return true;
 };
 
 const loadSettingsFromSupabase = async () => {
-  console.log('🔄 settingsService: sincronizando com Supabase...');
   const [companyResult, watermarkResult] = await Promise.allSettled([
     fetchCompanyFromSupabase(),
     fetchWatermarkFromSupabase()
   ]);
 
   if (companyResult.status === 'rejected') {
-    console.warn('⚠️ settingsService: falha ao carregar dados da empresa do Supabase:', companyResult.reason);
   }
   if (watermarkResult.status === 'rejected') {
-    console.warn('⚠️ settingsService: falha ao carregar marca d\'água do Supabase:', watermarkResult.reason);
   }
 
   startCompanyRealtime();
@@ -280,64 +275,22 @@ const loadSettingsFromSupabase = async () => {
 };
 
 // ❌ NÃO inicializar automaticamente - aguardar autenticação via supabaseInitService
-// Load company from Supabase on startup (fallback to localStorage)
-// (async () => {
-//   try {
-//     const { data, error } = await supabase
-//       .from('companies')
-//       .select(
-//         'id, razao_social, nome_fantasia, cnpj, ie, endereco, numero, bairro, cidade, uf, cep, telefone, email, website, logo_url'
-//       )
-//       .order('created_at', { ascending: true })
-//       .limit(1)
-//       .maybeSingle();
-
-//     if (error) throw error;
-//     if (data) {
-//       _companyId = data.id;
-//       _companyData = mapCompanyRecord(data);
-//       localStorage.setItem(COMPANY_KEY, JSON.stringify(_companyData));
-//       notifyCompanyListeners();
-//       console.log('✅ Company carregada do Supabase');
-//     }
-//   } catch (err) {
-//     console.warn('⚠️ settingsService: usando company do localStorage. Motivo:', err);
-//   } finally {
-//     startCompanyRealtime();
-//   }
-// })();
-
-// ❌ NÃO inicializar automaticamente - aguardar autenticação via supabaseInitService
-// Load watermark from Supabase on startup (fallback to localStorage)
-// (async () => {
-//   try {
-//     const { data, error } = await supabase
-//       .from('watermarks')
-//       .select('id, image_url, opacity, orientation')
-//       .order('created_at', { ascending: true })
-//       .limit(1)
-//       .maybeSingle();
-
-//     if (error) throw error;
-//     if (data) {
-//       _watermarkId = data.id;
-//       _watermarkSettings = mapWatermarkRecord(data);
-//       localStorage.setItem(WATERMARK_KEY, JSON.stringify(_watermarkSettings));
-//       notifyWatermarkListeners();
-//       console.log('✅ Watermark carregada do Supabase');
-//     }
-//   } catch (err) {
-//     console.warn('⚠️ settingsService: usando watermark do localStorage. Motivo:', err);
-//   } finally {
-//     startWatermarkRealtime();
-//   }
-// })();
 
 export const settingsService = {
   loadFromSupabase: () => loadSettingsFromSupabase(),
   startRealtime: () => {
     startCompanyRealtime();
     startWatermarkRealtime();
+  },
+  stopRealtime: () => {
+    if (companyChannel) {
+      supabase.removeChannel(companyChannel);
+      companyChannel = null;
+    }
+    if (watermarkChannel) {
+      supabase.removeChannel(watermarkChannel);
+      watermarkChannel = null;
+    }
   },
   // --- DADOS DA EMPRESA ---
   getCompanyData: () => _companyData,
@@ -371,8 +324,10 @@ export const settingsService = {
 
       // Persistir no Supabase
       try {
+        // Garante que temos o companyId do usuário autenticado
+        const resolvedCompanyId = _companyId || authService.getCurrentUser()?.companyId;
+
         const payload = {
-          id: _companyId || undefined,
           razao_social: _companyData.razaoSocial,
           nome_fantasia: _companyData.nomeFantasia,
           cnpj: _companyData.cnpj,
@@ -386,44 +341,44 @@ export const settingsService = {
           telefone: _companyData.telefone || null,
           email: _companyData.email || null,
           website: _companyData.site || null,
-          logo_url: _companyData.logoUrl || null,
-          active: true
+          logo_url: _companyData.logoUrl || null
         };
 
-        console.log('🔵 Tentando salvar company no Supabase...');
-        console.log('🔵 Payload:', JSON.stringify(payload, null, 2));
-        console.log('🔵 Company ID existente:', _companyId);
+        let upserted: { id: string } | null = null;
+        let error: any = null;
 
-        const { data: upserted, error } = await supabase
-          .from('companies')
-          .upsert(payload, { onConflict: 'cnpj' })
-          .select('id')
-          .maybeSingle();
-
-        console.log('🔵 Resposta Supabase:', { data: upserted, error });
+        if (resolvedCompanyId) {
+          // Empresa já existe: usar UPDATE direto (evita conflito RLS do upsert)
+          const result = await supabase
+            .from('companies')
+            .update(payload)
+            .eq('id', resolvedCompanyId)
+            .select('id')
+            .maybeSingle();
+          upserted = result.data;
+          error = result.error;
+        } else {
+          // Setup inicial: INSERT nova empresa
+          const result = await supabase
+            .from('companies')
+            .insert(payload)
+            .select('id')
+            .maybeSingle();
+          upserted = result.data;
+          error = result.error;
+        }
 
         if (error) {
-          console.error('❌ Erro Supabase completo:', {
-            message: error.message,
-            details: error.details,
-            hint: error.hint,
-            code: error.code
-          });
           throw error;
         }
 
         if (upserted?.id) {
           _companyId = upserted.id;
-          console.log('✅ Company salva no Supabase com ID:', _companyId);
-        } else {
-          console.log('✅ Company salva no Supabase (sem retorno de ID)');
         }
 
         // Notifica listeners apenas após salvar com sucesso
         notifyCompanyListeners();
       } catch (dbErr: any) {
-        console.error('❌ Erro CRÍTICO ao salvar company no Supabase:', dbErr);
-        console.error('❌ Stack trace:', dbErr.stack);
 
         // Mensagens de erro mais específicas
         if (dbErr.code === '23505') {
@@ -435,7 +390,6 @@ export const settingsService = {
         }
       }
     } catch (error: any) {
-      console.error("Erro ao salvar dados da empresa:", error);
       throw error; // Re-throw para o componente tratar
     }
   },
@@ -482,24 +436,19 @@ export const settingsService = {
           .maybeSingle();
 
         if (error) {
-          console.error('❌ Erro Supabase (watermarks):', error);
           throw error;
         }
 
         if (upserted?.id) {
           _watermarkId = upserted.id;
-          console.log('✅ Watermark salva no Supabase com ID:', _watermarkId);
         } else {
-          console.log('✅ Watermark salva no Supabase (sem retorno de ID)');
         }
 
         notifyWatermarkListeners();
       } catch (dbErr: any) {
-        console.error('❌ Erro ao salvar watermark no Supabase:', dbErr);
         throw dbErr;
       }
     } catch (error) {
-      console.error("Erro ao salvar marca d'água:", error);
       throw new Error("Falha ao salvar. A imagem da marca d'água pode ser muito grande.");
     }
   },
@@ -518,7 +467,6 @@ export const settingsService = {
         description: 'Atualizou configurações de fundo da tela de login.'
       });
     } catch (error) {
-      console.error("Erro ao salvar imagens de login:", error);
       throw new Error("Limite de armazenamento do navegador atingido. Tente usar menos imagens.");
     }
   },

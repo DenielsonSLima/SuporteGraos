@@ -2,7 +2,6 @@
 import React, { useMemo } from 'react';
 import { DollarSign, Truck, Clock, PackageCheck } from 'lucide-react';
 import { SalesOrder } from '../types';
-import { LoadingCache } from '../../../services/loadingCache';
 import { formatMoney } from '../../../utils/formatters';
 
 interface Props {
@@ -11,44 +10,14 @@ interface Props {
 
 const SalesKPIs: React.FC<Props> = React.memo(({ orders }) => {
   
+  // ═══════ Stats vindos do SQL (VIEW vw_sales_orders_enriched) ═══════
+  // Zero cálculo no frontend — apenas soma valores pré-calculados pelo banco
   const stats = useMemo(() => {
-    // 1. IDs dos pedidos visíveis
-    const visibleOrderIds = orders.map(o => o.id);
-
-    // 2. Filtra romaneios vinculados apenas aos pedidos visíveis
-    const allLoadings = LoadingCache.getAll();
-    const relatedLoadings = allLoadings.filter(l => 
-        l.salesOrderId && 
-        visibleOrderIds.includes(l.salesOrderId) && 
-        l.status !== 'canceled'
-    );
-    
-    // --- 1. VALOR TOTAL CONTRATUAL (Projetado dos pedidos na tela) ---
-    const totalContractValue = orders.reduce((acc, curr) => acc + curr.totalValue, 0);
-
-    // --- 2. VALOR TOTAL RECEBIDO (Fluxo de Caixa dos pedidos na tela) ---
-    const totalReceived = orders.reduce((acc, order) => {
-        const orderReceipts = order.transactions
-            ? order.transactions.filter(t => t.type === 'receipt').reduce((sum, t) => sum + t.value + (t.discountValue || 0), 0)
-            : 0;
-        return acc + orderReceipts;
-    }, 0);
-
-    // --- 3. VALOR TOTAL ENTREGUE (Faturado Real - Peso Destino) ---
-    const totalDeliveredValue = relatedLoadings
-        .filter(l => l.unloadWeightKg && l.unloadWeightKg > 0)
-        .reduce((acc, l) => {
-            const weightSc = l.unloadWeightKg! / 60;
-            const price = l.salesPrice || 0;
-            return acc + (weightSc * price);
-        }, 0);
-
-    // --- 4. VALOR EM TRÂNSITO (Projetado na Estrada) ---
-    const transitLoadings = relatedLoadings.filter(l => !l.unloadWeightKg || l.unloadWeightKg <= 0);
-    const totalTransitValue = transitLoadings.reduce((acc, l) => acc + (l.weightSc * (l.salesPrice || 0)), 0);
-
-    // --- 5. SALDO A RECEBER (Sobre o que já foi entregue) ---
-    // O que entreguei e ainda não recebi
+    const totalContractValue = orders.reduce((acc, o) => acc + o.totalValue, 0);
+    const totalDeliveredValue = orders.reduce((acc, o) => acc + (o.deliveredValue ?? 0), 0);
+    const totalReceived = orders.reduce((acc, o) => acc + (o.paidValue ?? 0), 0);
+    const totalTransitValue = orders.reduce((acc, o) => acc + (o.transitValue ?? 0), 0);
+    const transitCount = orders.reduce((acc, o) => acc + (o.transitCount ?? 0), 0);
     const pendingReceipt = Math.max(0, totalDeliveredValue - totalReceived);
 
     return {
@@ -57,7 +26,7 @@ const SalesKPIs: React.FC<Props> = React.memo(({ orders }) => {
         pendingReceipt,
         totalTransitValue,
         count: orders.length,
-        transitCount: transitLoadings.length
+        transitCount
     };
   }, [orders]);
 

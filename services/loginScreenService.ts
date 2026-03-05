@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { shouldSkipLegacyTableOps } from './realtimeTableAvailability';
 
 // ============================================================================
 // TIPOS
@@ -57,6 +58,24 @@ let _screens: LoginScreen[] = [];
 let _rotationConfig: RotationConfig | null = null;
 let _isLoaded = false;
 let _realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
+let _rotationConfigChannel: ReturnType<typeof supabase.channel> | null = null;
+let _loginScreensUnavailable = shouldSkipLegacyTableOps('login_screens');
+let _rotationConfigUnavailable = shouldSkipLegacyTableOps('login_rotation_config');
+
+const isMissingRelationError = (error: any) => {
+  const code = String(error?.code || '');
+  const status = Number(error?.status || error?.statusCode || 0);
+  const message = String(error?.message || '').toLowerCase();
+  const details = String(error?.details || '').toLowerCase();
+
+  return (
+    code === 'PGRST205'
+    || code === '42P01'
+    || status === 404
+    || message.includes('could not find the table')
+    || details.includes('could not find the table')
+  );
+};
 
 // ============================================================================
 // LOAD & FETCH
@@ -66,6 +85,11 @@ let _realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
  * Carrega imagens ativas da tela inicial
  */
 const loadActiveScreens = async (): Promise<LoginScreen[]> => {
+  if (_loginScreensUnavailable) {
+    _isLoaded = true;
+    return _screens;
+  }
+
   try {
     const { data, error } = await supabase
       .from('login_screens')
@@ -73,13 +97,19 @@ const loadActiveScreens = async (): Promise<LoginScreen[]> => {
       .eq('is_active', true)
       .order('sequence_order', { ascending: true });
 
-    if (error) throw error;
+    if (error) {
+      if (isMissingRelationError(error)) {
+        _loginScreensUnavailable = true;
+        _isLoaded = true;
+        return _screens;
+      }
+      throw error;
+    }
     _screens = data || [];
     _isLoaded = true;
-    console.log('🔄 Tela inicial sincronizando em tempo real...');
     return _screens;
   } catch (error) {
-    console.error('❌ Erro ao carregar login screens:', error);
+    _isLoaded = true;
     return [];
   }
 };
@@ -88,6 +118,10 @@ const loadActiveScreens = async (): Promise<LoginScreen[]> => {
  * Carrega configuração de rotação
  */
 const loadRotationConfig = async (): Promise<RotationConfig | null> => {
+  if (_rotationConfigUnavailable) {
+    return null;
+  }
+
   try {
     const { data, error } = await supabase
       .from('login_rotation_config')
@@ -95,23 +129,19 @@ const loadRotationConfig = async (): Promise<RotationConfig | null> => {
       .limit(1);
 
     if (error) {
-      console.warn('⚠️ Erro ao acessar login_rotation_config:', {
-        code: (error as any)?.code,
-        message: error.message
-      });
+      if (isMissingRelationError(error)) {
+        _rotationConfigUnavailable = true;
+      }
       return null;
     }
     
     // Se houver dados, retorna o primeiro; se não, retorna null
     _rotationConfig = (data && data.length > 0) ? data[0] : null;
     if (_rotationConfig) {
-      console.log('✅ Configuração de rotação carregada');
     } else {
-      console.log('ℹ️ Nenhuma configuração de rotação encontrada, usando padrão');
     }
     return _rotationConfig;
   } catch (err) {
-    console.error('❌ Erro ao carregar rotation config:', err);
     return null;
   }
 };
@@ -124,6 +154,10 @@ const loadRotationConfig = async (): Promise<RotationConfig | null> => {
  * Adiciona uma nova imagem à tela inicial
  */
 const addScreen = async (input: LoginScreenInput): Promise<LoginScreen | null> => {
+  if (_loginScreensUnavailable) {
+    return null;
+  }
+
   try {
     // Determinar sequence_order
     const maxOrder = _screens.reduce((max, s) => Math.max(max, s.sequence_order), 0);
@@ -143,7 +177,6 @@ const addScreen = async (input: LoginScreenInput): Promise<LoginScreen | null> =
       }
     };
 
-    console.log(`[loginScreenService] Inserindo imagem na posição ${sequenceOrder}...`);
     const { data, error } = await supabase
       .from('login_screens')
       .insert([payload])
@@ -151,20 +184,21 @@ const addScreen = async (input: LoginScreenInput): Promise<LoginScreen | null> =
       .single();
 
     if (error) {
-      console.error(`[loginScreenService] Erro ao inserir:`, error);
+      if (isMissingRelationError(error)) {
+        _loginScreensUnavailable = true;
+        return null;
+      }
       throw error;
     }
 
     // Adicionar ao cache local
     if (data) {
       _screens.push(data);
-      console.log(`[loginScreenService] ✅ Imagem salva! ID: ${data.id}`);
       window.dispatchEvent(new Event('login_screens:updated'));
     }
 
     return data || null;
   } catch (error) {
-    console.error('❌ Erro ao adicionar screen:', error);
     return null;
   }
 };
@@ -173,6 +207,10 @@ const addScreen = async (input: LoginScreenInput): Promise<LoginScreen | null> =
  * Atualiza uma imagem existente
  */
 const updateScreen = async (id: string, updates: Partial<LoginScreenInput> & { is_active?: boolean; sequence_order?: number }): Promise<LoginScreen | null> => {
+  if (_loginScreensUnavailable) {
+    return null;
+  }
+
   try {
     const payload: any = {
       image_url: updates.image_url,
@@ -195,7 +233,13 @@ const updateScreen = async (id: string, updates: Partial<LoginScreenInput> & { i
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      if (isMissingRelationError(error)) {
+        _loginScreensUnavailable = true;
+        return null;
+      }
+      throw error;
+    }
 
     // Atualizar cache
     const index = _screens.findIndex(s => s.id === id);
@@ -206,7 +250,6 @@ const updateScreen = async (id: string, updates: Partial<LoginScreenInput> & { i
 
     return data || null;
   } catch (error) {
-    console.error('❌ Erro ao atualizar screen:', error);
     return null;
   }
 };
@@ -215,13 +258,22 @@ const updateScreen = async (id: string, updates: Partial<LoginScreenInput> & { i
  * Deleta uma imagem
  */
 const deleteScreen = async (id: string): Promise<boolean> => {
+  if (_loginScreensUnavailable) {
+    return false;
+  }
+
   try {
     const { error } = await supabase
       .from('login_screens')
       .delete()
       .eq('id', id);
 
-    if (error) throw error;
+    if (error) {
+      if (isMissingRelationError(error)) {
+        _loginScreensUnavailable = true;
+      }
+      throw error;
+    }
 
     // Remover do cache
     _screens = _screens.filter(s => s.id !== id);
@@ -229,7 +281,6 @@ const deleteScreen = async (id: string): Promise<boolean> => {
 
     return true;
   } catch (error) {
-    console.error('❌ Erro ao deletar screen:', error);
     return false;
   }
 };
@@ -238,13 +289,23 @@ const deleteScreen = async (id: string): Promise<boolean> => {
  * Ativa/desativa uma imagem
  */
 const toggleScreenActive = async (id: string, isActive: boolean): Promise<boolean> => {
+  if (_loginScreensUnavailable) {
+    return false;
+  }
+
   try {
     const { error } = await supabase
       .from('login_screens')
       .update({ is_active: isActive })
       .eq('id', id);
 
-    if (error) throw error;
+    if (error) {
+      if (isMissingRelationError(error)) {
+        _loginScreensUnavailable = true;
+        return false;
+      }
+      throw error;
+    }
 
     // Atualizar cache
     const screen = _screens.find(s => s.id === id);
@@ -258,7 +319,6 @@ const toggleScreenActive = async (id: string, isActive: boolean): Promise<boolea
 
     return true;
   } catch (error) {
-    console.error('❌ Erro ao toglar screen:', error);
     return false;
   }
 };
@@ -267,6 +327,10 @@ const toggleScreenActive = async (id: string, isActive: boolean): Promise<boolea
  * Atualiza configuração de rotação
  */
 const updateRotationConfig = async (input: RotationConfigInput): Promise<boolean> => {
+  if (_rotationConfigUnavailable) {
+    return false;
+  }
+
   try {
     // Se não existe config, criar uma
     if (!_rotationConfig) {
@@ -280,7 +344,13 @@ const updateRotationConfig = async (input: RotationConfigInput): Promise<boolean
         .select()
         .single();
 
-      if (insertError) throw insertError;
+      if (insertError) {
+        if (isMissingRelationError(insertError)) {
+          _rotationConfigUnavailable = true;
+          return false;
+        }
+        throw insertError;
+      }
       _rotationConfig = data || null;
     } else {
       // Atualizar existente
@@ -295,14 +365,19 @@ const updateRotationConfig = async (input: RotationConfigInput): Promise<boolean
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        if (isMissingRelationError(error)) {
+          _rotationConfigUnavailable = true;
+          return false;
+        }
+        throw error;
+      }
       _rotationConfig = data || null;
     }
 
     window.dispatchEvent(new Event('login_screens:config_updated'));
     return true;
   } catch (error) {
-    console.error('❌ Erro ao atualizar rotation config:', error);
     return false;
   }
 };
@@ -312,6 +387,8 @@ const updateRotationConfig = async (input: RotationConfigInput): Promise<boolean
 // ============================================================================
 
 const startRealtime = () => {
+  if (_loginScreensUnavailable) return;
+
   if (_realtimeChannel) return;
 
   _realtimeChannel = supabase
@@ -336,12 +413,16 @@ const startRealtime = () => {
     })
     .subscribe(status => {
       if (status === 'CHANNEL_ERROR') {
-        console.error('❌ Erro no canal realtime login_screens');
+        _loginScreensUnavailable = true;
       }
     });
 
   // Também escuta mudanças de config
-  supabase
+  if (_rotationConfigUnavailable) {
+    return;
+  }
+
+  _rotationConfigChannel = supabase
     .channel('realtime:login_rotation_config')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'login_rotation_config' }, (payload) => {
       const rec = payload.new;
@@ -375,7 +456,17 @@ export const loginScreenService = {
   updateRotationConfig,
 
   // Realtime
-  startRealtime
+  startRealtime,
+  stopRealtime: () => {
+    if (_realtimeChannel) {
+      supabase.removeChannel(_realtimeChannel);
+      _realtimeChannel = null;
+    }
+    if (_rotationConfigChannel) {
+      supabase.removeChannel(_rotationConfigChannel);
+      _rotationConfigChannel = null;
+    }
+  }
 };
 
 // ============================================================================

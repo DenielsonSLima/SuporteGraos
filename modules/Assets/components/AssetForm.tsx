@@ -2,6 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, Car, Box } from 'lucide-react';
 import { Asset, AssetType } from '../types';
+import { assetService } from '../../../services/assetService';
+import { getTodayBR } from '../../../utils/dateUtils';
 
 interface Props {
   isOpen: boolean;
@@ -14,10 +16,12 @@ const AssetForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialData }) =>
   const [displayValue, setDisplayValue] = useState('');
   const [numericValue, setNumericValue] = useState(0);
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<Omit<Asset, 'id' | 'status'>>({
     name: '',
-    type: 'vehicle' as AssetType,
-    acquisitionDate: new Date().toISOString().split('T')[0],
+    type: 'vehicle',
+    acquisitionDate: getTodayBR(),
+    acquisitionValue: 0,
+    origin: 'purchase',
     identifier: '',
     description: ''
   });
@@ -30,13 +34,29 @@ const AssetForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialData }) =>
   useEffect(() => {
     if (isOpen) {
       if (initialData) {
-        setFormData({ name: initialData.name, type: initialData.type, acquisitionDate: initialData.acquisitionDate, identifier: initialData.identifier || '', description: initialData.description || '' });
+        setFormData({
+          name: initialData.name,
+          type: initialData.type,
+          acquisitionDate: initialData.acquisitionDate,
+          acquisitionValue: initialData.acquisitionValue,
+          origin: initialData.origin,
+          identifier: initialData.identifier || '',
+          description: initialData.description || ''
+        });
         setNumericValue(initialData.acquisitionValue);
         setDisplayValue(formatBRL(initialData.acquisitionValue));
       } else {
         setNumericValue(0);
         setDisplayValue('');
-        setFormData({ name: '', type: 'vehicle', acquisitionDate: new Date().toISOString().split('T')[0], identifier: '', description: '' });
+        setFormData({
+          name: '',
+          type: 'vehicle',
+          acquisitionDate: getTodayBR(),
+          acquisitionValue: 0,
+          origin: 'purchase',
+          identifier: '',
+          description: ''
+        });
       }
     }
   }, [isOpen, initialData]);
@@ -58,26 +78,26 @@ const AssetForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialData }) =>
           <button onClick={onClose} className="hover:bg-white/20 p-2 rounded-full"><X size={28} /></button>
         </div>
 
-        <form 
-          onSubmit={(e) => { 
-            e.preventDefault(); 
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
             if (numericValue > 0) {
-              const payload = initialData 
+              const payload = initialData
                 ? { ...initialData, ...formData, acquisitionValue: numericValue }
                 : { ...formData, acquisitionValue: numericValue };
               onSave(payload);
             }
-          }} 
+          }}
           className="p-8 space-y-5"
         >
           <div>
             <label className="block text-[10px] font-black text-slate-400 uppercase mb-1.5 ml-1">Nome / Modelo</label>
-            <input type="text" required className="w-full border-2 border-slate-200 rounded-2xl px-4 py-3 font-bold text-slate-900 outline-none" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+            <input type="text" required className="w-full border-2 border-slate-200 rounded-2xl px-4 py-3 font-bold text-slate-900 outline-none" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} />
           </div>
 
           <div>
             <label className="block text-[10px] font-black text-slate-400 uppercase mb-1.5 ml-1">Tipo de Ativo</label>
-            <select required className="w-full border-2 border-slate-200 rounded-2xl px-4 py-3 font-bold text-slate-900 outline-none" value={formData.type} onChange={e => setFormData({...formData, type: e.target.value as AssetType})}>
+            <select required className="w-full border-2 border-slate-200 rounded-2xl px-4 py-3 font-bold text-slate-900 outline-none" value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value as AssetType })}>
               <option value="vehicle">Veículo</option>
               <option value="machine">Máquina Agrícola</option>
               <option value="property">Imóvel</option>
@@ -87,24 +107,24 @@ const AssetForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialData }) =>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase mb-1.5 ml-1">Valor de Aquisição</label>
-                <input type="text" required className="w-full border-2 border-slate-200 rounded-2xl px-4 py-3 font-black text-blue-700 outline-none" value={displayValue} onChange={handleValueChange} placeholder="R$ 0,00" />
-              </div>
-              <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase mb-1.5 ml-1">Data Compra</label>
-                <input type="date" required className="w-full border-2 border-slate-200 rounded-2xl px-4 py-3 font-bold text-slate-900 outline-none" value={formData.acquisitionDate} onChange={e => setFormData({...formData, acquisitionDate: e.target.value})} />
-              </div>
+            <div>
+              <label className="block text-[10px] font-black text-slate-400 uppercase mb-1.5 ml-1">Valor de Aquisição</label>
+              <input type="text" required className="w-full border-2 border-slate-200 rounded-2xl px-4 py-3 font-black text-blue-700 outline-none" value={displayValue} onChange={handleValueChange} placeholder="R$ 0,00" />
+            </div>
+            <div>
+              <label className="block text-[10px] font-black text-slate-400 uppercase mb-1.5 ml-1">Data Compra</label>
+              <input type="date" required className="w-full border-2 border-slate-200 rounded-2xl px-4 py-3 font-bold text-slate-900 outline-none" value={formData.acquisitionDate} onChange={e => setFormData({ ...formData, acquisitionDate: e.target.value })} />
+            </div>
           </div>
 
           <div>
             <label className="block text-[10px] font-black text-slate-400 uppercase mb-1.5 ml-1">Identificador (Placa, Chassi, Matrícula)</label>
-            <input type="text" className="w-full border-2 border-slate-200 rounded-2xl px-4 py-3 font-bold text-slate-900 outline-none uppercase" value={formData.identifier} onChange={e => setFormData({...formData, identifier: e.target.value})} placeholder="Ex: ABC-1234" />
+            <input type="text" className="w-full border-2 border-slate-200 rounded-2xl px-4 py-3 font-bold text-slate-900 outline-none uppercase" value={formData.identifier} onChange={e => setFormData({ ...formData, identifier: e.target.value })} placeholder="Ex: ABC-1234" />
           </div>
 
           <div>
             <label className="block text-[10px] font-black text-slate-400 uppercase mb-1.5 ml-1">Descrição / Observações (Opcional)</label>
-            <textarea rows={3} className="w-full border-2 border-slate-200 rounded-2xl px-4 py-3 font-bold text-slate-900 outline-none resize-none" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} placeholder="Detalhes adicionais..."></textarea>
+            <textarea rows={3} className="w-full border-2 border-slate-200 rounded-2xl px-4 py-3 font-bold text-slate-900 outline-none resize-none" value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} placeholder="Detalhes adicionais..."></textarea>
           </div>
 
           <div className="pt-4 flex justify-end gap-3 border-t border-slate-100">

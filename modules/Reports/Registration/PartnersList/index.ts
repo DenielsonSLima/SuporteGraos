@@ -9,9 +9,9 @@ import { PARTNER_CATEGORY_IDS } from '../../../../constants';
 // Mocking partner fetch via existing mock data for demo consistency
 // In real app, import { partnerService } from ...
 const MOCK_PARTNERS = [
-    { id: '1', type: 'PF', categories: ['1'], name: 'José da Silva Fazenda', document: '123.456.789-00', address: { city: 'Sinop', state: 'MT' } },
-    { id: '2', type: 'PJ', categories: ['2'], name: 'Agro Industrial Norte', document: '12.345.678/0001-99', address: { city: 'Sinop', state: 'MT' } },
-    { id: '3', type: 'PJ', categories: ['3'], name: 'Rodoviário Expresso', document: '98.765.432/0001-11', address: { city: 'Sorriso', state: 'MT' } },
+    { id: '1', type: 'PF', categories: ['1'], name: 'José da Silva Fazenda', document: '123.456.789-00', address: { cityName: 'Sinop', stateUf: 'MT' } },
+    { id: '2', type: 'PJ', categories: ['2'], name: 'Agro Industrial Norte', document: '12.345.678/0001-99', address: { cityName: 'Sinop', stateUf: 'MT' } },
+    { id: '3', type: 'PJ', categories: ['3'], name: 'Rodoviário Expresso', document: '98.765.432/0001-11', address: { cityName: 'Sorriso', stateUf: 'MT' } },
 ];
 
 const partnersListReport: ReportModule = {
@@ -57,7 +57,7 @@ const partnersListReport: ReportModule = {
       ],
       rows: data.map(p => ({
         ...p,
-        location: `${p.address?.city}/${p.address?.state}`,
+        location: `${p.address?.cityName || (p.address as any)?.city || 'N/D'}/${p.address?.stateUf || (p.address as any)?.state || '??'}`,    
         typeLabel: getCategoryName(p.categories[0])
       })),
       summary: [{ label: 'Total Parceiros', value: data.length, format: 'number' }],

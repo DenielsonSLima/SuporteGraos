@@ -13,61 +13,63 @@ export interface LoadingExtraExpense {
 
 export interface Loading {
   id: string;
+  companyId?: string; // ✅ Adicionado para garantir vínculo correto
   date: string;
-  
+
   // Documento Fiscal
-  invoiceNumber?: string; 
+  invoiceNumber?: string;
 
   // Origin (Purchase)
   purchaseOrderId: string;
   purchaseOrderNumber: string;
   supplierName: string;
-  
+
   // Transport
   carrierId: string;
   carrierName: string;
   driverId: string;
   driverName: string;
   vehiclePlate: string;
-  isClientTransport?: boolean; 
-  
+  isClientTransport?: boolean;
+
   // Cargo Data
   product: string;
   weightKg: number;
-  weightTon: number; 
-  weightSc: number;  
-  
+  weightTon: number;
+  weightSc: number;
+
   // Unloading Data
   unloadWeightKg?: number;
-  breakageKg?: number; 
-  
+  breakageKg?: number;
+
   // Financials - Purchase Side
-  purchasePricePerSc: number; 
-  totalPurchaseValue: number; 
-  productPaid: number; 
-  
+  purchasePricePerSc: number;
+  totalPurchaseValue: number;
+  productPaid: number;
+
   // Financials - Freight Side
   freightPricePerTon: number;
   totalFreightValue: number; // Valor Bruto (Peso * Preço)
-  freightAdvances: number; 
-  freightPaid: number; 
-  
+  freightAdvances: number;
+  freightPaid: number;
+
   // Gestão de Extras (Novo)
   extraExpenses: LoadingExtraExpense[];
-  
-  transactions: OrderTransaction[]; 
-  
+
+  transactions: OrderTransaction[];
+
   // Destination (Sales)
   salesOrderId: string;
   salesOrderNumber: string;
   customerName: string;
-  salesPrice: number; 
-  totalSalesValue: number; 
-  
+  salesPrice: number;
+  totalSalesValue: number;
+
   status: LoadingStatus;
   notes?: string;
-  
+
   isRedirected?: boolean;
   originalDestination?: string;
   redirectDisplacementValue?: number; // VALOR ADICIONAL DE DESLOCAMENTO
+  freightBase?: 'Origem' | 'Destino'; // Base de cálculo do frete (trigger SQL é a autoridade)
 }

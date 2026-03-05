@@ -2,10 +2,7 @@
 import { Wallet } from 'lucide-react';
 import { ReportModule } from '../../types';
 import { financialService } from '../../../../services/financialService';
-import { purchaseService } from '../../../../services/purchaseService';
-import { salesService } from '../../../../services/salesService';
-import { loadingService } from '../../../../services/loadingService';
-import { financialActionService } from '../../../../services/financialActionService';
+import { financialTransactionsService } from '../../../../services/financialTransactionsService';
 import Template from './Template';
 import PdfDocument from './PdfDocument';
 import Filters from './Filters';
@@ -23,31 +20,19 @@ const accountBalancesMonthlyReport: ReportModule = {
     year: new Date().getFullYear().toString()
   },
   FilterComponent: Filters,
-  fetchData: ({ year }) => {
+  fetchData: async ({ year }) => {
     const selectedYear = parseInt(year);
     const accounts = financialService.getBankAccounts();
     const initialBalances = financialService.getInitialBalances();
-    
-    // Coleta todas as transações do sistema
-    const allTxs: any[] = [];
-    purchaseService.getAll().forEach(p => p.transactions.forEach(t => allTxs.push({ ...t, type: 'debit' })));
-    salesService.getAll().forEach(s => s.transactions.forEach(t => allTxs.push({ ...t, type: 'credit' })));
-    loadingService.getAll().forEach(l => (l.transactions || []).forEach(t => allTxs.push({ ...t, type: 'debit' })));
-    financialActionService.getStandaloneRecords().forEach(r => {
-        if (r.paidValue > 0) {
-            const isCredit = ['sales_order', 'loan_granted', 'receipt'].includes(r.subType || '');
-            const acc = accounts.find(a => a.bankName === r.bankAccount || a.id === r.bankAccount);
-            if (acc) {
-                allTxs.push({ date: r.issueDate, value: r.paidValue, accountId: acc.id, type: isCredit ? 'credit' : 'debit' });
-            }
-        }
-    });
-    financialActionService.getTransfers().forEach(t => {
-        const origin = accounts.find(a => a.bankName === t.originAccount);
-        const dest = accounts.find(a => a.bankName === t.destinationAccount);
-        if (origin) allTxs.push({ date: t.date, value: t.value, accountId: origin.id, type: 'debit' });
-        if (dest) allTxs.push({ date: t.date, value: t.value, accountId: dest.id, type: 'credit' });
-    });
+
+    const transactionsByAccountEntries = await Promise.all(
+      accounts.map(async (account) => {
+        const transactions = await financialTransactionsService.getByAccount(account.id);
+        return [account.id, transactions] as const;
+      })
+    );
+
+    const transactionsByAccount = new Map<string, any[]>(transactionsByAccountEntries);
 
     const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
     
@@ -60,12 +45,14 @@ const accountBalancesMonthlyReport: ReportModule = {
             const init = initialBalances.find(b => b.accountId === acc.id);
             let running = init ? init.value : 0;
             const initDate = init ? init.date : '2000-01-01';
+          const accountTransactions = transactionsByAccount.get(acc.id) || [];
 
             // Soma movimentações ANTERIORES ao primeiro dia deste mês
-            allTxs.forEach(tx => {
-                if (tx.accountId === acc.id && tx.date >= initDate && tx.date < firstDayOfMonth) {
-                    if (tx.type === 'credit') running += tx.value;
-                    else running -= tx.value;
+          accountTransactions.forEach((tx: any) => {
+            const txDate = tx.transaction_date;
+            if (txDate >= initDate && txDate < firstDayOfMonth) {
+              if (tx.type === 'credit') running += tx.amount;
+              else running -= tx.amount;
                 }
             });
             balancesByAccount[acc.id] = running;

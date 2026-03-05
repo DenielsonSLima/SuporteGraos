@@ -1,23 +1,25 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Truck, ArrowRightLeft, DollarSign, Calendar, X, Filter, BarChart3, Loader2 } from 'lucide-react';
-import { Freight } from './types';
+import { Search, Truck, ArrowRightLeft, DollarSign, Loader2 } from 'lucide-react';
 import { Loading } from '../Loadings/types';
 import OpenFreights from './tabs/OpenFreights';
 import AllFreights from './tabs/AllFreights';
 import FreightFinancials from './tabs/FreightFinancials';
 import LogisticsKPIs from './components/LogisticsKPIs';
 import LoadingManagement from '../Loadings/components/LoadingManagement';
-import { loadingService } from '../../services/loadingService';
-import { LoadingCache, invalidateLoadingCache } from '../../services/loadingCache';
-import { partnerService } from '../../services/partnerService';
-import { PARTNER_CATEGORY_IDS } from '../../constants';
-import { waitForInit } from '../../services/supabaseInitService';
+import { useLoadings } from '../../hooks/useLoadings';
+import { useFreights } from '../../hooks/useFreights';
+import { useCarriers } from '../../hooks/useCarriers';
+import { useQueryClient } from '@tanstack/react-query';
+import { QUERY_KEYS } from '../../hooks/queryKeys';
 
 const LogisticsModule: React.FC = () => {
-  const [loading, setLoading] = useState(true);
-  const [freights, setFreights] = useState<Freight[]>([]);
-  const [carriers, setCarriers] = useState<string[]>([]);
+  const queryClient = useQueryClient();
+  // useFreights: cálculos (balance, financial_status, breakage) vêm da VIEW do banco
+  const { data: freights = [], isLoading: freightsLoading } = useFreights();
+  // useLoadings: necessário apenas para findLoadingById (LoadingManagement requer Loading completo)
+  const { data: rawLoadings = [] } = useLoadings();
+  const { data: carriers = [], isLoading: carriersLoading } = useCarriers();
   const [activeTab, setActiveTab] = useState<'open' | 'all' | 'financial'>('open');
   const [searchTerm, setSearchTerm] = useState('');
   const [carrierFilter, setCarrierFilter] = useState('');
@@ -25,103 +27,44 @@ const LogisticsModule: React.FC = () => {
   const [endDate, setEndDate] = useState('');
   const [selectedLoading, setSelectedLoading] = useState<Loading | null>(null);
 
-  const refreshFreights = () => {
-    const list = LoadingCache.getAll().map(l => {
-        const totalPaid = l.freightPaid || 0;
-        const totalDiscount = (l.transactions || []).reduce((acc, t) => acc + (t.discountValue || 0), 0);
-        const balance = Math.max(0, l.totalFreightValue - totalPaid - totalDiscount);
-        const unloadWeight = l.unloadWeightKg;
-        const weightDiffRaw = unloadWeight ? (l.weightKg - unloadWeight) : 0;
-        const breakageKg = unloadWeight ? (Math.abs(weightDiffRaw) < 0.01 ? 0 : weightDiffRaw) : undefined;
-        const status = (l.status === 'unloading' && unloadWeight) ? 'completed' : l.status as any;
-        
-        return {
-            id: l.id,
-            orderNumber: l.purchaseOrderNumber,
-            date: l.date,
-            carrierName: l.carrierName,
-            driverName: l.driverName,
-            vehiclePlate: l.vehiclePlate,
-            supplierName: l.supplierName,
-            destinationCity: l.customerName,
-            product: l.product,
-            weight: l.weightKg,
-            unloadWeightKg: unloadWeight,
-            breakageKg,
-            pricePerUnit: l.freightPricePerTon,
-            totalFreight: l.totalFreightValue,
-            paidValue: totalPaid,
-            advanceValue: l.freightAdvances,
-            balanceValue: balance,
-            status,
-            financialStatus: balance <= 0.05 ? 'paid' : (totalPaid > 0 ? 'partial' : 'pending'),
-            freightBase: (l as any).freightBase,
-            merchandiseValue: l.totalSalesValue || l.totalPurchaseValue || 0
-        } as Freight;
-    });
-    setFreights(list);
-  };
+  const selectedLoadingRef = React.useRef<Loading | null>(null);
+  selectedLoadingRef.current = selectedLoading;
 
   useEffect(() => {
-    const initModule = async () => {
-      await waitForInit();
-      loadingService.startRealtime();
-      refreshFreights();
-      setCarriers(partnerService.getAll().filter(p => p.categories.includes(PARTNER_CATEGORY_IDS.CARRIER)).map(p => p.name).sort());
-      setLoading(false);
-    };
-    initModule();
-
     const handleGlobalNav = (e: any) => {
         if (e.detail?.moduleId === 'logistics' && e.detail?.loadingId) {
-          const l = LoadingCache.getAll().find(x => x.id === e.detail.loadingId);
+          const l = rawLoadings.find((x: any) => x.id === e.detail.loadingId);
             if (l) setSelectedLoading(l);
         }
     };
     
-    // Listener para atualizar quando houver mudanças nos dados
-    const handleDataUpdate = (e: any) => {
-      // Atualiza a lista de fretes quando houver mudança em qualquer loading/frete
-      if (e.detail?.type === 'freight_payment' || e.detail?.type === 'loading_update') {
-        invalidateLoadingCache();
-        refreshFreights();
-      }
-    };
-    
     window.addEventListener('app:navigate', handleGlobalNav);
-    window.addEventListener('data:updated', handleDataUpdate);
-    
+
     return () => {
       window.removeEventListener('app:navigate', handleGlobalNav);
-      window.removeEventListener('data:updated', handleDataUpdate);
     };
-  }, []);
+  }, [rawLoadings]);
 
-  // Assina atualizações em tempo real do serviço de logística
-  useEffect(() => {
-    const unsubscribe = loadingService.subscribe(() => {
-      invalidateLoadingCache();
-      refreshFreights();
-      // Mantém o modal sincronizado se houver item selecionado
-      if (selectedLoading) {
-        const fresh = LoadingCache.getAll().find(l => l.id === selectedLoading.id) || null;
-        setSelectedLoading(fresh);
-      }
-    });
-    return unsubscribe;
-  }, [selectedLoading]);
-
-  const filteredFreights = useMemo(() => {
+  // Freights filtrados SEM filtro de aba — usado pelos KPIs superiores
+  const kpiFreights = useMemo(() => {
     return freights.filter(f => {
       const search = searchTerm.toLowerCase();
       const matchesSearch = !searchTerm || f.carrierName.toLowerCase().includes(search) || f.driverName.toLowerCase().includes(search) || f.vehiclePlate.toLowerCase().includes(search) || f.orderNumber.toLowerCase().includes(search);
       const matchesCarrier = !carrierFilter || f.carrierName === carrierFilter;
       const matchesDate = (!startDate || f.date >= startDate) && (!endDate || f.date <= endDate);
-      let matchesTab = true;
-      if (activeTab === 'open') matchesTab = f.status !== 'completed' || f.balanceValue > 0.05;
-      return matchesSearch && matchesCarrier && matchesDate && matchesTab;
+      return matchesSearch && matchesCarrier && matchesDate;
     });
-  }, [freights, searchTerm, carrierFilter, startDate, endDate, activeTab]);
+  }, [freights, searchTerm, carrierFilter, startDate, endDate]);
+
+  // Freights filtrados COM filtro de aba — usado pelas tabelas
+  const filteredFreights = useMemo(() => {
+    return kpiFreights.filter(f => {
+      if (activeTab === 'open') return f.status !== 'completed' || f.balanceValue > 0.05;
+      return true;
+    });
+  }, [kpiFreights, activeTab]);
+
+  const loading = freightsLoading || carriersLoading;
 
   if (loading) {
     return (
@@ -134,9 +77,11 @@ const LogisticsModule: React.FC = () => {
     );
   }
 
+  const findLoadingById = (id: string) => rawLoadings.find((l: any) => l.id === id) || null;
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <LogisticsKPIs freights={filteredFreights} />
+      <LogisticsKPIs filters={{ carrierName: carrierFilter, startDate, endDate, searchTerm }} freights={kpiFreights} />
 
       <div className="flex flex-col gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -163,12 +108,12 @@ const LogisticsModule: React.FC = () => {
       </div>
 
       <div className="min-h-[400px]">
-        {activeTab === 'open' && <OpenFreights freights={filteredFreights} onFreightClick={(f) => setSelectedLoading(LoadingCache.getAll().find(l => l.id === f.id) || null)} />}
-        {activeTab === 'all' && <AllFreights freights={filteredFreights} onFreightClick={(f) => setSelectedLoading(LoadingCache.getAll().find(l => l.id === f.id) || null)} />}
-        {activeTab === 'financial' && <FreightFinancials freights={filteredFreights} onManageFinancials={(f) => setSelectedLoading(LoadingCache.getAll().find(l => l.id === f.id) || null)} />}
+        {activeTab === 'open' && <OpenFreights freights={filteredFreights} onFreightClick={(f) => setSelectedLoading(findLoadingById(f.id))} />}
+        {activeTab === 'all' && <AllFreights freights={filteredFreights} onFreightClick={(f) => setSelectedLoading(findLoadingById(f.id))} />}
+        {activeTab === 'financial' && <FreightFinancials freights={filteredFreights} onManageFinancials={(f) => setSelectedLoading(findLoadingById(f.id))} />}
       </div>
 
-      {selectedLoading && <LoadingManagement loading={selectedLoading} onClose={() => setSelectedLoading(null)} onUpdate={(updated) => { invalidateLoadingCache(); refreshFreights(); }} originContext="logistics" />}
+      {selectedLoading && <LoadingManagement loading={selectedLoading} onClose={() => setSelectedLoading(null)} onUpdate={() => { queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOADINGS }); }} originContext="logistics" />}
     </div>
   );
 };

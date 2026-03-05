@@ -2,10 +2,10 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Save, X, Calendar, User, Search, Package, TrendingUp, ChevronDown, CheckCircle2, Calculator, MapPin, FileText } from 'lucide-react';
 import { SalesOrder } from '../types';
-import { partnerService } from '../../../services/partnerService';
-import { shareholderService } from '../../../services/shareholderService';
 import { Partner } from '../../Partners/types';
 import { PARTNER_CATEGORY_IDS } from '../../../constants';
+import { usePartners } from '../../../hooks/useParceiros';
+import { useShareholders } from '../../../hooks/useShareholders';
 
 interface Props {
   initialData?: SalesOrder;
@@ -26,10 +26,23 @@ const SalesOrderForm: React.FC<Props> = ({ initialData, onSave, onCancel }) => {
   });
 
   const [displayPrice, setDisplayPrice] = useState('');
-  const [partners, setPartners] = useState<Partner[]>([]);
-  const [shareholders, setShareholders] = useState<any[]>([]);
+  const { data: partnersData } = usePartners({ page: 1, pageSize: 2000, category: 'all' });
+  const { data: shareholdersRaw = [] } = useShareholders();
   const [customerSearch, setCustomerSearch] = useState(initialData?.customerName || '');
   const [isSearching, setIsSearching] = useState(false);
+
+  const partners = useMemo(() => {
+    return (partnersData?.data || [])
+      .filter(p =>
+        p.categories.includes(PARTNER_CATEGORY_IDS.CUSTOMER) ||
+        p.categories.includes(PARTNER_CATEGORY_IDS.INDUSTRY)
+      )
+      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  }, [partnersData]);
+
+  const shareholders = useMemo(() => {
+    return [...shareholdersRaw].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  }, [shareholdersRaw]);
 
   const formatBRL = (val: number) => {
     const normalized = Math.abs(val) < 0.01 ? 0 : val;
@@ -37,18 +50,6 @@ const SalesOrderForm: React.FC<Props> = ({ initialData, onSave, onCancel }) => {
   };
 
   useEffect(() => {
-    // Busca e ordena parceiros alfabeticamente (Padronizado com Compra)
-    const allPartners = partnerService.getAll();
-    const validCustomers = allPartners
-      .filter(p => 
-        p.categories.includes(PARTNER_CATEGORY_IDS.CUSTOMER) || 
-        p.categories.includes(PARTNER_CATEGORY_IDS.INDUSTRY)
-      )
-      .sort((a, b) => a.name.localeCompare(b.name));
-    
-    setPartners(validCustomers);
-    setShareholders(shareholderService.getAll().sort((a, b) => a.name.localeCompare(b.name)));
-    
     if (initialData?.unitPrice) setDisplayPrice(formatBRL(initialData.unitPrice));
 
     const handleClickOutside = (event: MouseEvent) => {
@@ -57,7 +58,10 @@ const SalesOrderForm: React.FC<Props> = ({ initialData, onSave, onCancel }) => {
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
   }, [initialData]);
 
   useEffect(() => {
@@ -79,8 +83,8 @@ const SalesOrderForm: React.FC<Props> = ({ initialData, onSave, onCancel }) => {
       customerId: p.id,
       customerName: p.name,
       customerDocument: p.document,
-      customerCity: p.address?.city || '',
-      customerState: p.address?.state || ''
+      customerCity: p.address?.cityName || (p.address as any)?.city || '',
+      customerState: p.address?.stateUf || (p.address as any)?.state || ''
     });
     setCustomerSearch(p.name);
     setIsSearching(false);
@@ -90,7 +94,7 @@ const SalesOrderForm: React.FC<Props> = ({ initialData, onSave, onCancel }) => {
     const term = customerSearch.toLowerCase();
     return partners.filter(p => 
       p.name.toLowerCase().includes(term) || 
-      p.document.includes(term) || 
+      (p.document || '').toLowerCase().includes(term) || 
       (p.nickname && p.nickname.toLowerCase().includes(term))
     );
   }, [partners, customerSearch]);
@@ -175,7 +179,7 @@ const SalesOrderForm: React.FC<Props> = ({ initialData, onSave, onCancel }) => {
                                             <div className="font-black text-slate-900 uppercase text-sm group-hover:text-emerald-700 transition-colors">{p.name}</div>
                                             <div className="flex justify-between items-center mt-1 text-[10px] font-bold text-slate-400 uppercase tracking-tight">
                                                 <span className="flex items-center gap-1"><FileText size={10}/> {p.document}</span>
-                                                <span className="flex items-center gap-1"><MapPin size={10}/> {p.address?.city || 'N/D'}/{p.address?.state || '??'}</span>
+                                                <span className="flex items-center gap-1"><MapPin size={10}/> {p.address?.cityName || (p.address as any)?.city || 'N/D'}/{p.address?.stateUf || (p.address as any)?.state || '??'}</span>
                                             </div>
                                         </div>
                                     ))

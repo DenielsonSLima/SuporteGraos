@@ -18,6 +18,7 @@ type UpdateUserRequest = {
 type UpdateUserResponse = {
   success: boolean;
   error?: string;
+  error_details?: unknown;
 };
 
 const corsHeaders = {
@@ -88,15 +89,6 @@ serve(async (req) => {
     return jsonResponse(400, { success: false, error: 'Invalid JSON body' });
   }
 
-  console.log('[EDGE][update-user] Payload recebido:', {
-    userId: payload.userId,
-    email: payload.email,
-    role: payload.role,
-    permissionsCount: payload.permissions?.length || 0,
-    active: payload.active,
-    allowRecovery: payload.allowRecovery,
-    hasPassword: !!payload.password
-  });
 
   if (!payload.userId) {
     return jsonResponse(400, { success: false, error: 'Missing userId' });
@@ -104,7 +96,6 @@ serve(async (req) => {
 
   const { data: existingUserData, error: existingUserError } = await supabase.auth.admin.getUserById(payload.userId);
   if (existingUserError || !existingUserData?.user) {
-    console.error('[EDGE][update-user] Usuário não encontrado:', existingUserError);
     return jsonResponse(404, { success: false, error: 'Usuário não encontrado no Supabase Auth.' });
   }
 
@@ -121,7 +112,6 @@ serve(async (req) => {
       if (currentEmail !== normalizedEmail) {
         const { user: duplicateUser, error: duplicateCheckError } = await findAuthUserByEmail(normalizedEmail);
         if (duplicateCheckError) {
-          console.error('[EDGE][update-user] Falha ao verificar e-mail duplicado:', duplicateCheckError);
           return jsonResponse(400, { success: false, error: 'Não foi possível validar o e-mail. Tente novamente em instantes.' });
         }
 
@@ -154,16 +144,9 @@ serve(async (req) => {
     updatePayload.password = payload.password;
   }
 
-  console.log('[EDGE][update-user] Atualizando usuário no auth.admin...', {
-    userId: payload.userId,
-    includeEmail: !!updatePayload.email,
-    includePassword: !!updatePayload.password,
-    metadataKeys: Object.keys(userMetadata)
-  });
 
   const { error } = await supabase.auth.admin.updateUserById(payload.userId, updatePayload);
   if (error) {
-    console.error('[EDGE][update-user] Erro Supabase Auth:', error);
     return jsonResponse(400, { success: false, error: error.message || 'Failed to update user', error_details: error });
   }
 

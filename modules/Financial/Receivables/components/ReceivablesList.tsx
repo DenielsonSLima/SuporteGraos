@@ -6,6 +6,7 @@ import ReceivablesGroupedList from './ReceivablesGroupedList';
 import { Search, LayoutList, Users, CheckSquare, DollarSign, X, Filter } from 'lucide-react';
 import FinancialPaymentModal, { PaymentData } from '../../components/modals/FinancialPaymentModal';
 import { financialActionService } from '../../../../services/financialActionService';
+import { useTotalsByType } from '../../../../hooks/useFinancialEntries';
 
 interface Props {
   records: FinancialRecord[];
@@ -32,10 +33,11 @@ const ReceivablesList: React.FC<Props> = ({ records, onReceive, onRefresh }) => 
   }, [records, searchTerm]);
 
   // --- CALCULATIONS ---
-  const totalReceivable = useMemo(() => 
-    filteredRecords.reduce((acc, r) => acc + (r.originalValue - r.paidValue), 0)
-  , [filteredRecords]);
+  // ✅ ZERO CÁLCULO FINANCEIRO NO FRONTEND — total via RPC server-side
+  const { data: receivableTotals } = useTotalsByType('receivable');
+  const totalReceivable = receivableTotals?.remaining ?? 0;
 
+  // Seleção é UI-level (não é cálculo financeiro), mantemos minimal reduce
   const totalSelectedValue = useMemo(() => 
     records
       .filter(r => selectedIds.includes(r.id))

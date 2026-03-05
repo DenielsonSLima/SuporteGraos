@@ -15,12 +15,18 @@ const OrderItemsSection: React.FC<Props> = ({ items, onChange }) => {
   const [displayPrice, setDisplayPrice] = useState('');
 
   useEffect(() => {
-    // Carregar produtos do sistema
-    const allProducts = classificationService.getProductTypes();
-    setProducts(allProducts);
-    if (allProducts.length > 0) {
-      setNewItem({ ...newItem, productName: allProducts[0].name });
-    }
+    const load = async () => {
+      try {
+        const allProducts = await classificationService.getProductTypes();
+        setProducts(allProducts);
+        if (allProducts.length > 0) {
+          setNewItem(prev => ({ ...prev, productName: allProducts[0].name }));
+        }
+      } catch {
+        // silencioso — lista de produtos fica vazia
+      }
+    };
+    load();
   }, []);
 
   const formatBRL = (val: number) => {

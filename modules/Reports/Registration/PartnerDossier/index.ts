@@ -2,9 +2,7 @@
 import { ClipboardList } from 'lucide-react';
 import { ReportModule } from '../../types';
 import { partnerService } from '../../../../services/partnerService';
-import { purchaseService } from '../../../../services/purchaseService';
-import { salesService } from '../../../../services/salesService';
-import { loadingService } from '../../../../services/loadingService';
+import { reportsCache } from '../../../../services/reportsCache';
 import { financialIntegrationService } from '../../../../services/financialIntegrationService';
 import { advanceService } from '../../../Financial/Advances/services/advanceService';
 import Filters from './Filters';
@@ -35,13 +33,13 @@ const partnerDossierReport: ReportModule = {
     }
 
     // --- 1. PURCHASES ---
-    const purchases = purchaseService.getAll().filter(p => p.partnerId === partnerId && p.status !== 'canceled');
+    const purchases = reportsCache.getAllPurchases().filter(p => p.partnerId === partnerId && p.status !== 'canceled');
     
     // --- 2. SALES ---
-    const sales = salesService.getAll().filter(s => s.customerId === partnerId && s.status !== 'canceled');
+    const sales = reportsCache.getAllSales().filter(s => s.customerId === partnerId && s.status !== 'canceled');
 
     // --- 3. LOADINGS (As Supplier or Customer or Carrier) ---
-    const loadings = loadingService.getAll().filter(l => 
+    const loadings = reportsCache.getAllLoadings().filter(l => 
         l.supplierName === partner.name || 
         l.customerName === partner.name || 
         l.carrierId === partnerId
@@ -49,12 +47,16 @@ const partnerDossierReport: ReportModule = {
 
     // --- 4. FINANCIAL SUMMARY ---
     // Calculate pending values
-    const payables = financialIntegrationService.getPayables().filter(p => p.entityName === partner.name);
-    const receivables = financialIntegrationService.getReceivables().filter(r => r.entityName === partner.name);
+    const payables = financialIntegrationService
+      .getPayables()
+      .filter(p => p.entityName === partner.name && p.status !== 'paid');
+    const receivables = financialIntegrationService
+      .getReceivables()
+      .filter(r => r.entityName === partner.name && r.status !== 'paid');
     const advances = advanceService.getTransactionsByPartner(partnerId);
 
-    const totalToPay = payables.reduce((acc, p) => acc + (p.originalValue - p.paidValue), 0);
-    const totalToReceive = receivables.reduce((acc, r) => acc + (r.originalValue - r.paidValue), 0);
+    const totalToPay = payables.reduce((acc, p) => acc + (p.remainingValue || 0), 0);
+    const totalToReceive = receivables.reduce((acc, r) => acc + (r.remainingValue || 0), 0);
     
     // Advances Net Calculation
     const advancesGiven = advances.filter(a => a.type === 'given' && a.status === 'active').reduce((acc, a) => acc + a.value, 0);

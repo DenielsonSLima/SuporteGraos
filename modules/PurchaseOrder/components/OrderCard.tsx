@@ -1,12 +1,11 @@
 
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import { 
   MapPin, Wheat, Trash2, Calendar, User, DollarSign, ChevronRight, CheckCircle, Handshake, CreditCard
 } from 'lucide-react';
 import { PurchaseOrder, OrderStatus } from '../types';
-import { LoadingCache } from '../../../services/loadingCache';
 import { formatMoney } from '../../../utils/formatters';
-import { ledgerService } from '../../../services/ledgerService';
+import { useOrderCardStats } from '../hooks/useOrderCardStats';
 
 interface Props {
   order: PurchaseOrder;
@@ -25,7 +24,8 @@ const statusConfig: Record<OrderStatus, { label: string; color: string; bg: stri
 };
 
 const OrderCard: React.FC<Props> = React.memo(({ order, onClick, onFinalize, onDelete }) => {
-  const [refreshKey, setRefreshKey] = useState(0);
+  // Hook co-localizado — encapsula LoadingCache + ledgerService + loadingService subscriptions
+  const stats = useOrderCardStats(order);
   
   const status = statusConfig[order.status];
   const currency = (val: number) => formatMoney(val);
@@ -37,44 +37,6 @@ const OrderCard: React.FC<Props> = React.memo(({ order, onClick, onFinalize, onD
     const [year, month, day] = val.split('-');
     return `${day}/${month}/${year}`;
   };
-
-  // Listener para atualizar stats quando transações mudam
-  useEffect(() => {
-    const handleTransactionChange = (event: Event) => {
-      setRefreshKey(prev => prev + 1);
-    };
-
-    const unsubscribe = ledgerService.subscribe('ledger:transaction-changed', handleTransactionChange);
-    return () => unsubscribe();
-  }, []);
-
-  const stats = useMemo(() => {
-    const loadings = LoadingCache.getByPurchaseOrder(order.id);
-    const activeLoadings = loadings.filter(l => l.status !== 'canceled');
-    const loadedQty = activeLoadings.reduce((acc, l) => acc + l.weightSc, 0);
-    const contractQty = order.items.reduce((acc, i) => acc + i.quantity, 0);
-    const totalLoadedValue = activeLoadings.reduce((acc, l) => acc + (l.totalPurchaseValue || 0), 0);
-    
-    const txs = order.transactions || [];
-    const cashPaidTx = txs
-      .filter(t => t.type === 'payment' || t.type === 'advance')
-      .reduce((acc, t) => acc + (t.value || 0), 0);
-    const discountTx = txs.reduce((acc, t) => acc + (t.discountValue || 0), 0);
-
-    const cashPaid = Math.max(cashPaidTx, order.paidValue || 0);
-    const directDiscounts = Math.max(discountTx, order.discountValue || 0);
-    
-    const deductedExpenses = txs
-      .filter(t => (t.type === 'expense' || t.type === 'commission') && t.deductFromPartner)
-      .reduce((acc, t) => acc + t.value + (t.discountValue || 0), 0);
-
-    const totalSettled = cashPaid + directDiscounts + deductedExpenses;
-    const pendingValue = Math.max(0, totalLoadedValue - totalSettled);
-    const advanceBalance = Math.max(0, totalSettled - totalLoadedValue);
-    const progress = contractQty > 0 ? Math.min((loadedQty / contractQty) * 100, 100) : 0;
-
-    return { loadedQty, contractQty, totalLoadedValue, totalSettled, pendingValue, advanceBalance, progress };
-  }, [order, refreshKey]);
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();

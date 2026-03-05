@@ -10,108 +10,82 @@ import { DashboardCache, invalidateDashboardCache } from './dashboardCache';
 import { invalidateFinancialCache } from './financialCache';
 import { auditService } from './auditService';
 import { supabaseWithRetry } from '../utils/fetchWithRetry';
-import { eventBus } from './eventBus';
+import { financialHistoryService } from './financial/financialHistoryService';
+import { ledgerService } from './ledgerService';
+import { financialTransactionService } from './financial/financialTransactionService';
+import { standaloneRecordsService } from './standaloneRecordsService';
+import { isSqlCanonicalOpsEnabled, sqlCanonicalOpsLog } from './sqlCanonicalOps';
+import {
+  mapOrderToDb, mapOrderFromDb, mapOrderFromOpsRow,
+  persistUpsert, upsertPurchaseOrderCanonical, deletePurchaseOrderCanonical,
+  getLogInfo, createPayableForPurchaseOrder
+} from './purchaseServiceHelpers';
 
 const INITIAL_ORDERS: PurchaseOrder[] = [];
 const db = new Persistence<PurchaseOrder>('purchase_orders', INITIAL_ORDERS, { useStorage: false });
-
-type DbStatus = 'pending' | 'approved' | 'received' | 'cancelled';
-
-const statusToDb = (status: OrderStatus): DbStatus => {
-  switch (status) {
-    case 'approved':
-    case 'pending':
-    case 'draft':
-      return 'pending';
-    case 'transport':
-      return 'approved';
-    case 'completed':
-      return 'received';
-    case 'canceled':
-      return 'cancelled';
-    default:
-      return 'pending';
-  }
-};
-
-const statusFromDb = (status?: string): OrderStatus => {
-  switch (status) {
-    case 'approved':
-      return 'approved';
-    case 'received':
-      return 'completed';
-    case 'cancelled':
-      return 'canceled';
-    case 'pending':
-    default:
-      return 'pending';
-  }
-};
-
-const mapOrderToDb = (order: PurchaseOrder) => ({
-  id: order.id,
-  number: order.number,
-  partner_id: order.partnerId || null,
-  date: order.date,
-  status: statusToDb(order.status),
-  total_value: order.totalValue ?? 0,
-  received_value: order.paidValue ?? 0,
-  notes: order.notes || null,
-  metadata: order,
-  company_id: authService.getCurrentUser()?.companyId || null
-});
-
-const mapOrderFromDb = (row: any): PurchaseOrder => {
-  const meta: PurchaseOrder | undefined = row?.metadata;
-  const base: PurchaseOrder = meta ? { ...meta } : {
-    id: row?.id,
-    number: row?.number || '',
-    date: row?.date || new Date().toISOString().slice(0, 10),
-    status: statusFromDb(row?.status),
-    consultantName: '',
-    partnerId: row?.partner_id || '',
-    partnerName: '',
-    partnerDocument: '',
-    partnerCity: '',
-    partnerState: '',
-    useRegisteredLocation: false,
-    loadingCity: '',
-    loadingState: '',
-    harvest: '',
-    hasBroker: false,
-    items: [],
-    transactions: [],
-    totalValue: row?.total_value || 0,
-    paidValue: row?.received_value || 0,
-    transportValue: 0
-  } as PurchaseOrder;
-
-  // Migração: se loadingCity/loadingState não existem no metadata, usar partnerCity/State como fallback
-  if (meta && (!meta.loadingCity || !meta.loadingState)) {
-    base.loadingCity = meta.partnerCity || '';
-    base.loadingState = meta.partnerState || '';
-    if (meta.useRegisteredLocation === undefined) {
-      base.useRegisteredLocation = true; // Assume endereço cadastrado para pedidos antigos
-    }
-  }
-
-  return {
-    ...base,
-    id: row?.id ?? base.id,
-    number: row?.number ?? base.number,
-    date: row?.date ?? base.date,
-    status: statusFromDb(row?.status ?? base.status),
-    totalValue: row?.total_value ?? base.totalValue ?? 0,
-    paidValue: row?.received_value ?? base.paidValue ?? 0,
-    notes: row?.notes ?? base.notes
-  };
-};
 
 // ============================================================================
 // CARREGAMENTO INICIAL (SUPABASE)
 // ============================================================================
 
 const loadFromSupabase = async (): Promise<PurchaseOrder[]> => {
+  if (isSqlCanonicalOpsEnabled()) {
+    try {
+      const query = supabase
+        .from('ops_purchase_orders')
+        .select('*');
+
+      const data = await supabaseWithRetry(() =>
+        query.order('order_date', { ascending: false })
+      );
+
+      const mapped = (data as any[] || []).map(mapOrderFromOpsRow);
+
+      // Enriquecer pedidos com city/state faltando a partir do parceiro
+      const missingAddressOrders = mapped.filter(o => o.partnerId && (!o.partnerCity || !o.partnerState));
+      if (missingAddressOrders.length > 0) {
+        const partnerIds = [...new Set(missingAddressOrders.map(o => o.partnerId))];
+        try {
+          const { data: addrRows } = await supabase
+            .from('parceiros_enderecos')
+            .select('partner_id, city:cities(name, state:states(uf))')
+            .in('partner_id', partnerIds)
+            .eq('is_primary', true);
+
+          if (addrRows && addrRows.length > 0) {
+            const addrMap = new Map<string, { city: string; state: string }>();
+            for (const row of addrRows) {
+              const cityObj = Array.isArray(row.city) ? row.city[0] : row.city;
+              const stateObj = cityObj?.state ? (Array.isArray(cityObj.state) ? cityObj.state[0] : cityObj.state) : null;
+              if (cityObj?.name || stateObj?.uf) {
+                addrMap.set(row.partner_id, { city: cityObj?.name || '', state: stateObj?.uf || '' });
+              }
+            }
+            for (const order of mapped) {
+              if ((!order.partnerCity || !order.partnerState) && order.partnerId) {
+                const addr = addrMap.get(order.partnerId);
+                if (addr) {
+                  if (!order.partnerCity) order.partnerCity = addr.city;
+                  if (!order.partnerState) order.partnerState = addr.state;
+                  if (!order.loadingCity) order.loadingCity = addr.city;
+                  if (!order.loadingState) order.loadingState = addr.state;
+                }
+              }
+            }
+          }
+        } catch (addrErr) {
+          sqlCanonicalOpsLog('Falha ao enriquecer endereço do parceiro em purchase orders', addrErr);
+        }
+      }
+
+      db.setAll(mapped);
+      return mapped;
+    } catch (error) {
+      sqlCanonicalOpsLog('Falha ao carregar ops_purchase_orders (modo canônico)', error);
+      return db.getAll();
+    }
+  }
+
   try {
     const user = authService.getCurrentUser();
     let query = supabase
@@ -129,10 +103,9 @@ const loadFromSupabase = async (): Promise<PurchaseOrder[]> => {
 
     const mapped = (data as any[] || []).map(mapOrderFromDb);
     db.setAll(mapped);
-    console.log('🔄 Pedidos de compra sincronizando em tempo real...');
     return mapped;
   } catch (error) {
-    console.error('❌ Erro ao carregar pedidos de compra:', error);
+    console.error('[purchaseService] Erro ao carregar pedidos de compra:', error);
     return [];
   }
 };
@@ -140,250 +113,11 @@ const loadFromSupabase = async (): Promise<PurchaseOrder[]> => {
 // ❌ NÃO inicializar automaticamente - aguardar autenticação via supabaseInitService
 // void loadFromSupabase();
 
-const persistUpsert = async (order: PurchaseOrder) => {
-  try {
-    const user = authService.getCurrentUser();
-    if (!user?.companyId) {
-      console.error('❌ Erro: Tentativa de salvar pedido sem company_id');
-      return { success: false, error: 'Sessão inválida ou empresa não identificada' };
-    }
-
-    const payload = mapOrderToDb(order);
-    const { error } = await supabase.from('purchase_orders').upsert(payload);
-
-    if (error) {
-      console.error('❌ Erro ao salvar pedido no Supabase:', error.message);
-      return { success: false, error: error.message };
-    }
-
-    // Sincroniza despesas extras (não-bloqueante)
-    syncExpenses(order).catch(err => {
-      console.warn('⚠️ Falha ao sincronizar despesas extras (não-crítico):', err);
-    });
-
-    return { success: true };
-  } catch (err: any) {
-    console.error('❌ Erro inesperado ao salvar pedido no Supabase:', err);
-    return { success: false, error: err.message || 'Erro inesperado' };
-  }
-};
-
-const syncExpenses = async (order: PurchaseOrder) => {
-  try {
-    // Busca despesas existentes no Supabase
-    const { data: existingExpenses } = await supabase
-      .from('purchase_expenses')
-      .select('id')
-      .eq('purchase_order_id', order.id);
-
-    const existingIds = (existingExpenses || []).map(e => e.id);
-
-    // Despesas do tipo 'expense' no metadata
-    const expenseTransactions = (order.transactions || []).filter(t => t.type === 'expense');
-    const metadataIds = expenseTransactions.map(t => t.id);
-
-    // Remove despesas deletadas
-    const toDelete = existingIds.filter(id => !metadataIds.includes(id));
-    if (toDelete.length > 0) {
-      await supabase.from('purchase_expenses').delete().in('id', toDelete);
-    }
-
-    // Upsert despesas atuais
-    const expensesPayload = expenseTransactions.map(tx => ({
-      id: tx.id,
-      purchase_order_id: order.id,
-      expense_category_id: tx.accountId || '00000000-0000-0000-0000-000000000000',
-      description: tx.notes || 'Despesa extra',
-      value: tx.value,
-      expense_date: tx.date,
-      paid: false,
-      notes: tx.notes || null,
-      company_id: authService.getCurrentUser()?.companyId || null
-    }));
-
-    if (expensesPayload.length > 0) {
-      const { error } = await supabase.from('purchase_expenses').upsert(expensesPayload);
-      if (error) {
-        console.error('Erro ao sincronizar despesas extras', error);
-      }
-    }
-  } catch (err) {
-    console.error('Erro ao sincronizar despesas extras', err);
-  }
-};
-
-const persistDelete = async (id: string) => {
-  try {
-    // O CASCADE no banco já remove as despesas automaticamente
-    const { error } = await supabase.from('purchase_orders').delete().eq('id', id);
-    if (error) {
-      console.error('Erro ao excluir pedido no Supabase', error);
-    }
-  } catch (err) {
-    console.error('Erro inesperado ao excluir pedido no Supabase', err);
-  }
-};
-
-const syncFromSupabase = async () => {
-  try {
-    const { data, error } = await supabase
-      .from('purchase_orders')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) throw error;
-    if (data) {
-      const mapped = data.map(mapOrderFromDb);
-      db.setAll(mapped);
-    }
-  } catch (err) {
-    console.error('❌ Erro ao sincronizar purchase_orders do Supabase:', err);
-  }
-};
-
-// ❌ NÃO inicializar automaticamente - aguardar autenticação via supabaseInitService
-// void syncFromSupabase();
-
-// ============================================================================
-// SYNC DE PAYABLES PARA PEDIDOS EXISTENTES
-// ============================================================================
-
-// Sincronizar payables para pedidos que ainda não têm (somente uma vez por sessão)
-let _syncPayablesDone = false;
-const syncPayablesForExistingOrders = () => {
-  if (_syncPayablesDone) return;
-  _syncPayablesDone = true;
-  setTimeout(() => {
-    const orders = db.getAll();
-    const payables = payablesService.getAll();
-
-    orders.forEach(order => {
-      if (order.totalValue && order.totalValue > 0 && order.partnerId) {
-        const hasPayable = payables.some(
-          p => p.purchaseOrderId === order.id && p.subType === 'purchase_order'
-        );
-
-        if (!hasPayable) {
-          console.log('🔄 Sincronizando payable para pedido existente:', order.number);
-          createPayableForPurchaseOrder(order);
-        }
-      }
-    });
-  }, 2000);
-};
-
-syncPayablesForExistingOrders();
-
-// ============================================================================
-// SINCRONIZAÇÃO FINANCEIRA (Feedback do Financeiro -> Pedido)
-// ============================================================================
-const syncFinancialStatus = async (purchaseOrderId: string) => {
-  if (!purchaseOrderId) return;
-
-  // 1. Buscar todos os payables vinculados a este pedido
-  const allPayables = payablesService.getAll();
-  const linkedPayables = allPayables.filter(p =>
-    p.purchaseOrderId === purchaseOrderId &&
-    (p.subType === 'purchase_order' || p.subType === 'commission' || p.subType === 'freight')
-  );
-
-  if (linkedPayables.length === 0) return;
-
-  // 2. Calcular totais (apenas do subType 'purchase_order' para afetar o valor pago do PRODUTO)
-  // Fretes e Comissões não abatem do valor do pedido de compra do produto, são extras.
-  // MAS, se o pedido tiver transações de adiantamento, elas contam.
-
-  const productPayables = linkedPayables.filter(p => p.subType === 'purchase_order');
-
-  const totalPaid = productPayables.reduce((sum, p) => sum + (p.paidAmount || 0), 0);
-
-  // 3. Buscar o pedido
-  const order = db.getById(purchaseOrderId);
-  if (!order) return;
-
-  // 4. Verificar se precisa atualizar
-  // Nota: totalValue do pedido é mandatório. Se tiver zero, assume pendente.
-
-  // Se nada mudou, sai
-  if (Math.abs((order.paidValue || 0) - totalPaid) < 0.01) {
-    return;
-  }
-
-  console.log(`🔄 Sincronizando Pedido ${order.number}: Pago ${order.paidValue} -> ${totalPaid}`);
-
-  // 5. Atualizar pedido (local e banco)
-  const updatedOrder = {
-    ...order,
-    paidValue: totalPaid
-  };
-
-  db.update(updatedOrder);
-  await persistUpsert(updatedOrder);
-
-  // Notificar UI
-  invalidateDashboardCache();
-  window.dispatchEvent(new Event('purchase_orders:updated'));
-};
-
-const getLogInfo = () => {
-  const user = authService.getCurrentUser();
-  return { userId: user?.id || 'system', userName: user?.name || 'Sistema' };
-};
-
-// ============================================================================
-// FUNÇÃO HELPER PARA CRIAR PAYABLE
-// ============================================================================
-
-const createPayableForPurchaseOrder = (order: PurchaseOrder) => {
-  const generateUUID = (): string => {
-    if (typeof self !== 'undefined' && self.crypto && self.crypto.randomUUID) {
-      return self.crypto.randomUUID();
-    }
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-      const r = (Math.random() * 16) | 0;
-      const v = c === 'x' ? r : (r & 0x3) | 0x8;
-      return v.toString(16);
-    });
-  };
-
-  // Debug: Validar dados antes de criar payable
-  console.log('🔍 DEBUG - Criando payable do pedido de compra:', {
-    orderId: order.id,
-    partnerId: order.partnerId,
-    partnerName: order.partnerName,
-    totalValue: order.totalValue,
-    paidValue: order.paidValue,
-    date: order.date
-  });
-
-  const orderAmount = Number(order.totalValue) || 0;
-  const orderPaidAmount = Number(order.paidValue) || 0;
-
-  if (orderAmount <= 0) {
-    console.warn('⚠️ Valor do pedido inválido:', order.totalValue);
-    return;
-  }
-
-  payablesService.add({
-    id: generateUUID(),
-    purchaseOrderId: order.id,
-    partnerId: order.partnerId,
-    partnerName: order.partnerName,
-    description: `Pedido de Compra ${order.number}`,
-    dueDate: new Date(new Date(order.date).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 dias
-    amount: orderAmount,
-    paidAmount: orderPaidAmount,
-    status: orderPaidAmount >= orderAmount ? 'paid' : orderPaidAmount > 0 ? 'partially_paid' : 'pending',
-    subType: 'purchase_order', // ✅ TIPO: PEDIDO DE COMPRA
-    notes: `Fornecedor: ${order.partnerName}`
-  });
-
-  console.log('✅ Payable do pedido de compra criado com sucesso');
-};
-
 // ✅ REALTIME: Inscrever em mudanças em tempo real
 const subscribeToUpdates = (callback: (order: PurchaseOrder, eventType: 'INSERT' | 'UPDATE' | 'DELETE') => void) => {
   const channelName = `purchase_orders_${Date.now()}`;
+  const isCanonical = isSqlCanonicalOpsEnabled();
+  const tableName = isCanonical ? 'ops_purchase_orders' : 'purchase_orders';
   const channel = supabase.channel(channelName);
 
   channel
@@ -392,15 +126,14 @@ const subscribeToUpdates = (callback: (order: PurchaseOrder, eventType: 'INSERT'
       {
         event: '*',
         schema: 'public',
-        table: 'purchase_orders'
+        table: tableName
       },
       (payload: any) => {
-        console.log('[PurchaseOrder Realtime]', payload.eventType, payload);
 
         if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
           const newData = payload.new;
           if (newData) {
-            const order = mapOrderFromDb(newData);
+            const order = isCanonical ? mapOrderFromOpsRow(newData) : mapOrderFromDb(newData);
             // Atualizar cache local - verificar se já existe para evitar duplicação
             const existing = db.getById(order.id);
             if (existing) {
@@ -422,12 +155,10 @@ const subscribeToUpdates = (callback: (order: PurchaseOrder, eventType: 'INSERT'
       }
     )
     .subscribe((status) => {
-      console.log('[PurchaseOrder Realtime] Status:', status);
     });
 
   // Retornar função para desinscrever
   return () => {
-    console.log('[PurchaseOrder Realtime] Unsubscribing');
     supabase.removeChannel(channel);
   };
 };
@@ -440,6 +171,13 @@ const startRealtime = () => {
   });
 };
 
+const stopRealtime = () => {
+  if (purchaseRealtimeUnsub) {
+    purchaseRealtimeUnsub();
+    purchaseRealtimeUnsub = null;
+  }
+};
+
 export const purchaseService = {
   getAll: () => db.getAll(),
   getById: (id: string) => db.getById(id),
@@ -448,6 +186,8 @@ export const purchaseService = {
     return loadFromSupabase();
   },
   loadFromSupabase,
+  startRealtime,
+  stopRealtime,
   importData: (data: PurchaseOrder[]) => {
     if (!data) return;
     db.setAll(data);
@@ -462,13 +202,15 @@ export const purchaseService = {
         }));
         const { error } = await supabase.from('purchase_orders').upsert(payload, { onConflict: 'id' });
         if (error) console.error('❌ Erro ao sincronizar pedidos de compra:', error);
-        else console.log('✅ Pedidos de compra sincronizados no Supabase via ImportData');
+        
       } catch (err) {
-        console.error('❌ Erro inesperado ao importar pedidos de compra:', err);
+        console.error('[purchaseService] Erro na sincronização batch:', err);
       }
     })();
   },
   add: async (order: PurchaseOrder) => {
+    await upsertPurchaseOrderCanonical(order);
+
     // 1. Tentar persistir no Supabase primeiro
     const result = await persistUpsert(order);
     if (!result.success) return result;
@@ -476,15 +218,22 @@ export const purchaseService = {
     // 2. Se sucesso, atualizar cache local
     db.add(order);
 
-    // ✅ Criar automaticamente um payable para o pedido de compra
-    if (order.totalValue && order.totalValue > 0 && order.partnerId) {
-      createPayableForPurchaseOrder(order);
-    }
+    // ✅ Operações secundárias: NÃO bloqueiam o retorno do save
+    // Payable, log e audit rodam em background para evitar travamento da UI
+    void (async () => {
+      try {
+        if (order.totalValue && order.totalValue > 0 && order.partnerId) {
+          await createPayableForPurchaseOrder(order);
+        }
+      } catch (err) {
+        console.error('Erro ao criar payable (background):', err);
+      }
+    })();
 
     const { userId, userName } = getLogInfo();
     logService.addLog({ userId, userName, action: 'create', module: 'Compras', description: `Criou Pedido de Compra ${order.number}`, entityId: order.id });
 
-    // Audit Log
+    // Audit Log (já era void)
     void auditService.logAction('create', 'Compras', `Pedido de compra criado: #${order.number} - ${order.partnerName} - R$ ${order.totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, {
       entityType: 'PurchaseOrder',
       entityId: order.id,
@@ -496,36 +245,61 @@ export const purchaseService = {
     return { success: true };
   },
   update: async (updatedOrder: PurchaseOrder) => {
+    await upsertPurchaseOrderCanonical(updatedOrder);
+
     // 1. Tentar persistir no Supabase primeiro
     const result = await persistUpsert(updatedOrder);
     if (!result.success) return result;
 
     // 2. Se sucesso, atualizar cache local
+    const oldOrder = db.getById(updatedOrder.id);
     db.update(updatedOrder);
     invalidateFinancialCache();
 
+    // ✅ DETECÇÃO DE MUDANÇAS FINANCEIRAS (Histórico)
+    if (oldOrder) {
+      const oldTxs = oldOrder.transactions || [];
+      const newTxs = updatedOrder.transactions || [];
+
+      // Transactions are now handled via financialTransactionService in updateTransaction
+    }
+
+    // 3. Detectar pagamentos modificados (valor ou conta)
+    // Simplificação: só loga se houver diferença de valor. Se mudar conta, idealmente estorna e recria, mas aqui vamos focar no valor.
+    // Se a conta mudar, o saldo da conta antiga não é corrigido aqui automaticamente sem estorno complexo.
+    // Para MVP de correção, focamos no valor.
+
     // ✅ Verificar se já existe um payable para este pedido, se não, criar
-    if (updatedOrder.totalValue && updatedOrder.totalValue > 0 && updatedOrder.partnerId) {
-      const allPayables = payablesService.getAll();
-      const existingPayable = allPayables.find(
-        p => p.purchaseOrderId === updatedOrder.id && p.subType === 'purchase_order'
-      );
+    // Roda em background para não bloquear o retorno do update
+    if (!isSqlCanonicalOpsEnabled() && updatedOrder.totalValue && updatedOrder.totalValue > 0 && updatedOrder.partnerId) {
+      void (async () => {
+        try {
+          const allPayables = payablesService.getAll();
+          const existingPayable = allPayables.find(
+            p => p.purchaseOrderId === updatedOrder.id && p.subType === 'purchase_order'
+          );
 
-      if (!existingPayable) {
-        console.log('🔄 Pedido atualizado sem payable - criando agora:', updatedOrder.id);
-        createPayableForPurchaseOrder(updatedOrder);
-      } else {
-        // Atualizar valores do payable existente
-        const orderAmount = Number(updatedOrder.totalValue) || 0;
-        const orderPaidAmount = Number(updatedOrder.paidValue) || 0;
+          if (!existingPayable) {
+            await createPayableForPurchaseOrder(updatedOrder);
+          } else {
+            // Atualizar valores do payable existente
+            const orderAmount = Number(updatedOrder.totalValue) || 0;
+            const orderPaidAmount = Number(updatedOrder.paidValue) || 0;
 
-        payablesService.update({
-          ...existingPayable,
-          amount: orderAmount,
-          paidAmount: orderPaidAmount,
-          status: orderPaidAmount >= orderAmount ? 'paid' : orderPaidAmount > 0 ? 'partially_paid' : 'pending'
-        });
-      }
+            payablesService.update({
+              ...existingPayable,
+              amount: orderAmount,
+              paidAmount: orderPaidAmount,
+              status: orderPaidAmount >= orderAmount ? 'paid' : orderPaidAmount > 0 ? 'partially_paid' : 'pending'
+            });
+
+            // Single Ledger: Também atualizar a financial_entry (Dual Write)
+            await createPayableForPurchaseOrder(updatedOrder);
+          }
+        } catch (err) {
+          console.error('Erro ao atualizar payable (background):', err);
+        }
+      })();
     }
 
     const { userId, userName } = getLogInfo();
@@ -542,16 +316,37 @@ export const purchaseService = {
     return { success: true };
   },
 
-  updateTransaction: (orderId: string, updatedTx: OrderTransaction) => {
+  updateTransaction: async (orderId: string, updatedTx: OrderTransaction) => {
     const order = db.getById(orderId);
     if (!order) return;
+
+    if (updatedTx.type === 'payment' || updatedTx.type === 'advance') {
+      await financialTransactionService.add({
+        date: updatedTx.date,
+        description: `Pagamento Pedido #${order.number} (Editado)`,
+        amount: updatedTx.value,
+        type: 'payment',
+        bankAccountId: updatedTx.accountId,
+        financialRecordId: order.id,
+        companyId: (order as any).companyId || ''
+      });
+    }
+
     const newTxs = (order.transactions || []).map(t => t.id === updatedTx.id ? updatedTx : t);
-    const newPaidValue = newTxs.filter(t => t.type === 'payment' || t.type === 'advance').reduce((acc, t) => acc + t.value, 0);
-    const newDiscountValue = newTxs.reduce((acc, t) => acc + (t.discountValue || 0), 0);
-    const updated = { ...order, transactions: newTxs, paidValue: newPaidValue, discountValue: newDiscountValue };
+    const updated = isSqlCanonicalOpsEnabled()
+      ? { ...order, transactions: newTxs }
+      : {
+          ...order,
+          transactions: newTxs,
+          paidValue: newTxs.filter(t => t.type === 'payment' || t.type === 'advance').reduce((acc, t) => acc + t.value, 0),
+          discountValue: newTxs.reduce((acc, t) => acc + (t.discountValue || 0), 0)
+        };
     db.update(updated);
     void persistUpsert(updated);
+    // ❌ REMOVIDO: void financialSyncService.syncPurchaseOrder(orderId);
+    // Sync agora é feito apenas via financialActionService.processRecord()
     invalidateFinancialCache();
+    invalidateDashboardCache();
     const { userId, userName } = getLogInfo();
     logService.addLog({ userId, userName, action: 'update', module: 'Financeiro', description: `Editou pagamento no Pedido ${order.number}`, entityId: orderId });
     invalidateDashboardCache();
@@ -561,15 +356,28 @@ export const purchaseService = {
     const order = db.getById(orderId);
     if (!order) return;
 
+    // ✅ Limpeza COMPLETA via orquestrador centralizado
+    // Remove: financial_history + admin_expenses + financial_transactions
+    void import('./financial/paymentOrchestrator').then(({ removeFinancialTransaction }) => {
+      removeFinancialTransaction(txId);
+    });
+
     // Note: Removed syncDeleteFromOrigin call to avoid circular dependency. 
     // Financial records should be managed via Financial module if needed.
 
     const newTxs = (order.transactions || []).filter(t => t.id !== txId);
-    const newPaidValue = newTxs.filter(t => t.type === 'payment' || t.type === 'advance').reduce((acc, t) => acc + t.value, 0);
-    const newDiscountValue = newTxs.reduce((acc, t) => acc + (t.discountValue || 0), 0);
-    const updated = { ...order, transactions: newTxs, paidValue: newPaidValue, discountValue: newDiscountValue };
+    const updated = isSqlCanonicalOpsEnabled()
+      ? { ...order, transactions: newTxs }
+      : {
+          ...order,
+          transactions: newTxs,
+          paidValue: newTxs.filter(t => t.type === 'payment' || t.type === 'advance').reduce((acc, t) => acc + t.value, 0),
+          discountValue: newTxs.reduce((acc, t) => acc + (t.discountValue || 0), 0)
+        };
     db.update(updated);
     void persistUpsert(updated);
+    // ❌ REMOVIDO: void financialSyncService.syncPurchaseOrder(orderId);
+    // Sync agora é feito apenas via financialActionService.processRecord()
     invalidateFinancialCache();
 
     const { userId, userName } = getLogInfo();
@@ -579,81 +387,118 @@ export const purchaseService = {
   delete: async (id: string) => {
     const order = db.getById(id);
     if (!order) {
-      console.warn('⚠️ Pedido de compra não encontrado para exclusão:', id);
       return { success: false, error: 'Pedido não encontrado' };
     }
 
-    // ⛔ VALIDAÇÃO: Bloquear se houver carregamentos vinculados
-    const linkedLoadings = loadingService.getByPurchaseOrder(id);
-    if (linkedLoadings.length > 0) {
-      console.warn('⛔ Exclusão bloqueada: pedido tem carregamentos vinculados');
-      return {
-        success: false,
-        error: `Não é possível excluir. Este pedido possui ${linkedLoadings.length} carregamento(s) vinculado(s). Desvincule ou exclua os carregamentos primeiro.`
-      };
-    }
+    const canonicalDeleted = await deletePurchaseOrderCanonical(id);
+    const canonicalAuthoritative = isSqlCanonicalOpsEnabled() && canonicalDeleted;
 
-    // ✅ Apagar payables vinculados ao pedido de compra
+
     const allPayables = payablesService.getAll();
     const linkedPayables = allPayables.filter(p => p.purchaseOrderId === id);
 
-    console.log(`🗑️ Apagando ${linkedPayables.length} payables vinculados ao pedido ${order.number}`);
-    linkedPayables.forEach(p => {
-      payablesService.delete(p.id);
-    });
-
-    // ✅ Apagar do cache local
-    db.delete(id);
-
-    // ✅ Apagar do Supabase e aguardar resultado
-    try {
-      const { error } = await supabase.from('purchase_orders').delete().eq('id', id);
-      if (error) {
-        console.error('❌ Erro ao excluir pedido de compra no Supabase:', error);
-        // Reverter exclusão local se falhar no Supabase
-        db.add(order);
-        return { success: false, error: error.message };
+    if (!canonicalAuthoritative) {
+      // ========================================================================
+      // PASSO 1: Apagar CARREGAMENTOS vinculados (e seus filhos: frete, comissão)
+      // ========================================================================
+      const linkedLoadings = loadingService.getByPurchaseOrder(id);
+      if (linkedLoadings.length > 0) {
+        for (const l of linkedLoadings) {
+          try {
+            // loadingService.delete já cuida de comissões, freight_expenses e payables de frete/comissão
+            await loadingService.delete(l.id);
+            // Aguardar exclusão no banco (ops_loadings — logistics_loadings NÃO existe)
+            await supabase.from('ops_loadings').delete().or(`legacy_id.eq.${l.id},id.eq.${l.id}`);
+          } catch (err) {
+            console.error(`[purchaseService] Erro ao deletar carregamento ${l.id}:`, err);
+          }
+        }
       }
-    } catch (err: any) {
-      console.error('❌ Erro inesperado ao excluir pedido de compra:', err);
-      db.add(order);
-      return { success: false, error: err.message };
+
+      // ========================================================================
+      // PASSO 2: Apagar PAYABLES vinculados e suas TRANSAÇÕES FINANCEIRAS
+      // ========================================================================
+      const payableIds = linkedPayables.map(p => p.id);
+
+      // ========================================================================
+      // PASSO 3: ✅ LIMPEZA COMPLETA via orquestrador centralizado
+      // Limpa: financial_history + admin_expenses (standalone) + financial_transactions
+      // em uma operação consistente
+      // ========================================================================
+      try {
+        const { cleanupFinancialRecords } = await import('./financial/paymentOrchestrator');
+        await cleanupFinancialRecords({
+          entityId: id,
+          entityType: 'purchase_order',
+          payableIds
+        });
+      } catch (err) {
+        console.error('[purchaseService] Erro ao limpar registros financeiros:', err);
+      }
+
+      // PASSO 4: Apagar os PAYABLES (Agora tratados via CASCADE no banco, mas mantemos limpeza de cache/UI)
+      if (linkedPayables.length > 0) {
+        for (const p of linkedPayables) {
+          try {
+            // Apenas deleta do cache/estado local se necessário, 
+            // o banco já apagou via CASCADE do purchase_orders
+            payablesService.delete(p.id);
+          } catch (err) {
+            console.error(`[purchaseService] Erro ao deletar payable ${p.id}:`, err);
+          }
+        }
+      }
+    } else {
+      // ✅ SQL-first: delete canônico já remove vínculos financeiros no banco
+      void payablesService.loadFromSupabase();
     }
 
-    // ✅ Log de auditoria
+    // ========================================================================
+    // PASSO 5: Apagar o PEDIDO DE COMPRA (cache local + Supabase)
+    // ========================================================================
+    db.delete(id);
+
+    if (!canonicalAuthoritative) {
+      try {
+        const { error } = await supabase.from('purchase_orders').delete().eq('id', id);
+        if (error) {
+          db.add(order);
+          return { success: false, error: error.message };
+        }
+      } catch (err: any) {
+        db.add(order);
+        return { success: false, error: err.message };
+      }
+    }
+
+    // ========================================================================
+    // PASSO 5: Auditoria e limpeza de cache
+    // ========================================================================
     const { userId, userName } = getLogInfo();
     logService.addLog({
       userId,
       userName,
       action: 'delete',
       module: 'Compras',
-      description: `Excluiu Pedido ${order.number} e ${linkedPayables.length} payable(s)`,
+      description: `Excluiu Pedido ${order.number}, ${linkedPayables.length} payable(s)`,
       entityId: id
     });
 
-    // Audit Log
     void auditService.logAction('delete', 'Compras', `Pedido de compra excluído: #${order.number} - ${order.partnerName}`, {
       entityType: 'PurchaseOrder',
       entityId: id,
-      metadata: { totalValue: order.totalValue, status: order.status, linkedPayables: linkedPayables.length }
+      metadata: { totalValue: order.totalValue, status: order.status, linkedPayables: linkedPayables.length, canonicalAuthoritative }
     });
 
-    console.log('✅ Pedido de compra excluído com sucesso:', order.number);
 
-    // 🎯 LIMPAR CACHE DO DASHBOARD IMEDIATAMENTE
     DashboardCache.clearAll();
     invalidateDashboardCache();
+    invalidateFinancialCache();
 
     return { success: true };
   },
-  startRealtime,
-  syncFinancialStatus
 };
 
-// ✅ Inscrever no EventBus para atualizações financeiras
-eventBus.on('payable:updated', (data: { purchaseOrderId: string }) => {
-  if (data && data.purchaseOrderId) {
-    console.log('🔔 Evento recebido: payable:updated', data);
-    purchaseService.syncFinancialStatus(data.purchaseOrderId);
-  }
-});
+// ❌ REMOVIDO: eventBus.on('payable:updated', ...)
+// Motivo: Criava loop infinito → payable atualizado → syncPurchaseOrder → update payable → payable atualizado...
+// A sincronização agora é unidirecional: Financeiro → processa pagamento → atualiza payable (fim)

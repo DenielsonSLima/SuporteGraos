@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { X, Download, Loader2 } from 'lucide-react';
-import { Shareholder } from '../../../../services/shareholderService';
+import type { Shareholder } from '../../../../services/shareholderService';
 import { pdf } from '@react-pdf/renderer';
 import { saveAs } from 'file-saver';
 import ShareholderPdfDocument from './ShareholderPdfDocument';
@@ -26,7 +26,6 @@ const ShareholderPdfModal: React.FC<Props> = ({ isOpen, onClose, shareholder }) 
           url = URL.createObjectURL(blob);
           setPdfUrl(url);
         } catch (error) {
-          console.error('Erro ao gerar preview:', error);
         }
       }
     };
@@ -48,7 +47,6 @@ const ShareholderPdfModal: React.FC<Props> = ({ isOpen, onClose, shareholder }) 
       const blob = await pdf(<ShareholderPdfDocument shareholder={shareholder} />).toBlob();
       saveAs(blob, filename);
     } catch (error) {
-      console.error('Erro ao gerar PDF:', error);
       alert('Erro ao gerar arquivo.');
     } finally {
       setIsGenerating(false);

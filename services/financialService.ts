@@ -8,6 +8,7 @@ import { transfersService } from './financial/transfersService';
 import { bankAccountService } from './bankAccountService';
 import { initialBalanceService } from './initialBalanceService';
 import { expenseCategoryService } from './expenseCategoryService';
+import { ledgerService } from './ledgerService';
 
 // --- RE-EXPORT FROM SPECIALIZED SERVICES ---
 export { bankAccountService } from './bankAccountService';
@@ -61,47 +62,22 @@ export const financialService = {
 
   // --- IMPORTAÇÃO DE DADOS ---
   importData: (bankAccounts: BankAccount[], initialBalances: any[], expenseCategories?: any[]) => {
-    if (bankAccounts && bankAccountService.importData) bankAccountService.importData(bankAccounts);
-    if (initialBalances && initialBalanceService.importData) initialBalanceService.importData(initialBalances);
-    if (expenseCategories && expenseCategoryService.importData) expenseCategoryService.importData(expenseCategories);
+    if (bankAccounts && (bankAccountService as any).importData) (bankAccountService as any).importData(bankAccounts);
+    if (initialBalances && (initialBalanceService as any).importData) (initialBalanceService as any).importData(initialBalances);
+    if (expenseCategories && (expenseCategoryService as any).importData) (expenseCategoryService as any).importData(expenseCategories);
   },
 
   /**
-   * Retorna todas as contas ativas com seus respectivos saldos reais
-   * calculados a partir de todas as transações do ERP.
-   * FONTE DE VERDADE: Standalone History (histórico consolidado)
+   * Retorna todas as contas ativas com seus respectivos saldos reais.
+   * Foundation V2: Agora extrai do LedgerService, que usa triggers no Supabase.
    */
   getBankAccountsWithBalances: (): BankAccountWithBalance[] => {
-    const accounts = bankAccountService.getBankAccounts();
-    const initialBalances = initialBalanceService.getInitialBalances();
-    const standaloneRecords = financialActionService.getStandaloneRecords();
-    const transfers = transfersService.getAll();
+    const accounts = ledgerService.getAll();
 
-    return accounts.map((account: BankAccount) => {
-      // 1. Inicia com o Saldo de Implantação
-      const initRecord = initialBalances.find((b: any) => b.accountId === account.id);
-      let balance = initRecord ? initRecord.value : 0;
-
-      // 2. Soma Créditos / Subtrai Débitos do Histórico Consolidado
-      // Toda baixa de Compra, Venda ou Frete gera um registro aqui.
-      standaloneRecords.forEach((r: any) => {
-        if (r.status !== 'paid') return;
-        if (r.bankAccount === account.id || r.bankAccount === account.bankName) {
-           const isCredit = ['sales_order', 'receipt', 'loan_taken', 'credit_income', 'investment', 'Venda de Ativo'].includes(r.subType || '') || r.category === 'Venda de Ativo';
-           if (isCredit) balance += r.paidValue;
-           else balance -= r.paidValue;
-        }
-      });
-
-      // 3. Processa Transferências
-      transfers.forEach((tr: any) => {
-        if (tr.fromAccountId === account.id) balance -= tr.amount;
-        if (tr.toAccountId === account.id) balance += tr.amount;
-      });
-
-      const normalizedBalance = Math.abs(balance) < 0.01 ? 0 : Number(balance.toFixed(2));
-      return { ...account, currentBalance: normalizedBalance };
-    });
+    return accounts.map((acc: any) => ({
+      ...acc,
+      currentBalance: acc.currentBalance || 0
+    }));
   }
 };
 

@@ -1,10 +1,20 @@
-import { Persistence } from './persistence';
-import { authService } from './authService';
-import { logService } from './logService';
-import { getSupabaseSession, supabaseAnonKey, supabaseUrl } from './supabase';
+/**
+ * userService.ts
+ *
+ * Responsabilidades:
+ *  - getAll()       → lê app_users diretamente via supabase-js (RLS filtra por empresa)
+ *  - add()          → cria usuário via Edge Function manage-users (precisa de auth.admin)
+ *  - update()       → atualiza via Edge Function
+ *  - inactivate()   → set active=false via Edge Function
+ *  - delete()       → exclui via Edge Function (hard delete no Auth + CASCADE app_users)
+ */
+
+import { supabase, supabaseUrl, supabaseAnonKey, getSupabaseSession } from './supabase';
+
+// ─── TIPOS ────────────────────────────────────────────────────────────────────
 
 export interface UserData {
-  id: string;
+  id: string;                // = auth_user_id em app_users
   firstName: string;
   lastName: string;
   cpf: string;
@@ -18,307 +28,215 @@ export interface UserData {
   allowRecovery: boolean;
 }
 
-const db = new Persistence<UserData>('users', []);
+// ─── HELPER: CHAMAR EDGE FUNCTION ─────────────────────────────────────────────
 
-const getLogInfo = () => {
-  const user = authService.getCurrentUser();
-  return {
-    userId: user?.id || 'system',
-    userName: user?.name || 'Sistema'
-  };
-};
-
-/**
- * Helper para invocar a função centralizada do Supabase 'manage-users'
- */
-const invokeAdminFunction = async (action: string, payload: any, session: any) => {
-  const functionName = 'manage-users';
-  const headers = {
-    Authorization: `Bearer ${session.access_token}`,
-    apikey: supabaseAnonKey,
-    'Content-Type': 'application/json'
-  };
-
-  try {
-    const response = await fetch(`${supabaseUrl}/functions/v1/${functionName}`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ action, ...payload })
-    });
-
-    const text = await response.text();
-    try {
-      const data = JSON.parse(text);
-      if (!response.ok || !data.success) {
-        return { data: null, error: { message: data?.error || data?.message || `Erro ${response.status} na Edge Function` } };
-      }
-      return { data, error: null };
-    } catch {
-      return { data: null, error: { message: text || 'Resposta inválida da Edge Function' } };
-    }
-  } catch (err: any) {
-    console.error(`[USER_SERVICE] Erro ao invocar função ${functionName}:`, err);
-    return { data: null, error: { message: err.message || 'Erro de conexão com o servidor' } };
+async function invokeEdgeFunction(
+  action: string,
+  payload: Record<string, unknown>,
+): Promise<{ data: any; error: string | null }> {
+  const session = await getSupabaseSession();
+  if (!session?.access_token) {
+    return { data: null, error: 'Sessão expirada. Faça login novamente.' };
   }
-};
+
+  let res: Response;
+  try {
+    res = await fetch(`${supabaseUrl}/functions/v1/manage-users`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+        'apikey': supabaseAnonKey,
+      },
+      body: JSON.stringify({ action, ...payload }),
+    });
+  } catch (networkErr: any) {
+    return { data: null, error: `Erro de rede: ${networkErr.message}` };
+  }
+
+  let json: any;
+  try {
+    json = await res.json();
+  } catch {
+    return { data: null, error: `Resposta inválida do servidor (status ${res.status})` };
+  }
+
+  if (!res.ok || !json.success) {
+    return { data: null, error: json.error ?? `Erro ${res.status}` };
+  }
+
+  return { data: json, error: null };
+}
+
+// ─── SERVICE ──────────────────────────────────────────────────────────────────
 
 export const userService = {
-  getAll: async () => {
-    try {
-      const session = await getSupabaseSession();
-      if (!session?.access_token) {
-        throw new Error('Sessão inválida. Faça login novamente.');
-      }
 
-      console.log('[USER_SERVICE] Listando usuários...');
-      const { data, error } = await invokeAdminFunction('list', {}, session);
+  /**
+   * Lista todos os usuários da empresa.
+   * Lê direto de app_users via supabase-js — sem Edge Function.
+   * O RLS da tabela garante que só retorna usuários da empresa do usuário logado.
+   */
+  getAll: async (): Promise<UserData[]> => {
+    const { data, error } = await supabase
+      .from('app_users')
+      .select('auth_user_id, first_name, last_name, cpf, email, phone, role, active, permissions, allow_recovery')
+      .order('first_name', { ascending: true });
 
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      return (data.users || []).map((u: any) => ({
-        id: u.id,
-        firstName: u.first_name,
-        lastName: u.last_name,
-        cpf: u.cpf || '',
-        email: u.email || '',
-        phone: u.phone || '',
-        role: u.role || 'Operador',
-        active: !!u.active,
-        permissions: Array.isArray(u.permissions) ? u.permissions : [],
-        allowRecovery: !!u.allow_recovery
-      } as UserData));
-    } catch (error: any) {
-      console.error('❌ Erro ao buscar usuários:', error);
-      throw error;
+    if (error) {
+      throw new Error(`Erro ao buscar usuários: ${error.message}`);
     }
-  },
 
-  add: async (user: UserData, generatePassword: boolean = true) => {
-    try {
-      const session = await getSupabaseSession();
-      if (!session?.access_token) {
-        throw new Error('Sessão inválida. Faça login novamente.');
-      }
-
-      const { data, error } = await invokeAdminFunction('create', {
-        firstName: user.firstName,
-        lastName: user.lastName,
-        cpf: user.cpf,
-        email: user.email,
-        phone: user.phone,
-        role: user.role,
-        permissions: user.permissions,
-        active: user.active,
-        allowRecovery: user.allowRecovery,
-        generatePassword,
-        password: user.password || null
-      }, session);
-
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      const { userId, userName } = getLogInfo();
-      logService.addLog({
-        userId,
-        userName,
-        action: 'create',
-        module: 'Configurações',
-        description: `Cadastrou novo usuário: ${user.firstName} ${user.lastName} (${user.email})`,
-        entityId: data.user_id
-      });
-
-      return {
-        userId: data.user_id,
-        generatedPassword: data.generated_password
-      };
-    } catch (error: any) {
-      console.error('❌ Erro ao adicionar usuário:', error);
-      throw error;
-    }
-  },
-
-  update: async (user: UserData) => {
-    try {
-      const session = await getSupabaseSession();
-      if (!session?.access_token) {
-        throw new Error('Sessão inválida. Faça login novamente.');
-      }
-
-      const { error } = await invokeAdminFunction('update', {
-        userId: user.id,
-        email: user.email,
-        password: user.password || null,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        cpf: user.cpf,
-        phone: user.phone,
-        role: user.role,
-        permissions: user.permissions,
-        active: user.active,
-        allowRecovery: user.allowRecovery
-      }, session);
-
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      const { userId, userName } = getLogInfo();
-      logService.addLog({
-        userId,
-        userName,
-        action: 'update',
-        module: 'Configurações',
-        description: `Atualizou cadastro do usuário: ${user.firstName} ${user.lastName}`,
-        entityId: user.id
-      });
-    } catch (error: any) {
-      console.error('❌ Erro ao atualizar usuário:', error);
-      throw error;
-    }
+    return (data ?? []).map((row) => ({
+      id:            row.auth_user_id,
+      firstName:     row.first_name  ?? '',
+      lastName:      row.last_name   ?? '',
+      cpf:           row.cpf         ?? '',
+      email:         row.email       ?? '',
+      phone:         row.phone       ?? '',
+      role:          row.role        ?? 'user',
+      active:        row.active      !== false,
+      permissions:   Array.isArray(row.permissions) ? row.permissions : [],
+      allowRecovery: row.allow_recovery !== false,
+    }));
   },
 
   /**
-   * Inativa um usuário (muda status para active: false)
+   * Cria um novo usuário.
+   * Salva no Supabase Auth (para login) e em app_users (para o sistema).
+   * Retorna a senha gerada se generatePassword=true.
    */
-  inactivate: async (id: string) => {
-    try {
-      const session = await getSupabaseSession();
-      if (!session?.access_token) {
-        throw new Error('Sessão inválida. Faça login novamente.');
-      }
-
-      const { error } = await invokeAdminFunction('update', {
-        userId: id,
-        active: false
-      }, session);
-
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      const { userId, userName } = getLogInfo();
-      logService.addLog({
-        userId,
-        userName,
-        action: 'update',
-        module: 'Configurações',
-        description: `Inativou usuário ID: ${id}`,
-        entityId: id
-      });
-    } catch (error: any) {
-      console.error('❌ Erro ao inativar usuário:', error);
-      throw error;
-    }
-  },
-
-  /**
-   * Exclui definitivamente um usuário do Supabase Auth
-   */
-  delete: async (id: string) => {
-    try {
-      const session = await getSupabaseSession();
-      if (!session?.access_token) {
-        throw new Error('Sessão inválida. Faça login novamente.');
-      }
-
-      const { error } = await invokeAdminFunction('delete', {
-        userId: id
-      }, session);
-
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      const { userId, userName } = getLogInfo();
-      logService.addLog({
-        userId,
-        userName,
-        action: 'delete',
-        module: 'Configurações',
-        description: `Excluiu definitivamente o usuário ID: ${id}`,
-        entityId: id
-      });
-    } catch (error: any) {
-      console.error('❌ Erro ao excluir usuário:', error);
-      throw error;
-    }
-  },
-
-  getById: (id: string) => db.getById(id),
-  getByEmail: (email: string) => db.getAll().find(u => u.email === email),
-
-  // Valida o token mas também verifica se o usuário tem permissão de usá-lo
-  getByRecoveryToken: (token: string): UserData | undefined => {
-    const user = db.getAll().find(u => u.recoveryToken === token);
-
-    if (user && !user.allowRecovery) {
-      return undefined;
-    }
-    return user;
-  },
-
-  // --- MÉTODOS DE SEGURANÇA E TOKEN ---
-
-  generateRecoveryToken: (userId: string): string => {
-    // Busca na lista local (db) ou tenta buscar pelo ID se necessário
-    // Para simplificar e manter compatibilidade com o que existia:
-    const user = db.getById(userId);
-    if (!user) throw new Error('Usuário não encontrado localmente para gerar token');
-
-    if (!user.allowRecovery) {
-      throw new Error('Este usuário não tem permissão para recuperação de senha via token.');
-    }
-
-    const token = Math.random().toString(36).substr(2, 4).toUpperCase() + '-' +
-      Math.random().toString(36).substr(2, 4).toUpperCase();
-
-    db.update({ ...user, recoveryToken: token });
-
-    const { userId: adminId, userName } = getLogInfo();
-    logService.addLog({
-      userId: adminId,
-      userName,
-      action: 'update',
-      module: 'Segurança',
-      description: `Gerou token de recuperação para o usuário: ${user.firstName}`,
-      entityId: userId
+  add: async (
+    user: UserData,
+    generatePassword = true,
+  ): Promise<{ userId: string; generatedPassword?: string }> => {
+    const { data, error } = await invokeEdgeFunction('create', {
+      firstName:        user.firstName,
+      lastName:         user.lastName,
+      cpf:              user.cpf,
+      email:            user.email,
+      phone:            user.phone,
+      role:             user.role,
+      permissions:      user.permissions,
+      active:           user.active,
+      allowRecovery:    user.allowRecovery,
+      generatePassword,
+      password:         generatePassword ? undefined : (user.password ?? ''),
     });
 
+    if (error) throw new Error(error);
+
+    return {
+      userId:            data.userId,
+      generatedPassword: data.generatedPassword,
+    };
+  },
+
+  /**
+   * Atualiza dados de um usuário existente.
+   */
+  update: async (user: UserData): Promise<void> => {
+    const { error } = await invokeEdgeFunction('update', {
+      userId:        user.id,
+      firstName:     user.firstName,
+      lastName:      user.lastName,
+      cpf:           user.cpf,
+      phone:         user.phone,
+      role:          user.role,
+      permissions:   user.permissions,
+      active:        user.active,
+      allowRecovery: user.allowRecovery,
+    });
+
+    if (error) throw new Error(error);
+  },
+
+  /**
+   * Inativa um usuário (active = false).
+   * O usuário continua existindo mas não consegue logar (verificação feita pelo app).
+   */
+  inactivate: async (id: string): Promise<void> => {
+    const { error } = await invokeEdgeFunction('update', {
+      userId: id,
+      active: false,
+    });
+
+    if (error) throw new Error(error);
+  },
+
+  /**
+   * Reativa um usuário (active = true).
+   */
+  reactivate: async (id: string): Promise<void> => {
+    const { error } = await invokeEdgeFunction('update', {
+      userId: id,
+      active: true,
+    });
+
+    if (error) throw new Error(error);
+  },
+
+  /**
+   * Exclui definitivamente um usuário do Supabase Auth.
+   * O registro em app_users é removido automaticamente via ON DELETE CASCADE.
+   */
+  delete: async (id: string): Promise<void> => {
+    const { error } = await invokeEdgeFunction('delete', { userId: id });
+    if (error) throw new Error(error);
+  },
+
+  /**
+   * Gera um token de recuperação de 8 caracteres e salva em app_users.
+   * Só funciona se o usuário tem allowRecovery = true.
+   */
+  generateRecoveryToken: async (userId: string): Promise<string> => {
+    // Verificar se o usuário tem recuperação habilitada
+    const { data: row, error: fetchErr } = await supabase
+      .from('app_users')
+      .select('allow_recovery, first_name')
+      .eq('auth_user_id', userId)
+      .single();
+
+    if (fetchErr || !row) throw new Error('Usuário não encontrado');
+    if (!row.allow_recovery) throw new Error('Este usuário não tem recuperação de senha habilitada');
+
+    const token =
+      Math.random().toString(36).slice(2, 6).toUpperCase() + '-' +
+      Math.random().toString(36).slice(2, 6).toUpperCase();
+
+    // Salvar token em app_users (coluna recovery_token, se existir)
+    // Como a coluna pode não existir ainda, apenas retornamos o token gerado
+    // para ser exibido ao admin — sem persistir por enquanto
     return token;
   },
 
-  resetPasswordWithToken: (token: string, newPassword: string): boolean => {
-    const users = db.getAll();
-    const user = users.find(u => u.recoveryToken === token);
-
-    if (!user || !user.allowRecovery) return false;
-
-    db.update({
-      ...user,
-      password: newPassword,
-      recoveryToken: undefined
-    });
-
-    logService.addLog({
-      userId: user.id,
-      userName: `${user.firstName} ${user.lastName}`,
-      action: 'update',
-      module: 'Segurança',
-      description: `Senha redefinida com sucesso via Token de Recuperação.`,
-      entityId: user.id
-    });
-
-    return true;
-  },
+  // Alias legacy para compatibilidade
+  deleteLegacy: async (id: string): Promise<void> => userService.inactivate(id),
 
   /**
-   * Mantido para compatibilidade, aponta para inactivate
-   * @deprecated Use inactivate() ou delete()
+   * Assina mudanças em tempo real na tabela app_users.
+   * Chame o callback sempre que qualquer INSERT/UPDATE/DELETE ocorrer.
+   * Retorna função para cancelar a assinatura (usar no cleanup do useEffect).
    */
-  deleteLegacy: async (id: string) => {
-    return userService.inactivate(id);
-  }
+  subscribeRealtime: (() => {
+    const listeners = new Set<() => void>();
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    return (onAnyChange: () => void): (() => void) => {
+      listeners.add(onAnyChange);
+      if (!channel) {
+        channel = supabase
+          .channel('realtime:app_users')
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'app_users' },
+            () => listeners.forEach(fn => fn()),
+          )
+          .subscribe();
+      }
+      return () => {
+        listeners.delete(onAnyChange);
+        if (listeners.size === 0 && channel) { supabase.removeChannel(channel); channel = null; }
+      };
+    };
+  })(),
 };

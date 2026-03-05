@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, Calendar, DollarSign, Clock, RefreshCw, CheckCircle2, Info } from 'lucide-react';
-import { Shareholder } from '../../../../services/shareholderService';
+import type { Shareholder } from '../../../../services/shareholderService';
 
 interface Props {
   isOpen: boolean;

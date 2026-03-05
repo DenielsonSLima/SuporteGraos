@@ -14,28 +14,49 @@ import {
   Clock,
   ShieldCheck,
   Power,
-  // Added ChevronRight to fix 'Cannot find name' errors on lines 294 and 298
+  Loader2,
   ChevronRight
 } from 'lucide-react';
-import { authService } from '../../services/authService';
-import { logService, LogEntry } from '../../services/logService';
+import { logService } from '../../services/logService';
+import type { LogEntry } from '../../services/logService';
 import { useToast } from '../../contexts/ToastContext';
+import { useProfile, useUpdateProfile } from '../../hooks/useProfile';
+import { useCurrentUser } from '../../hooks/useCurrentUser';
 
 const ProfileModule: React.FC = () => {
   const { addToast } = useToast();
-  const currentUser = authService.getCurrentUser();
+  const currentUser = useCurrentUser();
+
+  // ── TanStack Query: dados reais do perfil (sem mock) ──────────────────
+  const { data: profileRaw, isLoading: profileLoading } = useProfile();
+  const updateProfile = useUpdateProfile();
+
   const [activeTab, setActiveTab] = useState<'overview' | 'security' | 'activity'>('overview');
   const [userLogs, setUserLogs] = useState<LogEntry[]>([]);
 
-  // Mock de dados estendidos (que viriam do banco no futuro)
+  // Estado local dos campos editáveis — sincronizado quando o perfil carrega
   const [profileData, setProfileData] = useState({
-    firstName: currentUser?.name.split(' ')[0] || '',
-    lastName: currentUser?.name.split(' ').slice(1).join(' ') || '',
-    email: currentUser?.email || '',
-    phone: '(66) 99999-0000',
-    cpf: '000.000.000-00',
-    role: currentUser?.role === 'admin' ? 'Administrador do Sistema' : 'Consultor Comercial'
+    firstName: '',
+    lastName:  '',
+    email:     '',
+    phone:     '',
+    cpf:       '',
+    role:      ''
   });
+
+  // Atualiza o formulário sempre que os dados do banco chegam/mudam
+  useEffect(() => {
+    if (profileRaw) {
+      setProfileData({
+        firstName: profileRaw.firstName,
+        lastName:  profileRaw.lastName,
+        email:     profileRaw.email,
+        phone:     profileRaw.phone,
+        cpf:       profileRaw.cpf,
+        role:      profileRaw.role === 'admin' ? 'Administrador do Sistema' : 'Consultor Comercial',
+      });
+    }
+  }, [profileRaw]);
 
   const [passwords, setPasswords] = useState({
     current: '',
@@ -52,7 +73,20 @@ const ProfileModule: React.FC = () => {
 
   const handleUpdateProfile = (e: React.FormEvent) => {
     e.preventDefault();
-    addToast('success', 'Perfil Atualizado', 'Suas informações básicas foram salvas no cache local.');
+    if (!profileRaw) return;
+
+    updateProfile.mutate(
+      {
+        ...profileRaw,
+        firstName: profileData.firstName,
+        lastName:  profileData.lastName,
+        phone:     profileData.phone,
+      },
+      {
+        onSuccess: () => addToast('success', 'Perfil Atualizado', 'Suas informações foram salvas com sucesso.'),
+        onError:   (err: any) => addToast('error', 'Erro ao salvar', err?.message || 'Falha ao atualizar perfil.'),
+      }
+    );
   };
 
   const handleChangePassword = (e: React.FormEvent) => {
@@ -67,6 +101,23 @@ const ProfileModule: React.FC = () => {
 
   const labelClass = 'block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1';
   const inputClass = 'w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white text-slate-900 font-bold focus:border-primary-500 outline-none transition-all placeholder:text-slate-300';
+
+  // Skeleton de carregamento inicial
+  if (profileLoading) {
+    return (
+      <div className="animate-in fade-in duration-500 space-y-6">
+        <div className="h-48 bg-slate-100 rounded-3xl animate-pulse" />
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="lg:col-span-8 h-96 bg-slate-100 rounded-3xl animate-pulse" />
+          <div className="lg:col-span-4 h-64 bg-slate-100 rounded-3xl animate-pulse" />
+        </div>
+        <div className="flex justify-center items-center gap-2 text-slate-400 py-4">
+          <Loader2 className="animate-spin" size={18} />
+          <span className="text-sm font-medium">Carregando perfil...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="animate-in fade-in duration-500 space-y-6">
@@ -174,8 +225,8 @@ const ProfileModule: React.FC = () => {
                       </div>
                     </div>
                     <div className="flex justify-end pt-4">
-                        <button type="submit" className="bg-slate-900 text-white px-8 py-3 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg flex items-center gap-2">
-                            <Save size={18} /> Salvar Alterações
+                        <button type="submit" disabled={updateProfile.isPending} className="bg-slate-900 text-white px-8 py-3 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg flex items-center gap-2 disabled:opacity-60">
+                            {updateProfile.isPending ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />} Salvar Alterações
                         </button>
                     </div>
                   </form>

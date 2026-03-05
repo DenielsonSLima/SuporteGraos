@@ -15,7 +15,8 @@ import {
   Pencil,
   Trash2
 } from 'lucide-react';
-import { Shareholder, ShareholderTransaction, shareholderService } from '../../../../services/shareholderService';
+import type { Shareholder, ShareholderTransaction } from '../../../../services/shareholderService';
+import { useUpdateShareholderTransaction, useDeleteShareholderTransaction, useShareholderTotals } from '../../../../hooks/useShareholders';
 import ShareholderCreditModal from './ShareholderCreditModal';
 import FinancialPaymentModal, { PaymentData } from '../../components/modals/FinancialPaymentModal';
 import ActionConfirmationModal from '../../../../components/ui/ActionConfirmationModal';
@@ -31,6 +32,8 @@ interface Props {
 
 const ShareholderDetails: React.FC<Props> = ({ shareholder, onBack, onGeneratePdf, onWithdraw, onAddCredit }) => {
   const { addToast } = useToast();
+  const updateTransaction = useUpdateShareholderTransaction();
+  const deleteTransaction = useDeleteShareholderTransaction();
   
   // Estado para Edição
   const [editingTx, setEditingTx] = useState<ShareholderTransaction | null>(null);
@@ -51,14 +54,10 @@ const ShareholderDetails: React.FC<Props> = ({ shareholder, onBack, onGeneratePd
     return `${day}/${month}/${year}`;
   };
 
-  // Calculations for this specific shareholder
-  const totalCredits = shareholder.financial.history
-    .filter(t => t.type === 'credit')
-    .reduce((acc, t) => acc + t.value, 0);
-
-  const totalDebits = shareholder.financial.history
-    .filter(t => t.type === 'debit')
-    .reduce((acc, t) => acc + t.value, 0);
+  // ✅ ZERO CÁLCULO FINANCEIRO NO FRONTEND — totais via RPC server-side
+  const { data: shareholderTotals } = useShareholderTotals(shareholder.id);
+  const totalCredits = shareholderTotals?.totalCredits ?? 0;
+  const totalDebits = shareholderTotals?.totalDebits ?? 0;
 
   // -- AÇÕES DE EDIÇÃO E EXCLUSÃO --
 
@@ -71,14 +70,17 @@ const ShareholderDetails: React.FC<Props> = ({ shareholder, onBack, onGeneratePd
     }
   };
 
-  const handleConfirmEditCredit = (data: { date: string; value: number; description: string }) => {
+  const handleConfirmEditCredit = async (data: { date: string; value: number; description: string }) => {
     if (!editingTx) return;
     
-    shareholderService.updateTransaction(shareholder.id, {
-        ...editingTx,
-        date: data.date,
-        value: data.value,
-        description: data.description
+    await updateTransaction.mutateAsync({
+        shareholderId: shareholder.id,
+        transaction: {
+            ...editingTx,
+            date: data.date,
+            value: data.value,
+            description: data.description
+        }
     });
     
     addToast('success', 'Lançamento Atualizado');
@@ -88,15 +90,18 @@ const ShareholderDetails: React.FC<Props> = ({ shareholder, onBack, onGeneratePd
     setTimeout(() => onBack(), 10); // Re-trigger visual refresh by forcing parent update via navigation toggle or reload
   };
 
-  const handleConfirmEditDebit = (data: PaymentData) => {
+  const handleConfirmEditDebit = async (data: PaymentData) => {
     if (!editingTx) return;
     
-    shareholderService.updateTransaction(shareholder.id, {
-        ...editingTx,
-        date: data.date,
-        value: data.amount,
-        description: data.notes || editingTx.description,
-        accountId: data.accountId
+    await updateTransaction.mutateAsync({
+        shareholderId: shareholder.id,
+        transaction: {
+            ...editingTx,
+            date: data.date,
+            value: data.amount,
+            description: data.notes || editingTx.description,
+            accountId: data.accountId
+        }
     });
 
     addToast('success', 'Retirada Atualizada');
@@ -106,9 +111,9 @@ const ShareholderDetails: React.FC<Props> = ({ shareholder, onBack, onGeneratePd
     setTimeout(() => onBack(), 10);
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!deletingTx) return;
-    shareholderService.deleteTransaction(shareholder.id, deletingTx.id);
+    await deleteTransaction.mutateAsync({ shareholderId: shareholder.id, transactionId: deletingTx.id });
     addToast('success', 'Transação Excluída');
     setDeletingTx(null);
     onBack(); // Refresh hack

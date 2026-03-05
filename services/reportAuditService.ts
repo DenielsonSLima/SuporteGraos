@@ -55,7 +55,7 @@ const persistReportLog = async (log: ReportAccessLog) => {
     const { error } = await supabase.from('report_access_logs').insert(payload);
     if (error) console.error('❌ Erro ao salvar report log:', error);
   } catch (err) {
-    console.error('❌ Erro inesperado ao salvar report log:', err);
+    console.warn('[reportAuditService] persistReportLog:', err);
   }
 };
 
@@ -74,7 +74,6 @@ const loadFromSupabase = async () => {
     
     if (error) {
       if (error.code !== 'PGRST25') {
-        console.warn('⚠️ Erro ao carregar report logs:', error);
       }
       return;
     }
@@ -82,7 +81,7 @@ const loadFromSupabase = async () => {
     const mapped = data.map(mapReportLogFromDb);
     reportLogsDb.setAll(mapped);
   } catch (err) {
-    console.warn('⚠️ ReportAuditService: Usando fallback:', err);
+    console.error('[reportAuditService] loadFromSupabase:', err);
   }
 };
 
@@ -104,11 +103,18 @@ const startRealtime = () => {
       )
       .subscribe((status) => {
         if (status === 'CHANNEL_ERROR') {
-          console.error('❌ Erro no canal report_access_logs realtime');
         }
       });
 
     _realtimeStarted = true;
+  }
+};
+
+const stopRealtime = () => {
+  if (reportChannel) {
+    supabase.removeChannel(reportChannel);
+    reportChannel = null;
+    _realtimeStarted = false;
   }
 };
 
@@ -204,7 +210,8 @@ export const reportAuditService = {
     };
   },
 
-  startRealtime
+  startRealtime,
+  stopRealtime
 };
 
 // ============================================================================

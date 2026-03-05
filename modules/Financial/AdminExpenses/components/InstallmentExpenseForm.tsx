@@ -1,8 +1,11 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, Save, Calendar, DollarSign, FileText, Tag, User, Layers, Calculator, Clock, Wallet, CheckCircle2, Anchor, TrendingUp, Briefcase, ChevronDown } from 'lucide-react';
-import { financialService, ExpenseCategory, BankAccountWithBalance } from '../../../../services/financialService';
-import { BankAccount, FinancialRecord } from '../../types';
+import type { ExpenseCategory } from '../../../../services/expenseCategoryService';
+import type { Account } from '../../../../services/accountsService';
+import { useAccounts } from '../../../../hooks/useAccounts';
+import { useExpenseCategories } from '../../../../hooks/useExpenseCategories';
+import { FinancialRecord } from '../../types';
 import { useToast } from '../../../../contexts/ToastContext';
 
 interface Props {
@@ -17,8 +20,9 @@ const InstallmentExpenseForm: React.FC<Props> = ({ isOpen, onClose, onSave, onUp
   const { addToast } = useToast();
   const isEditing = !!initialData;
   const formContainerRef = React.useRef<HTMLDivElement | null>(null);
-  const [categories, setCategories] = useState<ExpenseCategory[]>([]);
-  const [bankAccounts, setBankAccounts] = useState<BankAccountWithBalance[]>([]);
+  const { data: categories = [] } = useExpenseCategories();
+  const { data: allBankAccounts = [] } = useAccounts();
+  const bankAccounts = React.useMemo(() => allBankAccounts.filter(a => a.is_active !== false).sort((a, b) => a.account_name.localeCompare(b.account_name)), [allBankAccounts]);
   
   // Form State
   const [mode, setMode] = useState<'single' | 'installment'>('single');
@@ -46,11 +50,6 @@ const InstallmentExpenseForm: React.FC<Props> = ({ isOpen, onClose, onSave, onUp
       if (formContainerRef.current) {
         formContainerRef.current.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
       }
-      setCategories(financialService.getExpenseCategories());
-      setBankAccounts(financialService.getBankAccountsWithBalances()
-        .filter(acc => acc.active !== false)
-        .sort((a, b) => a.bankName.localeCompare(b.bankName))
-      );
       
       // Reset form
       setDescription('');
@@ -67,7 +66,7 @@ const InstallmentExpenseForm: React.FC<Props> = ({ isOpen, onClose, onSave, onUp
 
       // Edição: preencher dados
       if (initialData) {
-        const categoryGroup = financialService.getExpenseCategories()
+        const categoryGroup = categories
           .find(c => c.subtypes.some(s => s.name === initialData.category));
         setSelectedType((categoryGroup?.type as any) || null);
         setCategoryName(initialData.category || '');
@@ -79,8 +78,8 @@ const InstallmentExpenseForm: React.FC<Props> = ({ isOpen, onClose, onSave, onUp
         setMode('single');
         setIsPaidNow(initialData.status === 'paid');
 
-        const accounts = financialService.getBankAccountsWithBalances().filter(acc => acc.active !== false);
-        const matched = accounts.find(a => a.id === initialData.bankAccount || a.bankName === initialData.bankAccount);
+        const accounts = bankAccounts.filter(acc => acc.is_active !== false);
+        const matched = accounts.find(a => a.id === initialData.bankAccount || a.account_name === initialData.bankAccount);
         setAccountId(matched?.id || '');
       }
     }
@@ -125,7 +124,7 @@ const InstallmentExpenseForm: React.FC<Props> = ({ isOpen, onClose, onSave, onUp
         paidValue: isPaidNow ? value : (initialData.paidValue || 0),
         status: isPaidNow ? 'paid' : 'pending',
         subType: 'admin',
-        bankAccount: isPaidNow ? (selectedAccount?.bankName || initialData.bankAccount) : undefined,
+        bankAccount: isPaidNow ? (selectedAccount?.account_name || initialData.bankAccount) : undefined,
         notes
       };
 
@@ -137,7 +136,7 @@ const InstallmentExpenseForm: React.FC<Props> = ({ isOpen, onClose, onSave, onUp
 
     if (mode === 'single') {
       recordsToCreate.push({
-        id: Math.random().toString(36).substr(2, 9),
+        id: crypto.randomUUID(),
         description,
         entityName: 'DESPESA DIRETA', 
         category: categoryName,
@@ -147,7 +146,7 @@ const InstallmentExpenseForm: React.FC<Props> = ({ isOpen, onClose, onSave, onUp
         paidValue: isPaidNow ? value : 0,
         status: isPaidNow ? 'paid' : 'pending',
         subType: 'admin',
-        bankAccount: isPaidNow ? selectedAccount?.bankName : undefined,
+        bankAccount: isPaidNow ? selectedAccount?.account_name : undefined,
         notes: isPaidNow ? `[BAIXA IMEDIATA] ${notes}` : notes
       });
     } else {
@@ -159,7 +158,7 @@ const InstallmentExpenseForm: React.FC<Props> = ({ isOpen, onClose, onSave, onUp
         nextDueDate.setMonth(baseDate.getMonth() + i);
         
         recordsToCreate.push({
-          id: Math.random().toString(36).substr(2, 9),
+          id: crypto.randomUUID(),
           description: `${description} (${i + 1}/${installments})`,
           entityName: 'DESPESA PARCELADA',
           category: categoryName,
@@ -336,7 +335,7 @@ const InstallmentExpenseForm: React.FC<Props> = ({ isOpen, onClose, onSave, onUp
                           <option value="">Selecione a conta bancária...</option>
                           {bankAccounts.map(acc => (
                             <option key={acc.id} value={acc.id}>
-                              {acc.bankName} (Saldo: {formatBRL(acc.currentBalance)})
+                              {acc.account_name} (Saldo: {formatBRL(acc.balance)})
                             </option>
                           ))}
                       </select>

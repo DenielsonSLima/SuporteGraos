@@ -3,7 +3,8 @@ import {
   X, Save, TrendingUp, DollarSign, Calendar, 
   Wallet
 } from 'lucide-react';
-import { financialService, BankAccountWithBalance } from '../../../../services/financialService';
+import type { Account } from '../../../../services/accountsService';
+import { useAccounts } from '../../../../hooks/useAccounts';
 import { getLocalDateString } from '../../../../utils/dateUtils';
 import { useToast } from '../../../../contexts/ToastContext';
 
@@ -15,7 +16,8 @@ interface Props {
 }
 
 const CreditFormModal: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialData }) => {
-  const [bankAccounts, setBankAccounts] = useState<BankAccountWithBalance[]>([]);
+  const { data: allBankAccounts = [] } = useAccounts();
+  const bankAccounts = React.useMemo(() => allBankAccounts.sort((a, b) => a.account_name.localeCompare(b.account_name)), [allBankAccounts]);
   const { addToast } = useToast();
   
   const [formData, setFormData] = useState({
@@ -58,10 +60,6 @@ const CreditFormModal: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialDa
         setDisplayValue('');
       }
 
-      const accounts = financialService.getBankAccountsWithBalances()
-        .filter(acc => acc.active !== false)
-        .sort((a, b) => a.bankName.localeCompare(b.bankName));
-      setBankAccounts(accounts);
     }
   }, [isOpen, initialData]);
 
@@ -87,7 +85,7 @@ const CreditFormModal: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialDa
       description: formData.description,
       value,
       accountId: formData.accountId,
-      accountName: selectedAccount?.bankName || ''
+      accountName: selectedAccount?.account_name || ''
     });
     onClose();
   };
@@ -179,7 +177,7 @@ const CreditFormModal: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialDa
                   <option value="">Selecione uma conta...</option>
                   {bankAccounts.map(account => (
                     <option key={account.id} value={account.id}>
-                      {account.bankName} - {account.owner || 'Sem titular'} (Saldo: {formatBRL(account.currentBalance || 0)})
+                      {account.account_name} (Saldo: {formatBRL(account.balance || 0)})
                     </option>
                   ))}
                 </select>

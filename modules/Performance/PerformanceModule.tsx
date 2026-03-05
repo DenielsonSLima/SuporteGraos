@@ -1,7 +1,7 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import { Calendar, LayoutDashboard, Table, PieChart, Printer } from 'lucide-react';
-import { performanceService } from './services/performanceService';
+import { usePerformanceReport } from '../../hooks/usePerformance';
 import { PerformanceReport } from './types';
 import { formatMoney } from '../../utils/formatters';
 import FinancialKPIs from './components/FinancialKPIs';
@@ -10,44 +10,19 @@ import EvolutionChart from './components/EvolutionChart';
 import QuantityChart from './components/QuantityChart';
 import PriceTrendChart from './components/PriceTrendChart';
 import CostTrendChart from './components/CostTrendChart';
-import NetProfitChart from './components/NetProfitChart'; // Novo Import
+import NetProfitChart from './components/NetProfitChart';
 import HarvestBreakdown from './components/HarvestBreakdown';
 import ExpenseStructure from './components/ExpenseStructure';
 import PerformancePdfModal from './components/PerformancePdfModal';
-import { waitForInit } from '../../services/supabaseInitService';
 
 const PerformanceModule: React.FC = () => {
   const [monthsBack, setMonthsBack] = useState<number | null>(6);
-  const [data, setData] = useState<PerformanceReport | null>(null);
+  const { data, isLoading } = usePerformanceReport(monthsBack);
   const [isPdfOpen, setIsPdfOpen] = useState(false);
   const [pdfData, setPdfData] = useState<PerformanceReport | null>(null);
   const [pdfPeriodLabel, setPdfPeriodLabel] = useState('');
 
-  const loadData = useCallback(async () => {
-    await waitForInit();
-    const report = performanceService.getReport(monthsBack);
-    setData(report);
-  }, [monthsBack]);
-
-  useEffect(() => {
-    void loadData();
-  }, [loadData]);
-
-  useEffect(() => {
-    const handleUpdate = () => {
-      void loadData();
-    };
-
-    window.addEventListener('data:updated', handleUpdate);
-    window.addEventListener('financial:updated', handleUpdate);
-
-    return () => {
-      window.removeEventListener('data:updated', handleUpdate);
-      window.removeEventListener('financial:updated', handleUpdate);
-    };
-  }, [loadData]);
-
-  if (!data) return <div className="p-10 text-center animate-pulse text-slate-400 font-black uppercase">Calculando Indicadores...</div>;
+  if (isLoading || !data) return <div className="p-10 text-center animate-pulse text-slate-400 font-black uppercase">Calculando Indicadores...</div>;
 
   const periodLabel = monthsBack ? `Últimos ${monthsBack} Meses` : 'Histórico Total';
 

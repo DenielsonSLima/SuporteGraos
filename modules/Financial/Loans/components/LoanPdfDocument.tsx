@@ -5,12 +5,12 @@ import { pdfStyles } from '../../../../components/pdf/PdfStyles';
 import { PdfHeader } from '../../../../components/pdf/PdfHeader';
 import { PdfWatermark } from '../../../../components/pdf/PdfWatermark';
 import { PdfFooter } from '../../../../components/pdf/PdfFooter';
-import { settingsService } from '../../../../services/settingsService';
-import { bankAccountService } from '../../../../services/bankAccountService';
+import type { Account } from '../../../../services/accountsService';
 
 interface Props {
   loan: LoanRecord;
   history: FinancialRecord[];
+  accounts?: Account[];
 }
 
 const styles = {
@@ -24,7 +24,7 @@ const styles = {
   },
   contractGrid: {
     flexDirection: 'row' as const,
-    justifyContent: 'space-between',
+    justifyContent: 'space-between' as const,
     gap: 16,
     marginBottom: 12,
   },
@@ -83,7 +83,7 @@ const styles = {
     marginTop: 20,
     borderRadius: 4,
     flexDirection: 'row' as const,
-    justifyContent: 'flex-end',
+    justifyContent: 'flex-end' as const,
     gap: 32,
   },
   summaryItem: {
@@ -103,9 +103,7 @@ const styles = {
   },
 };
 
-const LoanPdfDocument: React.FC<Props> = ({ loan, history }) => {
-  const accounts = bankAccountService.getBankAccounts();
-
+const LoanPdfDocument: React.FC<Props> = ({ loan, history, accounts = [] }) => {
   const currency = (val: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
   };
@@ -117,7 +115,7 @@ const LoanPdfDocument: React.FC<Props> = ({ loan, history }) => {
   const getBankAccountName = (id?: string) => {
     if (!id) return '-';
     const acc = accounts.find(a => a.id === id);
-    return acc?.bankName || id;
+    return acc?.account_name || id;
   };
 
   const originalValue = loan.originalValue ?? loan.totalValue;
@@ -171,7 +169,7 @@ const LoanPdfDocument: React.FC<Props> = ({ loan, history }) => {
             </View>
             <View style={styles.contractItem}>
               <Text style={styles.contractLabel}>Conta Bancária</Text>
-              <Text style={styles.contractValue}>{getBankAccountName(loan.bankAccount)}</Text>
+              <Text style={styles.contractValue}>{loan.accountName || getBankAccountName(loan.accountId)}</Text>
             </View>
             <View style={styles.contractItem}>
               <Text style={styles.contractLabel}>Tipo</Text>

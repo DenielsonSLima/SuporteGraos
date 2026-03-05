@@ -33,11 +33,9 @@ export const partnerAddressSyncService = {
       .single();
 
     if (error) {
-      console.error('❌ Erro ao inserir endereço:', error);
       throw error;
     }
 
-    console.log(`✅ Endereço ${address.street} salvo no Supabase`);
     return data as PartnerAddress;
   },
 
@@ -66,11 +64,9 @@ export const partnerAddressSyncService = {
       .single();
 
     if (error) {
-      console.error('❌ Erro ao atualizar endereço:', error);
       throw error;
     }
 
-    console.log(`✅ Endereço ${address.street} atualizado no Supabase`);
     return data as PartnerAddress;
   },
 
@@ -84,11 +80,9 @@ export const partnerAddressSyncService = {
       .eq('id', id);
 
     if (error) {
-      console.error('❌ Erro ao excluir endereço:', error);
       throw error;
     }
 
-    console.log(`✅ Endereço excluído do Supabase`);
   },
 
   /**
@@ -103,7 +97,6 @@ export const partnerAddressSyncService = {
       .order('created_at');
 
     if (error) {
-      console.error('❌ Erro ao carregar endereços:', error);
       throw error;
     }
 

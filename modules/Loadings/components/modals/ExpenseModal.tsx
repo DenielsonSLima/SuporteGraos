@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { X, DollarSign, Calendar, Wallet, FileText, ArrowDown } from 'lucide-react';
-import { financialService, BankAccountWithBalance } from '../../../../services/financialService';
+import type { Account } from '../../../../services/accountsService';
+import { useAccounts } from '../../../../hooks/useAccounts';
 import { useToast } from '../../../../contexts/ToastContext';
 
 interface Props {
@@ -20,7 +21,12 @@ const ExpenseModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, vehiclePlat
   const [accountId, setAccountId] = useState('');
   const [notes, setNotes] = useState('');
   const [expenseType, setExpenseType] = useState<'deduction' | 'addition'>('deduction');
-  const [bankAccounts, setBankAccounts] = useState<BankAccountWithBalance[]>([]);
+
+  const { data: allAccounts = [] } = useAccounts();
+  const bankAccounts = useMemo(() =>
+    allAccounts.filter((a: Account) => a.is_active !== false).sort((a: Account, b: Account) => a.account_name.localeCompare(b.account_name)),
+    [allAccounts]
+  );
 
   const formatBRL = (val: number) => {
     const normalized = Math.abs(val) < 0.01 ? 0 : val;
@@ -29,11 +35,6 @@ const ExpenseModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, vehiclePlat
 
   useEffect(() => {
     if (isOpen) {
-      const sorted = financialService.getBankAccountsWithBalances()
-        .filter(acc => acc.active !== false)
-        .sort((a, b) => a.bankName.localeCompare(b.bankName));
-      setBankAccounts(sorted);
-      
       setDescription('');
       setDate(new Date().toISOString().split('T')[0]);
       setAmount('');
@@ -50,14 +51,14 @@ const ExpenseModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, vehiclePlat
   const valDiscount = parseFloat(discount) || 0;
   const totalOperation = valAmount + valDiscount;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!description.trim()) return addToast('warning', 'Descrição obrigatória');
     if (valAmount <= 0) return addToast('warning', 'Valor deve ser maior que zero');
     if (!accountId) return addToast('warning', 'Conta bancária obrigatória');
 
     const selectedAccount = bankAccounts.find(a => a.id === accountId);
-    const accountName = selectedAccount?.bankName || 'Caixa';
+    const accountName = selectedAccount?.account_name || 'Caixa';
 
     onConfirm({ 
       description, 
@@ -69,7 +70,6 @@ const ExpenseModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, vehiclePlat
       accountName,
       notes 
     });
-    
     onClose();
   };
 
@@ -143,7 +143,7 @@ const ExpenseModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, vehiclePlat
                 <option value="">Selecione o Banco...</option>
                 {bankAccounts.map(acc => (
                   <option key={acc.id} value={acc.id}>
-                    {acc.bankName} - {acc.owner} (Saldo: {formatBRL(acc.currentBalance)})
+                    {acc.account_name} (Saldo: {formatBRL(acc.balance)})
                   </option>
                 ))}
               </select>

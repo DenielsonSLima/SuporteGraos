@@ -16,7 +16,8 @@ import {
   HandCoins,
   CalendarDays,
   Percent,
-  Info
+  Info,
+  Car
 } from 'lucide-react';
 import { CashierReport } from '../types';
 import CashierPdfPreviewModal from './modals/CashierPdfPreviewModal';
@@ -140,6 +141,13 @@ const CashierReportView: React.FC<Props> = ({ report, title }) => {
             <ListItem label="Recebíveis de Vendas" value={report.pendingSalesReceipts} icon={TrendingUp} colorClass="bg-emerald-100 text-emerald-600" />
             <ListItem label="Patrimônio (Bens Ativos)" value={report.totalFixedAssetsValue} icon={Tractor} colorClass="bg-indigo-100 text-indigo-600" />
             <ListItem
+              label="Vendas de Bens (a Receber)"
+              value={report.pendingAssetSalesReceipts}
+              icon={Car}
+              colorClass="bg-teal-100 text-teal-600"
+              tooltip="Parcelas pendentes de veículos, máquinas e outros bens vendidos."
+            />
+            <ListItem
               label="Haveres de Sócios"
               value={report.shareholderReceivables}
               icon={Users}
@@ -152,7 +160,7 @@ const CashierReportView: React.FC<Props> = ({ report, title }) => {
           </div>
           <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100 flex justify-between items-center">
             <span className="text-xs font-bold uppercase text-emerald-700">Total Ativos + Bens</span>
-            <span className="text-xl font-bold text-emerald-700">{currency(report.totalAssets - report.totalBankBalance)}</span>
+            <span className="text-xl font-bold text-emerald-700">{currency(report.totalAssets)}</span>
           </div>
         </div>
 

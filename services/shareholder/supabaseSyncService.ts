@@ -33,9 +33,7 @@ export const shareholderSupabaseSync = {
       };
 
       await supabase.from('shareholders').insert(supabaseData);
-      console.log(`✅ Sócio ${shareholder.name} salvo no Supabase`);
     } catch (error) {
-      console.warn('⚠️ Erro ao salvar sócio no Supabase:', error);
     }
   },
 
@@ -60,18 +58,14 @@ export const shareholderSupabaseSync = {
         recurrence_day: shareholder.financial.recurrence?.day || 1,
         recurrence_last_generated_month: shareholder.financial.recurrence?.lastGeneratedMonth || null
       }).eq('id', shareholder.id);
-      console.log(`✅ Sócio ${shareholder.name} atualizado no Supabase`);
     } catch (error) {
-      console.warn('⚠️ Erro ao atualizar sócio no Supabase:', error);
     }
   },
 
   syncDeleteShareholder: async (id: string) => {
     try {
       await supabase.from('shareholders').delete().eq('id', id);
-      console.log(`✅ Sócio excluído do Supabase`);
     } catch (error) {
-      console.warn('⚠️ Erro ao excluir sócio do Supabase:', error);
     }
   },
 
@@ -88,7 +82,6 @@ export const shareholderSupabaseSync = {
         company_id: authService.getCurrentUser()?.companyId || null
       });
     } catch (error) {
-      console.warn('⚠️ Erro ao salvar transação no Supabase:', error);
     }
   },
 
@@ -102,7 +95,6 @@ export const shareholderSupabaseSync = {
         account_name: transaction.accountId || null
       }).eq('id', transaction.id);
     } catch (error) {
-      console.warn('⚠️ Erro ao atualizar transação no Supabase:', error);
     }
   },
 
@@ -110,7 +102,6 @@ export const shareholderSupabaseSync = {
     try {
       await supabase.from('shareholder_transactions').delete().eq('id', transactionId);
     } catch (error) {
-      console.warn('⚠️ Erro ao excluir transação do Supabase:', error);
     }
   },
 
@@ -120,7 +111,6 @@ export const shareholderSupabaseSync = {
         current_balance: currentBalance
       }).eq('id', shareholderId);
     } catch (error) {
-      console.warn('⚠️ Erro ao atualizar saldo no Supabase:', error);
     }
   }
 };

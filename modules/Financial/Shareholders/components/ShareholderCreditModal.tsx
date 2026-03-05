@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, Save, Calendar, DollarSign, FileText, TrendingUp, Pencil, CheckSquare, Square, Wallet, ArrowDown, User } from 'lucide-react';
-import { financialService, BankAccountWithBalance } from '../../../../services/financialService';
+import type { Account } from '../../../../services/accountsService';
+import { useAccounts } from '../../../../hooks/useAccounts';
 import { getLocalDateString } from '../../../../utils/dateUtils';
-import { Shareholder } from '../../../../services/shareholderService';
+import type { Shareholder } from '../../../../services/shareholderService';
 import { useToast } from '../../../../contexts/ToastContext';
 
 interface Props {
@@ -28,7 +29,8 @@ const ShareholderCreditModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, s
   const [description, setDescription] = useState('Pro-labore Mensal');
   const [payImmediately, setPayImmediately] = useState(false);
   const [accountId, setAccountId] = useState('');
-  const [bankAccounts, setBankAccounts] = useState<BankAccountWithBalance[]>([]);
+  const { data: allBankAccounts = [] } = useAccounts();
+  const bankAccounts = React.useMemo(() => allBankAccounts.sort((a, b) => a.account_name.localeCompare(b.account_name)), [allBankAccounts]);
 
   const formatBRL = (val: number) => {
     const normalized = Math.abs(val) < 0.01 ? 0 : val;
@@ -50,11 +52,7 @@ const ShareholderCreditModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, s
         setAccountId('');
         setSelectedShareholderId('');
       }
-      
-      const accounts = financialService.getBankAccountsWithBalances()
-          .filter(acc => acc.active !== false)
-          .sort((a, b) => a.bankName.localeCompare(b.bankName));
-      setBankAccounts(accounts);
+
     }
   }, [isOpen, initialData]);
 
@@ -75,7 +73,7 @@ const ShareholderCreditModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, s
     onConfirm({
       shareholderId: finalId, date, value: val, description, payImmediately,
       accountId: payImmediately ? accountId : undefined,
-      accountName: payImmediately ? (account?.bankName || 'Conta') : undefined
+      accountName: payImmediately ? (account?.account_name || 'Conta') : undefined
     });
     onClose();
   };
@@ -108,7 +106,7 @@ const ShareholderCreditModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, s
                 {payImmediately && (
                   <div className="mt-5 space-y-2 animate-in slide-in-from-top-2">
                      <label className={labelClass}>Conta Bancária (Saldo em Tempo Real)</label>
-                     <div className="relative"><Wallet className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={18} /><select required value={accountId} onChange={e => setAccountId(e.target.value)} className={`${inputClass} pl-10 appearance-none`}><option value="">Selecione a Conta...</option>{bankAccounts.map(acc => (<option key={acc.id} value={acc.id}>{acc.bankName} - {acc.owner} (Saldo: {formatBRL(acc.currentBalance)})</option>))}</select><ArrowDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" size={16} /></div>
+                     <div className="relative"><Wallet className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={18} /><select required value={accountId} onChange={e => setAccountId(e.target.value)} className={`${inputClass} pl-10 appearance-none`}><option value="">Selecione a Conta...</option>{bankAccounts.map(acc => (<option key={acc.id} value={acc.id}>{acc.account_name} (Saldo: {formatBRL(acc.balance)})</option>))}</select><ArrowDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" size={16} /></div>
                   </div>
                 )}
             </div>

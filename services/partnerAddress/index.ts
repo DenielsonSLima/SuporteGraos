@@ -7,6 +7,7 @@ import { supabase } from '../supabase';
 import { Persistence } from '../persistence';
 import { logService } from '../logService';
 import { authService } from '../authService';
+import { isSqlCanonicalOpsEnabled, sqlCanonicalOpsLog } from '../sqlCanonicalOps';
 import { PartnerAddress, PartnerAddressInput, PartnerAddressCreateInput } from './types';
 import { generateUUID, createPartnerAddress, transformAddressFromSupabase } from './utils';
 import { partnerAddressSyncService } from './supabaseSyncService';
@@ -23,6 +24,14 @@ let isLoaded = false;
 
 const loadFromSupabase = async () => {
   if (isLoaded) return;
+
+  if (isSqlCanonicalOpsEnabled()) {
+    sqlCanonicalOpsLog('partnerAddressService.loadFromSupabase ignorado em modo canônico (partner_addresses legado)');
+    db.setAll([]);
+    isLoaded = true;
+    return;
+  }
+
   try {
     const { data, error } = await supabase
       .from('partner_addresses')
@@ -35,7 +44,6 @@ const loadFromSupabase = async () => {
     db.setAll(transformedData);
     isLoaded = true;
   } catch (error) {
-    console.error('❌ Erro ao carregar endereços:', error);
   }
 };
 
@@ -45,6 +53,11 @@ const loadFromSupabase = async () => {
 
 const startRealtime = () => {
   if (realtimeChannel) return;
+
+  if (isSqlCanonicalOpsEnabled()) {
+    sqlCanonicalOpsLog('partnerAddressService.startRealtime ignorado em modo canônico (partner_addresses legado)');
+    return;
+  }
 
   realtimeChannel = supabase
     .channel('realtime:partner_addresses')
@@ -65,9 +78,15 @@ const startRealtime = () => {
     })
     .subscribe((status) => {
       if (status === 'CHANNEL_ERROR') {
-        console.error('❌ Erro no canal Realtime (pode ser RLS)');
       }
     });
+};
+
+const stopRealtime = () => {
+  if (realtimeChannel) {
+    supabase.removeChannel(realtimeChannel);
+    realtimeChannel = null;
+  }
 };
 
 // Inicializar ao carregar o módulo
@@ -205,10 +224,8 @@ export const partnerAddressService = {
       // Substitui pelo registro real do Supabase (em caso de diferenças)
       db.delete(address.id);
       db.add(savedAddress);
-      console.log(`✅ Endereço ${input.street} salvo com sucesso`);
       return savedAddress;
     } catch (error) {
-      console.error('❌ Erro ao salvar endereço:', error);
       db.delete(address.id);
       throw error;
     }
@@ -286,10 +303,8 @@ export const partnerAddressService = {
       address.city_id = (resolvedCityId ?? null) as any;
       const savedAddress = await partnerAddressSyncService.syncUpdate(address);
       db.update(savedAddress);
-      console.log(`✅ Endereço ${address.street} atualizado com sucesso`);
       return savedAddress;
     } catch (error) {
-      console.error('❌ Erro ao atualizar endereço:', error);
       if (existing) db.update(existing);
       throw error;
     }
@@ -313,9 +328,7 @@ export const partnerAddressService = {
 
     try {
       await partnerAddressSyncService.syncDelete(id);
-      console.log('✅ Endereço excluído com sucesso');
     } catch (error) {
-      console.error('❌ Erro ao excluir endereço:', error);
       db.add(address);
       throw error;
     }
@@ -333,7 +346,6 @@ export const partnerAddressService = {
       });
       return transformed;
     } catch (error) {
-      console.error('❌ Erro ao carregar endereços do parceiro:', error);
       throw error;
     }
   },
@@ -345,5 +357,6 @@ export const partnerAddressService = {
     return loadFromSupabase();
   },
   loadFromSupabase,
-  startRealtime
+  startRealtime,
+  stopRealtime
 };

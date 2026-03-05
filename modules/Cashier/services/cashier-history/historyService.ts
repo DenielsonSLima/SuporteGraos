@@ -1,209 +1,47 @@
 /**
- * 📈 historyService - Cálculo Retroativo de Meses
- * 
- * Filtra financial_history por data (month/year) para recalcular
- * relatórios de meses anteriores.
- * 
- * Suporta:
- * - Lançamentos atrasados que devem ser de mês anterior
- * - Ajustes/correções que modificam saldo retroativo
- * - Recálculo automático ao filtrar por data
+ * 📈 historyService - Balanço Retroativo via RPC
+ *
+ * REFATORADO: Todos os cálculos agora rodam no PostgreSQL via
+ * rpc_monthly_balance_sheet(). O frontend apenas consome o JSON retornado.
+ *
+ * Regra 5.4: "Não fazer cálculo crítico no front-end"
+ * Regra 7.2: "Toda regra financeira deve estar no banco"
+ *
+ * Antes: ~20 .reduce() no browser + 9 imports de services
+ * Agora: 1 RPC atômica que retorna tudo
  */
 
-import { financialActionService } from '../../../../services/financialActionService';
-import { financialService } from '../../../../services/financialService';
-import { transfersService } from '../../../../services/financial/transfersService';
-import { loansService } from '../../../../services/financial/loansService';
-import { advanceService } from '../../../../modules/Financial/Advances/services/advanceService';
-import { shareholderService } from '../../../../services/shareholderService';
-import { assetService } from '../../../../services/assetService';
-import { LoadingCache } from '../../../../services/loadingCache';
-import { FinancialCache } from '../../../../services/financialCache';
+import { supabase } from '../../../../services/supabase';
+import { authService } from '../../../../services/authService';
 
-import { MonthlyReport, HistoryListItem } from './types';
+import type { MonthlyReport, HistoryListItem } from './types';
+
+// ─── helpers ────────────────────────────────────────────────────────────────
+const getCompanyId = (): string => {
+  const user = authService.getCurrentUser();
+  return user?.companyId ?? '';
+};
 
 /**
- * Calcula relatório para um mês específico
- * @param year Ex: 2026
- * @param month Ex: 1 (janeiro)
- * @returns MonthlyReport com dados daquele mês
+ * Converte o JSON da RPC em MonthlyReport compatível com o tipo existente
  */
-export const calculateMonthlyReport = (year: number, month: number): MonthlyReport => {
-  const monthKey = `${year}-${String(month).padStart(2, '0')}`;
-  const monthLabel = new Date(year, month - 1).toLocaleDateString('pt-BR', {
-    month: 'long',
-    year: 'numeric'
-  });
+const rpcToMonthlyReport = (rpc: any, year: number, month: number): MonthlyReport => {
+  const monthKey = rpc.monthKey ?? `${year}-${String(month).padStart(2, '0')}`;
+  const endOfMonth = rpc.referenceDate ?? new Date(year, month, 0).toISOString().split('T')[0];
 
-  const startOfMonth = new Date(year, month - 1, 1).toISOString().split('T')[0];
-  const endOfMonth = new Date(year, month, 0).toISOString().split('T')[0];
+  const bankBalances = (rpc.bankBalances ?? []).map((b: any) => ({
+    id: b.id,
+    bankName: b.bankName,
+    owner: b.owner ?? undefined,
+    balance: Number(b.balance) || 0,
+  }));
 
-  // ============================================================================
-  // 1. FILTRA TRANSAÇÕES DO MÊS
-  // ============================================================================
+  const totalBankBalance = Number(rpc.totalBankBalance) || 0;
 
-  const standaloneRecords = financialActionService.getStandaloneRecords();
-  const bankAccounts = financialService.getBankAccounts();
-  const initialBalances = financialService.getInitialBalances();
-  const transfers = transfersService.getAll();
-  const allLoadings = LoadingCache.getAll();
-
-  // Mapeamento de movimentações por conta
-  const txByAccount: Record<string, any[]> = {};
-  const addTx = (accId: string, val: number, date: string, type: 'credit' | 'debit') => {
-    if (!txByAccount[accId]) txByAccount[accId] = [];
-    txByAccount[accId].push({ val, date, type });
-  };
-
-  // Filtra apenas registros do mês (por issueDate)
-  standaloneRecords.forEach(r => {
-    if (r.status !== 'paid') return;
-    if (r.issueDate < startOfMonth || r.issueDate > endOfMonth) return;
-
-    const acc = bankAccounts.find(a => a.id === r.bankAccount || a.bankName === r.bankAccount);
-    if (!acc) return;
-
-    const isCredit = ['sales_order', 'receipt', 'loan_taken', 'Venda de Ativo'].includes(
-      r.subType || ''
-    ) || r.category === 'Venda de Ativo';
-
-    addTx(acc.id, r.paidValue, r.issueDate, isCredit ? 'credit' : 'debit');
-  });
-
-  // Filtra transferências do mês
-  transfers.forEach(t => {
-    if (t.transferDate < startOfMonth || t.transferDate > endOfMonth) return;
-    if (t.fromAccountId) addTx(t.fromAccountId, t.amount, t.transferDate, 'debit');
-    if (t.toAccountId) addTx(t.toAccountId, t.amount, t.transferDate, 'credit');
-  });
-
-  // ============================================================================
-  // 2. CÁLCULO DE SALDOS (Início e Fim do Mês)
-  // ============================================================================
-
-  let totalInitialMonthBalance = 0;
-  const initialMonthBalances: any[] = [];
-
-  const bankBalances = bankAccounts.map(account => {
-    const initRecord = initialBalances.find(b => b.accountId === account.id);
-    const initVal = initRecord ? initRecord.value : 0;
-    const initDate = initRecord ? initRecord.date : '2000-01-01';
-
-    const accountTxs = txByAccount[account.id] || [];
-
-    // Saldo do INÍCIO do mês (antes de qualquer transação do mês)
-    const monthStartVal = accountTxs.reduce((acc, t) => {
-      if (t.date >= initDate && t.date < startOfMonth) {
-        return t.type === 'credit' ? acc + t.val : acc - t.val;
-      }
-      return acc;
-    }, initVal);
-
-    totalInitialMonthBalance += monthStartVal;
-    initialMonthBalances.push({
-      id: account.id,
-      bankName: account.bankName,
-      value: monthStartVal
-    });
-
-    // Saldo FINAL do mês (início + transações do mês)
-    const monthEndVal = accountTxs.reduce((acc, t) => {
-      if (t.date >= startOfMonth && t.date <= endOfMonth) {
-        return t.type === 'credit' ? acc + t.val : acc - t.val;
-      }
-      return acc;
-    }, monthStartVal);
-
-    return {
-      id: account.id,
-      bankName: account.bankName,
-      owner: account.owner || undefined,
-      balance: monthEndVal
-    };
-  });
-
-  // ============================================================================
-  // 3. ATIVOS E PASSIVOS (mesmo cálculo, mas filtrando por data)
-  // ============================================================================
-
-  const totalBankBalance = bankBalances.reduce((acc, b) => acc + b.balance, 0);
-  const receivables = FinancialCache.getReceivables();
-  const payables = FinancialCache.getPayables();
-
-  // Contas a receber em aberto (até fim do mês)
-  const pendingSalesReceipts = receivables
-    .filter(r => r.subType === 'sales_order' && r.status !== 'paid' && r.issueDate <= endOfMonth)
-    .reduce((acc, r) => acc + (r.originalValue - r.paidValue - (r.discountValue || 0)), 0);
-
-  // Mercadorias em trânsito (carregamentos)
-  const merchandiseInTransitValue = allLoadings
-    .filter(l => ['loaded', 'in_transit', 'redirected', 'waiting_unload'].includes(l.status))
-    .reduce((acc, l) => acc + (l.totalSalesValue || 0), 0);
-
-  // Ativos imobilizados
-  const totalFixedAssetsValue = assetService.getAll()
-    .filter(a => a.status === 'active')
-    .reduce((acc, a) => acc + a.acquisitionValue, 0);
-
-  // Haveres de sócios
-  const shareholderReceivables = shareholderService.getAll()
-    .filter(s => s.financial.currentBalance < 0)
-    .reduce((acc, s) => acc + Math.abs(s.financial.currentBalance), 0);
-
-  // Empréstimos concedidos
-  const loansGranted = loansService.getAll()
-    .filter(l => l.subType === 'loan_granted' && l.status !== 'paid' && l.issueDate <= endOfMonth)
-    .reduce((acc, l) => acc + (l.originalValue - l.paidValue), 0);
-
-  // Adiantamentos dados
-  const advancesGiven = advanceService.getSummaries()
-    .filter(s => s.netBalance > 0)
-    .reduce((acc, s) => acc + s.netBalance, 0);
-
-  const totalAssets = totalBankBalance + pendingSalesReceipts + merchandiseInTransitValue +
-    loansGranted + shareholderReceivables + advancesGiven + totalFixedAssetsValue;
-
-  // Contas a pagar
-  const pendingPurchasePayments = payables
-    .filter(r => r.subType === 'purchase_order' && r.status !== 'paid' && r.issueDate <= endOfMonth)
-    .reduce((acc, r) => acc + (r.originalValue - r.paidValue - (r.discountValue || 0)), 0);
-
-  const pendingFreightPayments = payables
-    .filter(r => r.subType === 'freight' && r.status !== 'paid' && r.issueDate <= endOfMonth)
-    .reduce((acc, r) => acc + (r.originalValue - r.paidValue - (r.discountValue || 0)), 0);
-
-  const commissionsToPay = payables
-    .filter(r => r.subType === 'commission' && r.status !== 'paid' && r.issueDate <= endOfMonth)
-    .reduce((acc, r) => acc + (r.originalValue - r.paidValue - (r.discountValue || 0)), 0);
-
-  // Empréstimos tomados
-  const loansTaken = loansService.getAll()
-    .filter(l => l.subType === 'loan_taken' && l.status !== 'paid' && l.issueDate <= endOfMonth)
-    .reduce((acc, l) => acc + (l.originalValue - l.paidValue), 0);
-
-  // Adiantamentos tomados
-  const advancesTaken = advanceService.getSummaries()
-    .filter(s => s.netBalance < 0)
-    .reduce((acc, s) => acc + Math.abs(s.netBalance), 0);
-
-  // Obrigações com sócios
-  const shareholderPayables = shareholderService.getAll()
-    .filter(s => s.financial.currentBalance > 0)
-    .reduce((acc, s) => acc + s.financial.currentBalance, 0);
-
-  const totalLiabilities = pendingPurchasePayments + pendingFreightPayments + loansTaken +
-    commissionsToPay + shareholderPayables + advancesTaken;
-
-  // ============================================================================
-  // 4. RETORNA RELATÓRIO MENSAL
-  // ============================================================================
-
-  const netBalance = totalAssets - totalLiabilities;
-
-  const report: any = {
+  return {
     id: monthKey,
     monthKey,
-    monthLabel,
+    monthLabel: rpc.monthLabel ?? '',
     referenceDate: endOfMonth + 'T23:59:59Z',
     isClosed: false,
     isSnapshot: false,
@@ -211,73 +49,157 @@ export const calculateMonthlyReport = (year: number, month: number): MonthlyRepo
 
     bankBalances,
     totalBankBalance,
-    totalInitialBalance: initialBalances.reduce((acc, b) => acc + b.value, 0),
-    totalInitialMonthBalance,
-    initialMonthBalances,
+    totalInitialBalance: Number(rpc.totalInitialBalance) || 0,
+    totalInitialMonthBalance: Number(rpc.totalInitialMonthBalance) || bankBalances.reduce(
+      (acc: number, b: any) => acc + (Number(b.startBalance) || 0), 0
+    ),
+    initialMonthBalances: bankBalances.map((b: any) => ({
+      id: b.id,
+      bankName: b.bankName,
+      value: Number(b.startBalance) || 0,
+    })),
 
-    pendingSalesReceipts,
-    merchandiseInTransitValue,
-    loansGranted,
-    advancesGiven,
-    totalFixedAssetsValue,
+    pendingSalesReceipts: Number(rpc.pendingSalesReceipts) || 0,
+    merchandiseInTransitValue: Number(rpc.merchandiseInTransitValue) || 0,
+    loansGranted: Number(rpc.loansGranted) || 0,
+    advancesGiven: Number(rpc.advancesGiven) || 0,
+    totalFixedAssetsValue: Number(rpc.totalFixedAssetsValue) || 0,
     pendingAssetSalesReceipts: 0,
-    shareholderReceivables,
-    totalAssets,
+    shareholderReceivables: Number(rpc.shareholderReceivables) || 0,
+    totalAssets: Number(rpc.totalAssets) || 0,
 
-    pendingPurchasePayments,
-    pendingFreightPayments,
-    loansTaken,
-    commissionsToPay,
-    advancesTaken,
-    shareholderPayables,
-    totalLiabilities,
+    pendingPurchasePayments: Number(rpc.pendingPurchasePayments) || 0,
+    pendingFreightPayments: Number(rpc.pendingFreightPayments) || 0,
+    loansTaken: Number(rpc.loansTaken) || 0,
+    commissionsToPay: Number(rpc.commissionsToPay) || 0,
+    advancesTaken: Number(rpc.advancesTaken) || 0,
+    shareholderPayables: Number(rpc.shareholderPayables) || 0,
+    totalLiabilities: Number(rpc.totalLiabilities) || 0,
 
-    netBalance
-  };
+    netBalance: Number(rpc.netBalance) || 0,
+  } as MonthlyReport;
+};
 
-  return report as MonthlyReport;
+// ─── RPC call ───────────────────────────────────────────────────────────────
+const fetchBalanceSheet = async (
+  companyId: string,
+  year: number,
+  month: number,
+): Promise<any | null> => {
+  const { data, error } = await supabase.rpc('rpc_monthly_balance_sheet', {
+    p_company_id: companyId,
+    p_year: year,
+    p_month: month,
+  });
+
+  if (error) {
+    console.error('[historyService] rpc_monthly_balance_sheet error:', error.message);
+    return null;
+  }
+
+  return data;
+};
+
+// ─── public API ─────────────────────────────────────────────────────────────
+
+/**
+ * Calcula relatório para um mês específico (via RPC)
+ */
+export const calculateMonthlyReport = async (
+  year: number,
+  month: number,
+): Promise<MonthlyReport> => {
+  const companyId = getCompanyId();
+  const rpc = await fetchBalanceSheet(companyId, year, month);
+
+  if (!rpc) {
+    // Retorna relatório vazio em caso de erro
+    return rpcToMonthlyReport({}, year, month);
+  }
+
+  return rpcToMonthlyReport(rpc, year, month);
 };
 
 /**
- * Lista todos os meses com histórico disponível
+ * Conta movimentações de um mês via SQL (count de financial_transactions + transfers)
+ */
+const getMonthlyMovementCount = async (
+  companyId: string,
+  year: number,
+  month: number,
+): Promise<number> => {
+  const startOfMonth = `${year}-${String(month).padStart(2, '0')}-01`;
+  const endOfMonth = new Date(year, month, 0).toISOString().split('T')[0];
+
+  const [txRes, trRes] = await Promise.all([
+    supabase
+      .from('financial_transactions')
+      .select('id', { count: 'exact', head: true })
+      .eq('company_id', companyId)
+      .gte('transaction_date', startOfMonth)
+      .lte('transaction_date', endOfMonth),
+    supabase
+      .from('transfers')
+      .select('id', { count: 'exact', head: true })
+      .eq('company_id', companyId)
+      .gte('transfer_date', startOfMonth)
+      .lte('transfer_date', endOfMonth),
+  ]);
+
+  return (txRes.count ?? 0) + (trRes.count ?? 0);
+};
+
+/**
+ * Lista todos os meses com histórico disponível (últimos 12 meses)
  * @returns Array de HistoryListItem ordenados por data (mais recentes primeiro)
  */
-export const getMonthlyHistory = (): HistoryListItem[] => {
+export const getMonthlyHistory = async (): Promise<HistoryListItem[]> => {
+  const companyId = getCompanyId();
+  if (!companyId) return [];
+
   const today = new Date();
-  const monthsList: HistoryListItem[] = [];
+  const months: { year: number; month: number }[] = [];
 
-  // Busca todos os meses até 12 meses atrás (configurável)
-  for (let i = 0; i < 12; i++) {
+  for (let i = 1; i <= 12; i++) {
     const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+    months.push({ year: d.getFullYear(), month: d.getMonth() + 1 });
+  }
 
-    // Pula mês atual
-    if (d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear()) {
-      continue;
-    }
+  // Busca contagens em paralelo
+  const counts = await Promise.all(
+    months.map(m => getMonthlyMovementCount(companyId, m.year, m.month)),
+  );
 
-    const report = calculateMonthlyReport(d.getFullYear(), d.getMonth() + 1);
+  // Filtra meses com movimentação
+  const activeMonths = months.filter((_, i) => counts[i] > 0);
 
-    monthsList.push({
+  // Busca balanços em paralelo
+  const reports = await Promise.all(
+    activeMonths.map(m => calculateMonthlyReport(m.year, m.month)),
+  );
+
+  return reports
+    .map((report, i) => ({
       monthKey: report.monthKey,
       label: report.monthLabel,
       report,
-      hasSnapshot: false, // será atualizado por snapshotService
-      finalBalance: (report as any).netBalance,
-      transactionCount: 0 // será contado
-    });
-  }
-
-  return monthsList.sort((a, b) => new Date(b.monthKey).getTime() - new Date(a.monthKey).getTime());
+      hasSnapshot: false,
+      finalBalance: report.netBalance,
+      transactionCount: counts[months.indexOf(activeMonths[i])],
+    }))
+    .sort((a, b) => b.monthKey.localeCompare(a.monthKey));
 };
 
 /**
  * Obtém relatório de um mês específico
  */
-export const getMonthReport = (year: number, month: number): MonthlyReport | null => {
+export const getMonthReport = async (
+  year: number,
+  month: number,
+): Promise<MonthlyReport | null> => {
   try {
-    return calculateMonthlyReport(year, month);
-  } catch (err) {
-    console.error(`❌ Erro ao calcular relatório para ${year}-${month}:`, err);
+    return await calculateMonthlyReport(year, month);
+  } catch {
     return null;
   }
 };
@@ -285,5 +207,5 @@ export const getMonthReport = (year: number, month: number): MonthlyReport | nul
 export const historyService = {
   calculateMonthlyReport,
   getMonthlyHistory,
-  getMonthReport
+  getMonthReport,
 };

@@ -3,7 +3,7 @@ import React from 'react';
 import { Calendar } from 'lucide-react';
 
 interface Props {
-  filters: { startDate?: string; endDate?: string };
+  filters: { startDate?: string; endDate?: string; carrierName?: string; [key: string]: any };
   onChange: (newFilters: any) => void;
 }
 

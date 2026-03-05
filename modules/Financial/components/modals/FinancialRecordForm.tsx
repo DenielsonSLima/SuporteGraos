@@ -1,29 +1,23 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, Save, Calendar, DollarSign, FileText, Tag, User, ArrowRight, Wallet } from 'lucide-react';
-import { financialService, BankAccountWithBalance } from '../../../../services/financialService';
-import { BankAccount } from '../../types';
+import type { Account } from '../../../../services/accountsService';
+import { useAccounts } from '../../../../hooks/useAccounts';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (record: any) => void;
+  onSave: (record: any) => void | Promise<void>;
   type: 'admin_expense' | 'transfer';
+  initialData?: any;
 }
 
-const FinancialRecordForm: React.FC<Props> = ({ isOpen, onClose, onSave, type }) => {
-  const [bankAccounts, setBankAccounts] = useState<BankAccountWithBalance[]>([]);
+const FinancialRecordForm: React.FC<Props> = ({ isOpen, onClose, onSave, type, initialData }) => {
+  const { data: allAccounts = [] } = useAccounts();
+  const accounts = React.useMemo(() => allAccounts.sort((a, b) => a.account_name.localeCompare(b.account_name)), [allAccounts]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const generateUUID = (): string => {
-    if (typeof self !== 'undefined' && self.crypto && self.crypto.randomUUID) {
-      return self.crypto.randomUUID();
-    }
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-      const r = (Math.random() * 16) | 0;
-      const v = c === 'x' ? r : (r & 0x3) | 0x8;
-      return v.toString(16);
-    });
-  };
+  const generateUUID = (): string => crypto.randomUUID();
   
   const [formData, setFormData] = useState({
     description: type === 'transfer' ? 'Transferência entre contas' : '',
@@ -57,10 +51,26 @@ const FinancialRecordForm: React.FC<Props> = ({ isOpen, onClose, onSave, type })
 
   useEffect(() => {
     if (isOpen) {
-      const sorted = financialService.getBankAccountsWithBalances()
-        .filter(acc => acc.active !== false)
-        .sort((a, b) => a.bankName.localeCompare(b.bankName));
-      setBankAccounts(sorted);
+      const formatInitialValue = (raw: any): string => {
+        const num = Number(raw || 0);
+        if (!num) return '';
+        const fixed = num.toFixed(2);
+        return fixed.replace('.', ',').replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1.');
+      };
+
+      if (initialData && type === 'transfer') {
+        setFormData({
+          description: initialData.description || 'Transferência entre contas',
+          entityName: '',
+          category: '',
+          originAccount: initialData.fromAccountId || '',
+          destinationAccount: initialData.toAccountId || '',
+          date: initialData.transferDate || new Date().toISOString().split('T')[0],
+          value: formatInitialValue(initialData.amount),
+          notes: initialData.notes || ''
+        });
+        return;
+      }
       
       setFormData({
         description: type === 'transfer' ? 'Transferência entre contas' : '',
@@ -73,38 +83,45 @@ const FinancialRecordForm: React.FC<Props> = ({ isOpen, onClose, onSave, type })
         notes: ''
       });
     }
-  }, [isOpen]);
+  }, [isOpen, initialData, type]);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     
     const numValue = parseFloat(parseValueInput(formData.value));
-    
-    if (type === 'admin_expense') {
-      onSave({
-        ...formData,
-        value: numValue,
-        id: Math.random().toString(36).substr(2, 9),
-        originalValue: numValue,
-        paidValue: 0,
-        status: 'pending',
-        subType: 'admin'
-      });
-    } else {
-      onSave({
-        id: generateUUID(),
-        transferDate: formData.date,
-        fromAccountId: formData.originAccount,
-        toAccountId: formData.destinationAccount,
-        amount: numValue,
-        description: formData.description,
-        notes: formData.notes || undefined
-      });
+
+    try {
+      setIsSubmitting(true);
+
+      if (type === 'admin_expense') {
+        await Promise.resolve(onSave({
+          ...formData,
+          value: numValue,
+          id: Math.random().toString(36).substr(2, 9),
+          originalValue: numValue,
+          paidValue: 0,
+          status: 'pending',
+          subType: 'admin'
+        }));
+      } else {
+        await Promise.resolve(onSave({
+          id: initialData?.id || generateUUID(),
+          transferDate: formData.date,
+          fromAccountId: formData.originAccount,
+          toAccountId: formData.destinationAccount,
+          amount: numValue,
+          description: formData.description,
+          notes: formData.notes || undefined
+        }));
+      }
+
+      onClose();
+    } finally {
+      setIsSubmitting(false);
     }
-    
-    onClose();
   };
 
   const inputClass = 'block w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm text-slate-900 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 placeholder:text-slate-400';
@@ -116,7 +133,9 @@ const FinancialRecordForm: React.FC<Props> = ({ isOpen, onClose, onSave, type })
         
         <div className="bg-slate-900 px-6 py-4 flex justify-between items-center text-white">
           <h3 className="font-bold text-lg">
-            {type === 'admin_expense' ? 'Nova Despesa Administrativa' : 'Nova Transferência'}
+            {type === 'admin_expense'
+              ? (initialData ? 'Editar Despesa Administrativa' : 'Nova Despesa Administrativa')
+              : (initialData ? 'Editar Transferência' : 'Nova Transferência')}
           </h3>
           <button onClick={onClose} className="hover:bg-white/20 p-2 rounded-full transition-colors">
             <X size={20} />
@@ -222,9 +241,9 @@ const FinancialRecordForm: React.FC<Props> = ({ isOpen, onClose, onSave, type })
                       onChange={e => setFormData({...formData, originAccount: e.target.value})}
                     >
                       <option value="">Selecione a conta...</option>
-                      {bankAccounts.map(acc => (
+                      {accounts.map(acc => (
                         <option key={acc.id} value={acc.id}>
-                          {acc.bankName} - {acc.owner} (Saldo: {currency(acc.currentBalance)})
+                          {acc.account_name} (Saldo: {currency(acc.balance)})
                         </option>
                       ))}
                     </select>
@@ -246,9 +265,9 @@ const FinancialRecordForm: React.FC<Props> = ({ isOpen, onClose, onSave, type })
                       onChange={e => setFormData({...formData, destinationAccount: e.target.value})}
                     >
                       <option value="">Selecione a conta...</option>
-                      {bankAccounts.map(acc => (
+                      {accounts.map(acc => (
                         <option key={acc.id} value={acc.id}>
-                          {acc.bankName} - {acc.owner} (Saldo: {currency(acc.currentBalance)})
+                          {acc.account_name} (Saldo: {currency(acc.balance)})
                         </option>
                       ))}
                     </select>
@@ -259,8 +278,8 @@ const FinancialRecordForm: React.FC<Props> = ({ isOpen, onClose, onSave, type })
           )}
 
           <div className="pt-2 flex justify-end gap-3">
-            <button type="button" onClick={onClose} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-medium text-sm transition-colors">Cancelar</button>
-            <button type="submit" className="px-6 py-2 rounded-lg bg-slate-800 text-white font-bold shadow-sm hover:bg-slate-900 flex items-center gap-2 text-sm transition-colors">
+            <button type="button" onClick={onClose} disabled={isSubmitting} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-medium text-sm transition-colors disabled:opacity-50">Cancelar</button>
+            <button type="submit" disabled={isSubmitting} className="px-6 py-2 rounded-lg bg-slate-800 text-white font-bold shadow-sm hover:bg-slate-900 flex items-center gap-2 text-sm transition-colors disabled:opacity-50">
               <Save size={18} /> Confirmar
             </button>
           </div>

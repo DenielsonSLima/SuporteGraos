@@ -55,11 +55,9 @@ export const migrateUsersToSupabase = async (): Promise<MigrationResult> => {
   };
 
   try {
-    console.log('🔄 Iniciando migração de usuários...');
     
     // 1. Obter todos os usuários do localStorage
-    const localUsers = userService.getAll();
-    console.log(`📋 Encontrados ${localUsers.length} usuários no localStorage`);
+    const localUsers = await userService.getAll();
 
     // 2. Verificar se a tabela existe no Supabase
     const { error: tableError } = await supabase
@@ -76,7 +74,6 @@ export const migrateUsersToSupabase = async (): Promise<MigrationResult> => {
     // 3. Migrar cada usuário
     for (const user of localUsers) {
       try {
-        console.log(`\n🔐 Processando usuário: ${user.email}`);
 
         // Verificar se já existe no Supabase
         const { data: existing } = await supabase
@@ -86,7 +83,6 @@ export const migrateUsersToSupabase = async (): Promise<MigrationResult> => {
           .single();
 
         if (existing) {
-          console.log(`⏭️  Usuário ${user.email} já existe no Supabase (ID: ${existing.id})`);
           result.users.push({
             email: user.email,
             status: 'skipped',
@@ -99,12 +95,10 @@ export const migrateUsersToSupabase = async (): Promise<MigrationResult> => {
         let passwordHash: string;
         if (user.password) {
           passwordHash = await hashPassword(user.password);
-          console.log(`✅ Hash gerado para ${user.email}`);
         } else {
           // Se não tiver senha, gerar uma temporária forte
           const tempPassword = '!Temp@2026!' + Math.random().toString(36);
           passwordHash = await hashPassword(tempPassword);
-          console.log(`⚠️  Senha temporária gerada para ${user.email}`);
         }
 
         // Verificar se o ID é um UUID válido
@@ -131,7 +125,6 @@ export const migrateUsersToSupabase = async (): Promise<MigrationResult> => {
         };
         
         if (!isValidUUID) {
-          console.log(`⚠️  ID "${user.id}" não é UUID válido. Gerando novo ID automaticamente.`);
         }
 
         // Inserir no Supabase
@@ -143,7 +136,6 @@ export const migrateUsersToSupabase = async (): Promise<MigrationResult> => {
           throw insertError;
         }
 
-        console.log(`✅ Usuário ${user.email} migrado com sucesso!`);
         result.migratedCount++;
         result.users.push({
           email: user.email,
@@ -151,7 +143,6 @@ export const migrateUsersToSupabase = async (): Promise<MigrationResult> => {
         });
 
       } catch (error: any) {
-        console.error(`❌ Erro ao migrar ${user.email}:`, error.message);
         result.errors.push(`${user.email}: ${error.message}`);
         result.users.push({
           email: user.email,
@@ -162,24 +153,14 @@ export const migrateUsersToSupabase = async (): Promise<MigrationResult> => {
     }
 
     // 4. Resumo final
-    console.log('\n' + '='.repeat(60));
-    console.log('📊 RESUMO DA MIGRAÇÃO');
-    console.log('='.repeat(60));
-    console.log(`✅ Migrados com sucesso: ${result.migratedCount}`);
-    console.log(`⏭️  Já existiam: ${result.users.filter(u => u.status === 'skipped').length}`);
-    console.log(`❌ Erros: ${result.errors.length}`);
-    console.log('='.repeat(60));
 
     if (result.errors.length > 0) {
-      console.log('\n⚠️  ERROS ENCONTRADOS:');
       result.errors.forEach(err => console.log(`  - ${err}`));
       result.success = false;
     } else {
-      console.log('\n🎉 Migração concluída com sucesso!');
     }
 
   } catch (error: any) {
-    console.error('❌ Erro fatal na migração:', error);
     result.success = false;
     result.errors.push(`Erro fatal: ${error.message}`);
   }
@@ -197,15 +178,13 @@ export const migrateUsersToSupabase = async (): Promise<MigrationResult> => {
  */
 export const validateMigration = async (): Promise<boolean> => {
   try {
-    console.log('🔍 Validando migração...');
 
-    const localUsers = userService.getAll();
+    const localUsers = await userService.getAll();
     const { data: supabaseUsers, error } = await supabase
       .from('app_users')
       .select('id, email');
 
     if (error) {
-      console.error('❌ Erro ao buscar usuários do Supabase:', error);
       return false;
     }
 
@@ -215,15 +194,12 @@ export const validateMigration = async (): Promise<boolean> => {
     const missingInSupabase = [...localEmails].filter(email => !supabaseEmails.has(email));
 
     if (missingInSupabase.length > 0) {
-      console.log('⚠️  Usuários ausentes no Supabase:', missingInSupabase);
       return false;
     }
 
-    console.log('✅ Migração validada! Todos os usuários estão no Supabase.');
     return true;
 
   } catch (error) {
-    console.error('❌ Erro na validação:', error);
     return false;
   }
 };
@@ -238,7 +214,6 @@ export const validateMigration = async (): Promise<boolean> => {
  */
 export const rollbackMigration = async (): Promise<boolean> => {
   try {
-    console.warn('⚠️  ATENÇÃO: Executando rollback da migração...');
     
     const confirm = window.confirm(
       'ATENÇÃO: Isso irá DELETAR todos os usuários do Supabase!\n\n' +
@@ -247,7 +222,6 @@ export const rollbackMigration = async (): Promise<boolean> => {
     );
 
     if (!confirm) {
-      console.log('❌ Rollback cancelado pelo usuário');
       return false;
     }
 
@@ -258,15 +232,12 @@ export const rollbackMigration = async (): Promise<boolean> => {
       .neq('id', '00000000-0000-0000-0000-000000000000'); // Condição sempre verdadeira
 
     if (error) {
-      console.error('❌ Erro no rollback:', error);
       return false;
     }
 
-    console.log('✅ Rollback concluído. Todos os usuários foram removidos do Supabase.');
     return true;
 
   } catch (error) {
-    console.error('❌ Erro no rollback:', error);
     return false;
   }
 };
@@ -295,15 +266,12 @@ export const updateUserPassword = async (email: string, newPassword: string): Pr
       .eq('email', email);
 
     if (error) {
-      console.error('Erro ao atualizar senha:', error);
       return false;
     }
 
-    console.log(`✅ Senha atualizada para ${email}`);
     return true;
 
   } catch (error) {
-    console.error('Erro ao atualizar senha:', error);
     return false;
   }
 };

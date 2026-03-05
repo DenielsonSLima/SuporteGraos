@@ -6,6 +6,7 @@ import { FinancialRecord } from '../../modules/Financial/types';
 import { logService } from '../logService';
 import { auditService } from '../auditService';
 import { authService } from '../authService';
+import { isSqlCanonicalOpsEnabled, sqlCanonicalOpsLog } from '../sqlCanonicalOps';
 
 // Tipos de empréstimos
 export type LoanType = 'loan_taken' | 'loan_granted';
@@ -42,15 +43,6 @@ const getLogInfo = () => {
  * Converte registro do Supabase (snake_case) para o formato do app (camelCase)
  */
 const fromSupabase = (record: any): FinancialRecord => {
-  console.log(`📊 Mapeando loan:`, {
-    id: record.id,
-    entityName: record.entity_name,
-    description: record.description,
-    originalValue: record.original_value,
-    paidValue: record.paid_value,
-    status: record.status,
-    subType: record.sub_type
-  });
 
   return {
     id: record.id,
@@ -112,10 +104,18 @@ const LOANS_SELECT_FIELDS = [
 ].join(',');
 
 const fetchPage = async (options: LoansPageOptions): Promise<FinancialRecord[]> => {
+  if (isSqlCanonicalOpsEnabled()) {
+    return [];
+  }
+
   try {
     const { limit, beforeDate, startDate, endDate } = options;
     const user = authService.getCurrentUser();
     const companyId = user?.companyId;
+
+    if (!companyId) {
+      return [];
+    }
 
     let query = supabase
       .from('standalone_records')
@@ -133,7 +133,6 @@ const fetchPage = async (options: LoansPageOptions): Promise<FinancialRecord[]> 
     if (error) throw error;
     return (data || []).map(fromSupabase);
   } catch (error) {
-    console.error('❌ Erro ao paginar loans:', error);
     return [];
   }
 };
@@ -143,9 +142,19 @@ const fetchPage = async (options: LoansPageOptions): Promise<FinancialRecord[]> 
 // ============================================================================
 
 const loadFromSupabase = async (): Promise<FinancialRecord[]> => {
+  if (isSqlCanonicalOpsEnabled()) {
+    db.clear();
+    isLoaded = true;
+    return [];
+  }
+
   try {
     const user = authService.getCurrentUser();
     const companyId = user?.companyId;
+
+    if (!companyId) {
+      return [];
+    }
 
     const { data, error } = await supabase
       .from('standalone_records')
@@ -155,20 +164,16 @@ const loadFromSupabase = async (): Promise<FinancialRecord[]> => {
       .order('issue_date', { ascending: false });
 
     if (error) {
-      console.error('❌ Erro SQL ao carregar loans:', error);
       throw error;
     }
 
-    console.log(`📥 Dados brutos recebidos do Supabase (${data?.length || 0} registros):`, data);
 
     const mapped = (data || []).map(fromSupabase);
     db.clear();
     mapped.forEach(record => db.add(record));
     isLoaded = true;
-    console.log(`✅ Empréstimos sincronizados em tempo real (${mapped.length} registros)`);
     return mapped;
   } catch (error) {
-    console.error('❌ Erro ao carregar loans:', error);
     return [];
   }
 };
@@ -178,6 +183,11 @@ const loadFromSupabase = async (): Promise<FinancialRecord[]> => {
 // ============================================================================
 
 const startRealtime = () => {
+  if (isSqlCanonicalOpsEnabled()) {
+    sqlCanonicalOpsLog('loansService.startRealtime legado ignorado (modo canônico)');
+    return;
+  }
+
   if (realtimeChannel) return;
 
   realtimeChannel = supabase
@@ -218,7 +228,6 @@ const persistUpsert = async (item: FinancialRecord) => {
   try {
     const payload = toSupabase(item);
 
-    console.log('🔥 Salvando empréstimo no Supabase:', payload);
 
     const { error } = await supabase
       .from('standalone_records')
@@ -226,12 +235,10 @@ const persistUpsert = async (item: FinancialRecord) => {
       .select();
 
     if (error) {
-      console.error('❌ Erro ao salvar loan no Supabase:', error);
       return;
     }
     await loadFromSupabase();
   } catch (err) {
-    console.error('Erro inesperado ao salvar loan', err);
   }
 };
 
@@ -245,7 +252,13 @@ const persistDelete = async (id: string) => {
     if (error) console.error('Erro ao excluir loan', error);
     else await loadFromSupabase();
   } catch (err) {
-    console.error('Erro inesperado ao excluir loan', err);
+  }
+};
+
+const stopRealtime = () => {
+  if (realtimeChannel) {
+    supabase.removeChannel(realtimeChannel);
+    realtimeChannel = null;
   }
 };
 
@@ -264,53 +277,37 @@ export const loansService = {
   loadFromSupabase,
   fetchPage,
   startRealtime,
+  stopRealtime,
 
-  add: (item: FinancialRecord) => {
-    // Criar dois registros: o empréstimo em si + o crédito/débito na conta
-    const records: FinancialRecord[] = [item];
+  add: async (item: FinancialRecord) => {
+    // 1. Chamar RPC atômica para criar o empréstimo, a entry e movimentar o saldo
+    const { userId, userName } = getLogInfo();
+    const companyId = authService.getCurrentUser()?.companyId;
 
-    // Segundo registro: o impacto no saldo da conta (criar DO ZERO)
-    if (item.subType === 'loan_taken') {
-      // Empréstimo tomado = crédito na conta (entrada de dinheiro)
-      records.push({
-        id: `${item.id}-credit`,
-        description: `Crédito de Empréstimo: ${item.description}`,
-        entityName: item.entityName,
-        category: 'Empréstimos',
-        issueDate: item.issueDate,
-        dueDate: item.issueDate,
-        originalValue: item.originalValue,
-        paidValue: item.originalValue, // PAGO - entra na conta AGORA
-        discountValue: 0,
-        status: 'paid' as const,
-        subType: 'receipt', // Receipt = entrada/crédito
-        bankAccount: item.bankAccount
-      });
-    } else if (item.subType === 'loan_granted') {
-      // Empréstimo cedido = débito na conta (saída de dinheiro)
-      records.push({
-        id: `${item.id}-debit`,
-        description: `Débito de Empréstimo: ${item.description}`,
-        entityName: item.entityName,
-        category: 'Empréstimos',
-        issueDate: item.issueDate,
-        dueDate: item.issueDate,
-        originalValue: item.originalValue,
-        paidValue: item.originalValue, // PAGO - sai da conta AGORA
-        discountValue: 0,
-        status: 'paid' as const,
-        subType: 'admin', // Admin = saída/débito
-        bankAccount: item.bankAccount
-      });
-    }
+    if (!companyId) throw new Error('Company ID is missing');
 
-    // Salvar ambos os registros
-    records.forEach(rec => {
-      db.add(rec);
-      void persistUpsert(rec);
+    const { error } = await supabase.rpc('rpc_register_loan', {
+      p_company_id: companyId,
+      p_id: item.id,
+      p_description: item.description,
+      p_entity_name: item.entityName,
+      p_category: item.category,
+      p_issue_date: item.issueDate,
+      p_due_date: item.dueDate,
+      p_original_value: item.originalValue,
+      p_bank_account_id: item.bankAccount,
+      p_type: item.subType,
+      p_notes: item.notes || ''
     });
 
-    const { userId, userName } = getLogInfo();
+    if (error) {
+      console.error('[loansService] add error:', error);
+      throw error;
+    }
+
+    // A RPC já salvou no standalone_records. Vamos atualizar a memória.
+    db.add(item);
+
     logService.addLog({
       userId,
       userName,
@@ -324,9 +321,6 @@ export const loansService = {
       entityId: item.id,
       metadata: { subType: item.subType, bankAccount: item.bankAccount }
     });
-
-    // NÃO atualizar saldo manualmente - o sistema já calcula baseado nas transações (receipt/admin)
-    // O registro 'receipt' com status='paid' será processado pelo cashierService automaticamente
 
     invalidateFinancialCache();
     invalidateDashboardCache();
@@ -385,56 +379,5 @@ export const loansService = {
 
     invalidateFinancialCache();
     invalidateDashboardCache();
-  }
-};
-
-// ============================================================================
-// FUNÇÃO AUXILIAR: ATUALIZAR SALDO DA CONTA BANCÁRIA
-// ============================================================================
-
-/**
- * Atualiza o saldo de uma conta bancária quando um empréstimo é criado
- */
-const updateBankAccountBalance = async (loan: FinancialRecord) => {
-  try {
-    console.log('🔄 Iniciando atualização de saldo para:', loan.bankAccount);
-    const { bankAccountService } = await import('../bankAccountService');
-
-    const currentAccount = bankAccountService.getById(loan.bankAccount as string);
-    if (!currentAccount) {
-      console.warn('⚠️ Conta bancária não encontrada:', loan.bankAccount);
-      console.log('📋 Contas disponíveis:', bankAccountService.getBankAccounts().map(a => ({ id: a.id, name: a.bankName, balance: a.balance })));
-      return;
-    }
-
-    console.log(`📊 Conta encontrada: ${currentAccount.bankName}, saldo atual: R$ ${currentAccount.balance}`);
-
-    // Calcular novo saldo
-    let newBalance = (currentAccount.balance || 0);
-
-    if (loan.subType === 'loan_taken') {
-      // Empréstimo tomado = saldo aumenta
-      newBalance += loan.originalValue;
-      console.log(`✅ Empréstimo TOMADO: Saldo aumentará de R$ ${currentAccount.balance} para R$ ${newBalance}`);
-    } else if (loan.subType === 'loan_granted') {
-      // Empréstimo cedido = saldo diminui
-      newBalance -= loan.originalValue;
-      console.log(`✅ Empréstimo CEDIDO: Saldo diminuirá de R$ ${currentAccount.balance} para R$ ${newBalance}`);
-    } else {
-      console.warn(`⚠️ Tipo de empréstimo desconhecido: ${loan.subType}, não atualizando saldo`);
-      return;
-    }
-
-    // Atualizar a conta
-    const updatedAccount = {
-      ...currentAccount,
-      balance: newBalance
-    };
-
-    console.log(`💾 Atualizando conta com novo saldo: R$ ${newBalance}`);
-    await bankAccountService.updateBankAccount(updatedAccount);
-    console.log(`✅ Conta atualizada com sucesso!`);
-  } catch (err) {
-    console.error('❌ Erro ao atualizar saldo da conta bancária:', err);
   }
 };

@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Download, Loader2, UserCheck, ShieldCheck } from 'lucide-react';
 import { Loading } from '../../../Loadings/types';
-import { LoadingCache } from '../../../../services/loadingCache';
+import { loadingService } from '../../../../services/loadingService';
 import { pdf } from '@react-pdf/renderer';
 import { saveAs } from 'file-saver';
 import PdfDocument from './PdfDocument';
@@ -25,8 +25,8 @@ const PdfPreviewModal: React.FC<Props> = ({ isOpen, onClose, order, variant }) =
     if (isOpen && order.id) {
       const isSales = !!(order as any).customerName;
       const list = isSales 
-        ? LoadingCache.getBySalesOrder(order.id)
-        : LoadingCache.getByPurchaseOrder(order.id);
+        ? loadingService.getBySalesOrder(order.id)
+        : loadingService.getByPurchaseOrder(order.id);
       setLoadings(list);
     }
   }, [isOpen, order.id]);
@@ -41,7 +41,6 @@ const PdfPreviewModal: React.FC<Props> = ({ isOpen, onClose, order, variant }) =
           url = URL.createObjectURL(blob);
           setPdfUrl(url);
         } catch (error) {
-          console.error('Erro ao gerar preview:', error);
         }
       }
     };
@@ -69,7 +68,6 @@ const PdfPreviewModal: React.FC<Props> = ({ isOpen, onClose, order, variant }) =
       const blob = await pdf(<PdfDocument order={order} loadings={loadings} variant={variant} />).toBlob();
       saveAs(blob, filename);
     } catch (err) {
-      console.error(err);
       alert("Erro ao gerar PDF.");
     } finally {
       setIsGenerating(false);

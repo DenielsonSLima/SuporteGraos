@@ -1,13 +1,17 @@
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Freight } from '../types';
-import { loadingService } from '../../../services/loadingService';
 import { financialActionService } from '../../../services/financialActionService';
 import { advanceService } from '../../Financial/Advances/services/advanceService';
+import { useLoadings } from '../../../hooks/useLoadings';
+import { useQueryClient } from '@tanstack/react-query';
+import { QUERY_KEYS } from '../../../hooks/queryKeys';
 import { useToast } from '../../../contexts/ToastContext';
 
 export const useCarrierFinancials = (carrierName: string, allFreights: Freight[], onRefreshParent: () => void) => {
   const { addToast } = useToast();
+  const { data: loadings = [] } = useLoadings();
+  const queryClient = useQueryClient();
   const [selectedFreightIds, setSelectedFreightIds] = useState<string[]>([]);
   
   const carrierFreights = useMemo(() => {
@@ -53,7 +57,7 @@ export const useCarrierFinancials = (carrierName: string, allFreights: Freight[]
     // Se usar saldo, precisamos registrar o débito no módulo de adiantamentos
     if (isUsingAdvance && remainingMoney > 0) {
         // Pega ID do parceiro de uma das cargas
-        const loadingRef = loadingService.getAll().find(l => l.id === selectedFreightIds[0]);
+        const loadingRef = loadings.find(l => l.id === selectedFreightIds[0]);
         if (loadingRef) {
             advanceService.addTransaction({
                 partnerId: loadingRef.carrierId,
@@ -73,7 +77,7 @@ export const useCarrierFinancials = (carrierName: string, allFreights: Freight[]
     let paidCount = 0;
 
     freightsToPay.forEach(freight => {
-        const loading = loadingService.getAll().find(l => l.id === freight.id);
+        const loading = loadings.find((l: any) => l.id === freight.id);
         
         if (loading && (remainingMoney > 0 || remainingDiscount > 0)) {
             const currentDebt = loading.totalFreightValue - loading.freightPaid;
@@ -106,6 +110,11 @@ export const useCarrierFinancials = (carrierName: string, allFreights: Freight[]
     if (paidCount > 0) {
         addToast('success', 'Baixa Realizada', `${paidCount} fretes foram baixados com sucesso.`);
         setSelectedFreightIds([]);
+        // Invalida caches via TanStack Query (SKIL: sem reload manual)
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOADINGS });
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FREIGHTS });
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_TRANSACTIONS });
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ADVANCES });
         onRefreshParent();
     } else {
         addToast('warning', 'Nenhuma baixa', 'Verifique os valores ou seleção.');

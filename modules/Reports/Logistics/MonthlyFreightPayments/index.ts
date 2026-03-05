@@ -1,7 +1,7 @@
 
 import { DollarSign } from 'lucide-react';
 import { ReportModule } from '../../types';
-import { loadingService } from '../../../../services/loadingService';
+import { financialIntegrationService } from '../../../../services/financialIntegrationService';
 import UniversalReportTemplate from '../../templates/UniversalReportTemplate';
 import DefaultFilters from '../../components/DefaultFilters';
 
@@ -20,25 +20,23 @@ const monthlyFreightPaymentsReport: ReportModule = {
   },
   FilterComponent: DefaultFilters,
   fetchData: ({ startDate, endDate }) => {
-    const allLoadings = loadingService.getAll();
-    const paymentRows: any[] = [];
-
-    allLoadings.forEach(l => {
-      (l.transactions || []).forEach(t => {
-        const matchesDate = (!startDate || t.date >= startDate) && (!endDate || t.date <= endDate);
-        if (matchesDate && (t.type === 'payment' || t.type === 'advance')) {
-          paymentRows.push({
-            date: t.date,
-            carrier: l.carrierName,
-            plate: l.vehiclePlate,
-            type: t.type === 'advance' ? 'Adiantamento' : 'Saldo',
-            account: t.accountName,
-            value: t.value,
-            notes: t.notes
-          });
-        }
-      });
-    });
+    const paymentRows = financialIntegrationService
+      .getPayables()
+      .filter((record) => record.subType === 'freight')
+      .filter((record) => {
+        if ((record.paidValue || 0) <= 0) return false;
+        const referenceDate = record.settlementDate || record.issueDate || record.dueDate;
+        return (!startDate || referenceDate >= startDate) && (!endDate || referenceDate <= endDate);
+      })
+      .map((record) => ({
+        date: record.settlementDate || record.issueDate || record.dueDate,
+        carrier: record.entityName,
+        plate: '-',
+        type: record.status === 'partial' ? 'Adiantamento' : 'Saldo',
+        account: record.bankAccount || '-',
+        value: record.paidValue,
+        notes: record.notes || '-'
+      }));
 
     const totalPaid = paymentRows.reduce((acc, p) => acc + p.value, 0);
 

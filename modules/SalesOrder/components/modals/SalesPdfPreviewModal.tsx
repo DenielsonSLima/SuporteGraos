@@ -6,6 +6,7 @@ import { Loading } from '../../../Loadings/types';
 import { pdf } from '@react-pdf/renderer';
 import { saveAs } from 'file-saver';
 import PdfDocument from './PdfDocument';
+import { settingsService } from '../../../../services/settingsService';
 
 type PdfVariant = 'producer' | 'internal'; // Reusing same logic naming: producer=customer, internal=manager
 
@@ -21,17 +22,20 @@ const SalesPdfPreviewModal: React.FC<Props> = ({ isOpen, onClose, order, loading
   const [isGenerating, setIsGenerating] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
 
+  // Dados da empresa/watermark carregados no orquestrador (não no PdfDocument)
+  const company = settingsService.getCompanyData();
+  const watermark = settingsService.getWatermark();
+
   useEffect(() => {
     let url: string | null = null;
 
     const generatePreview = async () => {
       if (isOpen && order) {
         try {
-          const blob = await pdf(<PdfDocument order={order} loadings={loadings} variant={variant} />).toBlob();
+          const blob = await pdf(<PdfDocument order={order} loadings={loadings} variant={variant} company={company} watermark={watermark} />).toBlob();
           url = URL.createObjectURL(blob);
           setPdfUrl(url);
         } catch (error) {
-          console.error('Erro ao gerar preview:', error);
         }
       }
     };
@@ -54,10 +58,9 @@ const SalesPdfPreviewModal: React.FC<Props> = ({ isOpen, onClose, order, loading
     const filename = `Venda_${typeLabel}_${order.number}.pdf`;
 
     try {
-      const blob = await pdf(<PdfDocument order={order} loadings={loadings} variant={variant} />).toBlob();
+      const blob = await pdf(<PdfDocument order={order} loadings={loadings} variant={variant} company={company} watermark={watermark} />).toBlob();
       saveAs(blob, filename);
     } catch (error) {
-      console.error('Erro ao gerar PDF:', error);
       alert('Erro ao gerar arquivo.');
     } finally {
       setIsGenerating(false);

@@ -3,7 +3,7 @@ export type OrderStatus = 'draft' | 'pending' | 'approved' | 'transport' | 'comp
 
 export type ProductUnit = 'KG' | 'SC' | 'TON';
 
-export type TransactionType = 'payment' | 'advance' | 'expense' | 'commission' | 'receipt';
+export type TransactionType = 'payment' | 'advance' | 'expense' | 'commission' | 'receipt' | 'reversal';
 
 export interface OrderItem {
   id: string;
@@ -30,7 +30,11 @@ export interface OrderTransaction {
   accountId: string; 
   accountName: string; 
   notes?: string;
-  deductFromPartner?: boolean; 
+  deductFromPartner?: boolean;
+  /** Quando 'reversed', indica que esta transação foi estornada (SKIL §3.6) */
+  status?: 'active' | 'reversed';
+  /** ID da transação original (presente em transações do tipo 'reversal') */
+  originalTxId?: string;
 }
 
 export interface PurchaseOrder {

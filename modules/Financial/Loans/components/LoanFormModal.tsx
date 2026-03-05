@@ -4,13 +4,9 @@ import {
   X, Save, Landmark, DollarSign, Calendar, 
   ArrowDownLeft, ArrowUpRight, Wallet, ChevronDown, FileText, TrendingUp, TrendingDown
 } from 'lucide-react';
-import { BankAccount } from '../../types';
-import { financialService } from '../../../../services/financialService';
+import type { Account } from '../../../../services/accountsService';
+import { useAccounts } from '../../../../hooks/useAccounts';
 import { useToast } from '../../../../contexts/ToastContext';
-
-interface BankAccountWithBalance extends BankAccount {
-  currentBalance?: number;
-}
 
 interface Props {
   isOpen: boolean;
@@ -20,7 +16,8 @@ interface Props {
 }
 
 const LoanFormModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialType = 'taken' }) => {
-  const [bankAccounts, setBankAccounts] = useState<BankAccountWithBalance[]>([]);
+  const { data: allBankAccounts = [] } = useAccounts();
+  const bankAccounts = React.useMemo(() => allBankAccounts.sort((a, b) => a.account_name.localeCompare(b.account_name)), [allBankAccounts]);
   const [type, setType] = useState<'taken' | 'granted'>('taken');
   const { addToast } = useToast();
   
@@ -58,11 +55,6 @@ const LoanFormModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialType =
       });
       setDisplayContractValue('');
       setDisplayRemainingValue('');
-
-      const accounts = financialService.getBankAccountsWithBalances()
-        .filter(acc => acc.active !== false)
-        .sort((a, b) => a.bankName.localeCompare(b.bankName));
-      setBankAccounts(accounts);
     }
   }, [isOpen, initialType]);
 
@@ -101,7 +93,7 @@ const LoanFormModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialType =
       remainingValue,
       type,
       accountId: formData.accountId,
-      accountName: selectedAccount?.bankName || ''
+      accountName: selectedAccount?.account_name || ''
     });
     addToast('success', 'Empréstimo criado');
     onClose();
@@ -228,7 +220,7 @@ const LoanFormModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialType =
                 <option value="">Selecione a conta...</option>
                 {bankAccounts.map(acc => (
                   <option key={acc.id} value={acc.id}>
-                    {acc.bankName} - {acc.owner} (Saldo: {formatBRL(acc.currentBalance ?? 0)})
+                    {acc.account_name} (Saldo: {formatBRL(acc.balance ?? 0)})
                   </option>
                 ))}
               </select>

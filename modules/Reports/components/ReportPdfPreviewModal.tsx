@@ -47,7 +47,6 @@ const ReportPdfPreviewModal: React.FC<Props> = ({ isOpen, onClose, reportId, rep
       const url = URL.createObjectURL(blob);
       setPdfUrl(url);
     } catch (err: any) {
-      console.error('Erro ao gerar preview PDF:', err);
       setError(err?.message || 'Erro ao carregar visualização');
     } finally {
       setIsLoadingPreview(false);
@@ -73,10 +72,8 @@ const ReportPdfPreviewModal: React.FC<Props> = ({ isOpen, onClose, reportId, rep
         const recordsCount = Array.isArray(data?.rows) ? data.rows.length : 0;
         await reportAuditService.logPdfExport(reportId, reportTitle, recordsCount);
       } catch (auditErr) {
-        console.warn('⚠️ Falha ao registrar exportação PDF na auditoria:', auditErr);
       }
     } catch (err) {
-      console.error('Erro ao gerar PDF:', err);
       alert("Ocorreu um erro ao gerar o arquivo PDF.");
     } finally {
       setIsGenerating(false);

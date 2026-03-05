@@ -42,9 +42,8 @@ const PerformancePdfModal: React.FC<Props> = ({ isOpen, onClose, data, periodLab
 
     try {
       await new Promise((resolve) => setTimeout(resolve, 600));
-      await html2pdf().set(options).from(contentRef.current).save();
+      await html2pdf().set(options as any).from(contentRef.current).save();
     } catch (err) {
-      console.error('Erro ao gerar PDF:', err);
       alert('Erro ao processar o PDF de performance.');
     } finally {
       setIsGenerating(false);

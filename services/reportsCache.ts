@@ -5,7 +5,7 @@ import { purchaseService } from './purchaseService';
 import { salesService } from './salesService';
 import { loadingService } from './loadingService';
 import { financialIntegrationService } from './financialIntegrationService';
-import { loanService } from './loanService';
+import { loansService } from './loansService';
 import { partnerService } from './partnerService';
 
 interface CacheEntry<T> {
@@ -66,9 +66,9 @@ class ReportsCache {
     );
   }
 
-  // 🏦 Loans
+  // 🏦 Loans (canônico via loansService)
   getAllLoans() {
-    return this.getCached('loans:all', () => loanService.getAll());
+    return this.getCached('loans:all', () => loansService.getAll());
   }
 
   // 👥 Partners
@@ -76,64 +76,9 @@ class ReportsCache {
     return this.getCached('partners:all', () => partnerService.getAll());
   }
 
-  // 📊 Dados agregados para Account Statement (evita triple loop)
-  getAllTransactions() {
-    return this.getCached('transactions:all', () => {
-      const allTransactions: any[] = [];
-
-      // Purchases
-      this.getAllPurchases().forEach(p => {
-        (p.transactions || []).forEach(t => {
-          allTransactions.push({
-            date: t.date,
-            description: `Compra #${p.number} - ${p.partnerName}`,
-            type: 'debit',
-            value: t.value,
-            accountId: t.accountId,
-            accountName: t.accountName,
-            category: 'purchase'
-          });
-        });
-      });
-
-      // Sales
-      this.getAllSales().forEach(s => {
-        (s.transactions || []).forEach(t => {
-          allTransactions.push({
-            date: t.date,
-            description: `Venda #${s.number} - ${s.customerName}`,
-            type: 'credit',
-            value: t.value,
-            accountId: t.accountId,
-            accountName: t.accountName,
-            category: 'sale'
-          });
-        });
-      });
-
-      // Loadings
-      this.getAllLoadings().forEach(l => {
-        (l.transactions || []).forEach(t => {
-          allTransactions.push({
-            date: t.date,
-            description: `Frete - Placa ${l.vehiclePlate}`,
-            type: 'debit',
-            value: t.value,
-            accountId: t.accountId,
-            accountName: t.accountName,
-            category: 'freight'
-          });
-        });
-      });
-
-      return allTransactions;
-    });
-  }
-
   // 🔄 Invalidar todo cache
   invalidateAll() {
     this.cache.clear();
-    console.log('📊 ReportsCache invalidated');
   }
 
   // 🎯 Invalidar cache específico

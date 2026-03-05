@@ -35,7 +35,6 @@ const FinancialPdfModal: React.FC<Props> = ({ isOpen, onClose, records, groupBy,
           url = URL.createObjectURL(blob);
           setPdfUrl(url);
         } catch (error) {
-          console.error('Erro ao gerar preview:', error);
         }
       }
     };
@@ -59,7 +58,6 @@ const FinancialPdfModal: React.FC<Props> = ({ isOpen, onClose, records, groupBy,
       ).toBlob();
       saveAs(blob, filename);
     } catch (error) {
-      console.error('Erro ao gerar PDF:', error);
       alert('Erro ao gerar arquivo.');
     } finally {
       setIsGenerating(false);

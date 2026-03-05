@@ -21,7 +21,7 @@ const GoalProgress: React.FC<Props> = ({ goals }) => {
         {goals.map((goal, index) => {
           const percentage = Math.min((goal.current / (goal.target || 1)) * 100, 100);
           const isCurrency = goal.unit === 'currency';
-          const format = isCurrency ? currency : number;
+          const format = isCurrency ? formatCurrency : formatInteger;
           const suffix = isCurrency ? '' : ' SC';
 
           return (

@@ -2,7 +2,7 @@
 import React from 'react';
 import { X } from 'lucide-react';
 import { PurchaseOrder } from '../types';
-import { LoadingCache } from '../../../services/loadingCache';
+import { loadingService } from '../../../services/loadingService';
 
 interface Props {
   isOpen: boolean;
@@ -14,7 +14,7 @@ interface Props {
 const OrderDeleteModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, order }) => {
   if (!isOpen || !order) return null;
 
-  const linkedLoadings = LoadingCache.getByPurchaseOrder(order.id);
+  const linkedLoadings = loadingService.getByPurchaseOrder(order.id);
   const financialCount = (order.transactions || []).length;
   const hasPaidValue = (order.paidValue || 0) > 0;
   

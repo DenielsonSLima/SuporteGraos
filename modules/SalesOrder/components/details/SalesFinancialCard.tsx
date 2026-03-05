@@ -3,7 +3,8 @@ import React, { useState } from 'react';
 import { DollarSign, Plus, Calendar, Wallet, CheckCircle2, Pencil, Trash2 } from 'lucide-react';
 import { SalesTransaction } from '../../types';
 import TransactionManagementModal from '../../../Financial/components/modals/TransactionManagementModal';
-import { salesService } from '../../../../services/salesService';
+import { useSalesTransactionActions } from '../../hooks/useSalesTransactionActions';
+import { formatDateBR } from '../../../../utils/dateUtils';
 
 interface Props {
   orderId: string;
@@ -15,36 +16,27 @@ interface Props {
 
 const SalesFinancialCard: React.FC<Props> = ({ orderId, transactions, totalOrderValue, onAddReceipt, onRefresh }) => {
   const [selectedTx, setSelectedTx] = useState<any>(null);
-  
+  const { updateTransaction, deleteTransaction } = useSalesTransactionActions(orderId);
+
   const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
-  const dateStr = (val: string) => {
-    if (!val) return '-';
-    if (val.includes('T')) return new Date(val).toLocaleDateString('pt-BR');
-    const [year, month, day] = val.split('-');
-    if (year && month && day) return `${day}/${month}/${year}`;
-    return new Date(val).toLocaleDateString('pt-BR');
-  };
+  const dateStr = (val: string) => formatDateBR(val);
   const cleanNotes = (val?: string) => val ? val.replace(/\s*\[ORIGIN:[^\]]+\]\s*/g, ' ').trim() : '';
 
   // Filtra apenas recebimentos
   const receipts = transactions.filter(t => t.type === 'receipt');
-  
+
   const totalReceived = receipts.reduce((acc, t) => acc + t.value, 0);
   const pending = Math.max(0, totalOrderValue - totalReceived);
   const progress = totalOrderValue > 0 ? Math.min((totalReceived / totalOrderValue) * 100, 100) : 0;
 
-  const handleUpdateTx = (updated: any) => {
-    salesService.updateTransaction(orderId, updated);
+  const handleUpdateTx = async (updated: any) => {
+    await updateTransaction(updated);
     onRefresh();
     setSelectedTx(null);
   };
 
-  const handleDeleteTx = (id: string) => {
-    salesService.deleteTransaction(orderId, id);
-    // Exclui também o registro financeiro correspondente
-    import('../../../../services/financialActionService').then(({ financialActionService }) => {
-      financialActionService.deleteStandaloneRecord('hist-' + id);
-    });
+  const handleDeleteTx = async (id: string) => {
+    await deleteTransaction(id);
     onRefresh();
     setSelectedTx(null);
   };
@@ -56,7 +48,7 @@ const SalesFinancialCard: React.FC<Props> = ({ orderId, transactions, totalOrder
           <DollarSign size={20} />
           <h3 className="font-black uppercase text-[10px] tracking-widest italic">Recebimentos do Pedido</h3>
         </div>
-        <button 
+        <button
           onClick={onAddReceipt}
           className="text-[10px] bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 rounded-xl font-black uppercase transition-all flex items-center gap-2 shadow-md active:scale-95"
         >
@@ -65,7 +57,7 @@ const SalesFinancialCard: React.FC<Props> = ({ orderId, transactions, totalOrder
       </div>
 
       <div className="p-6">
-        
+
         {/* Barra de Progresso */}
         <div className="mb-8">
           <div className="flex justify-between text-[10px] mb-2 font-black uppercase text-slate-400 tracking-widest">
@@ -88,7 +80,7 @@ const SalesFinancialCard: React.FC<Props> = ({ orderId, transactions, totalOrder
         </div>
 
         <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 border-b border-slate-50 pb-2">Histórico de Entradas</h4>
-        
+
         <div className="space-y-3">
           {receipts.length === 0 ? (
             <div className="text-center py-12 border-2 border-dashed border-slate-100 rounded-2xl bg-slate-50/30">
@@ -97,7 +89,7 @@ const SalesFinancialCard: React.FC<Props> = ({ orderId, transactions, totalOrder
           ) : (
             receipts.map(t => (
               <div key={t.id} className="group relative flex flex-col p-4 rounded-2xl border border-slate-200 bg-white hover:border-blue-300 hover:shadow-md transition-all">
-                
+
                 <div className="flex justify-between items-start mb-2">
                   <div className="flex items-center gap-3">
                     <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600 shadow-sm">
@@ -106,7 +98,7 @@ const SalesFinancialCard: React.FC<Props> = ({ orderId, transactions, totalOrder
                     <div>
                       <p className="font-black text-slate-900 text-sm uppercase tracking-tighter">Recebimento Confirmado</p>
                       <p className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
-                        <Calendar size={12}/> {dateStr(t.date)}
+                        <Calendar size={12} /> {dateStr(t.date)}
                       </p>
                     </div>
                   </div>
@@ -128,20 +120,20 @@ const SalesFinancialCard: React.FC<Props> = ({ orderId, transactions, totalOrder
 
                 {/* Botões de Ação */}
                 <div className="absolute right-2 top-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                    <button 
-                      onClick={() => setSelectedTx(t)} 
-                      className="p-2 bg-white border border-slate-200 rounded-xl text-blue-600 shadow-xl hover:bg-blue-600 hover:text-white active:scale-90 transition-all"
-                      title="Editar Recebimento"
-                    >
-                      <Pencil size={14}/>
-                    </button>
-                    <button 
-                      onClick={() => setSelectedTx(t)} 
-                      className="p-2 bg-white border border-slate-200 rounded-xl text-rose-600 shadow-xl hover:bg-rose-600 hover:text-white active:scale-90 transition-all"
-                      title="Excluir/Estornar"
-                    >
-                      <Trash2 size={14}/>
-                    </button>
+                  <button
+                    onClick={() => setSelectedTx(t)}
+                    className="p-2 bg-white border border-slate-200 rounded-xl text-blue-600 shadow-xl hover:bg-blue-600 hover:text-white active:scale-90 transition-all"
+                    title="Editar Recebimento"
+                  >
+                    <Pencil size={14} />
+                  </button>
+                  <button
+                    onClick={() => setSelectedTx(t)}
+                    className="p-2 bg-white border border-slate-200 rounded-xl text-rose-600 shadow-xl hover:bg-rose-600 hover:text-white active:scale-90 transition-all"
+                    title="Excluir/Estornar"
+                  >
+                    <Trash2 size={14} />
+                  </button>
                 </div>
               </div>
             ))
@@ -150,13 +142,13 @@ const SalesFinancialCard: React.FC<Props> = ({ orderId, transactions, totalOrder
       </div>
 
       {selectedTx && (
-        <TransactionManagementModal 
-            isOpen={!!selectedTx}
-            onClose={() => setSelectedTx(null)}
-            transaction={selectedTx}
-            onUpdate={handleUpdateTx}
-            onDelete={handleDeleteTx}
-            title="Gerenciar Recebimento"
+        <TransactionManagementModal
+          isOpen={!!selectedTx}
+          onClose={() => setSelectedTx(null)}
+          transaction={selectedTx}
+          onUpdate={handleUpdateTx}
+          onDelete={handleDeleteTx}
+          title="Gerenciar Recebimento"
         />
       )}
     </div>

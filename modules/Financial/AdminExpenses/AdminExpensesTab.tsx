@@ -1,29 +1,69 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, Search, Filter, Calendar, Tag, Layers, RefreshCw } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Plus, Search, Filter, Calendar, Tag, Layers } from 'lucide-react';
 import AdminExpenseGroupedList from './components/AdminExpenseGroupedList';
 import InstallmentExpenseForm from './components/InstallmentExpenseForm';
-import AdminExpensesKPIs from './components/AdminExpensesKPIs'; // Novo
+import AdminExpensesKPIs from './components/AdminExpensesKPIs';
 import FinancialPaymentModal, { PaymentData } from '../components/modals/FinancialPaymentModal';
-import { financialActionService } from '../../../services/financialActionService';
+import { useAdminExpenses } from '../../../hooks/useAdminExpenses';
+import type { AdminExpense } from '../../../services/adminExpensesService';
+import { useExpenseCategories } from '../../../hooks/useExpenseCategories';
 import { FinancialRecord } from '../types';
-import { financialService } from '../../../services/financialService';
 import ActionConfirmationModal from '../../../components/ui/ActionConfirmationModal';
 import { useToast } from '../../../contexts/ToastContext';
-import { standaloneRecordsService } from '../../../services/standaloneRecordsService';
+import type { ExpenseCategory } from '../../../services/expenseCategoryService';
+import { useAdminExpenseOperations } from './hooks/useAdminExpenseOperations';
+
+// Lookup: subcategory_id → { name, type }
+function buildCategoryLookup(cats: ExpenseCategory[]): Map<string, { name: string; type: string }> {
+  const map = new Map<string, { name: string; type: string }>();
+  cats.forEach(c => {
+    (c.subtypes || []).forEach(s => {
+      map.set(s.id, { name: s.name, type: c.type });
+    });
+  });
+  return map;
+}
+
+// Adapter: AdminExpense (DB) → FinancialRecord (UI)
+function toFinancialRecord(exp: AdminExpense, catLookup: Map<string, { name: string; type: string }>): FinancialRecord {
+  const catInfo = catLookup.get(exp.category_id);
+  return {
+    id: exp.id,
+    description: exp.description,
+    entityName: exp.payee_name || 'DESPESA DIRETA',
+    category: catInfo?.name || '',
+    dueDate: exp.due_date || exp.expense_date,
+    issueDate: exp.expense_date,
+    settlementDate: exp.paid_date,
+    originalValue: exp.amount,
+    paidValue: exp.status === 'paid' ? exp.amount : 0,
+    status: exp.status === 'open' ? 'pending' : exp.status === 'paid' ? 'paid' : 'pending',
+    subType: 'admin',
+    notes: '',
+  };
+}
 
 const AdminExpensesTab: React.FC = () => {
   const { addToast } = useToast();
-  // Data State
-  const [records, setRecords] = useState<FinancialRecord[]>([]);
-  const [categories, setCategories] = useState<string[]>([]);
-  
+  const { data: adminExpenses = [] } = useAdminExpenses();
+  const { data: expenseCategories = [] } = useExpenseCategories();
+  const { createExpense, payExpense, refreshData } = useAdminExpenseOperations();
+
+  const catLookup = useMemo(() => buildCategoryLookup(expenseCategories), [expenseCategories]);
+  const records = useMemo(() => adminExpenses.map(e => toFinancialRecord(e, catLookup)), [adminExpenses, catLookup]);
+
+  const categories = useMemo(() => {
+    return expenseCategories
+      .flatMap(c => (c.subtypes || []).map(s => s.name))
+      .sort();
+  }, [expenseCategories]);
+
   // UI State
   const [activeTab, setActiveTab] = useState<'open' | 'future' | 'all'>('open');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isPayModalOpen, setIsPayModalOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<FinancialRecord | null>(null);
-  const [editingRecord, setEditingRecord] = useState<FinancialRecord | null>(null);
   const [deletingRecord, setDeletingRecord] = useState<FinancialRecord | null>(null);
 
   // Filter State
@@ -33,23 +73,26 @@ const AdminExpensesTab: React.FC = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
-  const loadData = () => {
-    setRecords(financialActionService.getStandaloneRecords());
-    const cats = financialService.getExpenseCategories()
-      .flatMap(c => c.subtypes.map(s => s.name))
-      .sort();
-    setCategories(cats);
-  };
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
   const handleAddExpenses = async (newRecords: any[]) => {
-    for (const record of newRecords) {
-      await financialActionService.addAdminExpense(record);
+    try {
+      for (const record of newRecords) {
+        // Busca o subcategory id pelo nome da categoria
+        const subcatEntry = Array.from(catLookup.entries()).find(([, v]) => v.name === record.category);
+        await createExpense({
+          categoryId: subcatEntry?.[0] || undefined,
+          description: record.description,
+          amount: record.originalValue || record.paidValue || 0,
+          payeeName: record.entityName,
+          accountId: record.status === 'paid' ? record.bankAccount : undefined,
+          expenseDate: record.issueDate || record.dueDate,
+          dueDate: record.dueDate,
+        });
+      }
+      refreshData();
+      addToast('success', 'Despesa(s) lançada(s) com sucesso');
+    } catch (err: any) {
+      addToast('error', 'Erro ao lançar despesa', err.message);
     }
-    loadData();
   };
 
   const handleOpenPayment = (record: FinancialRecord) => {
@@ -58,20 +101,27 @@ const AdminExpensesTab: React.FC = () => {
   };
 
   const handleConfirmPayment = async (data: PaymentData) => {
-    if(!selectedRecord) return;
-    await financialActionService.processRecord(selectedRecord.id, data, 'admin');
-    setIsPayModalOpen(false);
-    loadData();
+    if (!selectedRecord) return;
+    try {
+      await payExpense({
+        entryOriginId: selectedRecord.id,
+        accountId: data.accountId,
+        amount: data.amount ?? (selectedRecord.originalValue - selectedRecord.paidValue),
+        discount: data.discount ?? 0,
+        description: data.notes || `Pagamento: ${selectedRecord.description}`,
+      });
+      addToast('success', 'Pagamento Registrado', `Despesa "${selectedRecord.description}" baixada com sucesso.`);
+    } catch (err: any) {
+      addToast('error', 'Erro ao Registrar Pagamento', err.message);
+    } finally {
+      setIsPayModalOpen(false);
+      setSelectedRecord(null);
+      refreshData();
+    }
   };
 
-  const handleEditRecord = (record: FinancialRecord) => {
-    setEditingRecord(record);
-  };
-
-  const handleUpdateRecord = async (record: FinancialRecord) => {
-    await standaloneRecordsService.update(record);
-    setEditingRecord(null);
-    loadData();
+  const handleEditRecord = (_record: FinancialRecord) => {
+    addToast('info', 'Edição será implementada na próxima fase');
   };
 
   const handleDeleteRecord = (record: FinancialRecord) => {
@@ -80,46 +130,20 @@ const AdminExpensesTab: React.FC = () => {
 
   const confirmDeleteRecord = async () => {
     if (!deletingRecord) return;
-    // Remove registros de histórico vinculados para estornar o saldo
-    const all = standaloneRecordsService.getAll();
-    const targetDate = deletingRecord.settlementDate || deletingRecord.issueDate || deletingRecord.dueDate;
-    const targetValue = (deletingRecord.paidValue || 0) + (deletingRecord.discountValue || 0);
-    const linkedHistory = all.filter(r =>
-      r.id?.startsWith('hist-') &&
-      r.subType === deletingRecord.subType &&
-      r.entityName === deletingRecord.entityName &&
-      (r.issueDate === targetDate || r.settlementDate === targetDate) &&
-      Math.abs((r.originalValue || 0) - targetValue) < 0.01 &&
-      (r.notes || '').includes(`ORIGIN:${deletingRecord.id}`)
-    );
-
-    for (const hist of linkedHistory) {
-      await financialActionService.deleteStandaloneRecord(hist.id);
-    }
-
-    await financialActionService.deleteStandaloneRecord(deletingRecord.id);
-    addToast('success', 'Despesa excluída');
+    addToast('info', 'Exclusão não disponível - registros são imutáveis no novo sistema');
     setDeletingRecord(null);
-    loadData();
   };
 
   // --- FILTERING & KPI CALCULATIONS ---
   const expenseRecords = useMemo(() => {
-      const allowedCategories = new Set(categories);
-      return records.filter(r => {
-        // Mostrar apenas despesas administrativas válidas do plano de contas
-        const isAdmin = r.subType === 'admin';
-        const isAllowedCategory = allowedCategories.has(r.category);
-        return isAdmin && isAllowedCategory;
-      });
-  }, [records, categories]);
+    return records.filter(r => r.subType === 'admin');
+  }, [records]);
 
   const categoryTypeMap = useMemo(() => {
-    const defs = financialService.getExpenseCategories();
     const map = new Map<string, string>();
-    defs.forEach(d => d.subtypes.forEach(s => map.set(s.name, d.type)));
+    expenseCategories.forEach(d => (d.subtypes || []).forEach(s => map.set(s.name, d.type)));
     return map;
-  }, [categories]);
+  }, [expenseCategories]);
 
   const filteredCategories = useMemo(() => {
     if (!typeFilter) return categories;
@@ -128,10 +152,10 @@ const AdminExpensesTab: React.FC = () => {
 
   const filteredRecords = useMemo(() => {
     return expenseRecords.filter(r => {
-      const matchesSearch = 
-        r.description.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      const matchesSearch =
+        r.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
         r.entityName.toLowerCase().includes(searchTerm.toLowerCase());
-      
+
       const matchesCategory = categoryFilter ? r.category === categoryFilter : true;
       const typeKey = categoryTypeMap.get(r.category) || 'custom';
       const matchesType = typeFilter ? typeKey === typeFilter : true;
@@ -146,7 +170,7 @@ const AdminExpensesTab: React.FC = () => {
       const currentMonth = today.getMonth() + 1;
       const startOfMonthStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`;
       const endOfMonthStr = new Date(currentYear, currentMonth, 0).toISOString().split('T')[0];
-      
+
       if (activeTab === 'open') {
         // Apenas registros do mês/ano atual
         const isCurrentMonth = r.dueDate >= startOfMonthStr && r.dueDate <= endOfMonthStr;
@@ -155,23 +179,23 @@ const AdminExpensesTab: React.FC = () => {
         const isPending = r.status !== 'paid';
         const isFuture = r.dueDate > endOfMonthStr;
         matchesTab = isPending && isFuture;
-      } 
+      }
 
       return matchesSearch && matchesCategory && matchesType && matchesDate && matchesTab;
     });
   }, [expenseRecords, searchTerm, categoryFilter, typeFilter, startDate, endDate, activeTab, categoryTypeMap]);
 
   const kpis = useMemo(() => {
-      // KPIs baseados no filtro atual para dar contexto dinâmico
-      const total = filteredRecords.reduce((acc, r) => acc + r.originalValue, 0);
-      const paid = filteredRecords.reduce((acc, r) => acc + r.paidValue, 0);
-      const pending = total - paid;
-      return { total, paid, pending };
+    // KPIs baseados no filtro atual para dar contexto dinâmico
+    const total = filteredRecords.reduce((acc, r) => acc + r.originalValue, 0);
+    const paid = filteredRecords.reduce((acc, r) => acc + r.paidValue, 0);
+    const pending = total - paid;
+    return { total, paid, pending };
   }, [filteredRecords]);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      
+
       {/* KPIs Section */}
       <AdminExpensesKPIs {...kpis} />
 
@@ -180,24 +204,22 @@ const AdminExpensesTab: React.FC = () => {
         <div className="flex flex-col sm:flex-row justify-between gap-4">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-            <input 
-              type="text" 
-              placeholder="Buscar despesa, fornecedor..." 
+            <input
+              type="text"
+              placeholder="Buscar despesa, fornecedor..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 rounded-xl border-2 border-slate-100 bg-slate-50 text-sm focus:bg-white focus:border-slate-800 focus:outline-none transition-all font-medium"
             />
           </div>
           <div className="flex gap-2">
-            <button onClick={loadData} className="p-2.5 text-slate-400 hover:text-slate-900 bg-slate-50 rounded-xl transition-all border border-slate-100">
-                <RefreshCw size={20} />
-            </button>
-            <button 
-                onClick={() => setIsAddModalOpen(true)}
-                className="flex items-center gap-2 bg-slate-900 text-white px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg active:scale-95"
+
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="flex items-center gap-2 bg-slate-900 text-white px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg active:scale-95"
             >
-                <Plus size={18} />
-                Lançar Despesa
+              <Plus size={18} />
+              Lançar Despesa
             </button>
           </div>
         </div>
@@ -206,8 +228,8 @@ const AdminExpensesTab: React.FC = () => {
           <div className="sm:col-span-3 flex items-center gap-2">
             <div className="relative flex-1">
               <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-              <input 
-                type="date" 
+              <input
+                type="date"
                 value={startDate}
                 onChange={e => setStartDate(e.target.value)}
                 className="w-full pl-10 pr-3 py-2 text-xs border border-slate-200 rounded-lg text-slate-900 bg-white focus:border-slate-800 outline-none font-bold"
@@ -216,8 +238,8 @@ const AdminExpensesTab: React.FC = () => {
             <span className="text-slate-300 font-black text-[10px] uppercase">até</span>
             <div className="relative flex-1">
               <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-              <input 
-                type="date" 
+              <input
+                type="date"
                 value={endDate}
                 onChange={e => setEndDate(e.target.value)}
                 className="w-full pl-10 pr-3 py-2 text-xs border border-slate-200 rounded-lg text-slate-900 bg-white focus:border-slate-800 outline-none font-bold"
@@ -226,7 +248,7 @@ const AdminExpensesTab: React.FC = () => {
           </div>
           <div className="sm:col-span-1 relative">
             <Layers className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-            <select 
+            <select
               value={typeFilter}
               onChange={e => setTypeFilter(e.target.value)}
               className="w-full pl-10 pr-3 py-2 text-xs border border-slate-200 rounded-lg text-slate-900 bg-white focus:border-slate-800 outline-none appearance-none font-bold"
@@ -239,7 +261,7 @@ const AdminExpensesTab: React.FC = () => {
           </div>
           <div className="sm:col-span-1 relative">
             <Tag className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-            <select 
+            <select
               value={categoryFilter}
               onChange={e => setCategoryFilter(e.target.value)}
               className="w-full pl-10 pr-3 py-2 text-xs border border-slate-200 rounded-lg text-slate-900 bg-white focus:border-slate-800 outline-none appearance-none font-bold"
@@ -289,31 +311,23 @@ const AdminExpensesTab: React.FC = () => {
 
       {/* CONTENT AREA */}
       <div>
-        <AdminExpenseGroupedList 
-          records={filteredRecords} 
-          onPay={handleOpenPayment} 
+        <AdminExpenseGroupedList
+          records={filteredRecords}
+          onPay={handleOpenPayment}
           onEdit={handleEditRecord}
           onDelete={handleDeleteRecord}
         />
       </div>
 
       {/* FORM MODAL */}
-      <InstallmentExpenseForm 
-        isOpen={isAddModalOpen} 
+      <InstallmentExpenseForm
+        isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onSave={handleAddExpenses}
       />
 
-      <InstallmentExpenseForm
-        isOpen={!!editingRecord}
-        onClose={() => setEditingRecord(null)}
-        onSave={handleAddExpenses}
-        onUpdate={handleUpdateRecord}
-        initialData={editingRecord}
-      />
-
       {/* PAYMENT MODAL */}
-      <FinancialPaymentModal 
+      <FinancialPaymentModal
         isOpen={isPayModalOpen}
         onClose={() => setIsPayModalOpen(false)}
         onConfirm={handleConfirmPayment}

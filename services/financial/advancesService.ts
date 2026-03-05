@@ -3,22 +3,9 @@ import { authService } from '../authService';
 import { supabase } from '../supabase';
 import { invalidateDashboardCache } from '../dashboardCache';
 import { invalidateFinancialCache } from '../financialCache';
+import { AdvanceTransaction } from '../../modules/Financial/Advances/types';
 
-export interface Advance {
-  id: string;
-  partnerId: string;
-  type: 'given' | 'received';
-  amount: number;
-  outstandingBalance: number;
-  advanceDate: string;
-  relatedType?: string;
-  relatedId?: string;
-  status: 'pending' | 'settled' | 'cancelled';
-  notes?: string;
-  companyId?: string;
-}
-
-const db = new Persistence<Advance>('advances', [], { useStorage: false });
+const db = new Persistence<AdvanceTransaction>('advances', [], { useStorage: false });
 let realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
 let isLoaded = false;
 
@@ -26,42 +13,44 @@ let isLoaded = false;
 // MAPEAMENTO
 // ============================================================================
 
-const mapToDb = (item: Advance) => ({
+const mapToDb = (item: AdvanceTransaction) => ({
   id: item.id,
   partner_id: item.partnerId,
-  type: item.type,
-  amount: item.amount,
-  outstanding_balance: item.outstandingBalance,
-  advance_date: item.advanceDate,
-  related_type: item.relatedType || null,
-  related_id: item.relatedId || null,
-  status: item.status,
-  notes: item.notes || null,
-  company_id: item.companyId || authService.getCurrentUser()?.companyId || null
+  partner_name: item.partnerName,
+  type: item.type === 'given' ? 'given' : 'received',
+  amount: item.value,
+  outstanding_balance: item.value, // Initially same as total
+  advance_date: item.date,
+  status: item.status === 'active' ? 'pending' : 'settled',
+  description: item.description,
+  notes: null,
+  company_id: authService.getCurrentUser()?.companyId || null,
+  created_by: authService.getCurrentUser()?.id || null
 });
 
-const mapFromDb = (row: any): Advance => ({
+const mapFromDb = (row: any): AdvanceTransaction => ({
   id: row.id,
   partnerId: row.partner_id,
-  type: row.type,
-  amount: Number(row.amount),
-  outstandingBalance: Number(row.outstanding_balance),
-  advanceDate: row.advance_date,
-  relatedType: row.related_type,
-  relatedId: row.related_id,
-  status: row.status,
-  notes: row.notes,
-  companyId: row.company_id
+  partnerName: row.partner_name || 'Desconhecido',
+  type: row.type === 'given' ? 'given' : 'taken',
+  date: row.advance_date,
+  value: Number(row.amount),
+  description: row.description || '',
+  status: row.status === 'pending' ? 'active' : 'settled'
 });
 
 // ============================================================================
 // CARREGAMENTO INICIAL
 // ============================================================================
 
-const loadFromSupabase = async (): Promise<Advance[]> => {
+const loadFromSupabase = async (): Promise<AdvanceTransaction[]> => {
   try {
     const user = authService.getCurrentUser();
     const companyId = user?.companyId;
+
+    if (!companyId) {
+      return [];
+    }
 
     const { data, error } = await supabase
       .from('advances')
@@ -73,10 +62,8 @@ const loadFromSupabase = async (): Promise<Advance[]> => {
     const mapped = (data || []).map(mapFromDb);
     db.setAll(mapped);
     isLoaded = true;
-    console.log('🔄 Antecipações sincronizando em tempo real...');
     return mapped;
   } catch (error) {
-    console.error('❌ Erro ao carregar advances:', error);
     return [];
   }
 };
@@ -113,17 +100,15 @@ const startRealtime = () => {
 // PERSISTÊNCIA
 // ============================================================================
 
-const persistUpsert = async (item: Advance) => {
+const persistUpsert = async (item: AdvanceTransaction) => {
   try {
     const payload = mapToDb(item);
     const { error } = await supabase.from('advances').upsert(payload).select();
     if (error) {
-      console.error('Erro ao salvar advance no Supabase', error);
       return;
     }
     await loadFromSupabase();
   } catch (err) {
-    console.error('Erro inesperado ao salvar advance', err);
   }
 };
 
@@ -132,7 +117,13 @@ const persistDelete = async (id: string) => {
     const { error } = await supabase.from('advances').delete().eq('id', id);
     if (error) console.error('Erro ao excluir advance', error);
   } catch (err) {
-    console.error('Erro inesperado ao excluir advance', err);
+  }
+};
+
+const stopRealtime = () => {
+  if (realtimeChannel) {
+    supabase.removeChannel(realtimeChannel);
+    realtimeChannel = null;
   }
 };
 
@@ -147,28 +138,57 @@ const persistDelete = async (id: string) => {
 export const advancesService = {
   getAll: () => db.getAll(),
   getById: (id: string) => db.getById(id),
-  subscribe: (callback: (items: Advance[]) => void) => db.subscribe(callback),
+  subscribe: (callback: (items: AdvanceTransaction[]) => void) => db.subscribe(callback),
   loadFromSupabase,
   startRealtime,
+  stopRealtime,
 
-  add: (item: Advance) => {
+  addTransaction: async (item: AdvanceTransaction, cashData?: { accountId: string, accountName: string }) => {
     db.add(item);
-    void persistUpsert(item);
+
+    // 1. Persistir no Supabase
+    const payload = mapToDb(item);
+    const { data: adv, error } = await supabase.from('advances').insert(payload).select().single();
+
+    if (error) throw error;
+
+    // 2. Se houver movimentação de caixa (Adiantamento Pago/Recebido em Dinheiro)
+    if (cashData) {
+      const { registerFinancialRecords } = await import('./handlers/orchestratorHelpers');
+      const txId = Math.random().toString(36).substr(2, 9);
+
+      await registerFinancialRecords({
+        txId,
+        date: item.date,
+        amount: item.value,
+        discount: 0,
+        accountId: cashData.accountId,
+        accountName: cashData.accountName,
+        type: item.type === 'given' ? 'payment' : 'receipt',
+        recordId: adv.id,
+        referenceType: 'standalone', // Advances são standalone por enquanto mas vinculados via link
+        referenceId: adv.id,
+        description: `Adiantamento: ${item.partnerName}${item.description ? ` - ${item.description}` : ''}`,
+        historyType: item.type === 'given' ? 'Adiantamento Concedido' : 'Adiantamento Recebido',
+        entityName: item.partnerName,
+        partnerId: item.partnerId,
+        notes: `[ADVANCE_ID:${adv.id}]`
+      });
+    }
+
     invalidateFinancialCache();
     invalidateDashboardCache();
   },
 
-  update: (item: Advance) => {
+  updateTransaction: (item: AdvanceTransaction) => {
     db.update(item);
     void persistUpsert(item);
-    invalidateFinancialCache();
-    invalidateDashboardCache();
   },
 
-  delete: (id: string) => {
+  deleteTransaction: async (id: string) => {
+    // Triggers e Links cuidarão do estorno se deletarmos a transação vinculada?
+    // Por enquanto, deletar a antecipação deve ser cauteloso.
     db.delete(id);
     void persistDelete(id);
-    invalidateFinancialCache();
-    invalidateDashboardCache();
   }
 };

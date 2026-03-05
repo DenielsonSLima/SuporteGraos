@@ -48,11 +48,7 @@ const UnifiedReceivableManager: React.FC<Props> = ({ records, onRefresh, viewMod
       }
       map[entityKey].items.push(r);
       map[entityKey].total += r.originalValue;
-
-      // Correção de precisão: garante que o saldo nunca seja negativo por arredondamento de float
-      const rawBalance = r.originalValue - r.paidValue - (r.discountValue || 0);
-      const itemBalance = rawBalance < 0.01 ? 0 : rawBalance;
-      map[entityKey].balance += itemBalance;
+      map[entityKey].balance += (r.remainingValue || 0);
     });
 
     return Object.values(map).sort((a, b) => b.balance - a.balance);
@@ -70,7 +66,9 @@ const UnifiedReceivableManager: React.FC<Props> = ({ records, onRefresh, viewMod
 
   const handleNavigateToOrder = (e: React.MouseEvent, item: FinancialRecord) => {
     e.stopPropagation();
-    const orderId = item.id.replace('so-', '');
+    const orderId = item.originId || item.id;
+    // Store pending navigation so the target module can pick it up on mount
+    (window as any).__pendingOrderNav = { moduleId: ModuleId.SALES_ORDER, orderId };
     window.dispatchEvent(new CustomEvent('app:navigate', {
       detail: { moduleId: ModuleId.SALES_ORDER, orderId }
     }));
@@ -78,10 +76,7 @@ const UnifiedReceivableManager: React.FC<Props> = ({ records, onRefresh, viewMod
 
   const totalSelected = records
     .filter(r => selectedIds.includes(r.id))
-    .reduce((acc, r) => {
-      const bal = r.originalValue - r.paidValue - (r.discountValue || 0);
-      return acc + (bal < 0.01 ? 0 : bal);
-    }, 0);
+    .reduce((acc, r) => acc + (r.remainingValue || 0), 0);
 
   const handleConfirmPayment = async (data: PaymentData) => {
     if (selectedRecordForSinglePay) {
@@ -90,8 +85,7 @@ const UnifiedReceivableManager: React.FC<Props> = ({ records, onRefresh, viewMod
       for (const id of selectedIds) {
         const record = records.find(r => r.id === id);
         if (record) {
-          const rawBalance = record.originalValue - record.paidValue - (record.discountValue || 0);
-          const balance = rawBalance < 0.01 ? 0 : rawBalance;
+          const balance = record.remainingValue || 0;
           await financialActionService.processRecord(id, { ...data, amount: balance, discount: 0 }, record.subType);
         }
       }
@@ -160,8 +154,7 @@ const UnifiedReceivableManager: React.FC<Props> = ({ records, onRefresh, viewMod
                   <tbody className="divide-y divide-slate-50">
                     {entity.items.map((item: FinancialRecord) => {
                       const totalLiquidated = item.paidValue + (item.discountValue || 0);
-                      const rawPending = item.originalValue - totalLiquidated;
-                      const pendingBalance = rawPending < 0.01 ? 0 : rawPending;
+                      const pendingBalance = item.remainingValue || 0;
                       const isPaid = item.status === 'paid';
 
                       return (
@@ -180,9 +173,10 @@ const UnifiedReceivableManager: React.FC<Props> = ({ records, onRefresh, viewMod
                           <td className="px-4 py-4">
                             <button
                               onClick={(e) => handleNavigateToOrder(e, item)}
-                              className="font-black text-emerald-600 hover:text-emerald-800 uppercase italic tracking-tighter text-xs"
+                              className="font-black text-emerald-600 hover:text-emerald-800 hover:underline transition-colors uppercase italic tracking-tighter text-xs"
+                              title="Ver detalhes do pedido de venda"
                             >
-                              #{item.description.replace('Venda ', '').replace('Pedido de Venda ', '')}
+                              #{item.orderNumber || item.description.replace('Venda ', '').replace('Pedido de Venda ', '')}
                             </button>
                           </td>
                           <td className="px-4 py-4">

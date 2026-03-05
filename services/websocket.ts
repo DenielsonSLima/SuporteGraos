@@ -74,7 +74,6 @@ class WebSocketService {
     if (this.socket && this.socket.readyState === WebSocket.OPEN) {
       this.socket.send(JSON.stringify({ channel, data }));
     } else {
-      console.warn('[WebSocket] Cannot send, socket not open (Mock: Message logged)', { channel, data });
     }
   }
 }

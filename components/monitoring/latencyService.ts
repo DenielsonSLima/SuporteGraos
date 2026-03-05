@@ -1,5 +1,5 @@
 // ⚡ Serviço de monitoramento de latência do banco de dados
-// Facilita mudanças futuras na lógica de medição
+// Mede round-trip real ao Supabase com adaptive polling
 
 import { supabase } from '../../services/supabase';
 
@@ -20,45 +20,85 @@ class LatencyMonitorService {
 
   private subscribers: ((data: LatencyData) => void)[] = [];
   private intervalId: ReturnType<typeof setInterval> | null = null;
+  private recentMeasurements: number[] = [];
+  private consecutiveFailures = 0;
+  private isTabVisible = true;
 
-  // 🎯 Configuração dos thresholds (ajustado para servidor internacional)
+  // 🎯 Thresholds ajustados para Supabase sa-east-1 (servidor Brasil)
+  // Referência: Datadog/NewRelic consideram <200ms "bom" para APIs internacionais
   private readonly THRESHOLDS = {
-    excellent: 100,  // < 100ms = Verde (muito bom para internacional)
-    good: 250,       // < 250ms = Verde claro (bom para internacional)
-    slow: 400,       // < 400ms = Amarelo (aceitável)
-    critical: 800    // < 800ms = Vermelho (ruim mas usável)
-    // >= 800ms = Offline
+    excellent: 150,  // < 150ms = Verde (muito bom)
+    good: 300,       // < 300ms = Verde claro (bom, padrão para internacional)
+    slow: 500,       // < 500ms = Amarelo (aceitável)
+    critical: 800    // >= 800ms = Vermelho (problema real)
   };
 
+  // Polling adaptativo: se conexão estável, reduz frequência
+  private readonly POLL_FAST = 15_000;   // 15s quando instável
+  private readonly POLL_NORMAL = 30_000; // 30s quando estável (reduz carga)
+  private readonly POLL_BACKGROUND = 60_000; // 60s quando aba não está ativa
+  private stableCount = 0;
+
+  private readonly MAX_WINDOW = 5;
+  private readonly MAX_CONSECUTIVE_FAILURES = 3;
+
   constructor() {
+    this.setupVisibilityListener();
     this.startMonitoring();
+  }
+
+  // 👁 Pausar/reduzir polling quando aba não está visível
+  private setupVisibilityListener() {
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', () => {
+        this.isTabVisible = !document.hidden;
+        // Reiniciar com intervalo adequado quando muda visibilidade
+        this.restartWithAdaptiveInterval();
+      });
+    }
   }
 
   // 📊 Classificar latência
   private getStatus(ms: number): LatencyStatus {
-    if (ms === 0) return 'offline';
+    if (ms <= 0) return this.consecutiveFailures >= this.MAX_CONSECUTIVE_FAILURES ? 'offline' : this.currentLatency.status;
     if (ms < this.THRESHOLDS.excellent) return 'excellent';
     if (ms < this.THRESHOLDS.good) return 'good';
     if (ms < this.THRESHOLDS.slow) return 'slow';
-    if (ms < this.THRESHOLDS.critical) return 'critical';
-    return 'offline';
+    return 'critical';
   }
 
-  // 🔄 Medir latência REAL com Supabase
+  // Suavização: remove outliers e faz média
+  private getSmoothedLatency(ms: number): number {
+    if (ms <= 0) return 0;
+    this.recentMeasurements.push(ms);
+    if (this.recentMeasurements.length > this.MAX_WINDOW) {
+      this.recentMeasurements.shift();
+    }
+
+    // Remove o valor mais alto e mais baixo (outlier removal) quando temos >= 3 amostras
+    const sorted = [...this.recentMeasurements].sort((a, b) => a - b);
+    const trimmed = sorted.length >= 3 ? sorted.slice(1, -1) : sorted;
+
+    const sum = trimmed.reduce((acc, value) => acc + value, 0);
+    return Math.round(sum / trimmed.length);
+  }
+
+  // 🔄 Medir latência REAL com Supabase (query ultra-leve)
   private async measureLatency(): Promise<number> {
     try {
       const start = performance.now();
       
-      // ✅ PING REAL: Query simples em tabela existente
+      // ✅ Query mínima: select('id') com limit(1), SEM count
+      // count: 'exact' forçava full table scan — removido
       const { error } = await supabase
         .from('app_users')
         .select('id')
-        .limit(1);
+        .limit(1)
+        .maybeSingle();
       
       const end = performance.now();
       const latency = Math.round(end - start);
       
-      // Se houver erro de autenticação, ainda retorna a latência (conexão existe)
       if (error && !error.message?.includes('JWT') && !error.message?.includes('auth')) {
         console.warn('Latency check error:', error);
       }
@@ -70,27 +110,65 @@ class LatencyMonitorService {
     }
   }
 
+  // Determinar intervalo de polling ideal
+  private getAdaptiveInterval(): number {
+    if (!this.isTabVisible) return this.POLL_BACKGROUND;
+    if (this.stableCount >= 5) return this.POLL_NORMAL; // Estável: poll menos
+    return this.POLL_FAST;
+  }
+
+  private restartWithAdaptiveInterval() {
+    if (this.intervalId) {
+      clearInterval(this.intervalId);
+    }
+    const interval = this.getAdaptiveInterval();
+    this.intervalId = setInterval(() => {
+      this.updateLatency();
+    }, interval);
+  }
+
   // 🚀 Iniciar monitoramento contínuo
   private startMonitoring() {
     // Medir imediatamente
     this.updateLatency();
     
-    // Atualizar a cada 10 segundos (reduzido para economizar requests)
-    this.intervalId = setInterval(() => {
-      this.updateLatency();
-    }, 10000);
+    // Iniciar com intervalo adaptativo
+    this.restartWithAdaptiveInterval();
   }
 
   // 📡 Atualizar latência e notificar subscribers
   private async updateLatency() {
-    const ms = await this.measureLatency();
-    const status = this.getStatus(ms);
+    const measuredMs = await this.measureLatency();
+    if (measuredMs <= 0) {
+      this.consecutiveFailures += 1;
+      this.stableCount = 0;
+    } else {
+      this.consecutiveFailures = 0;
+      // Incrementar estabilidade se dentro de "bom"
+      const status = this.getStatus(measuredMs);
+      if (status === 'excellent' || status === 'good') {
+        this.stableCount = Math.min(this.stableCount + 1, 10);
+      } else {
+        this.stableCount = Math.max(this.stableCount - 2, 0);
+      }
+    }
+
+    const ms = this.getSmoothedLatency(measuredMs);
+    const status = this.getStatus(ms || measuredMs);
+    
+    const prevInterval = this.getAdaptiveInterval();
     
     this.currentLatency = {
-      ms,
+      ms: ms || measuredMs,
       status,
       timestamp: new Date()
     };
+
+    // Ajustar polling se mudou de faixa
+    const newInterval = this.getAdaptiveInterval();
+    if (newInterval !== prevInterval) {
+      this.restartWithAdaptiveInterval();
+    }
 
     // Notificar todos os subscribers
     this.subscribers.forEach(callback => callback(this.currentLatency));

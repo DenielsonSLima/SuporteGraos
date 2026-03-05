@@ -1,7 +1,7 @@
 
 import { FileText } from 'lucide-react';
 import { ReportModule } from '../../types';
-import { loadingService } from '../../../../services/loadingService';
+import { financialIntegrationService } from '../../../../services/financialIntegrationService';
 import UniversalReportTemplate from '../../templates/UniversalReportTemplate';
 import DefaultFilters from '../../components/DefaultFilters';
 
@@ -20,14 +20,16 @@ const revenueReport: ReportModule = {
   },
   FilterComponent: DefaultFilters,
   fetchData: ({ startDate, endDate }) => {
-    const loadings = loadingService.getAll().filter(l => 
-        l.status === 'completed' && 
-        (!startDate || l.date >= startDate) && 
-        (!endDate || l.date <= endDate)
-    );
+    const receivables = financialIntegrationService
+      .getReceivables()
+      .filter((r) => r.subType === 'sales_order')
+      .filter((r) => {
+        const referenceDate = r.issueDate || r.dueDate;
+        return (!startDate || referenceDate >= startDate) && (!endDate || referenceDate <= endDate);
+      });
 
-    const totalRevenue = loadings.reduce((acc, l) => acc + (l.totalSalesValue || 0), 0);
-    const totalVolume = loadings.reduce((acc, l) => acc + (l.weightKg || 0), 0) / 1000;
+    const totalRevenue = receivables.reduce((acc, r) => acc + r.originalValue, 0);
+    const totalVolume = receivables.reduce((acc, r) => acc + (r.weightKg || 0), 0) / 1000;
 
     return {
       title: 'Relatório de Faturamento Detalhado',
@@ -41,14 +43,14 @@ const revenueReport: ReportModule = {
         { header: 'Preço SC', accessor: 'price', format: 'currency', align: 'right' },
         { header: 'Valor Total', accessor: 'total', format: 'currency', align: 'right' }
       ],
-      rows: loadings.map(l => ({
-        date: l.date,
-        invoice: l.invoiceNumber || 'S/N',
-        customer: l.customerName,
-        product: l.product,
-        weight: l.weightKg / 1000,
-        price: l.salesPrice,
-        total: l.totalSalesValue
+      rows: receivables.map(r => ({
+        date: r.issueDate || r.dueDate,
+        invoice: 'S/N',
+        customer: r.entityName,
+        product: r.description || 'Grãos',
+        weight: (r.weightKg || 0) / 1000,
+        price: r.unitPriceSc || 0,
+        total: r.originalValue
       })),
       summary: [
           { label: 'Volume Total (TON)', value: totalVolume, format: 'number' },

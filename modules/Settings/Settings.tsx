@@ -19,19 +19,19 @@ import {
 } from 'lucide-react';
 
 // Import sub-modules
-import CompanySettings from './Company/CompanySettings';
-import UsersSettings from './Users/UsersSettings';
-import ShareholdersSettings from './Shareholders/ShareholdersSettings';
-import ApiSettings from './Api/ApiSettings';
-import PartnerTypesSettings from './PartnerTypes/PartnerTypesSettings';
-import InitialBalanceSettings from './InitialBalance/InitialBalanceSettings';
-import BankAccountsSettings from './BankAccounts/BankAccountsSettings';
-import ExpenseTypesSettings from './ExpenseTypes/ExpenseTypesSettings';
-import BackupSettings from './Backup/BackupSettings';
-import LocationsSettings from './Locations/LocationsSettings';
-import WatermarkSettings from './Watermark/WatermarkSettings';
-import ProductTypesSettings from './ProductTypes/ProductTypesSettings';
-import LogsSettings from './Logs/LogsSettings';
+import CompanySettings from './Company/company.page';
+import UsersSettings from './Users/users.page';
+import ShareholdersSettings from './Shareholders/shareholders.page';
+import ApiSettings from './Api/api.page';
+import PartnerTypesSettings from './PartnerTypes/partner-types.page';
+import InitialBalanceSettings from './InitialBalance/initial-balance.page';
+import BankAccountsSettings from './BankAccounts/bank-accounts.page';
+import ExpenseTypesSettings from './ExpenseTypes/expense-types.page';
+import BackupSettings from './Backup/backup.page';
+import LocationsSettings from './Locations/locations.page';
+import WatermarkSettings from './Watermark/watermark.page';
+import ProductTypesSettings from './ProductTypes/product-types.page';
+import LogsSettings from './Logs/logs.page';
 
 const SETTINGS_MENU = [
   { 

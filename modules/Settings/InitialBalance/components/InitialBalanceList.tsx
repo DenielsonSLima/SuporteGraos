@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Landmark, Trash2, Calendar, Coins } from 'lucide-react';
-import { InitialBalanceRecord } from '../../../../services/financialService';
+import type { InitialBalanceRecord } from '../../../../services/financialService';
 import { formatDateBR } from '../../../../utils/dateUtils';
 
 interface Props {

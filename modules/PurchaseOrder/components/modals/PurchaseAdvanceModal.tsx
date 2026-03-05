@@ -1,7 +1,8 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { X, DollarSign, Calendar, Wallet, FileText, ArrowRight, ArrowDownLeft } from 'lucide-react';
-import { financialService, BankAccountWithBalance } from '../../../../services/financialService';
+import type { Account } from '../../../../services/accountsService';
+import { useAccounts } from '../../../../hooks/useAccounts';
 import { getLocalDateString } from '../../../../utils/dateUtils';
 import { BankAccount } from '../../../Financial/types';
 import { useToast } from '../../../../contexts/ToastContext';
@@ -20,7 +21,12 @@ const PurchaseAdvanceModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, par
   const [amount, setAmount] = useState('');
   const [accountId, setAccountId] = useState('');
   const [notes, setNotes] = useState('');
-  const [bankAccounts, setBankAccounts] = useState<BankAccountWithBalance[]>([]);
+
+  const { data: allAccounts = [] } = useAccounts();
+  const bankAccounts = useMemo(() =>
+    allAccounts.filter((a: Account) => a.is_active !== false).sort((a: Account, b: Account) => a.account_name.localeCompare(b.account_name)),
+    [allAccounts]
+  );
 
   const formatBRL = (val: number) => {
     const normalized = Math.abs(val) < 0.01 ? 0 : val;
@@ -29,10 +35,6 @@ const PurchaseAdvanceModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, par
 
   useEffect(() => {
     if (isOpen) {
-      const sorted = financialService.getBankAccountsWithBalances()
-        .filter(acc => acc.active !== false)
-        .sort((a, b) => a.bankName.localeCompare(b.bankName));
-      setBankAccounts(sorted);
       setAmount('');
       setAccountId('');
       setNotes('');
@@ -42,14 +44,14 @@ const PurchaseAdvanceModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, par
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const valAmount = parseFloat(amount);
     if (!valAmount || valAmount <= 0) return addToast('warning', 'Valor Inválido');
     if (!accountId) return addToast('warning', 'Conta Obrigatória');
 
     const selectedAccount = bankAccounts.find(a => a.id === accountId);
-    onConfirm({ date, value: valAmount, accountId, accountName: selectedAccount?.bankName || 'Caixa', notes: notes || 'Adiantamento de Compra' });
+    onConfirm({ date, value: valAmount, accountId, accountName: selectedAccount?.account_name || 'Caixa', notes: notes || 'Adiantamento de Compra' });
   };
 
   const inputClass = 'w-full border-2 border-slate-200 rounded-xl bg-white text-slate-900 font-bold px-4 py-2.5 focus:border-amber-500 outline-none transition-all placeholder:text-slate-300 text-sm';
@@ -69,7 +71,7 @@ const PurchaseAdvanceModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, par
           </div>
           <div>
             <label className={labelClass}>Conta de Saída (Saldo em Tempo Real)</label>
-            <div className="relative"><Wallet className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} /><select required value={accountId} onChange={e => setAccountId(e.target.value)} className={`${inputClass} pl-12 appearance-none`}><option value="">Selecione o banco...</option>{bankAccounts.map(acc => (<option key={acc.id} value={acc.id}>{acc.bankName} - {acc.owner} (Saldo: {formatBRL(acc.currentBalance)})</option>))}</select><ArrowRight className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} /></div>
+            <div className="relative"><Wallet className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} /><select required value={accountId} onChange={e => setAccountId(e.target.value)} className={`${inputClass} pl-12 appearance-none`}><option value="">Selecione o banco...</option>{bankAccounts.map(acc => (<option key={acc.id} value={acc.id}>{acc.account_name} (Saldo: {formatBRL(acc.balance)})</option>))}</select><ArrowRight className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} /></div>
           </div>
           <div><label className={labelClass}>Histórico / Observações</label><div className="relative"><FileText className="absolute left-3 top-3 text-slate-300" size={18} /><textarea rows={2} value={notes} onChange={e => setNotes(e.target.value)} className={`${inputClass} pl-10 text-xs font-medium`} placeholder="Notas..." /></div></div>
           <div className="pt-4 flex justify-end gap-3 border-t border-slate-100">

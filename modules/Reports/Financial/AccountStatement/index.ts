@@ -2,8 +2,7 @@
 import { Landmark } from 'lucide-react';
 import { ReportModule } from '../../types';
 import { financialService } from '../../../../services/financialService';
-import { financialActionService } from '../../../../services/financialActionService';
-import { reportsCache } from '../../../../services/reportsCache';
+import { financialTransactionsService } from '../../../../services/financialTransactionsService';
 import Template from './Template';
 import PdfDocument from './PdfDocument';
 import Filters from './Filters';
@@ -23,7 +22,7 @@ const accountStatementReport: ReportModule = {
     accountId: ''
   },
   FilterComponent: Filters,
-  fetchData: ({ startDate, endDate, accountId }) => {
+  fetchData: async ({ startDate, endDate, accountId }) => {
     if (!accountId) {
         return { title: 'Extrato de Conta', subtitle: 'Selecione uma conta nos filtros', columns: [], rows: [] };
     }
@@ -36,28 +35,16 @@ const accountStatementReport: ReportModule = {
     const startBalanceVal = initialBalanceRecord ? initialBalanceRecord.value : 0;
     const startBalanceDate = initialBalanceRecord ? initialBalanceRecord.date : '2000-01-01';
 
-    // 2. Gather ALL transactions (usando cache otimizado)
-    let allTransactions: any[] = [];
-
-    financialActionService.getStandaloneRecords().forEach(r => {
-        if ((r.bankAccount === accountId || r.bankAccount === account?.bankName) && r.paidValue > 0) {
-            const isCredit = ['sales_order', 'loan_granted', 'receipt', 'Venda de Ativo'].includes(r.subType || '') || r.category === 'Venda de Ativo';
-            allTransactions.push({ date: r.issueDate, description: r.description, entity: r.entityName, type: isCredit ? 'credit' : 'debit', value: r.paidValue, category: r.category });
-        }
-    });
-
-    financialActionService.getTransfers().forEach(t => {
-        if (t.originAccount === account?.bankName) allTransactions.push({ date: t.date, description: `Transf. para ${t.destinationAccount}`, entity: 'INTERNO', type: 'debit', value: t.value, category: 'Transferência' });
-        if (t.destinationAccount === account?.bankName) allTransactions.push({ date: t.date, description: `Transf. de ${t.originAccount}`, entity: 'INTERNO', type: 'credit', value: t.value, category: 'Transferência' });
-    });
-
-    // ✅ Usar getAllTransactions do cache (evita triple loop)
-    const cachedTransactions = reportsCache.getAllTransactions();
-    cachedTransactions.forEach(t => {
-        if (t.accountId === accountId) {
-            allTransactions.push(t);
-        }
-    });
+    // 2. Gather ALL canonical account transactions from ledger
+    const accountTransactions = await financialTransactionsService.getByAccount(accountId);
+    const allTransactions: any[] = accountTransactions.map((tx) => ({
+      date: tx.transaction_date,
+      description: tx.description || (tx.type === 'credit' ? 'Entrada' : 'Saída'),
+      entity: '',
+      type: tx.type,
+      value: tx.amount,
+      category: tx.type === 'credit' ? 'Crédito' : 'Débito'
+    }));
 
     // Sort by Date
     allTransactions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());

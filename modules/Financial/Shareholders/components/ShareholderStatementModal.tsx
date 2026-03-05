@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { X, Calendar, ArrowUpCircle, ArrowDownCircle, Printer } from 'lucide-react';
-import { Shareholder } from '../../../../services/shareholderService';
+import type { Shareholder } from '../../../../services/shareholderService';
 import ShareholderPdfModal from './ShareholderPdfModal';
 
 interface Props {

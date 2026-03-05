@@ -1,82 +1,112 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { ArrowRightLeft, ArrowRight, Calendar, Plus, Wallet, Trash2, Pencil } from 'lucide-react';
-import { transfersService, Transfer } from '../../../services/financial/transfersService';
+import type { Transfer } from '../../../services/transfersService';
+import { useTransfers, useCreateTransfer, useUpdateTransfer, useDeleteTransfer, useTransfersMonthTotal } from '../../../hooks/useTransfers';
+import { useAccounts } from '../../../hooks/useAccounts';
 import FinancialRecordForm from '../components/modals/FinancialRecordForm';
 import ActionConfirmationModal from '../../../components/ui/ActionConfirmationModal';
 import { useToast } from '../../../contexts/ToastContext';
-import { bankAccountService } from '../../../services/bankAccountService';
-import { BankAccount } from '../types';
-import { waitForInit } from '../../../services/supabaseInitService';
+import { useTransferOperations } from './hooks/useTransferOperations';
 
 const TransfersTab: React.FC = () => {
   const { addToast } = useToast();
   const [activeSubTab, setActiveSubTab] = useState<'month' | 'history'>('month');
-  const [records, setRecords] = useState<Transfer[]>([]);
-  const [loading, setLoading] = useState(true);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [txToDelete, setTxToDelete] = useState<Transfer | null>(null);
-  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [editingTransfer, setEditingTransfer] = useState<Transfer | null>(null);
+  const [transferToDelete, setTransferToDelete] = useState<Transfer | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  const loadData = async () => {
+  // TanStack Query: dados + realtime automático
+  const { data: transfers = [], isLoading: loading } = useTransfers();
+  const { data: accounts = [] } = useAccounts();
+  const { data: monthTotalData } = useTransfersMonthTotal();
+  const createTransfer = useCreateTransfer();
+  const updateTransfer = useUpdateTransfer();
+  const deleteTransferMutation = useDeleteTransfer();
+
+  // Hook co-localizado — encapsula accountsService + invalidações (SKIL compliance)
+  const { refreshFinancialViews } = useTransferOperations();
+
+  const handleAddTransfer = async (formData: any) => {
     try {
-      setLoading(true);
-      const data = await transfersService.loadFromSupabase();
-      setRecords(data || []);
-    } finally {
-      setLoading(false);
+      const amount = formData.amount ?? formData.value;
+      const fromAccountId = formData.fromAccountId;
+
+      await createTransfer.mutateAsync({
+        accountFromId: fromAccountId,
+        accountToId: formData.toAccountId,
+        amount,
+        description: formData.description,
+        transferDate: formData.transferDate ?? formData.date,
+      });
+      refreshFinancialViews();
+      addToast('success', 'Transferência Realizada');
+    } catch (err: any) {
+      addToast('error', 'Erro na Transferência', err.message);
+      throw err;
     }
   };
 
-  useEffect(() => {
-    const initTab = async () => {
-      await waitForInit();
-      transfersService.startRealtime();
-      await loadData();
-    };
+  const handleUpdateTransfer = async (formData: any) => {
+    try {
+      if (!editingTransfer) return;
+      const amount = formData.amount ?? formData.value;
+      const fromAccountId = formData.fromAccountId;
 
-    void initTab();
-    
-    // Subscribe to real-time updates
-    const unsubscribe = transfersService.subscribe((updatedRecords) => {
-      setRecords(updatedRecords);
-    });
+      await updateTransfer.mutateAsync({
+        id: editingTransfer.id,
+        accountFromId: fromAccountId,
+        accountToId: formData.toAccountId,
+        amount,
+        description: formData.description,
+        transferDate: formData.transferDate ?? formData.date,
+      });
 
-    const unsubscribeAccounts = bankAccountService.subscribe((items) => {
-      setBankAccounts(items);
-    });
+      refreshFinancialViews();
 
-    return () => {
-      unsubscribe();
-      unsubscribeAccounts();
-    };
-  }, []);
-
-  const handleAddTransfer = (newTransfer: Transfer) => {
-    transfersService.add(newTransfer);
-    addToast('success', 'Transferência Realizada');
+      setEditingTransfer(null);
+      setIsAddModalOpen(false);
+      addToast('success', 'Transferência Atualizada');
+    } catch (err: any) {
+      addToast('error', 'Erro ao Atualizar Transferência', err.message);
+      throw err;
+    }
   };
 
-  const handleDeleteTransfer = () => {
-    if (!txToDelete) return;
-    transfersService.delete(txToDelete.id);
-    addToast('success', 'Transferência Estornada');
-    setTxToDelete(null);
+  const handleDeleteTransfer = async () => {
+    try {
+      if (!transferToDelete) return;
+      setIsDeleting(true);
+
+      await deleteTransferMutation.mutateAsync(transferToDelete.id);
+
+      refreshFinancialViews();
+      addToast('success', 'Transferência Excluída');
+      setTransferToDelete(null);
+    } catch (err: any) {
+      addToast('error', 'Erro ao Excluir Transferência', err.message);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
   const date = (val: string) => new Date(val).toLocaleDateString('pt-BR');
   const getAccountLabel = (accountId: string) => {
-    const acc = bankAccounts.find(a => a.id === accountId);
-    if (!acc) return accountId;
-    return `${acc.bankName}${acc.owner ? ` - ${acc.owner}` : ''}`;
+    const acc = accounts.find(a => a.id === accountId);
+    return acc ? acc.account_name : accountId;
   };
 
   const currentMonthStr = new Date().toISOString().slice(0, 7);
-  const currentMonthTransfers = records.filter(t => t.transferDate.startsWith(currentMonthStr)); 
+  const currentMonthTransfers = useMemo(
+    () => transfers.filter(t => t.transfer_date?.startsWith(currentMonthStr)),
+    [transfers, currentMonthStr]
+  );
   
-  const totalMonthTransfers = currentMonthTransfers.reduce((acc, t) => acc + t.amount, 0);
-  const displayedTransfers = activeSubTab === 'month' ? currentMonthTransfers : records;
+  // ✅ ZERO CÁLCULO NO FRONTEND — total via RPC server-side
+  const totalMonthTransfers = monthTotalData?.total ?? 0;
+  const displayedTransfers = activeSubTab === 'month' ? currentMonthTransfers : transfers;
 
   return (
     <div className="space-y-6">
@@ -102,7 +132,10 @@ const TransfersTab: React.FC = () => {
         </div>
 
         <button 
-          onClick={() => setIsAddModalOpen(true)}
+          onClick={() => {
+            setEditingTransfer(null);
+            setIsAddModalOpen(true);
+          }}
           className="flex items-center gap-2 bg-slate-900 text-white px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg active:scale-95"
         >
           <Plus size={18} />
@@ -136,7 +169,7 @@ const TransfersTab: React.FC = () => {
               <div className="flex flex-col items-center md:items-start min-w-[120px]">
                 <div className="flex items-center gap-2 text-slate-500 text-sm font-bold">
                   <Calendar size={16} className="text-slate-300" />
-                  {date(transfer.transferDate)}
+                  {date(transfer.transfer_date)}
                 </div>
                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Por: Sistema</span>
               </div>
@@ -146,7 +179,7 @@ const TransfersTab: React.FC = () => {
                   <div className="p-2 bg-rose-50 rounded-xl text-rose-600"><Wallet size={18} /></div>
                   <div className="overflow-hidden">
                     <p className="text-[9px] text-rose-500 font-black uppercase tracking-tighter">Origem (Saída)</p>
-                    <p className="text-sm font-black text-slate-700 truncate uppercase" title={getAccountLabel(transfer.fromAccountId)}>{getAccountLabel(transfer.fromAccountId)}</p>
+                    <p className="text-sm font-black text-slate-700 truncate uppercase" title={getAccountLabel(transfer.account_from_id)}>{getAccountLabel(transfer.account_from_id)}</p>
                   </div>
                 </div>
 
@@ -159,25 +192,36 @@ const TransfersTab: React.FC = () => {
                   <div className="p-2 bg-emerald-50 rounded-xl text-emerald-600"><Wallet size={18} /></div>
                   <div className="overflow-hidden">
                     <p className="text-[9px] text-emerald-500 font-black uppercase tracking-tighter">Destino (Entrada)</p>
-                    <p className="text-sm font-black text-slate-700 truncate uppercase" title={getAccountLabel(transfer.toAccountId)}>{getAccountLabel(transfer.toAccountId)}</p>
+                    <p className="text-sm font-black text-slate-700 truncate uppercase" title={getAccountLabel(transfer.account_to_id)}>{getAccountLabel(transfer.account_to_id)}</p>
                   </div>
                 </div>
               </div>
 
-              <div className="text-center md:text-right min-w-[180px] flex items-center justify-between md:justify-end gap-6 w-full md:w-auto">
+              <div className="text-center md:text-right min-w-[220px] flex items-center justify-between md:justify-end gap-4 w-full md:w-auto">
                 <div>
                   <p className="text-lg font-black text-slate-900 tracking-tighter">{currency(transfer.amount)}</p>
                   <p className="text-[10px] text-slate-500 font-medium italic mt-1 line-clamp-1">{transfer.description}</p>
                 </div>
-                
-                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                    <button 
-                        onClick={() => setTxToDelete(transfer)}
-                        className="p-2.5 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white rounded-xl transition-all shadow-sm"
-                        title="Excluir Transferência"
-                    >
-                        <Trash2 size={16} />
-                    </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingTransfer(transfer);
+                      setIsAddModalOpen(true);
+                    }}
+                    className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100"
+                    title="Editar transferência"
+                  >
+                    <Pencil size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTransferToDelete(transfer)}
+                    className="p-2 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50"
+                    title="Excluir transferência"
+                  >
+                    <Trash2 size={16} />
+                  </button>
                 </div>
               </div>
 
@@ -188,18 +232,30 @@ const TransfersTab: React.FC = () => {
 
       <FinancialRecordForm 
         isOpen={isAddModalOpen} 
-        onClose={() => setIsAddModalOpen(false)}
-        onSave={handleAddTransfer}
+        onClose={() => {
+          setIsAddModalOpen(false);
+          setEditingTransfer(null);
+        }}
+        onSave={editingTransfer ? handleUpdateTransfer : handleAddTransfer}
         type="transfer"
+        initialData={editingTransfer ? {
+          id: editingTransfer.id,
+          transferDate: editingTransfer.transfer_date,
+          fromAccountId: editingTransfer.account_from_id,
+          toAccountId: editingTransfer.account_to_id,
+          amount: editingTransfer.amount,
+          description: editingTransfer.description || 'Transferência entre contas',
+        } : undefined}
       />
 
-      <ActionConfirmationModal 
-        isOpen={!!txToDelete}
-        onClose={() => setTxToDelete(null)}
+      <ActionConfirmationModal
+        isOpen={!!transferToDelete}
+        onClose={() => setTransferToDelete(null)}
         onConfirm={handleDeleteTransfer}
-        title="Estornar Transferência?"
-        description={`Deseja cancelar esta transferência de ${currency(txToDelete?.value || 0)} entre as contas? Esta ação apenas removerá o registro do histórico.`}
-        type="danger"
+        title="Excluir Transferência"
+        message={`Deseja realmente excluir a transferência de ${currency(transferToDelete?.amount || 0)}?`}
+        confirmLabel={isDeleting ? 'Excluindo...' : 'Excluir'}
+        cancelLabel="Cancelar"
       />
 
     </div>

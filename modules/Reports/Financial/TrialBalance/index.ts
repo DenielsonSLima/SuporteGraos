@@ -14,8 +14,8 @@ const trialBalanceReport: ReportModule = {
     needsDateFilter: false
   },
   initialFilters: {},
-  fetchData: () => {
-    const report = cashierService.getCurrentMonthReport();
+  fetchData: async () => {
+    const report = await cashierService.getCurrentMonthReport();
 
     const rows = [
       { cat: 'Ativo Circulante', item: 'Saldos em Bancos/Caixa', val: report.totalBankBalance, type: 'C' },

@@ -1,0 +1,31 @@
+rpc,file,args,has_p_company_id,has_auth_guard,has_company_helper,has_access_denied
+rpc_cashier_report,20260223_create_assets_table_and_fix_cashier.sql,p_company_id UUID,1,1,1,1
+rpc_create_admin_expense,022_financial_rpc_functions.sql,p_category_id UUID; p_description TEXT; p_amount DECIMAL; p_payee_name TEXT DEFAULT NULL; p_payee_id UUID DEFAULT NULL; p_account_id UUID DEFAULT NULL; p_expense_date DATE DEFAULT CURRENT_DATE; p_due_date DATE DEFAULT NULL,0,1,0,0
+rpc_create_advance,022_financial_rpc_functions.sql,p_recipient_id UUID; p_recipient_type TEXT; p_amount DECIMAL; p_account_id UUID; p_description TEXT DEFAULT NULL; p_advance_date DATE DEFAULT CURRENT_DATE,0,1,0,0
+rpc_create_loan,022_financial_rpc_functions.sql,p_lender_id UUID DEFAULT NULL; p_principal_amount DECIMAL DEFAULT 0; p_interest_rate DECIMAL DEFAULT 0; p_start_date DATE DEFAULT CURRENT_DATE; p_end_date DATE DEFAULT NULL; p_num_installments INT DEFAULT 1; p_description TEXT DEFAULT NULL,0,1,0,0
+rpc_dashboard_data,20260303_fix_rpc_auth_validation.sql,p_company_id UUID,1,1,0,1
+rpc_delete_transfer_between_accounts,20260221_transfer_sql_source_of_truth_fix.sql,p_transfer_id UUID,0,1,0,0
+rpc_financial_entry_totals_by_type,20260303_fix_rpc_auth_validation.sql,p_type text,0,1,0,0
+rpc_monthly_balance_sheet,20260303_fix_rpc_auth_validation.sql,p_company_id UUID; p_year INT; p_month INT,1,1,0,1
+rpc_ops_loading_delete_v1,20260223_fix_origin_module_to_origin_type.sql,p_legacy_id UUID,0,0,1,0
+rpc_ops_loading_rebuild_freight_financial_v1,20260223_fix_rebuild_rpcs_partner_id.sql,p_origin_id UUID,0,0,1,0
+rpc_ops_loading_upsert_v1,20260222_sql_canonical_ops_phase1.sql,p_payload JSONB,0,0,1,0
+rpc_ops_loading_upsert_v2,20260222_sql_canonical_ops_phase2_loading_sales.sql,p_payload JSONB,0,0,1,0
+rpc_ops_purchase_order_delete_v1,20260223_fix_origin_module_to_origin_type.sql,p_legacy_id UUID,0,0,1,0
+rpc_ops_purchase_order_upsert_v1,20260222_sql_canonical_ops_phase1.sql,p_payload JSONB,0,0,1,0
+rpc_ops_purchase_order_upsert_v2,20260222_sql_canonical_ops_phase2_purchase.sql,p_payload JSONB,0,0,1,0
+rpc_ops_purchase_rebuild_financial_v1,20260223_fix_rebuild_rpcs_partner_id.sql,p_origin_id UUID,0,0,1,0
+rpc_ops_sales_order_delete_v1,20260223_fix_origin_module_to_origin_type.sql,p_legacy_id UUID,0,0,1,0
+rpc_ops_sales_order_upsert_v1,20260222_sql_canonical_ops_phase1.sql,p_payload JSONB,0,0,1,0
+rpc_ops_sales_order_upsert_v2,20260222_sql_canonical_ops_phase2_loading_sales.sql,p_payload JSONB,0,0,1,0
+rpc_ops_sales_rebuild_financial_v1,20260223_fix_rebuild_rpcs_partner_id.sql,p_origin_id UUID,0,0,1,0
+rpc_pay_entry,022_financial_rpc_functions.sql,p_entry_id UUID; p_account_id UUID; p_amount DECIMAL; p_description TEXT DEFAULT NULL; p_payment_date DATE DEFAULT CURRENT_DATE,0,1,0,0
+rpc_performance_report,20260303_harden_remaining_critical_rpcs.sql,p_company_id uuid; p_months_back integer DEFAULT NULL::integer,1,1,0,1
+rpc_recalc_account_balances,20260303_recalc_balance_rpcs.sql,p_company_id UUID,1,1,0,1
+rpc_recalc_shareholder_balance,20260303_recalc_balance_rpcs.sql,p_shareholder_id UUID,0,1,0,1
+rpc_remove_initial_balance,20260303_harden_remaining_critical_rpcs.sql,p_balance_id uuid,0,1,0,1
+rpc_set_initial_balance,20260303_harden_remaining_critical_rpcs.sql,p_account_id uuid; p_account_name text; p_date date; p_value numeric,0,1,0,1
+rpc_shareholder_operation,022_financial_rpc_functions.sql,p_shareholder_id UUID; p_operation_type TEXT; p_amount DECIMAL; p_account_id UUID; p_description TEXT DEFAULT NULL; p_operation_date DATE DEFAULT CURRENT_DATE,0,1,0,0
+rpc_transfer_between_accounts,20260221_transfer_sql_source_of_truth_fix.sql,p_account_from_id UUID; p_account_to_id UUID; p_amount DECIMAL; p_description TEXT DEFAULT NULL; p_transfer_date DATE DEFAULT CURRENT_DATE,0,1,0,0
+rpc_update_transfer_between_accounts,20260221_transfer_sql_source_of_truth_fix.sql,p_transfer_id UUID; p_account_from_id UUID; p_account_to_id UUID; p_amount DECIMAL; p_description TEXT DEFAULT NULL; p_transfer_date DATE DEFAULT CURRENT_DATE,0,1,0,0
+rpc_use_credit_line,022_financial_rpc_functions.sql,p_credit_line_id UUID; p_amount DECIMAL; p_partner_id UUID; p_description TEXT DEFAULT NULL; p_due_date DATE DEFAULT NULL,0,1,0,0

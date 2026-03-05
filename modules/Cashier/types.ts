@@ -56,4 +56,5 @@ export interface CashierReport {
 
   // --- RESUMO ---
   netBalance: number;
+  netWorth?: number; // Patrimônio líquido calculado pelo RPC
 }

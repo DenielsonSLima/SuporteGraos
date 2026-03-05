@@ -1,32 +1,22 @@
 
 import React, { useState, useEffect, Suspense, useMemo, useCallback } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Sidebar from './components/layout/Sidebar';
 import HeaderSimple from './components/layout/HeaderSimple';
 import { ModuleId, User } from './types';
 import { MENU_ITEMS } from './constants';
-import { authService } from './services/authService';
-import { auditService } from './services/auditService';
-import { supabase } from './services/supabase';
 import { ToastProvider, useToast } from './contexts/ToastContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { WebSocketProvider } from './contexts/WebSocketContext';
 import { Loader2 } from 'lucide-react';
-import { initializeSupabaseData, resetSupabaseInit, getInitDiagnostics } from './services/supabaseInitService';
 import FloatingAssistant from './components/ai/FloatingAssistant';
-
-// ============================================================================
-// LOG GLOBAL DE INICIALIZAÇÃO
-// ============================================================================
-console.log('%c╔════════════════════════════════════════════════════════════════════════════╗', 'color: cyan; font-weight: bold; font-size: 16px;');
-console.log('%c║  🚀 APP.TSX CARREGADO!                                                    ║', 'color: cyan; font-weight: bold; font-size: 16px;');
-console.log('%c╚════════════════════════════════════════════════════════════════════════════╝', 'color: cyan; font-weight: bold; font-size: 16px;');
-console.log('[APP] 📅 Data:', new Date().toISOString());
-console.log('[APP] 🌐 URL:', window.location.href);
-console.log('[APP] 📦 Módulos importados com sucesso');
-console.log('[APP] ⏳ Aguardando montagem do React...\n');
+import { useRealtimeResilience } from './hooks/useRealtimeResilience';
+import { usePrefetchModules } from './hooks/usePrefetchModules';
+import { useAppSessionServices } from './hooks/useAppSessionServices';
 
 // Lazy Load Modules
-const Dashboard = React.lazy(() => import('./modules/Dashboard/Dashboard'));
+const preloadDashboardModule = () => import('./modules/Dashboard/Dashboard');
+const Dashboard = React.lazy(preloadDashboardModule);
 const PartnersModule = React.lazy(() => import('./modules/Partners/PartnersModule'));
 const PurchaseOrderModule = React.lazy(() => import('./modules/PurchaseOrder/PurchaseOrderModule'));
 const SalesOrderModule = React.lazy(() => import('./modules/SalesOrder/SalesOrderModule'));
@@ -50,7 +40,6 @@ const LoadingFallback = () => (
   </div>
 );
 
-const TestSupabase = React.lazy(() => import('./TestSupabase'));
 const MigrationPanel = React.lazy(() => import('./components/MigrationPanel'));
 
 const AppContent: React.FC = () => {
@@ -60,18 +49,27 @@ const AppContent: React.FC = () => {
   const [activeModule, setActiveModule] = useState<ModuleId>(ModuleId.HOME);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const { addToast } = useToast();
+  const appSessionServices = useAppSessionServices();
+
+  // Resiliência: invalida cache ao reconectar (online/offline + tab visibility)
+  useRealtimeResilience();
+
+  // Prefetching: pré-carrega dados de módulos adjacentes em background
+  usePrefetchModules(activeModule);
+
+  const prefetchDashboard = useCallback(() => {
+    void preloadDashboardModule();
+    appSessionServices.prefetchDashboard();
+  }, [appSessionServices]);
   
   // Check if we should show test page
   const showTestPage = new URLSearchParams(window.location.search).get('test') === 'supabase';
 
-  const shouldDiagInit = new URLSearchParams(window.location.search).get('diag') === '1';
-  
   // Check if we should show migration panel
   const showMigrationPanel = new URLSearchParams(window.location.search).get('migrate') === 'users';
   
   // Handler de navegação memoizado (sem transição para evitar travamentos)
   const handleNavigate = useCallback((id: ModuleId) => {
-    console.log('[APP] Navegando para modulo:', id);
     setActiveModule(id);
   }, []);
 
@@ -86,172 +84,60 @@ const AppContent: React.FC = () => {
   }, [handleNavigate]);
 
   useEffect(() => {
-    console.log('[APP] 🎬 AppContent MONTANDO...');
-    console.log('[APP] ⏰', new Date().toISOString());
-    console.log('[APP] 📊 States inicializados');
-  }, []); // Roda apenas UMA VEZ no mount
-
-  useEffect(() => {
-    console.log('%c[APP] 🚀 useEffect initAuth MONTADO!', 'background: #222; color: #bada55; font-size: 14px; font-weight: bold;');
-    console.log('[APP] ⏰ Timestamp:', new Date().toISOString());
-    
     const initAuth = async () => {
-      console.log('[APP] 📂 initAuth() função iniciada');
       try {
-        console.log('[APP] 🔍 Tentando restaurar sessão do Supabase...');
         // 1. Tentar restaurar sessão do Supabase
-        const restoredUser = await authService.restoreSession();
+        const restoredUser = await appSessionServices.restoreSession();
         if (restoredUser) {
-          console.log('[APP] ✅ Sessão encontrada!');
-          console.log('[APP] 👤 Usuário restaurado:', restoredUser.email);
           setCurrentUser(restoredUser);
-          console.log('✅ Sessão restaurada com sucesso:', restoredUser.email);
+          setIsAuthLoading(false);
+          prefetchDashboard();
 
-          // Carregar dados somente quando autenticado
-          console.log('[APP] 📊 Usuário autenticado - iniciando carregamento de dados');
+          // Carregar dados em background (não bloqueia renderização da aplicação)
           setIsDataLoading(true);
-          console.log('[APP] ⏳ isDataLoading = true');
-          console.log('📊 Iniciando carregamento de dados do Supabase...');
-          const initStartTime = performance.now();
-          const initStats = await initializeSupabaseData();
-          console.log('[APP] ⏱️  initializeSupabaseData() levou:', (performance.now() - initStartTime).toFixed(2) + 'ms');
+          void appSessionServices.initializeDataInBackground()
+            .finally(() => {
+              setIsDataLoading(false);
+            });
 
-          console.log('✅ Dados do Supabase carregados:', {
-            tablesLoaded: initStats.tablesLoaded,
-            totalTime: initStats.totalTime.toFixed(2) + 'ms',
-            errors: initStats.errors.length
-          });
-
-          if (shouldDiagInit) {
-            console.log('[APP] Init diagnostics:', getInitDiagnostics());
-          }
-
-          if (initStats.errors.length > 0) {
-            console.warn('[APP] ⚠️ Erros durante inicialização:');
-            initStats.errors.forEach(err => console.warn('[APP]   -', err));
-          } else {
-            console.log('[APP] ✅ Dados carregados sem erros');
-          }
-        } else {
-          console.log('[APP] ℹ️ Nenhum usuário para restaurar - primeira vez');
+          return;
         }
       } catch (error) {
-        console.error('[APP] ❌ ERRO CRÍTICO ao restaurar sessão ou carregar dados:', error);
-        console.error('[APP] Stack:', (error as any).stack);
+        console.error('[APP] Erro ao restaurar sessão:', error);
       } finally {
-        console.log('[APP] 🏁 initAuth() finalizando...');
-        console.log('[APP] ⏳ setIsAuthLoading(false)');
         setIsAuthLoading(false);
-        console.log('[APP] ⏳ setIsDataLoading(false)');
-        setIsDataLoading(false);
-        console.log('[APP] ✅ initAuth() concluído!');
       }
     };
 
-    console.log('[APP] 🚀 Chamando initAuth()...');
     initAuth();
-    console.log('[APP] ✅ useEffect concluído (initAuth em background)');
-  }, []);
+  }, [appSessionServices, prefetchDashboard]);
 
   // Handler de login memoizado para evitar remontagem desnecessária do LoginScreen
   const handleLoginSuccess = useCallback(async (user: User) => {
-    console.log('%c[APP] ╔════════════════════════════════════════════════════════════════════════════╗', 'color: #00ff00; font-weight: bold;');
-    console.log('%c[APP] ║  🔓 HANDLELOGINSUCCESS CHAMADO!                                           ║', 'color: #00ff00; font-weight: bold;');
-    console.log('%c[APP] ╚════════════════════════════════════════════════════════════════════════════╝', 'color: #00ff00; font-weight: bold;');
-    console.log('\n' + '='.repeat(80));
-    console.log('🔐 HANDLELOGINSUCCESS INICIADO');
-    console.log('='.repeat(80));
-    console.log('👤 Usuário:', user.email);
-    console.log('🕐 Timestamp:', new Date().toISOString());
-    
     setCurrentUser(user);
-    console.log('✅ State currentUser atualizado');
+    prefetchDashboard();
 
     // Mostrar notificação de boas-vindas
     addToast('success', 'Bem-vindo!', `${user.name || user.email.split('@')[0]}`);
 
     // Carregar dados do Supabase após login bem-sucedido
-    console.log('🔄 Resetando supabaseInit...');
-    resetSupabaseInit();
-    
-    console.log('⏳ Definindo isDataLoading = true');
+    appSessionServices.resetInit();
     setIsDataLoading(true);
     
-    console.log('📊 Iniciando initializeSupabaseData()...');
-    console.log('⏱️  Tempo de início:', performance.now());
-    
-    // 🔥 LOG CRÍTICO: Verificar sessão ANTES de chamar initializeSupabaseData
-    const { data: sessionCheck } = await supabase.auth.getSession();
-    console.log('%c[APP] 🔍 SESSÃO ANTES DE initializeSupabaseData:', 'color: yellow; font-weight: bold;', {
-      hasSession: !!sessionCheck.session,
-      userId: sessionCheck.session?.user?.id || 'NENHUM',
-      email: sessionCheck.session?.user?.email || 'NENHUM',
-      expiresAt: sessionCheck.session?.expires_at || 'N/A'
-    });
-    
     try {
-      const initStartTime = performance.now();
-      
-      // ⏱️ TIMEOUT de segurança - máximo 20 segundos
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('TIMEOUT: initializeSupabaseData demorou mais de 20 segundos')), 20000);
-      });
-      
-      const initStats = await Promise.race([
-        initializeSupabaseData(),
-        timeoutPromise
-      ]);
-      const initEndTime = performance.now();
-      
-      console.log('\n✅ initializeSupabaseData() concluído!');
-      console.log('⏱️  Tempo total:', (initEndTime - initStartTime).toFixed(2) + 'ms');
-      
-      // 🔥 LOG CRÍTICO: Se tablesLoaded = 0, algo deu errado!
-      if (initStats.tablesLoaded === 0) {
-        console.error('%c[APP] ❌❌❌ PROBLEMA DETECTADO: tablesLoaded = 0!', 'color: red; font-weight: bold; font-size: 16px;');
-        console.error('[APP] Erros:', initStats.errors);
-        console.error('[APP] Isso significa que a sessão NÃO foi detectada pelo supabaseInitService!');
-      }
-      
-      console.log('📦 Dados carregados:', {
-        tablesLoaded: initStats.tablesLoaded,
-        totalTime: initStats.totalTime.toFixed(2) + 'ms',
-        hasData: {
-          ufs: !!initStats.data.ufs?.length,
-          cities: !!initStats.data.cities?.length,
-          partnerTypes: !!initStats.data.partnerTypes?.length,
-          productTypes: !!initStats.data.productTypes?.length,
-          bankAccounts: !!initStats.data.bankAccounts?.length,
-          partners: !!initStats.data.partners?.length
-        }
-      });
-
-      if (shouldDiagInit) {
-        console.log('[APP] Init diagnostics:', getInitDiagnostics());
-      }
-
-      if (initStats.errors.length > 0) {
-        console.warn('⚠️ Erros durante carregamento:');
-        initStats.errors.forEach((err, i) => console.warn(`   ${i + 1}. ${err}`));
-      } else {
-        console.log('✅ Sem erros durante carregamento');
-      }
+      await appSessionServices.initializeDataAfterLogin();
     } catch (error) {
-      console.error('❌ Erro ao carregar dados pós-login:', error);
-      console.error('Stack:', (error as any).stack);
+      console.error('[APP] Erro ao carregar dados pós-login:', error);
     } finally {
-      console.log('⏳ Definindo isDataLoading = false');
       setIsDataLoading(false);
-      console.log('🎉 handleLoginSuccess finalizado');
-      console.log('='.repeat(80) + '\n');
     }
-  }, []); // Nenhuma dependência = função estável
+  }, [addToast, appSessionServices, prefetchDashboard]); // Nenhuma dependência = função estável
 
   const handleLogout = useCallback(async () => {
-    await authService.logout();
+    await appSessionServices.logout();
     setCurrentUser(null);
     setActiveModule(ModuleId.HOME);
-  }, []);
+  }, [appSessionServices]);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -289,12 +175,12 @@ const AppContent: React.FC = () => {
     };
 
     const sendHeartbeat = () => {
-      const sessionId = authService.getCurrentSessionId();
+      const sessionId = appSessionServices.getCurrentSessionId();
       if (!sessionId) return;
       const now = Date.now();
       if (now - lastHeartbeatAt < HEARTBEAT_INTERVAL_MS) return;
       lastHeartbeatAt = now;
-      void auditService.heartbeatSession(sessionId);
+      void appSessionServices.heartbeatSession(sessionId);
     };
 
     const handleActivity = () => {
@@ -308,7 +194,7 @@ const AppContent: React.FC = () => {
         const ping = localStorage.getItem(REFRESH_PING_KEY);
         const pingTime = ping ? Number(ping) : 0;
         if (pingTime && pingTime >= unloadAt) return;
-        void authService.logout();
+        void appSessionServices.logout();
       }, REFRESH_GRACE_MS);
     };
 
@@ -325,7 +211,7 @@ const AppContent: React.FC = () => {
     }, REFRESH_GRACE_MS);
 
     resetTimer();
-    void auditService.closeStaleSessions(60);
+    void appSessionServices.closeStaleSessions(60);
     sendHeartbeat();
     heartbeatId = window.setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
 
@@ -338,7 +224,7 @@ const AppContent: React.FC = () => {
       );
       window.removeEventListener('pagehide', handlePageExit);
     };
-  }, [addToast, currentUser, handleLogout]);
+  }, [addToast, appSessionServices, currentUser, handleLogout]);
 
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 
@@ -375,15 +261,6 @@ const AppContent: React.FC = () => {
     );
   }
 
-  // Show test page if requested via URL
-  if (new URLSearchParams(window.location.search).get('test') === 'supabase') {
-    return (
-      <Suspense fallback={<LoadingFallback />}>
-        <TestSupabase />
-      </Suspense>
-    );
-  }
-
   // Show migration panel if requested via URL
   if (showMigrationPanel) {
     return (
@@ -396,7 +273,6 @@ const AppContent: React.FC = () => {
   }
 
   if (!currentUser) {
-    console.log('[APP] 👤 currentUser = null → Exibindo LoginScreen');
     return (
       <Suspense fallback={<div className="min-h-screen bg-slate-900" />}>
         <LoginScreen onLoginSuccess={handleLoginSuccess} />
@@ -404,15 +280,6 @@ const AppContent: React.FC = () => {
     );
   }
   
-  if (isDataLoading) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 gap-4">
-        <Loader2 className="animate-spin text-primary-600" size={40} />
-        <span className="text-slate-400 font-black uppercase tracking-widest animate-pulse">Sincronizando...</span>
-      </div>
-    );
-  }
-
   return (
     <div className="flex min-h-screen w-full bg-slate-50 text-slate-900 font-sans overflow-x-hidden">
       <Sidebar 
@@ -444,23 +311,48 @@ const AppContent: React.FC = () => {
 
       {/* ASSISTENTE FLUTUANTE GLOBAL */}
       <FloatingAssistant />
+
+      {isDataLoading && (
+        <div className="fixed bottom-4 right-20 z-50 flex items-center gap-2 rounded-full bg-slate-900/90 px-3 py-2 text-xs font-bold text-white shadow-lg">
+          <Loader2 size={14} className="animate-spin" />
+          Sincronizando em segundo plano
+        </div>
+      )}
       
     </div>
   );
 };
 
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Dados frescos por 1 min por padrão (hooks individuais sobrescrevem)
+      staleTime: 60_000,
+      // Garbage collect após 10 min sem uso (libera memória)
+      gcTime: 10 * 60 * 1000,
+      // Não refetch automático na janela — Realtime + useRealtimeResilience cobrem
+      refetchOnWindowFocus: false,
+      // Reconexão de rede: refetcha queries stale automaticamente
+      refetchOnReconnect: 'always',
+      // 1 retry com backoff exponencial
+      retry: 1,
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
+    },
+  },
+});
+
 const App: React.FC = () => {
   return (
-    <ToastProvider>
-      <WebSocketProvider>
-        <NotificationProvider>
-          <AppContent />
-        </NotificationProvider>
-      </WebSocketProvider>
-    </ToastProvider>
+    <QueryClientProvider client={queryClient}>
+      <ToastProvider>
+        <WebSocketProvider>
+          <NotificationProvider>
+            <AppContent />
+          </NotificationProvider>
+        </WebSocketProvider>
+      </ToastProvider>
+    </QueryClientProvider>
   );
 };
-
-console.log('[APP] 📤 App component exportado - aguardando React montar...\n');
 
 export default App;

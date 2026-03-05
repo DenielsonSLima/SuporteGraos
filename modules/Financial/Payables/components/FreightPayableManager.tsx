@@ -82,7 +82,6 @@ const FreightPayableManager: React.FC<Props> = ({ records, onRefresh }) => {
 
   const handleConfirmPayment = (data: PaymentData) => {
     // Here we would call the service API to process the payment
-    console.log('Processing Payment:', data);
     
     if (selectedRecordForSinglePay) {
       // FIX: Property 'remainderAction' does not exist on type 'PaymentData'.

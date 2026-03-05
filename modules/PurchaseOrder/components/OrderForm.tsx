@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
-import { Save, X, ShoppingCart, Calculator } from 'lucide-react';
+import React, { useState, useCallback, useMemo } from 'react';
+import { Save, X, ShoppingCart, Calculator, Loader2 } from 'lucide-react';
 import { PurchaseOrder } from '../types';
 
 // Components
@@ -9,24 +9,30 @@ import OrderPartnerSection from './form/OrderPartnerSection';
 import OrderBrokerSection from './form/OrderBrokerSection';
 import OrderItemsSection from './form/OrderItemsSection';
 
-import { partnerService } from '../../../services/partnerService';
-import { shareholderService, Shareholder } from '../../../services/shareholderService';
+import { useShareholders } from '../../../hooks/useShareholders';
+import { usePartners } from '../../../hooks/useParceiros';
 import { Partner } from '../../Partners/types';
 
 interface Props {
   initialData?: PurchaseOrder;
-  onSave: (order: PurchaseOrder) => void;
+  onSave: (order: PurchaseOrder) => Promise<void> | void;
   onCancel: () => void;
 }
 
 const OrderForm: React.FC<Props> = ({ initialData, onSave, onCancel }) => {
-  const [partners, setPartners] = useState<Partner[]>([]);
-  const [shareholders, setShareholders] = useState<Shareholder[]>([]);
+  // TanStack Query hooks — cache + realtime automáticos (SKIL: zero service imports)
+  const { data: partnersData } = usePartners({ page: 1, pageSize: 2000, category: 'all' });
+  const { data: shareholdersRaw = [] } = useShareholders();
+  const [isSaving, setIsSaving] = useState(false);
 
-  useEffect(() => {
-    setPartners(partnerService.getAll());
-    setShareholders(shareholderService.getAll());
-  }, []);
+  const partners = useMemo(
+    () => (partnersData?.data || []).sort((a, b) => (a.name || '').localeCompare(b.name || '')),
+    [partnersData]
+  );
+  const shareholders = useMemo(
+    () => [...shareholdersRaw].sort((a, b) => (a.name || '').localeCompare(b.name || '')),
+    [shareholdersRaw]
+  );
   
   const getLocalDate = () => {
     const now = new Date();
@@ -59,13 +65,21 @@ const OrderForm: React.FC<Props> = ({ initialData, onSave, onCancel }) => {
     setFormData(prev => ({ ...prev, ...updates }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSaving) return; // Proteção contra double-click
     if (!formData.partnerId) return alert('Selecione um parceiro/fornecedor.');
     if (!formData.consultantName) return alert('Informe o nome do consultor.');
     
-    onSave(formData as PurchaseOrder);
-  };
+    setIsSaving(true);
+    try {
+      await onSave(formData as PurchaseOrder);
+    } catch (err) {
+      console.error('Erro ao salvar pedido:', err);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [isSaving, formData, onSave]);
 
   return (
     <div className="mx-auto max-w-5xl rounded-3xl border border-slate-200 bg-white shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4">
@@ -107,10 +121,10 @@ const OrderForm: React.FC<Props> = ({ initialData, onSave, onCancel }) => {
              </div>
           </div>
           <div className="flex gap-3 w-full sm:w-auto">
-            <button type="button" onClick={onCancel} className="flex-1 sm:flex-none rounded-2xl border-2 border-slate-200 bg-white px-8 py-3.5 text-xs font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50 transition-all active:scale-95">Cancelar</button>
-            <button type="submit" className="flex-1 sm:flex-none flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-10 py-3.5 text-xs font-black uppercase tracking-widest text-white shadow-xl shadow-blue-200 hover:bg-blue-700 transition-all active:scale-95">
-                <Save size={18} />
-                Salvar Pedido
+            <button type="button" onClick={onCancel} disabled={isSaving} className="flex-1 sm:flex-none rounded-2xl border-2 border-slate-200 bg-white px-8 py-3.5 text-xs font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">Cancelar</button>
+            <button type="submit" disabled={isSaving} className="flex-1 sm:flex-none flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-10 py-3.5 text-xs font-black uppercase tracking-widest text-white shadow-xl shadow-blue-200 hover:bg-blue-700 transition-all active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:bg-blue-600">
+                {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+                {isSaving ? 'Salvando...' : 'Salvar Pedido'}
             </button>
           </div>
         </div>

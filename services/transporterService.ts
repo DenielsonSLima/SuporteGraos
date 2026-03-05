@@ -7,6 +7,7 @@ import { supabase } from './supabase';
 import { Persistence } from './persistence';
 import { logService } from './logService';
 import { authService } from './authService';
+import { isSqlCanonicalOpsEnabled, sqlCanonicalOpsLog } from './sqlCanonicalOps';
 
 export interface Transporter {
   id: string;
@@ -31,24 +32,32 @@ let isLoaded = false;
 // ============================================================================
 
 const loadFromSupabase = async () => {
-  if (isLoaded) return;
+  if (isSqlCanonicalOpsEnabled()) {
+    db.setAll([]);
+    isLoaded = true;
+    return;
+  }
+
   try {
     const user = authService.getCurrentUser();
     const companyId = user?.companyId;
 
-    const { data, error } = await supabase
+    let query = supabase
       .from('transporters')
-      .select('*')
-      .eq('company_id', companyId)
-      .order('name');
+      .select('*');
+
+    if (companyId) {
+      query = query.eq('company_id', companyId);
+    }
+
+    const { data, error } = await query.order('name');
 
     if (error) throw error;
     db.setAll(data || []);
 
     isLoaded = true;
-    console.log('🔄 Transportadoras sincronizando em tempo real...');
   } catch (error) {
-    console.error('❌ Erro ao carregar transportadoras:', error);
+    console.error('[transporterService] loadFromSupabase:', error);
   }
 };
 
@@ -57,6 +66,11 @@ const loadFromSupabase = async () => {
 // ============================================================================
 
 const startRealtime = () => {
+  if (isSqlCanonicalOpsEnabled()) {
+    sqlCanonicalOpsLog('transporterService.startRealtime legado ignorado (modo canônico)');
+    return;
+  }
+
   if (realtimeChannel) return;
 
   realtimeChannel = supabase
@@ -73,11 +87,17 @@ const startRealtime = () => {
         db.delete(rec.id);
       }
 
-      console.log(`🔔 Realtime transporters: ${payload.eventType}`);
     })
     .subscribe(status => {
       // Realtime subscribed
     });
+};
+
+const stopRealtime = () => {
+  if (realtimeChannel) {
+    supabase.removeChannel(realtimeChannel);
+    realtimeChannel = null;
+  }
 };
 
 // Inicializar ao carregar o módulo
@@ -150,9 +170,7 @@ export const transporterService = {
       const savedTransporter: Transporter = data as Transporter;
       db.delete(tempId);
       db.add(savedTransporter);
-      console.log(`✅ Transportadora ${transporter.name} salva no Supabase`);
     } catch (error) {
-      console.error('❌ Erro ao salvar transportadora:', error);
       db.delete(tempId);
       throw error;
     }
@@ -178,9 +196,7 @@ export const transporterService = {
         .update(transporter)
         .eq('id', transporter.id);
       if (error) throw error;
-      console.log(`✅ Transportadora ${transporter.name} atualizada no Supabase`);
     } catch (error) {
-      console.error('❌ Erro ao atualizar transportadora:', error);
       if (existing) db.update(existing);
       throw error;
     }
@@ -190,7 +206,6 @@ export const transporterService = {
     const transporter = db.getById(id);
     if (!transporter) return;
 
-    console.log('🗑️ [1/3] Deletando transportadora:', id);
     db.delete(id);
 
     const { userId, userName } = getLogInfo();
@@ -206,9 +221,7 @@ export const transporterService = {
     try {
       const { error } = await supabase.from('transporters').delete().eq('id', id);
       if (error) throw error;
-      console.log('✅ [3/3] Transportadora excluída do Supabase');
     } catch (error) {
-      console.error('❌ Erro ao excluir transportadora:', error);
       db.add(transporter);
       throw error;
     }
@@ -219,5 +232,6 @@ export const transporterService = {
     return loadFromSupabase();
   },
   loadFromSupabase,
-  startRealtime
+  startRealtime,
+  stopRealtime
 };

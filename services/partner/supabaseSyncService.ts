@@ -17,10 +17,8 @@ export const partnerSupabaseSync = {
       .single();
     
     if (partnerError) {
-      console.error('❌ Erro ao inserir parceiro:', partnerError);
       throw partnerError;
     }
-    console.log(`✅ Parceiro ${partner.name} salvo no Supabase com id ${savedPartner.id}`);
 
     return savedPartner;
   },
@@ -33,18 +31,14 @@ export const partnerSupabaseSync = {
       .eq('id', partner.id);
     
     if (partnerError) {
-      console.error('❌ Erro ao atualizar parceiro:', partnerError);
       throw partnerError;
     }
-    console.log(`✅ Parceiro ${partner.name} atualizado no Supabase`);
   },
 
   syncDeletePartner: async (id: string) => {
     const { error } = await supabase.from('partners').delete().eq('id', id);
     if (error) {
-      console.error('❌ Erro ao excluir parceiro:', error);
       throw error;
     }
-    console.log(`✅ Parceiro excluído do Supabase (endereços deletados em cascata)`);
   }
 };

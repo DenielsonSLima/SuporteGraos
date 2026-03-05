@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { User, TrendingDown, Eye, Edit2, CheckCircle2, TrendingUp, RefreshCw, AlertCircle } from 'lucide-react';
-import { Shareholder } from '../../../../services/shareholderService';
+import type { Shareholder } from '../../../../services/shareholderService';
 
 interface Props {
   shareholder: Shareholder;

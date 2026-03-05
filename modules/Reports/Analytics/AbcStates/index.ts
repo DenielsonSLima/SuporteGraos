@@ -1,7 +1,8 @@
 
 import { Map } from 'lucide-react';
 import { ReportModule } from '../../types';
-import { salesService } from '../../../../services/salesService';
+import { financialIntegrationService } from '../../../../services/financialIntegrationService';
+import { partnerService } from '../../../../services/partnerService';
 import UniversalReportTemplate from '../../templates/UniversalReportTemplate';
 import DefaultFilters from '../../components/DefaultFilters';
 
@@ -20,13 +21,24 @@ const abcStatesReport: ReportModule = {
   },
   FilterComponent: DefaultFilters,
   fetchData: ({ startDate, endDate }) => {
-    const sales = salesService.getAll().filter(s => s.status !== 'canceled');
-    const filteredSales = sales.filter(s => (!startDate || s.date >= startDate) && (!endDate || s.date <= endDate));
+    const receivables = financialIntegrationService
+      .getReceivables()
+      .filter((r) => r.subType === 'sales_order')
+      .filter((r) => {
+        const referenceDate = r.issueDate || r.dueDate;
+        return (!startDate || referenceDate >= startDate) && (!endDate || referenceDate <= endDate);
+      });
+
+    const partners = partnerService.getAll();
+    const stateByCustomer: Record<string, string> = {};
+    partners.forEach((partner) => {
+      stateByCustomer[partner.name] = partner.address?.stateUf || 'N/D';
+    });
 
     const map: Record<string, number> = {};
-    filteredSales.forEach(s => {
-      const uf = s.customerState || 'N/D';
-      map[uf] = (map[uf] || 0) + s.totalValue;
+    receivables.forEach((record) => {
+      const uf = stateByCustomer[record.entityName] || 'N/D';
+      map[uf] = (map[uf] || 0) + record.originalValue;
     });
 
     const sorted = Object.entries(map)

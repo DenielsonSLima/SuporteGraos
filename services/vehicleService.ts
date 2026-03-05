@@ -7,6 +7,7 @@ import { supabase } from './supabase';
 import { Persistence } from './persistence';
 import { logService } from './logService';
 import { authService } from './authService';
+import { isSqlCanonicalOpsEnabled, sqlCanonicalOpsLog } from './sqlCanonicalOps';
 
 // UUID compatível com navegador (fallback manual)
 const generateUUID = (): string => {
@@ -48,24 +49,32 @@ let isLoaded = false;
 // ============================================================================
 
 const loadFromSupabase = async () => {
-  if (isLoaded) return;
+  if (isSqlCanonicalOpsEnabled()) {
+    db.setAll([]);
+    isLoaded = true;
+    return;
+  }
+
   try {
     const user = authService.getCurrentUser();
     const companyId = user?.companyId;
 
-    const { data, error } = await supabase
+    let query = supabase
       .from('vehicles')
-      .select('*')
-      .eq('company_id', companyId)
-      .order('plate');
+      .select('*');
+
+    if (companyId) {
+      query = query.eq('company_id', companyId);
+    }
+
+    const { data, error } = await query.order('plate');
 
     if (error) throw error;
     db.setAll(data || []);
 
     isLoaded = true;
-    console.log('🔄 Veículos sincronizando em tempo real...');
   } catch (error) {
-    console.error('❌ Erro ao carregar veículos:', error);
+    console.error('[vehicleService] loadFromSupabase:', error);
   }
 };
 
@@ -74,6 +83,11 @@ const loadFromSupabase = async () => {
 // ============================================================================
 
 const startRealtime = () => {
+  if (isSqlCanonicalOpsEnabled()) {
+    sqlCanonicalOpsLog('vehicleService.startRealtime legado ignorado (modo canônico)');
+    return;
+  }
+
   if (realtimeChannel) return;
 
   realtimeChannel = supabase
@@ -90,11 +104,17 @@ const startRealtime = () => {
         db.delete(rec.id);
       }
 
-      console.log(`🔔 Realtime vehicles: ${payload.eventType}`);
     })
     .subscribe(status => {
       // Realtime subscribed
     });
+};
+
+const stopRealtime = () => {
+  if (realtimeChannel) {
+    supabase.removeChannel(realtimeChannel);
+    realtimeChannel = null;
+  }
 };
 
 // Inicializar ao carregar o módulo
@@ -171,19 +191,12 @@ export const vehicleService = {
         updated_at: now
       } as any;
 
-      console.log('🔵 [DEBUG] Vehicle payload para Supabase:', JSON.stringify(insertPayload, null, 2));
       const { data, error } = await supabase
         .from('vehicles')
         .insert(insertPayload)
         .select()
         .single();
       if (error) {
-        console.error('❌ [ERRO SUPABASE DETALHADO]:', {
-          message: error.message,
-          details: (error as any).details,
-          hint: (error as any).hint,
-          code: (error as any).code
-        });
         throw error;
       }
 
@@ -191,9 +204,7 @@ export const vehicleService = {
       const savedVehicle: Vehicle = data as Vehicle;
       db.delete(tempId);
       db.add(savedVehicle);
-      console.log(`✅ Veículo ${vehicle.plate} salvo no Supabase`);
     } catch (error) {
-      console.error('❌ Erro ao salvar veículo:', error);
       db.delete(tempId);
       throw error;
     }
@@ -219,9 +230,7 @@ export const vehicleService = {
         .update(vehicle)
         .eq('id', vehicle.id);
       if (error) throw error;
-      console.log(`✅ Veículo ${vehicle.plate} atualizado no Supabase`);
     } catch (error) {
-      console.error('❌ Erro ao atualizar veículo:', error);
       if (existing) db.update(existing);
       throw error;
     }
@@ -231,7 +240,6 @@ export const vehicleService = {
     const vehicle = db.getById(id);
     if (!vehicle) return;
 
-    console.log('🗑️ [1/3] Deletando veículo:', id);
     db.delete(id);
 
     const { userId, userName } = getLogInfo();
@@ -247,9 +255,7 @@ export const vehicleService = {
     try {
       const { error } = await supabase.from('vehicles').delete().eq('id', id);
       if (error) throw error;
-      console.log('✅ [3/3] Veículo excluído do Supabase');
     } catch (error) {
-      console.error('❌ Erro ao excluir veículo:', error);
       db.add(vehicle);
       throw error;
     }
@@ -261,6 +267,7 @@ export const vehicleService = {
   },
   loadFromSupabase,
   startRealtime,
+  stopRealtime,
 
   importData: (vehicles: Vehicle[]) => {
     if (!vehicles) return;
@@ -277,9 +284,9 @@ export const vehicleService = {
         }));
         const { error } = await supabase.from('vehicles').upsert(payload, { onConflict: 'id' });
         if (error) console.error('❌ Erro ao sincronizar veículos:', error);
-        else console.log('✅ Veículos sincronizados no Supabase via ImportData');
+        
       } catch (err) {
-        console.error('❌ Erro inesperado ao importar veículos:', err);
+        console.error('[vehicleService] importData:', err);
       }
     })();
   }

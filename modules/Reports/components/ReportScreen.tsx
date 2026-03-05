@@ -12,8 +12,7 @@ import {
 } from 'lucide-react';
 import { ReportModule, GeneratedReportData } from '../types';
 import ReportGeneratorModal from './ReportGeneratorModal';
-import { reportAuditService } from '../../../services/reportAuditService';
-import { loadingService } from '../../../services/loadingService';
+import { useReportScreenOperations } from '../hooks/useReportScreenOperations';
 
 interface Props {
   reportModule: ReportModule;
@@ -22,6 +21,7 @@ interface Props {
 }
 
 const ReportScreen: React.FC<Props> = ({ reportModule, reportId, onBack }) => {
+  const { subscribeLogisticsRefresh, logReportAccess } = useReportScreenOperations();
   const [filters, setFilters] = useState(reportModule.initialFilters);
   const [data, setData] = useState<GeneratedReportData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -41,7 +41,6 @@ const ReportScreen: React.FC<Props> = ({ reportModule, reportId, onBack }) => {
       const result = resultOrPromise instanceof Promise ? await resultOrPromise : resultOrPromise;
       if (result) setData(result);
     } catch (error) {
-      console.error('Erro ao buscar dados do relatório:', error);
     } finally {
       setIsLoading(false);
     }
@@ -50,10 +49,7 @@ const ReportScreen: React.FC<Props> = ({ reportModule, reportId, onBack }) => {
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
     if (isLogistics && reportModule.fetchData) {
-      unsubscribe = (window as any).loadingRealtimeSub = (window as any).loadingRealtimeSub || null;
-      if (unsubscribe) unsubscribe();
-
-      unsubscribe = loadingService.subscribe(() => {
+      unsubscribe = subscribeLogisticsRefresh(() => {
         void executeFetch(filtersRef.current);
       });
       // Primeira carga
@@ -93,7 +89,7 @@ const ReportScreen: React.FC<Props> = ({ reportModule, reportId, onBack }) => {
     // O ideal seria logar no executeFetch ou usar um useEffect para logar quando data mudar.
     // Mantendo comportamento similar ao anterior:
     if (data) {
-      void reportAuditService.logReportAccess(
+      void logReportAccess(
         reportModule.metadata.id,
         reportModule.metadata.title,
         filters,

@@ -85,7 +85,7 @@ const InitialBalanceForm: React.FC<Props> = ({ accounts, onSave, onCancel }) => 
                   required 
                   value={displayValue} 
                   onChange={handleValueChange} 
-                  className={`${inputClass} pl-12 font-black text-emerald-700 text-lg`} 
+                  className={`${inputClass} pl-12 font-black text-slate-900 text-lg`} 
                   placeholder="R$ 0,00" 
                />
             </div>

@@ -4,7 +4,6 @@ import {
   MapPin, Trash2, Calendar, Check, User, TrendingUp, Scale, DollarSign, ChevronRight, PackageCheck, AlertCircle, CheckCircle, Package
 } from 'lucide-react';
 import { SalesOrder, SalesStatus } from '../types';
-import { LoadingCache } from '../../../services/loadingCache';
 import { formatMoney } from '../../../utils/formatters';
 
 interface Props {
@@ -34,23 +33,14 @@ const SalesOrderCard: React.FC<Props> = React.memo(({ order, onClick, onDelete, 
     return `${day}/${month}/${year}`;
   };
 
+  // ═══════ Stats vindos do SQL (VIEW vw_sales_orders_enriched) ═══════
+  // Zero cálculo no frontend — tudo pré-calculado pelo banco de dados
   const stats = useMemo(() => {
-    const loadings = LoadingCache.getBySalesOrder(order.id);
-    const deliveredLoadings = loadings.filter(l => l.unloadWeightKg && l.unloadWeightKg > 0);
-    const deliveredQtySc = deliveredLoadings.reduce((acc, l) => acc + (l.unloadWeightKg! / 60), 0);
-    const contractQtySc = order.quantity || 0;
-    
-    const deliveredValue = deliveredLoadings.reduce((acc, l) => {
-        const weightSc = l.unloadWeightKg! / 60;
-        const price = l.salesPrice || order.unitPrice || 0;
-        return acc + (weightSc * price);
-    }, 0);
-
-    const receivedValue = order.transactions 
-      ? order.transactions.filter(t => t.type === 'receipt').reduce((acc, t) => acc + t.value, 0)
-      : 0;
-
-    const pendingValue = Math.max(0, deliveredValue - receivedValue); 
+    const deliveredQtySc = order.deliveredQtySc ?? 0;
+    const contractQtySc = order.quantity ?? 0;
+    const deliveredValue = order.deliveredValue ?? 0;
+    const receivedValue = order.paidValue ?? 0;
+    const pendingValue = Math.max(0, deliveredValue - receivedValue);
     const progress = contractQtySc > 0 ? Math.min((deliveredQtySc / contractQtySc) * 100, 100) : 0;
 
     return { deliveredQtySc, contractQtySc, deliveredValue, receivedValue, pendingValue, progress };

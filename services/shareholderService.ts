@@ -1,577 +1,396 @@
-import { logService } from './logService';
-import { authService } from './authService';
-import { financialActionService } from './financialActionService';
 import { supabase } from './supabase';
-import { waitForInit } from './supabaseInitService';
 import { Persistence } from './persistence';
 import { invalidateDashboardCache } from './dashboardCache';
-import { invalidateFinancialCache } from './financialCache';
-import { Shareholder, ShareholderTransaction, ShareholderRecurrence } from './shareholder/types';
-import { formatCurrency } from './shareholder/utils';
-import { shareholderSupabaseSync } from './shareholder/supabaseSyncService';
 
-// Re-export types
-export type { Shareholder, ShareholderTransaction, ShareholderRecurrence } from './shareholder/types';
+// ─── TIPOS EXPORTADOS ─────────────────────────────────────────────────────────
 
-// Initial Mock Data
-let _shareholders: Shareholder[] = [];
-let _isSupabaseLoaded = false;
-const _shareholdersDb = new Persistence<Shareholder>('shareholders', [], { useStorage: false });
-let shareholdersChannel: ReturnType<typeof supabase.channel> | null = null;
-let transactionsChannel: ReturnType<typeof supabase.channel> | null = null;
-let _realtimeStarted = false;
+export interface ShareholderTransaction {
+  id: string;
+  date: string;
+  type: 'credit' | 'debit';
+  value: number;
+  description: string;
+  accountId?: string;
+}
 
-const mapTransactionFromDb = (t: any): ShareholderTransaction => ({
-  id: t.id,
-  date: t.date,
-  type: t.type,
-  value: parseFloat(t.value),
-  description: t.description,
-  accountId: t.account_name || undefined
-});
+export interface ShareholderRecurrence {
+  active: boolean;
+  amount: number;
+  day: number;
+  lastGeneratedMonth?: string;
+}
 
-const mapShareholderFromDb = (s: any, transactions: ShareholderTransaction[] = []): Shareholder => ({
-  id: s.id,
-  name: s.name,
-  cpf: s.cpf || '',
-  email: s.email || '',
-  phone: s.phone || '',
+export interface Shareholder {
+  id: string;
+  name: string;
+  cpf: string;
+  email: string;
+  phone: string;
   address: {
-    street: s.address_street || '',
-    number: s.address_number || '',
-    neighborhood: s.address_neighborhood || '',
-    city: s.address_city || '',
-    state: s.address_state || '',
-    zip: s.address_zip || ''
-  },
-  financial: {
-    proLaboreValue: parseFloat(s.pro_labore_value) || 0,
-    currentBalance: parseFloat(s.current_balance) || 0,
-    lastProLaboreDate: s.last_pro_labore_date || undefined,
-    recurrence: {
-      active: s.recurrence_active || false,
-      amount: parseFloat(s.recurrence_amount) || 0,
-      day: s.recurrence_day || 1,
-      lastGeneratedMonth: s.recurrence_last_generated_month || undefined
-    },
-    history: transactions
-  }
-});
-
-const recalcShareholderBalance = (shareholder: Shareholder) => {
-  const totalCredits = shareholder.financial.history
-    .filter(t => t.type === 'credit')
-    .reduce((acc, t) => acc + t.value, 0);
-  const totalDebits = shareholder.financial.history
-    .filter(t => t.type === 'debit')
-    .reduce((acc, t) => acc + t.value, 0);
-  shareholder.financial.currentBalance = totalCredits - totalDebits;
-};
-
-// Load from Supabase
-const loadFromSupabase = async () => {
-  try {
-    const stats = await waitForInit();
-
-    if (!stats.data.shareholders || !stats.data.shareholderTransactions) {
-      throw new Error('Shareholders ou Transactions não carregadas');
-    }
-
-    // Map shareholders with their transactions
-    const mapped: Shareholder[] = stats.data.shareholders.map((s: any) => {
-      const transactions: ShareholderTransaction[] = (stats.data.shareholderTransactions || [])
-        .filter((t: any) => t.shareholder_id === s.id)
-        .map(mapTransactionFromDb);
-
-      return mapShareholderFromDb(s, transactions);
-    });
-
-    // Corrige saldos órfãos automaticamente
-    mapped.forEach(shareholder => {
-      if (shareholder.financial.currentBalance > 0 && shareholder.financial.history.length === 0) {
-        const initialTx: ShareholderTransaction = {
-          id: `init-${shareholder.id}-migration`,
-          date: new Date().toISOString().split('T')[0],
-          type: 'credit',
-          value: shareholder.financial.currentBalance,
-          description: 'Saldo Anterior (Migração Automática)'
-        };
-        shareholder.financial.history = [initialTx];
-        console.log(`✅ Saldo órfão corrigido: ${shareholder.name} (${shareholder.financial.currentBalance})`);
-      }
-    });
-
-    _shareholdersDb.setAll(mapped);
-    _shareholders = mapped;
-    _isSupabaseLoaded = true;
-
-  } catch (error) {
-    console.warn('⚠️ ShareholderService: Usando fallback:', error);
-    _shareholders = [];
-    _isSupabaseLoaded = false;
-  }
-};
-
-const startRealtime = () => {
-  if (_realtimeStarted) return;
-  _realtimeStarted = true;
-
-  if (!shareholdersChannel) {
-    shareholdersChannel = supabase.channel('shareholders_realtime');
-    shareholdersChannel
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'shareholders' }, payload => {
-        console.log('[Realtime] Shareholders update:', payload.eventType, payload.new?.name || payload.old?.name);
-        const row = payload.new || payload.old;
-        if (!row) return;
-
-        const existing = _shareholders.find(s => s.id === row.id);
-        const history = existing?.financial.history || [];
-        const mapped = mapShareholderFromDb(row, history);
-
-        if (payload.eventType === 'INSERT') {
-          if (!existing) _shareholders = [mapped, ..._shareholders];
-          console.log('✅ Shareholder inserted:', mapped.name);
-        } else if (payload.eventType === 'UPDATE') {
-          _shareholders = _shareholders.map(s => s.id === row.id ? mapped : s);
-          console.log('✅ Shareholder updated:', mapped.name);
-        } else if (payload.eventType === 'DELETE') {
-          _shareholders = _shareholders.filter(s => s.id !== row.id);
-          console.log('✅ Shareholder deleted:', row.name);
-        }
-
-        _shareholdersDb.setAll(_shareholders);
-        invalidateFinancialCache();
-        invalidateDashboardCache();
-      })
-      .subscribe(() => console.log('✅ Shareholders realtime channel subscribed'));
-  }
-
-  if (!transactionsChannel) {
-    transactionsChannel = supabase.channel('shareholder_transactions_realtime');
-    transactionsChannel
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'shareholder_transactions' }, payload => {
-        console.log('[Realtime] Transaction update:', payload.eventType, payload.new?.description || payload.old?.description);
-        const row = payload.new || payload.old;
-        if (!row) return;
-
-        const shareholderId = row.shareholder_id;
-        const shareholder = _shareholders.find(s => s.id === shareholderId);
-        if (!shareholder) return;
-
-        if (payload.eventType === 'INSERT') {
-          const tx = mapTransactionFromDb(row);
-          const exists = shareholder.financial.history.some(t => t.id === tx.id);
-          if (!exists) {
-            shareholder.financial.history = [tx, ...shareholder.financial.history];
-            console.log('✅ Transaction inserted:', tx.description);
-          }
-        } else if (payload.eventType === 'UPDATE') {
-          const tx = mapTransactionFromDb(row);
-          shareholder.financial.history = shareholder.financial.history.map(t => t.id === tx.id ? tx : t);
-          console.log('✅ Transaction updated:', tx.description);
-        } else if (payload.eventType === 'DELETE') {
-          shareholder.financial.history = shareholder.financial.history.filter(t => t.id !== row.id);
-          console.log('✅ Transaction deleted');
-        }
-
-        recalcShareholderBalance(shareholder);
-        _shareholders = _shareholders.map(s => s.id === shareholderId ? shareholder : s);
-        _shareholdersDb.setAll(_shareholders);
-        invalidateFinancialCache();
-        invalidateDashboardCache();
-      })
-      .subscribe(() => console.log('✅ Transactions realtime channel subscribed'));
-  }
-};
-
-// Initialize on module load
-// ❌ NÃO inicializar automaticamente - aguardar autenticação
-// loadFromSupabase();
-// startRealtime();
-
-const getLogInfo = () => {
-  const user = authService.getCurrentUser();
-  return {
-    userId: user?.id || 'system',
-    userName: user?.name || 'Sistema'
+    street: string;
+    number: string;
+    neighborhood: string;
+    city: string;
+    state: string;
+    zip: string;
   };
-};
+  financial: {
+    proLaboreValue: number;
+    currentBalance: number;
+    lastProLaboreDate?: string;
+    recurrence?: ShareholderRecurrence;
+    history: ShareholderTransaction[];
+  };
+}
+
+// ─── MAPEADORES ───────────────────────────────────────────────────────────────
+
+function mapRow(row: any, transactions: ShareholderTransaction[] = []): Shareholder {
+  return {
+    id: row.id,
+    name: row.name ?? '',
+    cpf: row.cpf ?? '',
+    email: row.email ?? '',
+    phone: row.phone ?? '',
+    address: {
+      street: row.address_street ?? '',
+      number: row.address_number ?? '',
+      neighborhood: row.address_neighborhood ?? '',
+      city: row.address_city ?? '',
+      state: row.address_state ?? '',
+      zip: row.address_zip ?? '',
+    },
+    financial: {
+      proLaboreValue: Number(row.pro_labore_value) || 0,
+      currentBalance: Number(row.current_balance) || 0,
+      lastProLaboreDate: row.last_pro_labore_date ?? undefined,
+      recurrence: {
+        active: row.recurrence_active ?? false,
+        amount: Number(row.recurrence_amount) || 0,
+        day: row.recurrence_day ?? 1,
+        lastGeneratedMonth: row.recurrence_last_generated_month ?? undefined,
+      },
+      history: transactions,
+    },
+  };
+}
+
+function mapTransactionRow(row: any): ShareholderTransaction {
+  return {
+    id: row.id,
+    date: row.date,
+    type: row.type,
+    value: Number(row.value),
+    description: row.description ?? '',
+    accountId: row.account_name ?? undefined,
+  };
+}
+
+// ─── INSTÂNCIA DE PERSISTÊNCIA (CACHE) ────────────────────────────────────────
+
+const db = new Persistence<Shareholder>('shareholders', [], { useStorage: false });
+let isInitialized = false;
+let realtimeSubscription: any = null;
+
+// ─── SERVICE ──────────────────────────────────────────────────────────────────
 
 export const shareholderService = {
-  getAll: () => {
-    // Verifica recorrência com throttle (não roda a cada chamada)
-    shareholderService.checkAndGenerateRecurring();
-    return _shareholders;
+
+  /**
+   * Inicializa o serviço e carrega dados
+   */
+  initialize: async () => {
+    if (isInitialized) return;
+    await shareholderService.loadFromSupabase();
+    shareholderService.startRealtime();
+    isInitialized = true;
   },
 
-  subscribe: (callback: (items: Shareholder[]) => void) => {
-    startRealtime();
-    return _shareholdersDb.subscribe(callback);
-  },
-  startRealtime,
+  /**
+   * Carrega dados do Supabase para o cache em memória
+   */
+  loadFromSupabase: async () => {
+    try {
+      const { data, error } = await supabase
+        .from('shareholders')
+        .select('*')
+        .order('name', { ascending: true });
 
-  add: async (shareholder: Shareholder) => {
-    if (!shareholder.financial) {
-      shareholder.financial = { proLaboreValue: 0, currentBalance: 0, history: [] };
-    }
-    // Inicializa recorrência vazia
-    shareholder.financial.recurrence = { active: false, amount: 0, day: 1 };
-
-    _shareholders = [..._shareholders, shareholder];
-    _shareholdersDb.setAll(_shareholders);
-
-    const { userId, userName } = getLogInfo();
-    logService.addLog({
-      userId, userName, action: 'create', module: 'Financeiro',
-      description: `Cadastrou novo sócio: ${shareholder.name}`,
-      entityId: shareholder.id
-    });
-    invalidateFinancialCache();
-    invalidateDashboardCache();
-
-    // Save to Supabase (background)
-    if (_isSupabaseLoaded) {
-      Promise.resolve().then(() => shareholderSupabaseSync.syncInsertShareholder(shareholder));
-    }
-  },
-
-  update: async (updated: Shareholder) => {
-    _shareholders = _shareholders.map(s => s.id === updated.id ? updated : s);
-    _shareholdersDb.setAll(_shareholders);
-    const { userId, userName } = getLogInfo();
-    logService.addLog({
-      userId, userName, action: 'update', module: 'Financeiro',
-      description: `Atualizou dados do sócio: ${updated.name}`,
-      entityId: updated.id
-    });
-    invalidateFinancialCache();
-    invalidateDashboardCache();
-
-    // Update in Supabase (background)
-    if (_isSupabaseLoaded) {
-      Promise.resolve().then(() => shareholderSupabaseSync.syncUpdateShareholder(updated));
-    }
-  },
-
-  delete: async (id: string) => {
-    const s = _shareholders.find(s => s.id === id);
-    _shareholders = _shareholders.filter(s => s.id !== id);
-    _shareholdersDb.setAll(_shareholders);
-    const { userId, userName } = getLogInfo();
-    logService.addLog({
-      userId, userName, action: 'delete', module: 'Financeiro',
-      description: `Removeu sócio: ${s?.name || 'Desconhecido'}`,
-      entityId: id
-    });
-    invalidateFinancialCache();
-    invalidateDashboardCache();
-
-    // Delete from Supabase (background)
-    if (_isSupabaseLoaded) {
-      Promise.resolve().then(() => shareholderSupabaseSync.syncDeleteShareholder(id));
-    }
-  },
-
-  // --- Financial Methods ---
-
-  // Agora suporta payImmediately para criar o par Crédito + Débito
-  addTransaction: async (shareholderId: string, transaction: Omit<ShareholderTransaction, 'id'>, payImmediatelyData?: { accountId: string, accountName: string }) => {
-    const shareholder = _shareholders.find(s => s.id === shareholderId);
-    if (!shareholder) return;
-
-    // 1. Cria a transação original (ex: Crédito de Pro-Labore)
-    const newTx: ShareholderTransaction = {
-      ...transaction,
-      id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `txn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-    };
-
-    shareholder.financial.history = [newTx, ...shareholder.financial.history];
-    recalcShareholderBalance(shareholder);
-
-    // Save transaction to Supabase (background)
-    if (_isSupabaseLoaded) {
-      Promise.resolve().then(() =>
-        shareholderSupabaseSync.syncInsertTransaction(shareholderId, newTx)
-      );
-    }
-
-    // 2. Se for "Lançar e Baixar", cria o débito imediatamente
-    if (transaction.type === 'credit' && payImmediatelyData) {
-      const withdrawalTx: ShareholderTransaction = {
-        id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `txn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        date: transaction.date,
-        type: 'debit',
-        value: transaction.value,
-        description: `Retirada Imediata (Ref: ${transaction.description})`,
-        accountId: payImmediatelyData.accountName
-      };
-
-      shareholder.financial.history = [withdrawalTx, ...shareholder.financial.history];
-      recalcShareholderBalance(shareholder);
-
-      // Save withdrawal to Supabase (background)
-      if (_isSupabaseLoaded) {
-        Promise.resolve().then(() =>
-          shareholderSupabaseSync.syncInsertTransaction(shareholderId, withdrawalTx)
-        );
+      if (error) throw error;
+      if (data) {
+        db.setAll(data.map((row) => mapRow(row)));
       }
-
-      // Lança no financeiro global
-      financialActionService.processRecord(`imm-${withdrawalTx.id}`, {
-        date: transaction.date,
-        amount: transaction.value,
-        discount: 0,
-        accountId: payImmediatelyData.accountId,
-        accountName: payImmediatelyData.accountName,
-        notes: `Pagamento Sócio: ${shareholder.name} - ${transaction.description}`,
-        isAsset: false,
-        entityName: shareholder.name
-      }, 'shareholder');
+    } catch (error) {
+      console.error('❌ Erro ao carregar sócios:', error);
     }
+  },
 
-    _shareholders = _shareholders.map(s => s.id === shareholderId ? shareholder : s);
-    _shareholdersDb.setAll(_shareholders);
+  /**
+   * Configura sincronização em tempo real
+   */
+  startRealtime: () => {
+    if (realtimeSubscription) return;
+    realtimeSubscription = supabase
+      .channel('shareholder_all_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'shareholders' }, () => {
+        shareholderService.loadFromSupabase();
+        invalidateDashboardCache();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'shareholder_transactions' }, () => {
+        // Quando as transações mudam, precisamos recarregar os saldos
+        shareholderService.loadFromSupabase();
+        invalidateDashboardCache();
+      })
+      .subscribe();
+  },
 
-    // Update balance in Supabase (background)
-    if (_isSupabaseLoaded) {
-      Promise.resolve().then(() =>
-        shareholderSupabaseSync.syncUpdateBalance(shareholderId, shareholder.financial.currentBalance)
-      );
+  stopRealtime: () => {
+    if (realtimeSubscription) {
+      supabase.removeChannel(realtimeSubscription);
+      realtimeSubscription = null;
     }
+  },
 
-    const { userId, userName } = getLogInfo();
-    logService.addLog({
-      userId, userName, action: transaction.type === 'credit' ? 'create' : 'approve', module: 'Financeiro',
-      description: `Lançamento ${transaction.type === 'credit' ? 'Crédito' : 'Débito'} para ${shareholder.name}: ${formatCurrency(transaction.value)}`,
-      entityId: shareholder.id
+  /**
+   * Lista todos os sócios da empresa (Síncrono via Cache).
+   */
+  getAll: (): Shareholder[] => db.getAll(),
+
+  /**
+   * Busca um sócio pelo ID, incluindo o histórico de transações.
+   */
+  getById: async (id: string): Promise<Shareholder | null> => {
+    const [{ data: row, error }, { data: txRows, error: txErr }] = await Promise.all([
+      supabase.from('shareholders').select('*').eq('id', id).single(),
+      supabase.from('shareholder_transactions').select('*').eq('shareholder_id', id).order('date', { ascending: false }),
+    ]);
+
+    if (error) throw new Error(`Erro ao buscar sócio: ${error.message}`);
+    if (!row) return null;
+    if (txErr) throw new Error(`Erro ao buscar transações: ${txErr.message}`);
+
+    return mapRow(row, (txRows ?? []).map(mapTransactionRow));
+  },
+
+  /**
+   * Adiciona um novo sócio.
+   */
+  add: async (shareholder: Omit<Shareholder, 'id'>): Promise<Shareholder> => {
+    const { data: profile } = await supabase
+      .from('app_users')
+      .select('company_id')
+      .single();
+
+    if (!profile?.company_id) throw new Error('Usuário sem empresa vinculada');
+
+    const { data, error } = await supabase
+      .from('shareholders')
+      .insert({
+        company_id: profile.company_id,
+        name: shareholder.name,
+        cpf: shareholder.cpf || null,
+        email: shareholder.email || null,
+        phone: shareholder.phone || null,
+        address_street: shareholder.address.street || null,
+        address_number: shareholder.address.number || null,
+        address_neighborhood: shareholder.address.neighborhood || null,
+        address_city: shareholder.address.city || null,
+        address_state: shareholder.address.state || null,
+        address_zip: shareholder.address.zip || null,
+        pro_labore_value: shareholder.financial?.proLaboreValue ?? 0,
+        current_balance: shareholder.financial?.currentBalance ?? 0,
+        recurrence_active: shareholder.financial?.recurrence?.active ?? false,
+        recurrence_amount: shareholder.financial?.recurrence?.amount ?? 0,
+        recurrence_day: shareholder.financial?.recurrence?.day ?? 1,
+      })
+      .select()
+      .single();
+
+    if (error) throw new Error(`Erro ao cadastrar sócio: ${error.message}`);
+
+    const newShareholder = mapRow(data);
+    db.add(newShareholder);
+    invalidateDashboardCache();
+
+    return newShareholder;
+  },
+
+  /**
+   * Atualiza um sócio existente.
+   */
+  update: async (shareholder: Shareholder): Promise<void> => {
+    const { error } = await supabase
+      .from('shareholders')
+      .update({
+        name: shareholder.name,
+        cpf: shareholder.cpf || null,
+        email: shareholder.email || null,
+        phone: shareholder.phone || null,
+        address_street: shareholder.address.street || null,
+        address_number: shareholder.address.number || null,
+        address_neighborhood: shareholder.address.neighborhood || null,
+        address_city: shareholder.address.city || null,
+        address_state: shareholder.address.state || null,
+        address_zip: shareholder.address.zip || null,
+        pro_labore_value: shareholder.financial?.proLaboreValue ?? 0,
+        recurrence_active: shareholder.financial?.recurrence?.active ?? false,
+        recurrence_amount: shareholder.financial?.recurrence?.amount ?? 0,
+        recurrence_day: shareholder.financial?.recurrence?.day ?? 1,
+      })
+      .eq('id', shareholder.id);
+
+    if (error) throw new Error(`Erro ao atualizar sócio: ${error.message}`);
+
+    db.update(shareholder);
+    invalidateDashboardCache();
+  },
+
+  /**
+   * Exclui um sócio.
+   */
+  delete: async (id: string): Promise<void> => {
+    const { error } = await supabase
+      .from('shareholders')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw new Error(`Erro ao excluir sócio: ${error.message}`);
+
+    db.delete(id);
+    invalidateDashboardCache();
+  },
+
+  /**
+   * Adiciona uma transação financeira para um sócio.
+   */
+  addTransaction: async (
+    shareholderId: string,
+    tx: Omit<ShareholderTransaction, 'id'>,
+  ): Promise<void> => {
+    const { data: profile } = await supabase
+      .from('app_users')
+      .select('company_id')
+      .single();
+
+    if (!profile?.company_id) throw new Error('Usuário sem empresa vinculada');
+
+    const { error } = await supabase.from('shareholder_transactions').insert({
+      company_id: profile.company_id,
+      shareholder_id: shareholderId,
+      date: tx.date,
+      type: tx.type,
+      value: tx.value,
+      description: tx.description || '',
+      account_name: tx.accountId ?? null,
     });
-    invalidateFinancialCache();
+
+    if (error) throw new Error(`Erro ao registrar transação: ${error.message}`);
+
+    // Recalcular saldo e recarregar cache
+    await shareholderService._recalcBalance(shareholderId);
+    await shareholderService.loadFromSupabase();
     invalidateDashboardCache();
   },
 
-  updateTransaction: async (shareholderId: string, updatedTx: ShareholderTransaction) => {
-    const shareholder = _shareholders.find(s => s.id === shareholderId);
-    if (!shareholder) return;
-
-    shareholder.financial.history = shareholder.financial.history.map(t =>
-      t.id === updatedTx.id ? updatedTx : t
-    );
-
-    // Recalcula Saldo
-    const totalCredits = shareholder.financial.history.filter(t => t.type === 'credit').reduce((acc, t) => acc + t.value, 0);
-    const totalDebits = shareholder.financial.history.filter(t => t.type === 'debit').reduce((acc, t) => acc + t.value, 0);
-    shareholder.financial.currentBalance = totalCredits - totalDebits;
-
-    _shareholders = _shareholders.map(s => s.id === shareholderId ? shareholder : s);
-    _shareholdersDb.setAll(_shareholders);
-
-    // Sync to Supabase (background)
-    if (_isSupabaseLoaded) {
-      Promise.resolve().then(() => {
-        shareholderSupabaseSync.syncUpdateTransaction(shareholderId, updatedTx);
-        shareholderSupabaseSync.syncUpdateBalance(shareholderId, shareholder.financial.currentBalance);
-      });
-    }
-    invalidateFinancialCache();
-    invalidateDashboardCache();
-  },
-
-  deleteTransaction: async (shareholderId: string, txId: string) => {
-    const shareholder = _shareholders.find(s => s.id === shareholderId);
-    if (!shareholder) return;
-
-    shareholder.financial.history = shareholder.financial.history.filter(t => t.id !== txId);
-
-    // Recalcula Saldo
-    const totalCredits = shareholder.financial.history.filter(t => t.type === 'credit').reduce((acc, t) => acc + t.value, 0);
-    const totalDebits = shareholder.financial.history.filter(t => t.type === 'debit').reduce((acc, t) => acc + t.value, 0);
-    shareholder.financial.currentBalance = totalCredits - totalDebits;
-
-    _shareholders = _shareholders.map(s => s.id === shareholderId ? shareholder : s);
-    _shareholdersDb.setAll(_shareholders);
-
-    // Sync to Supabase (background)
-    if (_isSupabaseLoaded) {
-      Promise.resolve().then(() => {
-        shareholderSupabaseSync.syncDeleteTransaction(txId);
-        shareholderSupabaseSync.syncUpdateBalance(shareholderId, shareholder.financial.currentBalance);
-      });
-    }
-    invalidateFinancialCache();
-    invalidateDashboardCache();
-  },
-
-  // --- Recorrência ---
-
-  updateRecurrence: (shareholderId: string, config: ShareholderRecurrence) => {
-    const shareholder = _shareholders.find(s => s.id === shareholderId);
-    if (!shareholder) return;
-
-    // Preserva o histórico de geração se não for passado
-    const lastGen = shareholder.financial.recurrence?.lastGeneratedMonth;
-    shareholder.financial.recurrence = { ...config, lastGeneratedMonth: lastGen };
-
-    _shareholders = _shareholders.map(s => s.id === shareholderId ? shareholder : s);
-    _shareholdersDb.setAll(_shareholders);
-
-    const { userId, userName } = getLogInfo();
-    logService.addLog({
-      userId, userName, action: 'update', module: 'Financeiro',
-      description: `Configurou recorrência para ${shareholder.name}: ${formatCurrency(config.amount)}`,
-      entityId: shareholderId
+  /**
+   * Recalcula o saldo atual do sócio (Internal)
+   * Usa a VIEW v_shareholder_balances para agregar no banco (SQL SUM)
+   * em vez de buscar todas as transações e reduzir no browser.
+   */
+  _recalcBalance: async (shareholderId: string): Promise<void> => {
+    // SKIL "Saldo Sagrado": recálculo via RPC server-side (nunca UPDATE direto)
+    const { error } = await supabase.rpc('rpc_recalc_shareholder_balance', {
+      p_shareholder_id: shareholderId,
     });
-    invalidateFinancialCache();
+
+    if (error) {
+      console.error('[shareholderService] Erro ao recalcular saldo via RPC:', error.message);
+      throw new Error(`Falha ao recalcular saldo do sócio: ${error.message}`);
+    }
+  },
+
+  /**
+   * Atualiza uma transação financeira existente de um sócio.
+   */
+  updateTransaction: async (
+    shareholderId: string,
+    tx: ShareholderTransaction,
+  ): Promise<void> => {
+    const { error } = await supabase
+      .from('shareholder_transactions')
+      .update({
+        date: tx.date,
+        type: tx.type,
+        value: tx.value,
+        description: tx.description || '',
+        account_name: tx.accountId ?? null,
+      })
+      .eq('id', tx.id);
+
+    if (error) throw new Error(`Erro ao atualizar transação: ${error.message}`);
+
+    await shareholderService._recalcBalance(shareholderId);
+    await shareholderService.loadFromSupabase();
     invalidateDashboardCache();
   },
 
-  checkAndGenerateRecurring: (() => {
-    let _lastCheckTs = 0;
-    const THROTTLE_MS = 60_000; // 60 segundos
-    return () => {
-      const now = Date.now();
-      if (now - _lastCheckTs < THROTTLE_MS) return; // Throttle ativo
-      _lastCheckTs = now;
+  /**
+   * Exclui uma transação financeira de um sócio.
+   */
+  deleteTransaction: async (
+    shareholderId: string,
+    txId: string,
+  ): Promise<void> => {
+    const { error } = await supabase
+      .from('shareholder_transactions')
+      .delete()
+      .eq('id', txId);
 
-      const today = new Date();
-      const currentMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
-      const dayOfMonth = today.getDate();
+    if (error) throw new Error(`Erro ao excluir transação: ${error.message}`);
 
-      _shareholders.forEach(s => {
-        const rec = s.financial.recurrence;
-        if (rec && rec.active && rec.amount > 0) {
-          if (rec.lastGeneratedMonth !== currentMonthKey && dayOfMonth >= rec.day) {
-            const tx: ShareholderTransaction = {
-              id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `txn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-              date: new Date().toISOString().split('T')[0],
-              type: 'credit',
-              value: rec.amount,
-              description: `Crédito Recorrente Automático - ${new Date().toLocaleDateString('pt-BR', { month: 'long' })}`
-            };
+    await shareholderService._recalcBalance(shareholderId);
+    await shareholderService.loadFromSupabase();
+    invalidateDashboardCache();
+  },
 
-            s.financial.history = [tx, ...s.financial.history];
-            recalcShareholderBalance(s);
-            s.financial.recurrence!.lastGeneratedMonth = currentMonthKey;
-            console.log(`[Auto] Crédito gerado para ${s.name}`);
-          }
-        }
-      });
+  // ─── COMPATIBILIDADE ─────────────────────────────────────────────────────────
+
+  subscribe: (callback: (items: Shareholder[]) => void): (() => void) => {
+    return db.subscribe(callback);
+  },
+
+  /**
+   * Totais de créditos/débitos de um sócio via RPC server-side.
+   * Zero cálculo no frontend.
+   */
+  getShareholderTotals: async (shareholderId: string): Promise<{ totalCredits: number; totalDebits: number; balance: number }> => {
+    const { data, error } = await supabase.rpc('rpc_shareholder_totals', {
+      p_shareholder_id: shareholderId,
+    });
+
+    if (error) {
+      console.error('[shareholderService] getShareholderTotals RPC error:', error.message);
+      return { totalCredits: 0, totalDebits: 0, balance: 0 };
+    }
+
+    const result = typeof data === 'string' ? JSON.parse(data) : data;
+    return {
+      totalCredits: Number(result?.totalCredits ?? 0),
+      totalDebits: Number(result?.totalDebits ?? 0),
+      balance: Number(result?.balance ?? 0),
+    };
+  },
+
+  subscribeRealtime: (() => {
+    const listeners = new Set<() => void>();
+    return (onAnyChange: () => void): (() => void) => {
+      listeners.add(onAnyChange);
+      // startRealtime já guarda contra duplicação internamente
+      shareholderService.startRealtime();
+      return () => {
+        listeners.delete(onAnyChange);
+        // NÃO remove o canal — startRealtime é global para o service
+      };
     };
   })(),
-
-  updateProLabore: (shareholderId: string, value: number) => {
-    // Mantido para compatibilidade, mas agora updateRecurrence é preferível
-    const shareholder = _shareholders.find(s => s.id === shareholderId);
-    if (!shareholder) return;
-    shareholder.financial.proLaboreValue = value;
-    _shareholders = [..._shareholders];
-    _shareholdersDb.setAll(_shareholders);
-    invalidateFinancialCache();
-    invalidateDashboardCache();
-  },
-
-  // Corrige saldos órfãos (sem histórico de transações)
-  fixOrphanBalance: async (shareholderId: string, description: string = 'Saldo Anterior Importado') => {
-    const shareholder = _shareholders.find(s => s.id === shareholderId);
-    if (!shareholder) return;
-
-    // Se tem saldo mas SEM histórico, cria transação inicial
-    if (shareholder.financial.currentBalance > 0 && shareholder.financial.history.length === 0) {
-      const initialTx: ShareholderTransaction = {
-        id: `init-${shareholderId}-${Date.now()}`,
-        date: new Date().toISOString().split('T')[0],
-        type: 'credit',
-        value: shareholder.financial.currentBalance,
-        description
-      };
-
-      shareholder.financial.history = [initialTx];
-
-      _shareholders = _shareholders.map(s => s.id === shareholderId ? shareholder : s);
-      _shareholdersDb.setAll(_shareholders);
-
-      // Sync to Supabase
-      if (_isSupabaseLoaded) {
-        Promise.resolve().then(() =>
-          shareholderSupabaseSync.syncInsertTransaction(shareholderId, initialTx)
-        );
-      }
-
-      invalidateFinancialCache();
-      invalidateDashboardCache();
-      return true;
-    }
-    return false;
-  },
-
-  importData: (data: Shareholder[]) => {
-    _shareholders = data;
-    _shareholdersDb.setAll(data);
-    invalidateFinancialCache();
-    invalidateDashboardCache();
-
-    const companyId = authService.getCurrentUser()?.companyId;
-    if (!companyId) return;
-
-    void (async () => {
-      try {
-        const sPayload = data.map(s => ({
-          id: s.id,
-          name: s.name,
-          cpf: s.cpf || null,
-          email: s.email || null,
-          phone: s.phone || null,
-          address_street: s.address?.street || null,
-          address_number: s.address?.number || null,
-          address_neighborhood: s.address?.neighborhood || null,
-          address_city: s.address?.city || null,
-          address_state: s.address?.state || null,
-          address_zip: s.address?.zip || null,
-          pro_labore_value: s.financial.proLaboreValue,
-          current_balance: s.financial.currentBalance,
-          last_pro_labore_date: s.financial.lastProLaboreDate || null,
-          recurrence_active: s.financial.recurrence?.active || false,
-          recurrence_amount: s.financial.recurrence?.amount || 0,
-          recurrence_day: s.financial.recurrence?.day || 1,
-          recurrence_last_generated_month: s.financial.recurrence?.lastGeneratedMonth || null,
-          company_id: companyId
-        }));
-
-        const tPayload: any[] = [];
-        data.forEach(s => {
-          if (s.financial.history) {
-            s.financial.history.forEach(t => {
-              tPayload.push({
-                id: t.id,
-                shareholder_id: s.id,
-                date: t.date,
-                type: t.type,
-                value: t.value,
-                description: t.description,
-                account_name: t.accountId || null,
-                company_id: companyId
-              });
-            });
-          }
-        });
-
-        const { error: sError } = await supabase.from('shareholders').upsert(sPayload, { onConflict: 'id' });
-        if (sError) console.error('❌ Erro ao sincronizar sócios:', sError);
-
-        if (tPayload.length > 0) {
-          const { error: tError } = await supabase.from('shareholder_transactions').upsert(tPayload, { onConflict: 'id' });
-          if (tError) console.error('❌ Erro ao sincronizar transações de sócios:', tError);
-        }
-
-        console.log('✅ Sócios e transações sincronizados no Supabase via ImportData');
-      } catch (err) {
-        console.error('❌ Erro inesperado ao importar sócios:', err);
-      }
-    })();
-  },
-
-  reload: () => {
-    _isSupabaseLoaded = false;
-    return loadFromSupabase();
-  },
-  loadFromSupabase
 };

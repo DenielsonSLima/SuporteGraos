@@ -1,46 +1,19 @@
 
-import React, { useEffect, useState } from 'react';
-import { CashierCache } from '../../../services/cashierCache';
+import React from 'react';
+import { useCashierCurrentMonth } from '../../../hooks/useCashier';
 import { CashierReport } from '../types';
 import CashierReportView from '../components/CashierReportView';
 import { Loader2 } from 'lucide-react';
 
 const CurrentMonthTab: React.FC = () => {
-  const [report, setReport] = useState<CashierReport | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data: report, isLoading } = useCashierCurrentMonth();
 
-  useEffect(() => {
-    setLoading(true);
-    // Carrega do cache (instantâneo se cache HIT)
-    const fetchReport = async () => {
-      setReport(CashierCache.getCurrentMonthReport());
-      setLoading(false);
-    };
-    fetchReport();
-
-    const handleRefresh = () => {
-      setReport(CashierCache.getCurrentMonthReport());
-    };
-
-    if (typeof window !== 'undefined') {
-      window.addEventListener('financial:updated', handleRefresh);
-      window.addEventListener('data:updated', handleRefresh);
-    }
-
-    return () => {
-      if (typeof window !== 'undefined') {
-        window.removeEventListener('financial:updated', handleRefresh);
-        window.removeEventListener('data:updated', handleRefresh);
-      }
-    };
-  }, []);
-
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex h-96 items-center justify-center">
         <div className="text-center">
           <Loader2 size={40} className="animate-spin text-primary-600 mx-auto mb-4" />
-          <p className="text-slate-500">Calculando fechamento atual...</p>
+          <p className="text-slate-500">Carregando fechamento atual...</p>
         </div>
       </div>
     );
@@ -50,7 +23,7 @@ const CurrentMonthTab: React.FC = () => {
 
   return (
     <CashierReportView 
-      report={report} 
+      report={report as CashierReport} 
       title={`Mês Atual (${new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })})`} 
     />
   );

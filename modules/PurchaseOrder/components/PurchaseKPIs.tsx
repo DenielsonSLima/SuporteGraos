@@ -2,22 +2,23 @@
 import React, { useMemo } from 'react';
 import { DollarSign, Truck, Clock, CheckCircle2, Scale } from 'lucide-react';
 import { PurchaseOrder } from '../types';
-import { LoadingCache } from '../../../services/loadingCache';
 import { formatMoney } from '../../../utils/formatters';
 
 interface Props {
   orders: PurchaseOrder[];
+  /** Romaneios reativos — fornecidos pelo hook useLoadings() no módulo pai */
+  loadings?: any[];
 }
 
-const PurchaseKPIs: React.FC<Props> = React.memo(({ orders }) => {
+const PurchaseKPIs: React.FC<Props> = React.memo(({ orders, loadings: externalLoadings }) => {
   
   const stats = useMemo(() => {
     // 1. IDs dos pedidos visíveis para filtrar os romaneios correspondentes
     const visibleOrderIds = orders.map(o => o.id);
     
-    // 2. Busca todos os romaneios e filtra apenas os vinculados aos pedidos atuais
-    const allLoadings = LoadingCache.getAll();
-    const relatedLoadings = allLoadings.filter(l => 
+    // 2. Usa loadings reativos recebidos por props (sem depender de cache com TTL)
+    const allLoadings = externalLoadings || [];
+    const relatedLoadings = allLoadings.filter((l: any) => 
         l.purchaseOrderId && 
         visibleOrderIds.includes(l.purchaseOrderId) && 
         l.status !== 'canceled'
@@ -58,7 +59,7 @@ const PurchaseKPIs: React.FC<Props> = React.memo(({ orders }) => {
         count: orders.length,
         loadedCount: relatedLoadings.length
     };
-  }, [orders]);
+  }, [orders, externalLoadings]);
 
   const StatCard = ({ label, value, icon: Icon, color, subtext, bgClass }: any) => (
     <div className={`p-5 rounded-2xl border shadow-sm flex items-start justify-between hover:shadow-md transition-shadow ${bgClass || 'bg-white border-slate-200'}`}>

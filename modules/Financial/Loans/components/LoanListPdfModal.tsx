@@ -29,7 +29,6 @@ const LoanListPdfModal: React.FC<Props> = ({ isOpen, onClose, loans, tab }) => {
         const url = URL.createObjectURL(blob);
         setPdfUrl(url);
       } catch (error) {
-        console.error('Erro ao gerar PDF:', error);
       } finally {
         setIsGenerating(false);
       }
@@ -57,7 +56,6 @@ const LoanListPdfModal: React.FC<Props> = ({ isOpen, onClose, loans, tab }) => {
       ).toBlob();
       saveAs(blob, filename);
     } catch (err) {
-      console.error('Erro ao gerar PDF:', err);
       alert("Erro ao processar o arquivo PDF.");
     } finally {
       setIsGenerating(false);

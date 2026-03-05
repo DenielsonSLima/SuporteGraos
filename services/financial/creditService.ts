@@ -6,6 +6,10 @@ import { logService } from '../logService';
 import { auditService } from '../auditService';
 import { authService } from '../authService';
 import { FinancialRecord } from '../../modules/Financial/types';
+import { shouldSkipLegacyTableOps } from '../realtimeTableAvailability';
+import { sqlCanonicalOpsLog } from '../sqlCanonicalOps';
+import { creditMathService } from './credits/creditMathService';
+import { creditReportsService } from './credits/creditReportsService';
 
 // Tipos de créditos
 export type CreditType = 'credit_income' | 'investment';
@@ -26,15 +30,18 @@ let isLoaded = false;
 // ============================================================================
 
 const startRealtime = () => {
+  if (shouldSkipLegacyTableOps('credits')) {
+    sqlCanonicalOpsLog('creditService.startRealtime ignorado: tabela credits indisponível no modo canônico');
+    return;
+  }
+
   if (realtimeChannel) return;
 
   realtimeChannel = supabase
     .channel('realtime:credits')
     .on('postgres_changes', {
-      event: '*', schema: 'public', table: 'standalone_records',
-      filter: 'sub_type=in.(credit_income,investment)'
+      event: '*', schema: 'public', table: 'credits'
     }, () => {
-      console.log('🔔 Realtime credits: mudança detectada');
       isLoaded = false;
       void loadFromSupabase();
       invalidateFinancialCache();
@@ -42,9 +49,15 @@ const startRealtime = () => {
     })
     .subscribe(status => {
       if (status === 'SUBSCRIBED') {
-        console.log('✅ Realtime credits ativo');
       }
     });
+};
+
+const stopRealtime = () => {
+  if (realtimeChannel) {
+    supabase.removeChannel(realtimeChannel);
+    realtimeChannel = null;
+  }
 };
 
 const getLogInfo = () => {
@@ -74,6 +87,7 @@ const fromSupabase = (record: any): FinancialRecord => {
     settlementDate: record.settlement_date,
     originalValue: parseFloat(record.original_value) || 0,
     paidValue: parseFloat(record.paid_value || 0) || 0,
+    remainingValue: Math.max(0, (parseFloat(record.original_value) || 0) - (parseFloat(record.paid_value || 0) || 0) - (parseFloat(record.discount_value || 0) || 0)),
     discountValue: parseFloat(record.discount_value || 0) || 0,
     status: record.status,
     subType: record.sub_type,
@@ -110,8 +124,8 @@ const toSupabase = (record: FinancialRecord) => {
     is_asset_receipt: record.isAssetReceipt || null,
     asset_name: record.assetName || null,
     weight_kg: record.weightKg ?? 0,
+    company_id: authService.getCurrentUser()?.companyId || null
   };
-  console.log('🔄 toSupabase resultado:', result);
   return result;
 };
 
@@ -123,19 +137,24 @@ const toSupabase = (record: FinancialRecord) => {
  * Carrega créditos do Supabase e armazena em cache
  */
 export const loadFromSupabase = async (): Promise<FinancialRecord[]> => {
+  if (shouldSkipLegacyTableOps('credits')) {
+    sqlCanonicalOpsLog('creditService.loadFromSupabase ignorado: tabela credits indisponível no modo canônico');
+    db.setAll([]);
+    isLoaded = true;
+    return [];
+  }
+
   if (isLoaded) {
     return db.getAll() || [];
   }
 
   try {
     const { data, error } = await supabase
-      .from('standalone_records')
+      .from('credits')
       .select('*')
-      .in('sub_type', ['credit_income', 'investment'])
       .order('issue_date', { ascending: false });
 
     if (error) {
-      console.error('❌ Erro ao carregar créditos:', error);
       return [];
     }
 
@@ -145,7 +164,6 @@ export const loadFromSupabase = async (): Promise<FinancialRecord[]> => {
 
     return records;
   } catch (err) {
-    console.error('❌ Erro ao carregar créditos:', err);
     return [];
   }
 };
@@ -154,26 +172,24 @@ export const loadFromSupabase = async (): Promise<FinancialRecord[]> => {
  * Cria um novo crédito
  */
 export const create = async (credit: FinancialRecord): Promise<Credit | null> => {
+  if (shouldSkipLegacyTableOps('credits')) {
+    sqlCanonicalOpsLog('creditService.create ignorado: tabela credits indisponível no modo canônico');
+    return null;
+  }
+
   try {
     const sbRecord = toSupabase(credit);
-    console.log('📝 Criando crédito:', {
-      input: credit,
-      converted: sbRecord
-    });
 
     const { data, error } = await supabase
-      .from('standalone_records')
+      .from('credits')
       .insert([sbRecord])
       .select()
       .single();
 
     if (error) {
-      console.error('❌ Erro ao criar crédito:', error);
-      console.error('Dados enviados:', sbRecord);
       return null;
     }
 
-    console.log('✅ Crédito criado:', data);
     const mapped = fromSupabase(data);
     db.add(mapped);
 
@@ -192,12 +208,35 @@ export const create = async (credit: FinancialRecord): Promise<Credit | null> =>
       metadata: { subType: mapped.subType, bankAccount: mapped.bankAccount }
     });
 
-    invalidateDashboardCache();
     invalidateFinancialCache();
+
+    // ✅ SINGLE LEDGER: Criar a entrada financeira
+    try {
+      const user = authService.getCurrentUser();
+      const companyId = user?.companyId;
+      if (companyId) {
+        // Mapeamento: given (emprestei -> receivable), taken (tomei -> payable)
+        // SubType investment/credit_income costumam ser receivables
+        const entryType = (mapped as any).type === 'taken' ? 'loan_payable' : 'loan_receivable';
+
+        await supabase.from('financial_entries').insert({
+          company_id: companyId,
+          type: entryType,
+          origin_type: 'loan',
+          origin_id: mapped.id,
+          total_amount: mapped.originalValue,
+          due_date: mapped.dueDate,
+          status: 'open',
+          paid_amount: 0,
+          remaining_amount: mapped.originalValue,
+          created_date: new Date().toISOString().split('T')[0]
+        });
+      }
+    } catch (err) {
+    }
 
     return mapped as Credit;
   } catch (err) {
-    console.error('❌ Erro ao criar crédito:', err);
     return null;
   }
 };
@@ -206,18 +245,22 @@ export const create = async (credit: FinancialRecord): Promise<Credit | null> =>
  * Atualiza um crédito existente
  */
 export const update = async (id: string, updates: Partial<FinancialRecord>): Promise<Credit | null> => {
+  if (shouldSkipLegacyTableOps('credits')) {
+    sqlCanonicalOpsLog('creditService.update ignorado: tabela credits indisponível no modo canônico');
+    return null;
+  }
+
   try {
     const sbUpdates = toSupabase(updates as FinancialRecord);
 
     const { data, error } = await supabase
-      .from('standalone_records')
+      .from('credits')
       .update(sbUpdates)
       .eq('id', id)
       .select()
       .single();
 
     if (error) {
-      console.error('❌ Erro ao atualizar crédito:', error);
       return null;
     }
 
@@ -241,12 +284,19 @@ export const update = async (id: string, updates: Partial<FinancialRecord>): Pro
       metadata: { subType: mapped.subType, bankAccount: mapped.bankAccount }
     });
 
-    invalidateDashboardCache();
     invalidateFinancialCache();
+
+    // ✅ SINGLE LEDGER: Atualizar a entrada financeira
+    try {
+      await supabase.from('financial_entries').update({
+        total_amount: mapped.originalValue,
+        due_date: mapped.dueDate
+      }).eq('origin_id', id).eq('origin_type', 'loan');
+    } catch (err) {
+    }
 
     return mapped as Credit;
   } catch (err) {
-    console.error('❌ Erro ao atualizar crédito:', err);
     return null;
   }
 };
@@ -255,14 +305,18 @@ export const update = async (id: string, updates: Partial<FinancialRecord>): Pro
  * Remove um crédito
  */
 export const remove = async (id: string): Promise<boolean> => {
+  if (shouldSkipLegacyTableOps('credits')) {
+    sqlCanonicalOpsLog('creditService.remove ignorado: tabela credits indisponível no modo canônico');
+    return false;
+  }
+
   try {
     const { error } = await supabase
-      .from('standalone_records')
+      .from('credits')
       .delete()
       .eq('id', id);
 
     if (error) {
-      console.error('❌ Erro ao deletar crédito:', error);
       return false;
     }
 
@@ -283,12 +337,19 @@ export const remove = async (id: string): Promise<boolean> => {
       entityId: id
     });
 
-    invalidateDashboardCache();
     invalidateFinancialCache();
+
+    // ✅ SINGLE LEDGER: Marcar entrada como estornada (imutabilidade do ledger)
+    try {
+      await supabase.from('financial_entries')
+        .update({ status: 'reversed', description: `[ESTORNO] ${id}` })
+        .eq('origin_id', id)
+        .eq('origin_type', 'loan');
+    } catch (err) {
+    }
 
     return true;
   } catch (err) {
-    console.error('❌ Erro ao deletar crédito:', err);
     return false;
   }
 };
@@ -297,6 +358,10 @@ export const remove = async (id: string): Promise<boolean> => {
  * Inscreve-se para atualizações em tempo real
  */
 export const subscribe = (callback: (credits: FinancialRecord[]) => void): (() => void) => {
+  if (shouldSkipLegacyTableOps('credits')) {
+    return () => {};
+  }
+
   const channel = supabase
     .channel('credits-changes')
     .on(
@@ -304,8 +369,7 @@ export const subscribe = (callback: (credits: FinancialRecord[]) => void): (() =
       {
         event: '*',
         schema: 'public',
-        table: 'standalone_records',
-        filter: `sub_type=in.(credit_income,investment)`,
+        table: 'credits',
       },
       async () => {
         const records = await loadFromSupabase();
@@ -326,10 +390,7 @@ export const calculateEarnings = (
   principal: number,
   interestRate: number,
   monthsElapsed: number
-): number => {
-  // Juros simples: Capital × Taxa × Período
-  return principal * (interestRate / 100) * monthsElapsed;
-};
+): number => creditMathService.calculateEarnings(principal, interestRate, monthsElapsed);
 
 /**
  * Calcula o valor total incluindo rendimentos
@@ -338,10 +399,7 @@ export const calculateTotalValue = (
   principal: number,
   interestRate: number,
   monthsElapsed: number
-): number => {
-  const earnings = calculateEarnings(principal, interestRate, monthsElapsed);
-  return principal + earnings;
-};
+): number => creditMathService.calculateTotalValue(principal, interestRate, monthsElapsed);
 
 /**
  * Obtém apenas créditos (filtra por sub_type)
@@ -354,50 +412,23 @@ export const getCredits = (): FinancialRecord[] => {
 /**
  * Agrupa créditos por mês
  */
-export const groupByMonth = (credits: FinancialRecord[]): Record<string, FinancialRecord[]> => {
-  const grouped: Record<string, FinancialRecord[]> = {};
-
-  credits.forEach(credit => {
-    const date = new Date(credit.issueDate);
-    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-
-    if (!grouped[monthKey]) {
-      grouped[monthKey] = [];
-    }
-    grouped[monthKey].push(credit);
-  });
-
-  return grouped;
-};
+export const groupByMonth = (credits: FinancialRecord[]): Record<string, FinancialRecord[]> =>
+  creditMathService.groupByMonth(credits);
 
 /**
  * Retorna créditos do mês atual
  */
 export const getCurrentMonthCredits = (): FinancialRecord[] => {
-  const now = new Date();
-  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-
   const credits = getCredits();
-  return credits.filter(credit => {
-    const date = new Date(credit.issueDate);
-    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-    return monthKey === currentMonth;
-  });
+  return creditReportsService.getCurrentMonthCredits(credits);
 };
 
 /**
  * Retorna créditos de outros meses (não é mês atual)
  */
 export const getOtherMonthsCredits = (): FinancialRecord[] => {
-  const now = new Date();
-  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-
   const credits = getCredits();
-  return credits.filter(credit => {
-    const date = new Date(credit.issueDate);
-    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-    return monthKey !== currentMonth;
-  });
+  return creditReportsService.getOtherMonthsCredits(credits);
 };
 
 // ============================================================================
@@ -409,32 +440,13 @@ export const getOtherMonthsCredits = (): FinancialRecord[] => {
  */
 export const getSummary = () => {
   const credits = getCredits();
-
-  const activeCredits = credits.filter(c => c.status === 'pending' || c.status === 'partial');
-  const totalInvested = activeCredits.reduce((sum, c) => sum + (c.originalValue || 0), 0);
-
-  // Calcula rendimentos médios
-  const totalEarnings = activeCredits.reduce((sum, c) => {
-    const monthsElapsed = Math.max(1, Math.floor(
-      (new Date().getTime() - new Date(c.issueDate).getTime()) / (1000 * 60 * 60 * 24 * 30)
-    ));
-    const earnings = calculateEarnings(c.originalValue || 0, c.paidValue || 0, monthsElapsed);
-    return sum + earnings;
-  }, 0);
-
-  return {
-    activeCount: activeCredits.length,
-    totalInvested,
-    totalEarnings,
-    averageRate: activeCredits.length > 0
-      ? activeCredits.reduce((sum, c) => sum + (c.paidValue || 0), 0) / activeCredits.length
-      : 0,
-  };
+  return creditReportsService.getSummary(credits);
 };
 
 export default {
   loadFromSupabase,
   startRealtime,
+  stopRealtime,
   create,
   update,
   remove,

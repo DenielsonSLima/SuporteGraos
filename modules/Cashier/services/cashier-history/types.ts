@@ -5,7 +5,7 @@
  * MonthlySnapshot: Snapshot manual congelado (salvo em BD para auditoria)
  */
 
-import { CashierReport } from '../types';
+import { CashierReport } from '../../types';
 
 export interface MonthlyReport extends CashierReport {
   /** Mês/ano: "2026-01" */

@@ -9,6 +9,8 @@ import { partnerSupabaseSync } from './partner/supabaseSyncService';
 import { locationService } from './locationService';
 import { auditService } from './auditService';
 import { supabaseWithRetry } from '../utils/fetchWithRetry';
+import { isSqlCanonicalOpsEnabled, sqlCanonicalOpsLog } from './sqlCanonicalOps';
+import { parceirosService } from './parceirosService';
 
 // Initial Data - System starts empty
 const INITIAL_PARTNERS: Partner[] = [];
@@ -26,6 +28,14 @@ let isLoaded = false;
 const loadFromSupabase = async () => {
   if (isLoaded) return;
   try {
+    if (isSqlCanonicalOpsEnabled()) {
+      const { data } = await parceirosService.getPartners({ page: 1, pageSize: 2000 });
+      db.setAll(data || []);
+      isLoaded = true;
+      sqlCanonicalOpsLog('partnerService carregado via parceiros_parceiros (modo canônico)');
+      return;
+    }
+
     // Carrega parceiros com retry
     const partners = await supabaseWithRetry(() =>
       supabase
@@ -78,9 +88,7 @@ const loadFromSupabase = async () => {
 
     db.setAll(transformedData);
     isLoaded = true;
-    console.log('🔄 Parceiros sincronizando em tempo real...');
   } catch (error) {
-    console.error('❌ Erro ao carregar parceiros:', error);
   }
 };
 
@@ -90,6 +98,11 @@ const loadFromSupabase = async () => {
 
 const startRealtime = () => {
   if (realtimeChannel) return;
+
+  if (isSqlCanonicalOpsEnabled()) {
+    sqlCanonicalOpsLog('partnerService.startRealtime legado ignorado (modo canônico)');
+    return;
+  }
 
   realtimeChannel = supabase
     .channel('realtime:partners')
@@ -111,9 +124,15 @@ const startRealtime = () => {
     })
     .subscribe((status) => {
       if (status === 'CHANNEL_ERROR') {
-        console.error('❌ Erro no canal Realtime (pode ser RLS)');
       }
     });
+};
+
+const stopRealtime = () => {
+  if (realtimeChannel) {
+    supabase.removeChannel(realtimeChannel);
+    realtimeChannel = null;
+  }
 };
 
 // ❌ NÃO inicializar automaticamente - aguardar autenticação
@@ -205,7 +224,9 @@ const transformPartnerFromSupabase = (supabasePartner: any): Partner => {
     email: supabasePartner.email,
     phone: supabasePartner.phone,
     active: supabasePartner.active,
+    companyId: supabasePartner.company_id || '',
     createdAt: supabasePartner.created_at,
+    updatedAt: supabasePartner.updated_at || supabasePartner.created_at,
     address: undefined // Seria carregado de partner_addresses se necessário
   };
 };
@@ -230,8 +251,18 @@ export const partnerService = {
   // Assinatura reativa de mudanças (usando Persistence.subscribe)
   subscribe: (callback: (items: Partner[]) => void) => db.subscribe(callback),
   startRealtime,
+  stopRealtime,
 
   add: async (partner: Partner) => {
+    if (isSqlCanonicalOpsEnabled()) {
+      const created = await parceirosService.createPartner({
+        ...partner,
+        partnerTypeId: partner.partnerTypeId || partner.categories?.[0],
+      } as any);
+      db.add(created as Partner);
+      return created as Partner;
+    }
+
     // Adiciona no cache com id do frontend para UX rápida
     const originalId = partner.id;
     db.add(partner);
@@ -267,9 +298,7 @@ export const partnerService = {
       transformedSaved = transformPartnerFromSupabase(savedPartner);
       db.delete(originalId);
       db.add(transformedSaved);
-      console.log(`✅ Parceiro ${partner.name} salvo no Supabase com id ${transformedSaved.id}`);
     } catch (error) {
-      console.error('❌ Erro ao salvar parceiro:', error);
       db.delete(originalId);
       throw error;
     }
@@ -278,6 +307,15 @@ export const partnerService = {
   },
 
   update: async (updatedPartner: Partner) => {
+    if (isSqlCanonicalOpsEnabled()) {
+      const updated = await parceirosService.updatePartner(updatedPartner.id, {
+        ...updatedPartner,
+        partnerTypeId: updatedPartner.partnerTypeId || updatedPartner.categories?.[0],
+      } as any);
+      db.update(updated as Partner);
+      return;
+    }
+
     const existing = db.getById(updatedPartner.id);
     db.update(updatedPartner);
 
@@ -303,15 +341,19 @@ export const partnerService = {
     try {
       const supabasePartner = transformPartnerToSupabase(updatedPartner);
       await partnerSupabaseSync.syncUpdatePartner(updatedPartner, supabasePartner);
-      console.log(`✅ Parceiro ${updatedPartner.name} atualizado no Supabase`);
     } catch (error) {
-      console.error('❌ Erro ao atualizar parceiro:', error);
       if (existing) db.update(existing);
       throw error;
     }
   },
 
   delete: async (id: string) => {
+    if (isSqlCanonicalOpsEnabled()) {
+      await parceirosService.deletePartner(id);
+      db.delete(id);
+      return;
+    }
+
     const partner = db.getById(id);
     if (!partner) return;
 
@@ -338,9 +380,7 @@ export const partnerService = {
     // Deletar do Supabase
     try {
       await partnerSupabaseSync.syncDeletePartner(id);
-      console.log('✅ Parceiro excluído do Supabase');
     } catch (error) {
-      console.error('❌ Erro ao excluir parceiro:', error);
       db.add(partner);
       throw error;
     }
@@ -348,6 +388,12 @@ export const partnerService = {
 
   importData: (data: Partner[]) => {
     db.setAll(data);
+
+    if (isSqlCanonicalOpsEnabled()) {
+      sqlCanonicalOpsLog('partnerService.importData: sync legado ignorado (modo canônico)');
+      return;
+    }
+
     const companyId = authService.getCurrentUser()?.companyId;
     if (!companyId) return;
 
@@ -360,9 +406,8 @@ export const partnerService = {
       try {
         const { error } = await supabase.from('partners').upsert(payload, { onConflict: 'id' });
         if (error) console.error('❌ Erro ao sincronizar parceiros:', error);
-        else console.log('✅ Parceiros sincronizados no Supabase via ImportData');
+        
       } catch (err) {
-        console.error('❌ Erro inesperado ao importar parceiros:', err);
       }
     })();
   },

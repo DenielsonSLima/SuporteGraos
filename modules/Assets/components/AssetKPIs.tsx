@@ -1,8 +1,8 @@
 
-import React, { useMemo } from 'react';
+import React from 'react';
 import { Tractor, DollarSign, Clock, TrendingUp, HandCoins } from 'lucide-react';
 import { Asset } from '../types';
-import { financialActionService } from '../../../services/financialActionService';
+import { useAssetKPIs } from '../hooks/useAssetKPIs';
 
 interface Props {
   assets: Asset[];
@@ -11,33 +11,8 @@ interface Props {
 const AssetKPIs: React.FC<Props> = ({ assets }) => {
   const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
 
-  const stats = useMemo(() => {
-    // 1. Valor dos Bens Ativos (Imobilizado)
-    const activeAssets = assets.filter(a => a.status === 'active');
-    const totalFixedValue = activeAssets.reduce((acc, a) => acc + a.acquisitionValue, 0);
-
-    const financialRecords = financialActionService.getStandaloneRecords();
-    
-    // 2. Valor Total das Vendas Realizadas que ainda tem parcelas pendentes
-    const soldAssetsWithPending = assets.filter(a => {
-        if (a.status !== 'sold') return false;
-        return financialRecords.some(r => r.assetId === a.id && r.status !== 'paid');
-    });
-    const totalSoldOpen = soldAssetsWithPending.reduce((acc, a) => acc + (a.saleValue || 0), 0);
-    
-    // 3. Saldo Líquido que falta entrar no caixa (Recebíveis Reais)
-    const totalPendingReceipt = financialRecords
-        .filter(r => r.assetId && assets.some(a => a.id === r.assetId && a.status === 'sold'))
-        .reduce((acc, r) => acc + (r.originalValue - r.paidValue), 0);
-
-    return {
-      totalFixedValue,
-      totalSoldOpen,
-      totalPendingReceipt,
-      activeCount: activeAssets.length,
-      soldCount: soldAssetsWithPending.length
-    };
-  }, [assets]);
+  // Cálculos centralizados no hook (TODO: migrar para RPC no banco)
+  const stats = useAssetKPIs(assets);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">

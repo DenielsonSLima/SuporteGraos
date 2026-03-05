@@ -1,15 +1,13 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { ArrowLeft, Plus, History, Landmark, DollarSign, Wallet, ArrowDownCircle, ArrowUpCircle, Printer, Trash2, AlertTriangle, Pencil } from 'lucide-react';
 import { LoanRecord, LoanTransaction } from '../../types';
 import LoanTransactionModal from './LoanTransactionModal';
 import LoanPdfModal from './LoanPdfModal';
 import ActionConfirmationModal from '../../../../components/ui/ActionConfirmationModal';
 import { useToast } from '../../../../contexts/ToastContext';
-import { loansService } from '../../../../services/financial/loansService';
-import { financialActionService } from '../../../../services/financialActionService';
-import { bankAccountService } from '../../../../services/bankAccountService';
-import { standaloneRecordsService } from '../../../../services/standaloneRecordsService';
+import { useAccounts } from '../../../../hooks/useAccounts';
+import { useLoanDetails } from '../hooks/useLoanDetails';
 
 interface Props {
   loan: LoanRecord;
@@ -22,10 +20,16 @@ const LoanDetails: React.FC<Props> = ({ loan, onBack, onUpdate }) => {
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeleteTxModalOpen, setIsDeleteTxModalOpen] = useState(false);
-  const [deletingTxRecord, setDeletingTxRecord] = useState<any | null>(null);
-  const [editingTx, setEditingTx] = useState<(Omit<LoanTransaction, 'id'> & { id?: string }) | null>(null);
-  const [txVersion, setTxVersion] = useState(0);
+  const { data: accountsList = [] } = useAccounts();
   const { addToast } = useToast();
+
+  const {
+    editingTx, setEditingTx,
+    deletingTxRecord, setDeletingTxRecord,
+    financialHistory,
+    handleAddTx, handleEditTx, handleDeleteTx,
+    confirmDeleteTx, handleDeleteContract,
+  } = useLoanDetails({ loan, onUpdate, onBack, addToast });
   
   const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
   const dateStr = (val: string) => new Date(val).toLocaleDateString('pt-BR');
@@ -35,187 +39,28 @@ const LoanDetails: React.FC<Props> = ({ loan, onBack, onUpdate }) => {
       if (description && /abatimento|desconto|ajuste/i.test(description)) return 'Desconto';
       return 'Não informada';
     }
-    const accounts = bankAccountService.getBankAccounts();
-    const account = accounts.find(a => a.id === bankAccountId);
-    return account?.bankName || bankAccountId;
+    const account = accountsList.find(a => a.id === bankAccountId);
+    return account?.account_name || bankAccountId;
   };
 
-  const financialHistory = useMemo(() => {
-    return financialActionService.getStandaloneRecords()
-      .filter(r => {
-        // Mostra apenas o crédito/débito inicial do empréstimo (receipt ou admin)
-        // E não mostra o registro principal (loan_taken ou loan_granted) com paidValue=0
-        return r.id?.startsWith(loan.id) && ['receipt', 'admin'].includes(r.subType || '') && r.paidValue > 0;
-      })
-      .sort((a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime());
-  }, [loan.id, txVersion]);
-
-  const getTxTypeFromRecord = (subType?: string): 'increase' | 'decrease' => {
-    if (loan.type === 'taken') return subType === 'receipt' ? 'increase' : 'decrease';
-    return subType === 'receipt' ? 'decrease' : 'increase';
+  const onSaveTx = async (tx: Omit<LoanTransaction, 'id'> & { id?: string }) => {
+    await handleAddTx(tx);
+    setIsTxModalOpen(false);
   };
 
-  const resolveSubTypeFromTx = (type: 'increase' | 'decrease') => {
-    const isEntry = (loan.type === 'taken' && type === 'increase') || (loan.type === 'granted' && type === 'decrease');
-    return isEntry ? 'receipt' : 'admin';
-  };
-
-  const applyTxEffect = (record: any, type: 'increase' | 'decrease', value: number, sign: 1 | -1) => {
-    if (type === 'increase') record.originalValue = (record.originalValue || 0) + sign * value;
-    if (type === 'decrease') record.paidValue = (record.paidValue || 0) + sign * value;
-  };
-
-  const handleAddTx = async (tx: Omit<LoanTransaction, 'id'> & { id?: string }) => {
-    try {
-      const current = loansService.getById(loan.id);
-      if (!current) {
-        addToast('error', 'Empréstimo não encontrado');
-        return;
-      }
-
-      const updated = { ...current } as any;
-
-      // Se EDITANDO (tem ID), remove efeito antigo
-      if (tx.id) {
-        const existing = financialActionService.getStandaloneRecords().find(r => r.id === tx.id);
-        if (existing) {
-          const oldType = getTxTypeFromRecord(existing.subType);
-          const oldValue = existing.paidValue || 0;
-          applyTxEffect(updated, oldType, oldValue, -1);
-        }
-      }
-
-      // Aplica novo efeito
-      applyTxEffect(updated, tx.type, tx.value, 1);
-      updated.status = updated.paidValue >= updated.originalValue - 0.01 ? 'paid' : updated.paidValue > 0 ? 'partial' : 'pending';
-      await loansService.update(updated);
-
-      // SALVAR ou ATUALIZAR registro
-      if (tx.id) {
-        // EDITANDO: atualiza registro existente
-        const subType = resolveSubTypeFromTx(tx.type);
-        await standaloneRecordsService.update({
-          id: tx.id,
-          description: tx.description || (tx.type === 'increase' ? 'Reforço de Empréstimo' : 'Pagamento de Empréstimo'),
-          entityName: loan.entityName,
-          category: 'Empréstimos',
-          dueDate: tx.date,
-          issueDate: tx.date,
-          originalValue: tx.value,
-          paidValue: tx.value,
-          discountValue: 0,
-          status: 'paid',
-          subType: subType as any,
-          bankAccount: tx.accountId
-        });
-      } else if (tx.accountId) {
-        // CRIANDO NOVO com conta: salva como transação real
-        const subType = resolveSubTypeFromTx(tx.type);
-        const txId = Math.random().toString(36).substr(2, 9);
-
-        await financialActionService.addAdminExpense({
-          id: `${loan.id}-tx-${txId}`,
-          description: tx.description || (tx.type === 'increase' ? 'Reforço de Empréstimo' : 'Pagamento de Empréstimo'),
-          entityName: loan.entityName,
-          category: 'Empréstimos',
-          dueDate: tx.date,
-          issueDate: tx.date,
-          originalValue: tx.value,
-          paidValue: tx.value,
-          discountValue: 0,
-          status: 'paid',
-          subType: subType as any,
-          bankAccount: tx.accountId
-        });
-      } else if (tx.isHistorical && !tx.accountId) {
-        // CRIANDO NOVO abatimento sem conta: salva como ajuste/desconto
-        const subType = resolveSubTypeFromTx(tx.type);
-        const txId = Math.random().toString(36).substr(2, 9);
-
-        await financialActionService.addAdminExpense({
-          id: `${loan.id}-tx-${txId}`,
-          description: tx.description || 'Abatimento / Desconto',
-          entityName: loan.entityName,
-          category: 'Empréstimos',
-          dueDate: tx.date,
-          issueDate: tx.date,
-          originalValue: tx.value,
-          paidValue: tx.value,
-          discountValue: 0,
-          status: 'paid',
-          subType: subType as any,
-          bankAccount: undefined // SEM conta bancária
-        });
-      }
-
-      setEditingTx(null);
-      setIsTxModalOpen(false);
-      setTxVersion(v => v + 1);
-      onUpdate();
-
-      if (tx.id) {
-        addToast('success', 'Lançamento atualizado');
-      } else if (!tx.accountId) {
-        addToast('success', 'Desconto registrado');
-      } else {
-        addToast('success', tx.type === 'increase' ? 'Reforço lançado' : 'Pagamento lançado');
-      }
-    } catch (error) {
-      console.error('Erro ao salvar lançamento:', error);
-      addToast('error', 'Erro ao salvar lançamento', (error as any).message);
-    }
-  };
-
-  const handleEditTx = (record: any) => {
-    const type = getTxTypeFromRecord(record.subType);
-    setEditingTx({
-      id: record.id,
-      date: record.issueDate,
-      type,
-      value: record.paidValue || 0,
-      description: record.description,
-      accountId: record.bankAccount,
-      accountName: getBankAccountName(record.bankAccount),
-      isHistorical: false
-    });
+  const onEditTx = (record: any) => {
+    handleEditTx(record);
     setIsTxModalOpen(true);
   };
 
-  const handleDeleteTx = (record: any) => {
-    setDeletingTxRecord(record);
+  const onDeleteTx = (record: any) => {
+    handleDeleteTx(record);
     setIsDeleteTxModalOpen(true);
   };
 
-  const confirmDeleteTx = async () => {
-    if (!deletingTxRecord) return;
-    try {
-      const current = loansService.getById(loan.id);
-      if (!current) {
-        addToast('error', 'Empréstimo não encontrado');
-        return;
-      }
-      const updated = { ...current } as any;
-      const oldType = getTxTypeFromRecord(deletingTxRecord.subType);
-      const oldValue = deletingTxRecord.paidValue || 0;
-      applyTxEffect(updated, oldType, oldValue, -1);
-      updated.status = updated.paidValue >= updated.originalValue - 0.01 ? 'paid' : updated.paidValue > 0 ? 'partial' : 'pending';
-      await loansService.update(updated);
-      await financialActionService.deleteStandaloneRecord(deletingTxRecord.id);
-      setIsDeleteTxModalOpen(false);
-      setDeletingTxRecord(null);
-      setTxVersion(v => v + 1);
-      onUpdate();
-      addToast('success', 'Movimentação excluída');
-    } catch (error) {
-      console.error('Erro ao deletar:', error);
-      addToast('error', 'Erro ao excluir movimentação', (error as any).message);
-    }
-  };
-
-  const handleDeleteContract = () => {
-    loansService.delete(loan.id);
-    addToast('success', 'Empréstimo excluído');
-    onBack();
+  const onConfirmDeleteTx = async () => {
+    await confirmDeleteTx();
+    setIsDeleteTxModalOpen(false);
   };
 
   return (
@@ -328,7 +173,7 @@ const LoanDetails: React.FC<Props> = ({ loan, onBack, onUpdate }) => {
                                   <div className="inline-flex gap-2">
                                     <button
                                       type="button"
-                                      onClick={() => handleEditTx(record)}
+                                      onClick={() => onEditTx(record)}
                                       className="p-2 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-100"
                                       aria-label="Editar lançamento"
                                     >
@@ -336,7 +181,7 @@ const LoanDetails: React.FC<Props> = ({ loan, onBack, onUpdate }) => {
                                     </button>
                                     <button
                                       type="button"
-                                      onClick={() => handleDeleteTx(record)}
+                                      onClick={() => onDeleteTx(record)}
                                       className="p-2 rounded-lg border border-rose-100 text-rose-500 hover:bg-rose-50"
                                       aria-label="Excluir lançamento"
                                     >
@@ -366,16 +211,16 @@ const LoanDetails: React.FC<Props> = ({ loan, onBack, onUpdate }) => {
           setIsTxModalOpen(false);
           setEditingTx(null);
         }}
-        onSave={handleAddTx}
+        onSave={onSaveTx}
         loanType={loan.type}
         initialTx={editingTx || undefined}
       />
-      <LoanPdfModal isOpen={isPdfModalOpen} onClose={() => setIsPdfModalOpen(false)} loan={loan} history={financialHistory} />
+      <LoanPdfModal isOpen={isPdfModalOpen} onClose={() => setIsPdfModalOpen(false)} loan={loan} history={financialHistory as any[]} />
       
       <ActionConfirmationModal 
         isOpen={isDeleteModalOpen} 
         onClose={() => setIsDeleteModalOpen(false)} 
-        onConfirm={handleDeleteContract} 
+        onConfirm={handleDeleteContract}  
         title="Excluir Contrato?" 
         description={<p>Tem certeza que deseja apagar o contrato com <strong>{loan.entityName}</strong>? Todos os lançamentos internos serão perdidos.</p>} 
         type="danger" 
@@ -386,7 +231,7 @@ const LoanDetails: React.FC<Props> = ({ loan, onBack, onUpdate }) => {
           setIsDeleteTxModalOpen(false);
           setDeletingTxRecord(null);
         }} 
-        onConfirm={confirmDeleteTx} 
+        onConfirm={onConfirmDeleteTx} 
         title="Excluir Movimentação?" 
         description={<p>Tem certeza que deseja apagar esta movimentação? <strong>{deletingTxRecord?.description}</strong></p>} 
         type="danger" 

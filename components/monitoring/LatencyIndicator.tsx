@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Activity, Wifi, WifiOff } from 'lucide-react';
+import { Activity, Wifi, WifiOff, Signal } from 'lucide-react';
 import { latencyService, LatencyData, LatencyStatus } from './latencyService';
 
 interface LatencyIndicatorProps {
@@ -14,10 +14,7 @@ const LatencyIndicator: React.FC<LatencyIndicatorProps> = ({
   const [latency, setLatency] = useState<LatencyData>(latencyService.getCurrentLatency());
 
   useEffect(() => {
-    // Inscrever para receber atualizações
     const unsubscribe = latencyService.subscribe(setLatency);
-    
-    // Cleanup ao desmontar
     return unsubscribe;
   }, []);
 
@@ -30,7 +27,8 @@ const LatencyIndicator: React.FC<LatencyIndicatorProps> = ({
           ringColor: 'ring-emerald-200',
           textColor: 'text-emerald-600',
           label: 'Excelente',
-          icon: Wifi
+          shortLabel: 'Estável',
+          icon: Signal
         };
       case 'good':
         return {
@@ -38,14 +36,16 @@ const LatencyIndicator: React.FC<LatencyIndicatorProps> = ({
           ringColor: 'ring-green-200',
           textColor: 'text-green-600',
           label: 'Bom',
+          shortLabel: 'Bom',
           icon: Wifi
         };
       case 'slow':
         return {
-          color: 'bg-yellow-500',
-          ringColor: 'ring-yellow-200',
-          textColor: 'text-yellow-600',
+          color: 'bg-amber-500',
+          ringColor: 'ring-amber-200',
+          textColor: 'text-amber-600',
           label: 'Lento',
+          shortLabel: 'Lento',
           icon: Activity
         };
       case 'critical':
@@ -53,7 +53,8 @@ const LatencyIndicator: React.FC<LatencyIndicatorProps> = ({
           color: 'bg-red-500',
           ringColor: 'ring-red-200',
           textColor: 'text-red-600',
-          label: 'Crítico',
+          label: 'Instável',
+          shortLabel: 'Instável',
           icon: WifiOff
         };
       case 'offline':
@@ -63,6 +64,7 @@ const LatencyIndicator: React.FC<LatencyIndicatorProps> = ({
           ringColor: 'ring-slate-200',
           textColor: 'text-slate-500',
           label: 'Offline',
+          shortLabel: 'Offline',
           icon: WifiOff
         };
     }
@@ -84,9 +86,23 @@ const LatencyIndicator: React.FC<LatencyIndicatorProps> = ({
     lg: 'ring-[3px]'
   };
 
+  // Formatar exibição: empresas mostram "Estável" ou "230ms" só quando relevante
+  const getDisplayText = () => {
+    if (latency.ms <= 0) return 'Offline';
+    if (latency.status === 'excellent' || latency.status === 'good') {
+      return config.shortLabel; // "Estável" / "Bom" — sem ms (como Vercel, Linear)
+    }
+    // Só mostra ms quando tem problema — chama atenção para o que importa
+    return `${latency.ms}ms`;
+  };
+
+  const tooltipText = latency.ms > 0
+    ? `Conexão: ${config.label} (${latency.ms}ms)\nServidor: Supabase sa-east-1`
+    : 'Sem conexão com o servidor';
+
   return (
-    <div className="flex items-center gap-2">
-      {/* 🔴 Bolinha de status com pulse animation */}
+    <div className="flex items-center gap-1.5 cursor-default" title={tooltipText}>
+      {/* 🔴 Bolinha de status */}
       <div className="relative flex items-center">
         <span 
           className={`
@@ -95,18 +111,17 @@ const LatencyIndicator: React.FC<LatencyIndicatorProps> = ({
             rounded-full 
             ${ringSizeClasses[size]} 
             ${config.ringColor} 
-            ${latency.status === 'offline' ? '' : 'animate-pulse'}
+            ${latency.status === 'offline' ? '' : latency.status === 'critical' || latency.status === 'slow' ? 'animate-pulse' : ''}
           `}
-          title={`Latência: ${latency.ms}ms - ${config.label}`}
         />
       </div>
 
-      {/* 📊 Label opcional com MS */}
+      {/* 📊 Label inteligente */}
       {showLabel && (
-        <div className="flex items-center gap-1.5">
-          <Icon size={14} className={config.textColor} />
-          <span className={`text-xs font-medium ${config.textColor}`}>
-            {latency.ms > 0 ? `${latency.ms}ms` : 'Offline'}
+        <div className="flex items-center gap-1">
+          <Icon size={13} className={config.textColor} strokeWidth={2.5} />
+          <span className={`text-[11px] font-semibold ${config.textColor} tabular-nums`}>
+            {getDisplayText()}
           </span>
         </div>
       )}

@@ -87,19 +87,6 @@ serve(async (req) => {
       password
     } = payload;
 
-    console.log('[EDGE][create-user] Payload recebido:', {
-      hasFirstName: !!firstName,
-      hasLastName: !!lastName,
-      hasCpf: !!cpf,
-      email,
-      phone,
-      role,
-      permissionsCount: permissions?.length || 0,
-      active,
-      allowRecovery,
-      shouldGenerate: shouldGenerate,
-      passwordProvided: !!password
-    });
 
     if (!firstName || !lastName || !cpf || !email) {
       return jsonResponse(400, { success: false, error: 'Missing required fields' });
@@ -147,12 +134,10 @@ serve(async (req) => {
     const normalizedEmail = email.trim().toLowerCase();
     const { user: duplicateUser, error: duplicateCheckError } = await findAuthUserByEmail(normalizedEmail);
     if (duplicateCheckError) {
-      console.error('[EDGE][create-user] Falha ao verificar duplicidade:', duplicateCheckError);
       return jsonResponse(400, { success: false, error: 'Não foi possível validar o e-mail. Tente novamente em instantes.' });
     }
 
     if (duplicateUser) {
-      console.warn('[EDGE][create-user] E-mail duplicado:', normalizedEmail);
       return jsonResponse(409, { success: false, error: 'Já existe um usuário cadastrado com este e-mail.' });
     }
 
@@ -173,7 +158,6 @@ serve(async (req) => {
     });
 
     if (authError || !authData?.user) {
-      console.error('[EDGE][create-user] Erro Supabase Auth:', authError);
       return jsonResponse(400, {
         success: false,
         error: authError?.message || 'Failed to create auth user',
@@ -188,7 +172,6 @@ serve(async (req) => {
       generated_password: shouldGenerate ? passwordToUse : null
     });
   } catch (error) {
-    console.error('[EDGE][create-user] Erro não tratado:', error);
     const message = error instanceof Error ? error.message : 'Erro interno inesperado ao criar usuário.';
     return jsonResponse(500, { success: false, error: message });
   }

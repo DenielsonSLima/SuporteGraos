@@ -7,6 +7,7 @@ import { supabase } from './supabase';
 import { Persistence } from './persistence';
 import { logService } from './logService';
 import { authService } from './authService';
+import { isSqlCanonicalOpsEnabled, sqlCanonicalOpsLog } from './sqlCanonicalOps';
 
 /**
  * Gera UUID compatível com navegador
@@ -53,23 +54,31 @@ let isLoaded = false;
 // ============================================================================
 
 const loadFromSupabase = async () => {
-  if (isLoaded) return;
+  if (isSqlCanonicalOpsEnabled()) {
+    db.setAll([]);
+    isLoaded = true;
+    return;
+  }
+
   try {
     const user = authService.getCurrentUser();
     const companyId = user?.companyId;
 
-    const { data, error } = await supabase
+    let query = supabase
       .from('drivers')
-      .select('*')
-      .eq('company_id', companyId)
-      .order('name');
+      .select('*');
+
+    // Aplicar filtro de empresa se disponível
+    if (companyId) {
+      query = query.eq('company_id', companyId);
+    }
+
+    const { data, error } = await query.order('name');
 
     if (error) throw error;
     db.setAll(data || []);
     isLoaded = true;
-    console.log('🔄 Motoristas sincronizando em tempo real...');
   } catch (error) {
-    console.error('❌ Erro ao carregar motoristas:', error);
   }
 };
 
@@ -78,6 +87,11 @@ const loadFromSupabase = async () => {
 // ============================================================================
 
 const startRealtime = () => {
+  if (isSqlCanonicalOpsEnabled()) {
+    sqlCanonicalOpsLog('driverService.startRealtime legado ignorado (modo canônico)');
+    return;
+  }
+
   if (realtimeChannel) return;
 
   realtimeChannel = supabase
@@ -94,11 +108,17 @@ const startRealtime = () => {
         db.delete(rec.id);
       }
 
-      console.log(`🔔 Realtime drivers: ${payload.eventType}`);
     })
     .subscribe(status => {
       // Realtime subscribed
     });
+};
+
+const stopRealtime = () => {
+  if (realtimeChannel) {
+    supabase.removeChannel(realtimeChannel);
+    realtimeChannel = null;
+  }
 };
 
 // Inicializar ao carregar o módulo
@@ -182,9 +202,7 @@ export const driverService = {
       const savedDriver: Driver = data as Driver;
       db.delete(tempId);
       db.add(savedDriver);
-      console.log(`✅ Motorista ${driver.name} salvo no Supabase`);
     } catch (error) {
-      console.error('❌ Erro ao salvar motorista:', error);
       db.delete(tempId);
       throw error;
     }
@@ -210,9 +228,7 @@ export const driverService = {
         .update(driver)
         .eq('id', driver.id);
       if (error) throw error;
-      console.log(`✅ Motorista ${driver.name} atualizado no Supabase`);
     } catch (error) {
-      console.error('❌ Erro ao atualizar motorista:', error);
       if (existing) db.update(existing);
       throw error;
     }
@@ -222,7 +238,6 @@ export const driverService = {
     const driver = db.getById(id);
     if (!driver) return;
 
-    console.log('🗑️ [1/3] Deletando motorista:', id);
     db.delete(id);
 
     const { userId, userName } = getLogInfo();
@@ -238,9 +253,7 @@ export const driverService = {
     try {
       const { error } = await supabase.from('drivers').delete().eq('id', id);
       if (error) throw error;
-      console.log('✅ [3/3] Motorista excluído do Supabase');
     } catch (error) {
-      console.error('❌ Erro ao excluir motorista:', error);
       db.add(driver);
       throw error;
     }
@@ -252,6 +265,7 @@ export const driverService = {
   },
   loadFromSupabase,
   startRealtime,
+  stopRealtime,
 
   importData: (drivers: Driver[]) => {
     if (!drivers) return;
@@ -269,9 +283,8 @@ export const driverService = {
         }));
         const { error } = await supabase.from('drivers').upsert(payload, { onConflict: 'id' });
         if (error) console.error('❌ Erro ao sincronizar motoristas:', error);
-        else console.log('✅ Motoristas sincronizados no Supabase via ImportData');
+        
       } catch (err) {
-        console.error('❌ Erro inesperado ao importar motoristas:', err);
       }
     })();
   }

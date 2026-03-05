@@ -1,8 +1,7 @@
 
 import { BarChart2 } from 'lucide-react';
 import { ReportModule } from '../../types';
-import { loadingService } from '../../../../services/loadingService';
-import { financialActionService } from '../../../../services/financialActionService';
+import { financialIntegrationService } from '../../../../services/financialIntegrationService';
 import { financialService } from '../../../../services/financialService';
 import Template from './Template';
 import PdfDocument from './PdfDocument';
@@ -24,20 +23,35 @@ const dreReport: ReportModule = {
   FilterComponent: DefaultFilters,
   fetchData: ({ startDate, endDate }) => {
     const filterFn = (date: string) => (!startDate || date >= startDate) && (!endDate || date <= endDate);
-    
-    const loadings = loadingService.getAll().filter(l => filterFn(l.date) && l.status !== 'canceled');
-    const standalone = financialActionService.getStandaloneRecords().filter(r => filterFn(r.issueDate) && r.subType === 'admin');
+
+    const payables = financialIntegrationService
+      .getPayables()
+      .filter((r) => filterFn(r.issueDate || r.dueDate));
+
+    const receivables = financialIntegrationService
+      .getReceivables()
+      .filter((r) => filterFn(r.issueDate || r.dueDate));
+
+    const standalone = payables.filter((r) => r.subType === 'admin');
     const expenseCats = financialService.getExpenseCategories();
 
     // 1. RECEITA BRUTA (Vendas)
-    const revenue = loadings.reduce((acc, l) => acc + (l.totalSalesValue || 0), 0);
+    const revenue = receivables
+      .filter((r) => r.subType === 'sales_order')
+      .reduce((acc, r) => acc + r.originalValue, 0);
 
     // 2. CUSTOS VARIÁVEIS (Deduções Diretas)
-    const grainCost = loadings.reduce((acc, l) => acc + (l.totalPurchaseValue || 0), 0);
-    const freightCost = loadings.reduce((acc, l) => acc + (l.totalFreightValue || 0), 0);
-    const varCommission = financialActionService.getStandaloneRecords()
-        .filter(r => filterFn(r.issueDate) && r.subType === 'commission')
-        .reduce((acc, r) => acc + r.originalValue, 0);
+    const grainCost = payables
+      .filter((r) => r.subType === 'purchase_order')
+      .reduce((acc, r) => acc + r.originalValue, 0);
+
+    const freightCost = payables
+      .filter((r) => r.subType === 'freight')
+      .reduce((acc, r) => acc + r.originalValue, 0);
+
+    const varCommission = payables
+      .filter((r) => r.subType === 'commission')
+      .reduce((acc, r) => acc + r.originalValue, 0);
 
     const contributionMargin = revenue - (grainCost + freightCost + varCommission);
 

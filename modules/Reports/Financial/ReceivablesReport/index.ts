@@ -34,7 +34,7 @@ const receivablesReport: ReportModule = {
       return d >= start && d <= end;
     });
 
-    const pendingTotal = records.reduce((acc, r) => acc + (r.originalValue - r.paidValue), 0);
+    const pendingTotal = records.reduce((acc, r) => acc + (r.remainingValue || 0), 0);
 
     return {
       title: 'Relatório de Contas a Receber',
@@ -47,7 +47,7 @@ const receivablesReport: ReportModule = {
         { header: 'Valor Original', accessor: 'originalValue', format: 'currency', align: 'right' },
         { header: 'Saldo a Receber', accessor: 'balance', format: 'currency', align: 'right' }
       ],
-      rows: records.map(r => ({ ...r, balance: r.originalValue - r.paidValue })),
+      rows: records.map(r => ({ ...r, balance: r.remainingValue || 0 })),
       summary: [{ label: 'Total a Receber', value: pendingTotal, format: 'currency' }]
     };
   },

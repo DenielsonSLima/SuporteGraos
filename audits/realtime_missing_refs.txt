@@ -1,0 +1,174 @@
+### assets
+services/assetService.ts:99:      .from('assets')
+services/assetService.ts:126:    .on('postgres_changes', { event: '*', schema: 'public', table: 'assets' }, (payload) => {
+services/assetService.ts:164:    const { error } = await supabase.from('assets').upsert(payload).select();
+services/assetService.ts:175:    const { error } = await supabase.from('assets').delete().eq('id', id);
+services/assetService.ts:257:        const { error } = await supabase.from('assets').upsert(payload);
+
+### audit_logs
+services/logService.ts:66:    const { error } = await supabase.from('audit_logs').insert(payload);
+services/logService.ts:80:      .from('audit_logs')
+services/logService.ts:107:        { event: 'INSERT', schema: 'public', table: 'audit_logs' },
+services/auditService.ts:259:    const { error } = await supabase.from('audit_logs').insert(payload);
+services/auditService.ts:335:      .from('audit_logs')
+services/auditService.ts:413:    .from('audit_logs')
+services/auditService.ts:584:        { event: 'INSERT', schema: 'public', table: 'audit_logs' },
+services/auditService.ts:591:        { event: 'UPDATE', schema: 'public', table: 'audit_logs' },
+
+### cashier_monthly_snapshots
+services/cashierSnapshotService.ts:12:      .from('cashier_monthly_snapshots')
+services/cashierSnapshotService.ts:25:      .from('cashier_monthly_snapshots')
+services/cashierSnapshotService.ts:36:      .from('cashier_monthly_snapshots')
+services/cashierSnapshotService.ts:50:        { event: '*', schema: 'public', table: 'cashier_monthly_snapshots' },
+
+### credits
+services/financial/creditService.ts:34:      event: '*', schema: 'public', table: 'credits'
+services/financial/creditService.ts:129:      .from('credits')
+services/financial/creditService.ts:155:      .from('credits')
+services/financial/creditService.ts:220:      .from('credits')
+services/financial/creditService.ts:274:      .from('credits')
+services/financial/creditService.ts:326:        table: 'credits',
+
+### drivers
+services/supabaseInitService.ts:274:          supabase.from('drivers').select('*').order('name'),
+services/driverService.ts:68:      .from('drivers')
+services/driverService.ts:99:    .on('postgres_changes', { event: '*', schema: 'public', table: 'drivers' }, (payload) => {
+services/driverService.ts:188:        .from('drivers')
+services/driverService.ts:220:        .from('drivers')
+services/driverService.ts:247:      const { error } = await supabase.from('drivers').delete().eq('id', id);
+services/driverService.ts:276:        const { error } = await supabase.from('drivers').upsert(payload, { onConflict: 'id' });
+
+### financial_transactions_v2
+services/financial/financialHistoryService.ts:213:    .on('postgres_changes', { event: '*', schema: 'public', table: 'financial_transactions_v2' }, (payload: any) => {
+
+### login_history
+services/auditService.ts:283:    const { error } = await supabase.from('login_history').insert(payload);
+services/auditService.ts:382:      .from('login_history')
+services/auditService.ts:483:    .from('login_history')
+services/auditService.ts:549:    .from('login_history')
+services/auditService.ts:565:    .from('login_history')
+services/auditService.ts:641:        { event: 'INSERT', schema: 'public', table: 'login_history' },
+
+### login_rotation_config
+services/loginScreenService.ts:91:      .from('login_rotation_config')
+services/loginScreenService.ts:258:        .from('login_rotation_config')
+services/loginScreenService.ts:272:        .from('login_rotation_config')
+services/loginScreenService.ts:328:    .on('postgres_changes', { event: '*', schema: 'public', table: 'login_rotation_config' }, (payload) => {
+
+### login_screens
+services/loginScreenService.ts:71:      .from('login_screens')
+services/loginScreenService.ts:138:      .from('login_screens')
+services/loginScreenService.ts:179:      .from('login_screens')
+services/loginScreenService.ts:206:      .from('login_screens')
+services/loginScreenService.ts:228:      .from('login_screens')
+services/loginScreenService.ts:302:    .on('postgres_changes', { event: '*', schema: 'public', table: 'login_screens' }, (payload) => {
+
+### logistics_loadings
+services/loadingService.ts:60:      supabase.from('logistics_loadings').select('*').order('created_at', { ascending: false })
+services/loadingService.ts:80:      table: 'logistics_loadings',
+services/loadingService.ts:102:    const { error } = await supabase.from('logistics_loadings').upsert(payload).select();
+services/loadingService.ts:110:    const { error } = await supabase.from('logistics_loadings').delete().eq('id', id);
+services/loadingService.ts:185:      .from('logistics_loadings')
+services/loadingService.ts:475:        const { error } = await supabase.from('logistics_loadings').upsert(payload);
+services/purchaseService.ts:685:            await supabase.from('logistics_loadings').delete().eq('id', l.id);
+
+### partner_addresses
+services/partnerService.ts:50:        .from('partner_addresses')
+services/partnerAddress/index.ts:37:      .from('partner_addresses')
+services/partnerAddress/index.ts:64:    .on('postgres_changes', { event: '*', schema: 'public', table: 'partner_addresses' }, (payload) => {
+services/partnerAddress/supabaseSyncService.ts:14:      .from('partner_addresses')
+services/partnerAddress/supabaseSyncService.ts:47:      .from('partner_addresses')
+services/partnerAddress/supabaseSyncService.ts:78:      .from('partner_addresses')
+services/partnerAddress/supabaseSyncService.ts:93:      .from('partner_addresses')
+
+### partners
+services/partnerService.ts:42:        .from('partners')
+services/partnerService.ts:109:    .on('postgres_changes', { event: '*', schema: 'public', table: 'partners' }, (payload) => {
+services/partnerService.ts:397:        const { error } = await supabase.from('partners').upsert(payload, { onConflict: 'id' });
+services/supabaseInitService.ts:275:          supabase.from('partners').select('*').order('name')
+services/partner/supabaseSyncService.ts:14:      .from('partners')
+services/partner/supabaseSyncService.ts:29:      .from('partners')
+services/partner/supabaseSyncService.ts:39:    const { error } = await supabase.from('partners').delete().eq('id', id);
+
+### payables
+services/financial/payablesService.ts:139:      .from('payables')
+services/financial/payablesService.ts:164:      .from('payables')
+services/financial/payablesService.ts:196:    .on('postgres_changes', { event: '*', schema: 'public', table: 'payables' }, (payload) => {
+services/financial/payablesService.ts:222:    const { data: savedData, error } = await supabase.from('payables').upsert(payload).select().single();
+services/financial/payablesService.ts:240:    const { error } = await supabase.from('payables').delete().eq('id', id);
+
+### purchase_orders
+services/purchaseService.ts:134:      .from('purchase_orders')
+services/purchaseService.ts:170:    const { error } = await supabase.from('purchase_orders').upsert(payload);
+services/purchaseService.ts:236:    const { error } = await supabase.from('purchase_orders').delete().eq('id', id);
+services/purchaseService.ts:296:      .from('purchase_orders')
+services/purchaseService.ts:426:        table: 'purchase_orders'
+services/purchaseService.ts:492:        const { error } = await supabase.from('purchase_orders').upsert(payload, { onConflict: 'id' });
+services/purchaseService.ts:734:        const { error } = await supabase.from('purchase_orders').delete().eq('id', id);
+hooks/usePurchaseOrders.ts:65:                .from('purchase_orders')
+hooks/usePurchaseOrders.ts:81:                { event: '*', schema: 'public', table: 'purchase_orders' },
+
+### receivables
+services/financial/receivablesService.ts:101:      .from('receivables')
+services/financial/receivablesService.ts:126:      .from('receivables')
+services/financial/receivablesService.ts:155:    .on('postgres_changes', { event: '*', schema: 'public', table: 'receivables' }, (payload) => {
+services/financial/receivablesService.ts:181:    const { data: savedData, error } = await supabase.from('receivables').upsert(payload).select().single();
+services/financial/receivablesService.ts:199:    const { error } = await supabase.from('receivables').delete().eq('id', id);
+
+### report_access_logs
+services/reportAuditService.ts:55:    const { error } = await supabase.from('report_access_logs').insert(payload);
+services/reportAuditService.ts:69:      .from('report_access_logs')
+services/reportAuditService.ts:96:        { event: 'INSERT', schema: 'public', table: 'report_access_logs' },
+
+### sales_orders
+services/loading/loadingReceivableSync.ts:48:      .from('sales_orders')
+services/salesService.ts:121:      .from('sales_orders')
+services/salesService.ts:164:    const { error } = await supabase.from('sales_orders').upsert(payload).select();
+services/salesService.ts:183:    const { error } = await supabase.from('sales_orders').delete().eq('id', id);
+services/salesService.ts:194:      .from('sales_orders')
+services/salesService.ts:275:    .on('postgres_changes', { event: '*', schema: 'public', table: 'sales_orders' }, (payload) => {
+services/salesService.ts:575:        const { error } = await supabase.from('sales_orders').delete().eq('id', id);
+services/salesService.ts:616:        const { error } = await supabase.from('sales_orders').upsert(payload);
+
+### standalone_receipts
+services/financial/receiptService.ts:70:                .from('standalone_receipts')
+services/financial/receiptService.ts:86:            .on('postgres_changes', { event: '*', schema: 'public', table: 'standalone_receipts' }, () => {
+services/financial/receiptService.ts:106:        const { error } = await supabase.from('standalone_receipts').insert(supabaseRecord);
+services/financial/receiptService.ts:129:        const { error } = await supabase.from('standalone_receipts').update(toSupabase(record)).eq('id', record.id);
+services/financial/receiptService.ts:148:        const { error } = await supabase.from('standalone_receipts').delete().eq('id', id);
+
+### standalone_records
+services/financial/loansService.ts:121:      .from('standalone_records')
+services/financial/loansService.ts:160:      .from('standalone_records')
+services/financial/loansService.ts:200:        table: 'standalone_records',
+services/financial/loansService.ts:233:      .from('standalone_records')
+services/financial/loansService.ts:248:      .from('standalone_records')
+
+### transporters
+services/supabaseInitService.ts:272:          supabase.from('transporters').select('*').order('name'),
+services/transporterService.ts:46:      .from('transporters')
+services/transporterService.ts:77:    .on('postgres_changes', { event: '*', schema: 'public', table: 'transporters' }, (payload) => {
+services/transporterService.ts:155:        .from('transporters')
+services/transporterService.ts:187:        .from('transporters')
+services/transporterService.ts:214:      const { error } = await supabase.from('transporters').delete().eq('id', id);
+
+### user_sessions
+services/auditService.ts:273:    const { error } = await supabase.from('user_sessions').upsert(payload);
+services/auditService.ts:295:      .from('user_sessions')
+services/auditService.ts:361:      .from('user_sessions')
+services/auditService.ts:452:    .from('user_sessions')
+services/auditService.ts:510:    .from('user_sessions')
+services/auditService.ts:526:    .from('user_sessions')
+services/auditService.ts:539:    .from('user_sessions')
+services/auditService.ts:615:        { event: 'INSERT', schema: 'public', table: 'user_sessions' },
+services/auditService.ts:622:        { event: 'UPDATE', schema: 'public', table: 'user_sessions' },
+
+### vehicles
+services/supabaseInitService.ts:273:          supabase.from('vehicles').select('*').order('plate'),
+services/vehicleService.ts:63:      .from('vehicles')
+services/vehicleService.ts:94:    .on('postgres_changes', { event: '*', schema: 'public', table: 'vehicles' }, (payload) => {
+services/vehicleService.ts:187:        .from('vehicles')
+services/vehicleService.ts:221:        .from('vehicles')
+services/vehicleService.ts:248:      const { error } = await supabase.from('vehicles').delete().eq('id', id);
+services/vehicleService.ts:276:        const { error } = await supabase.from('vehicles').upsert(payload, { onConflict: 'id' });
+

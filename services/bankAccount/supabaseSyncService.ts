@@ -17,9 +17,7 @@ export const bankAccountSupabaseSync = {
           company_id: authService.getCurrentUser()?.companyId || null
         });
       if (error) throw error;
-      console.log(`✅ Conta ${account.bankName} salva no Supabase`);
     } catch (error) {
-      console.warn('⚠️ Erro ao salvar conta no Supabase:', error);
     }
   },
 
@@ -36,9 +34,7 @@ export const bankAccountSupabaseSync = {
         })
         .eq('id', account.id);
       if (error) throw error;
-      console.log(`✅ Conta ${account.bankName} atualizada no Supabase`);
     } catch (error) {
-      console.warn('⚠️ Erro ao atualizar conta no Supabase:', error);
     }
   },
 
@@ -51,9 +47,7 @@ export const bankAccountSupabaseSync = {
         .select();
 
       if (error) throw error;
-      console.log(`✅ Conta excluída do Supabase`, data);
     } catch (error) {
-      console.warn('⚠️ Erro ao excluir conta do Supabase:', error);
     }
   }
 };

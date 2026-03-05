@@ -3,11 +3,11 @@ import React from 'react';
 import { Package, Calculator, TrendingUp, Scale, Truck, ShoppingBag, Info, Coins, ArrowRight } from 'lucide-react';
 import { Loading } from '../../../Loadings/types';
 import { SalesOrder } from '../../types';
+import { useSalesPerformanceStats } from '../../hooks/useSalesPerformanceStats';
 
 /**
  * COMPONENTE DE LAYOUT TRAVADO - V1.5
- * Este componente contém a lógica mestre de performance do pedido de venda.
- * Cálculos baseados no fluxo físico (romaneios ativos).
+ * Cálculos de performance delegados ao hook useSalesPerformanceStats (SKILL).
  */
 
 interface Props {
@@ -19,32 +19,12 @@ const SalesProductSummary: React.FC<Props> = ({ order, loadings }) => {
   const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(!val || Math.abs(val) < 0.005 ? 0 : val);
   const num = (val: number) => new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(val || 0);
 
-  // --- CÁLCULOS TOTAIS DA OPERAÇÃO ---
-  const activeLoadings = loadings.filter(l => l.status !== 'canceled');
-  
-  // 1. Volumes (Sacas)
-  const totalLoadedSc = activeLoadings.reduce((acc, l) => acc + l.weightSc, 0);
-  const totalDeliveredSc = activeLoadings.reduce((acc, l) => acc + (l.unloadWeightKg ? l.unloadWeightKg / 60 : 0), 0);
-  const contractQty = order.quantity || 0;
-  const pendingQty = Math.max(0, contractQty - totalLoadedSc);
-
-  // 2. Financeiro (Custos)
-  const totalGrainCost = activeLoadings.reduce((acc, l) => acc + (l.totalPurchaseValue || 0), 0);
-  const totalFreightCost = activeLoadings.reduce((acc, l) => acc + (l.totalFreightValue || 0), 0);
-  
-  // SOMA DOS CUSTOS DIRETOS (GRÃO + FRETE)
-  const totalDirectInvestment = totalGrainCost + totalFreightCost;
-  
-  // 3. Financeiro (Receita/Faturamento)
-  // Faturamento Realizado (Peso Destino se houver, senão Origem * Preço Venda)
-  const totalRevenueRealized = activeLoadings.reduce((acc, l) => {
-    const weightSc = l.unloadWeightKg ? l.unloadWeightKg / 60 : l.weightSc;
-    return acc + (weightSc * (l.salesPrice || order.unitPrice || 0));
-  }, 0);
-
-  // 4. Resultado (Lucro Bruto)
-  const grossProfit = totalRevenueRealized - totalDirectInvestment;
-  const marginPercent = totalRevenueRealized > 0 ? (grossProfit / totalRevenueRealized) * 100 : 0;
+  // --- CÁLCULOS DELEGADOS AO HOOK (SKILL: zero lógica financeira no componente) ---
+  const {
+    contractQty, totalLoadedSc, totalDeliveredSc, pendingQty,
+    totalGrainCost, totalFreightCost, totalDirectInvestment,
+    totalRevenueRealized, grossProfit, marginPercent,
+  } = useSalesPerformanceStats(order, loadings);
 
   const labelClass = 'text-[10px] font-black text-slate-400 uppercase tracking-widest';
   const valueClass = 'text-lg font-black text-slate-900';

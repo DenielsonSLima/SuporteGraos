@@ -1,3 +1,8 @@
+// ⚠️ LEGACY SERVICE — Em modo canônico (SQL Canonical Ops), todas as operações
+// são ignoradas via shouldSkipLegacyTableOps('receivables').
+// O ReceivablesTab agora usa vw_receivables_enriched (VIEW SQL) via useReceivables.
+// TODO: Remover completamente quando todos os consumidores forem migrados.
+
 import { Persistence } from '../persistence';
 import { authService } from '../authService';
 import { supabase } from '../supabase';
@@ -5,12 +10,16 @@ import { supabaseWithRetry } from '../../utils/fetchWithRetry';
 import { invalidateDashboardCache } from '../dashboardCache';
 import { invalidateFinancialCache } from '../financialCache';
 import { auditService } from '../auditService';
+import { getTodayBR } from '../../utils/dateUtils';
+import { shouldSkipLegacyTableOps } from '../realtimeTableAvailability';
+import { sqlCanonicalOpsLog } from '../sqlCanonicalOps';
 // import { salesService } from '../salesService'; // Removed circular dependency // Added salesService import
 
 export interface Receivable {
   id: string;
   salesOrderId?: string;
   partnerId: string;
+  partnerName?: string;
   description: string;
   dueDate: string;
   amount: number;
@@ -51,15 +60,17 @@ const mapToDb = (item: Receivable) => ({
   bank_account_id: item.bankAccountId || null,
   receipt_date: item.receiptDate || null,
   notes: item.notes || null,
-  company_id: item.companyId || authService.getCurrentUser()?.companyId || null
+  company_id: item.companyId || authService.getCurrentUser()?.companyId || null,
+  created_by: authService.getCurrentUser()?.id || null
 });
 
 const mapFromDb = (row: any): Receivable => ({
   id: row.id,
   salesOrderId: row.sales_order_id,
   partnerId: row.partner_id,
+  partnerName: row.partner_name,
   description: row.description,
-  dueDate: row.due_date,
+  dueDate: row.due_date || getTodayBR(),
   amount: Number(row.amount),
   receivedAmount: Number(row.received_amount || 0),
   status: row.status,
@@ -83,10 +94,16 @@ const RECEIVABLES_SELECT_FIELDS = [
   'bank_account_id',
   'receipt_date',
   'notes',
-  'company_id'
+  'company_id',
+  'created_by'
 ].join(',');
 
 const fetchPage = async (options: ReceivablesPageOptions): Promise<Receivable[]> => {
+  if (shouldSkipLegacyTableOps('receivables')) {
+    sqlCanonicalOpsLog('receivablesService.fetchPage ignorado: tabela receivables indisponível no modo canônico');
+    return [];
+  }
+
   try {
     const { limit, beforeDate, startDate, endDate } = options;
     const user = authService.getCurrentUser();
@@ -106,7 +123,6 @@ const fetchPage = async (options: ReceivablesPageOptions): Promise<Receivable[]>
     const data = await supabaseWithRetry(() => query);
     return (data as any[] || []).map(mapFromDb);
   } catch (error) {
-    console.error('❌ Erro ao paginar receivables:', error);
     return [];
   }
 };
@@ -116,6 +132,13 @@ const fetchPage = async (options: ReceivablesPageOptions): Promise<Receivable[]>
 // ============================================================================
 
 const loadFromSupabase = async (): Promise<Receivable[]> => {
+  if (shouldSkipLegacyTableOps('receivables')) {
+    sqlCanonicalOpsLog('receivablesService.loadFromSupabase ignorado: tabela receivables indisponível no modo canônico');
+    db.setAll([]);
+    isLoaded = true;
+    return [];
+  }
+
   try {
     const user = authService.getCurrentUser();
     let query = supabase
@@ -133,10 +156,8 @@ const loadFromSupabase = async (): Promise<Receivable[]> => {
     const mapped = (data as any[] || []).map(mapFromDb);
     db.setAll(mapped);
     isLoaded = true;
-    console.log('🔄 Contas a receber sincronizando em tempo real...');
     return mapped;
   } catch (error) {
-    console.error('❌ Erro ao carregar receivables:', error);
     return [];
   }
 };
@@ -146,6 +167,11 @@ const loadFromSupabase = async (): Promise<Receivable[]> => {
 // ============================================================================
 
 const startRealtime = () => {
+  if (shouldSkipLegacyTableOps('receivables')) {
+    sqlCanonicalOpsLog('receivablesService.startRealtime ignorado: tabela receivables indisponível no modo canônico');
+    return;
+  }
+
   if (realtimeChannel) return;
 
   realtimeChannel = supabase
@@ -174,26 +200,46 @@ const startRealtime = () => {
 // ============================================================================
 
 const persistUpsert = async (item: Receivable) => {
+  if (shouldSkipLegacyTableOps('receivables')) {
+    return;
+  }
+
   try {
     const payload = mapToDb(item);
-    const { error } = await supabase.from('receivables').upsert(payload).select();
+    const { data: savedData, error } = await supabase.from('receivables').upsert(payload).select().single();
+
     if (error) {
-      console.error('❌ Erro ao salvar receivable no Supabase', error);
       return;
     }
-    // silencioso
-    // Realtime irá atualizar automaticamente
+
+    if (savedData) {
+      const mapped = mapFromDb(savedData);
+      const existing = db.getById(mapped.id);
+      if (existing) db.update(mapped);
+      else db.add(mapped);
+    }
   } catch (err) {
-    console.error('❌ Erro inesperado ao salvar receivable', err);
   }
 };
 
 const persistDelete = async (id: string) => {
+  if (shouldSkipLegacyTableOps('receivables')) {
+    return;
+  }
+
   try {
     const { error } = await supabase.from('receivables').delete().eq('id', id);
-    if (error) console.error('Erro ao excluir receivable', error);
+    if (error) {
+      return;
+    }
   } catch (err) {
-    console.error('Erro inesperado ao excluir receivable', err);
+  }
+};
+
+const stopRealtime = () => {
+  if (realtimeChannel) {
+    supabase.removeChannel(realtimeChannel);
+    realtimeChannel = null;
   }
 };
 
@@ -212,6 +258,8 @@ export const receivablesService = {
   loadFromSupabase,
   fetchPage,
   startRealtime,
+  stopRealtime,
+  persistUpsert,
 
   add: (item: Receivable) => {
     db.add(item);
@@ -250,17 +298,56 @@ export const receivablesService = {
     if (item.salesOrderId) {
       // Emite evento para quem estiver ouvindo (salesService)
       import('../eventBus').then(({ eventBus }) => {
-        eventBus.emit('receivable:updated', { salesOrderId: item.salesOrderId });
+        eventBus.emit('receivable:updated', { salesOrderId: item.salesOrderId, receivedAmount: item.receivedAmount });
       });
     }
   },
 
-  delete: (id: string) => {
+  /**
+   * Registra um recebimento parcial ou total para um receivable
+   */
+  recordReceipt: async (receivableId: string, data: { amount: number; date: string; description: string; bankAccountId: string }) => {
+    const receivable = db.getById(receivableId);
+    if (!receivable) throw new Error('Receivable not found');
+
+    const { financialTransactionService } = await import('./financialTransactionService');
+
+    // 1. Criar a transação financeira
+    await financialTransactionService.add({
+      date: data.date,
+      description: data.description || `Recebimento: ${receivable.description}`,
+      amount: data.amount,
+      type: 'receipt',
+      bankAccountId: data.bankAccountId,
+      financialRecordId: receivableId,
+      companyId: receivable.companyId
+    });
+
+    // 2. Atualizar o receivable com o novo valor recebido
+    const newReceivedAmount = (receivable.receivedAmount || 0) + data.amount;
+    const newStatus = newReceivedAmount >= receivable.amount ? 'received' : 'partially_received';
+
+    receivablesService.update({
+      ...receivable,
+      receivedAmount: newReceivedAmount,
+      status: newStatus,
+      receiptDate: data.date,
+      bankAccountId: data.bankAccountId
+    });
+
+    return { success: true };
+  },
+
+  delete: async (id: string) => {
     const item = db.getById(id);
     if (!item) return; // Ensure item exists before proceeding
 
     db.delete(id);
     void persistDelete(id);
+
+    // ✅ Clean up associated transactions
+    const { financialTransactionService } = await import('./financialTransactionService');
+    void financialTransactionService.deleteByRecordId(id, 'receivable');
 
     // Audit Log
     void auditService.logAction('delete', 'Financeiro', `Conta a receber excluída: #${item.description}`, {
@@ -275,7 +362,7 @@ export const receivablesService = {
     // ✅ Sincronizar status financeiro via EventBus
     if (item.salesOrderId) {
       import('../eventBus').then(({ eventBus }) => {
-        eventBus.emit('receivable:updated', { salesOrderId: item.salesOrderId });
+        eventBus.emit('receivable:updated', { salesOrderId: item.salesOrderId, receivedAmount: 0 });
       });
     }
   }

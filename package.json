@@ -6,12 +6,15 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest",
+    "test:run": "vitest run"
   },
   "dependencies": {
     "@google/genai": "^1.37.0",
     "@react-pdf/renderer": "^4.3.2",
     "@supabase/supabase-js": "^2.95.3",
+    "@tanstack/react-query": "^5.90.21",
     "@types/bcryptjs": "^2.4.6",
     "@types/dompurify": "^3.0.5",
     "@types/jsonwebtoken": "^9.0.10",
@@ -29,7 +32,8 @@
     "react-dom": "^19.2.3",
     "recharts": "^3.6.0",
     "stream-browserify": "^3.0.0",
-    "util": "^0.12.5"
+    "util": "^0.12.5",
+    "zustand": "^5.0.11"
   },
   "devDependencies": {
     "@types/file-saver": "^2.0.7",
@@ -37,8 +41,10 @@
     "@types/react": "^19.2.10",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.0.0",
+    "supabase": "^2.76.12",
     "terser": "^5.46.0",
     "typescript": "~5.8.2",
-    "vite": "^6.2.0"
+    "vite": "^6.2.0",
+    "vitest": "^4.0.18"
   }
 }

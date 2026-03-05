@@ -27,7 +27,6 @@ const AssetDossierPdfModal: React.FC<Props> = ({ isOpen, onClose, asset, financi
           url = URL.createObjectURL(blob);
           setPdfUrl(url);
         } catch (error) {
-          console.error('Erro ao gerar preview:', error);
         }
       }
     };
@@ -50,7 +49,6 @@ const AssetDossierPdfModal: React.FC<Props> = ({ isOpen, onClose, asset, financi
       const blob = await pdf(<AssetDossierPdfDocument asset={asset} financialHistory={financialHistory} />).toBlob();
       saveAs(blob, filename);
     } catch (err) {
-      console.error(err);
       alert("Erro ao gerar PDF.");
     } finally {
       setIsGenerating(false);

@@ -1,7 +1,8 @@
 
 import React, { useEffect, useState, useRef, useCallback, useLayoutEffect } from 'react';
 import { TrendingUp, TrendingDown, Minus, RefreshCw, Globe } from 'lucide-react';
-import { marketService, MarketItem } from '../../../services/marketService';
+import { marketService } from '../../../services/marketService';
+import type { MarketItem } from '../../../services/marketService';
 
 const MarketTicker: React.FC = () => {
   const [marketData, setMarketData] = useState<MarketItem[]>([]);
@@ -29,7 +30,6 @@ const MarketTicker: React.FC = () => {
       setMarketData(finalData);
       setLastSync(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
     } catch (error) {
-      console.error('Erro ao carregar dados do mercado:', error);
     } finally {
       setLoading(false);
     }
@@ -68,7 +68,6 @@ const MarketTicker: React.FC = () => {
   // Iniciar/Parar animação
   useEffect(() => {
     // Inicia loop
-    console.log('🎬 Iniciando animação do ticker...');
     animationRef.current = requestAnimationFrame(animate);
     return () => {
       if (animationRef.current) cancelAnimationFrame(animationRef.current);

@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Folder, Calendar, Lock, ChevronLeft, DollarSign, Activity } from 'lucide-react';
-import { cashierService } from '../services/cashierService';
-import { MonthlyReport } from '../services/cashier-history';
+import { useCashierHistory } from '../../../hooks/useCashier';
 import { CashierReport } from '../types';
 import CashierReportView from './CashierReportView';
 
@@ -10,21 +9,13 @@ interface Props {
 }
 
 const HistoryViewComponent: React.FC<Props> = ({ onCloseDetail }) => {
-  const [history, setHistory] = useState<CashierReport[]>([]);
+  const { data: history = [], isLoading: loading } = useCashierHistory();
   const [selectedReport, setSelectedReport] = useState<CashierReport | null>(null);
-  const [loading, setLoading] = useState(true);
 
   const currency = (val: number) => new Intl.NumberFormat('pt-BR', { 
     style: 'currency', 
     currency: 'BRL' 
   }).format(val);
-
-  useEffect(() => {
-    setLoading(true);
-    const reports = cashierService.getHistory();
-    setHistory(reports);
-    setLoading(false);
-  }, []);
 
   // Retornar à lista ao fechar detalhe
   if (selectedReport) {

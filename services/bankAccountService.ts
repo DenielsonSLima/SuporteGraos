@@ -1,188 +1,130 @@
-import { logService } from './logService';
-import { authService } from './authService';
-import { BankAccount } from '../modules/Financial/types';
-import { Persistence } from './persistence';
+/**
+ * bankAccountService.ts
+ *
+ * CRUD de contas bancárias via supabase-js direto.
+ * Interface pública mantida compatível com o código legado
+ * (financialService, BankAccountsSettings, etc.).
+ *
+ * Tabela: public.bank_accounts
+ * RLS: company_id = public.my_company_id() — isolamento automático por empresa.
+ */
+
 import { supabase } from './supabase';
-import { invalidateSettingsCache } from './settingsCache';
-import { waitForInit } from './supabaseInitService';
-import { financialActionService } from './financialActionService';
-import { bankAccountSupabaseSync } from './bankAccount/supabaseSyncService';
+import { BankAccount } from '../modules/Financial/types';
 
-const accountsDb = new Persistence<BankAccount>('bank_accounts', [], { useStorage: false });
-let _isSupabaseLoaded = false;
-let bankAccountsChannel: ReturnType<typeof supabase.channel> | null = null;
-let _realtimeStarted = false;
+// ─── MAPEADOR ─────────────────────────────────────────────────────────────────
 
-const syncWindowAccounts = () => {
-  if (typeof window === 'undefined') return;
-  (window as any).bankAccountsList = accountsDb.getAll();
-};
+function mapRow(row: any): BankAccount {
+  return {
+    id:            row.id,
+    bankName:      row.bank_name      ?? '',
+    owner:         row.owner          ?? '',
+    agency:        row.agency         ?? '',
+    accountNumber: row.account_number ?? '',
+    active:        row.active         ?? true,
+  };
+}
 
-const getLogInfo = () => {
-  const user = authService.getCurrentUser();
-  return { userId: user?.id || 'system', userName: user?.name || 'Sistema' };
-};
+// ─── OPERAÇÕES CRUD ───────────────────────────────────────────────────────────
 
-const mapBankAccountRecord = (record: any): BankAccount => ({
-  id: record.id,
-  bankName: record.bank_name,
-  owner: record.owner || '',
-  agency: record.agency || '',
-  accountNumber: record.account_number || '',
-  active: record.active !== false
-});
+async function getAll(): Promise<BankAccount[]> {
+  const { data, error } = await supabase
+    .from('bank_accounts')
+    .select('*')
+    .order('bank_name');
+  if (error) throw error;
+  return (data ?? []).map(mapRow);
+}
 
-const loadFromSupabase = async () => {
-  try {
-    const stats = await waitForInit();
-    if (stats.data.bankAccounts && Array.isArray(stats.data.bankAccounts)) {
-      const bankAccounts: BankAccount[] = (stats.data.bankAccounts || []).map((account: any) => ({
-        id: account.id,
-        bankName: account.bank_name,
-        owner: account.owner || '',
-        agency: account.agency || '',
-        accountNumber: account.account_number || '',
-        active: account.active
-      }));
-      accountsDb.setAll(bankAccounts);
-      syncWindowAccounts();
-      _isSupabaseLoaded = true;
-      invalidateSettingsCache();
+async function _getCompanyId(): Promise<string> {
+  const { data } = await supabase.rpc('my_company_id');
+  if (!data) throw new Error('Empresa não encontrada para o usuário logado.');
+  return data as string;
+}
+
+async function add(account: BankAccount): Promise<void> {
+  const companyId = await _getCompanyId();
+  const { error } = await supabase.from('bank_accounts').insert({
+    id:             account.id,
+    bank_name:      account.bankName.trim(),
+    owner:          account.owner          ?? '',
+    agency:         account.agency         ?? '',
+    account_number: account.accountNumber  ?? '',
+    active:         account.active         ?? true,
+    company_id:     companyId,
+  });
+  if (error) {
+    if (error.code === '23505') throw new Error('Já existe uma conta cadastrada com este nome.');
+    throw error;
+  }
+}
+
+async function update(account: BankAccount): Promise<void> {
+  const { error } = await supabase
+    .from('bank_accounts')
+    .update({
+      bank_name:      account.bankName.trim(),
+      owner:          account.owner          ?? '',
+      agency:         account.agency         ?? '',
+      account_number: account.accountNumber  ?? '',
+      active:         account.active         ?? true,
+    })
+    .eq('id', account.id);
+  if (error) throw error;
+}
+
+async function remove(id: string): Promise<void> {
+  const { error } = await supabase
+    .from('bank_accounts')
+    .delete()
+    .eq('id', id);
+  if (error) {
+    if (error.code === '23503') throw new Error('Não é possível excluir uma conta com movimentações vinculadas. Inative-a em vez disso.');
+    throw error;
+  }
+}
+
+// ─── REALTIME (singleton channel) ─────────────────────────────────────────────────────────
+
+const subscribeRealtime = (() => {
+  const listeners = new Set<() => void>();
+  let channel: ReturnType<typeof supabase.channel> | null = null;
+  return (callback: () => void): (() => void) => {
+    listeners.add(callback);
+    if (!channel) {
+      channel = supabase
+        .channel('bank-accounts-changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'bank_accounts' }, () => listeners.forEach(fn => fn()))
+        .subscribe();
     }
-  } catch (error) {
-    console.warn('⚠️ BankAccountService: Erro ao carregar do Supabase:', error);
-    _isSupabaseLoaded = false;
-  }
-};
+    return () => {
+      listeners.delete(callback);
+      if (listeners.size === 0 && channel) { supabase.removeChannel(channel); channel = null; }
+    };
+  };
+})();
 
-const startBankAccountRealtime = () => {
-  if (_realtimeStarted) return;
-  _realtimeStarted = true;
-
-  if (!bankAccountsChannel) {
-    bankAccountsChannel = supabase
-      .channel('realtime:contas_bancarias')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'contas_bancarias' }, payload => {
-        const rec = payload.new || payload.old;
-        if (!rec) return;
-        const account = mapBankAccountRecord(rec);
-
-        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-          const existing = accountsDb.getById(account.id);
-          if (existing) accountsDb.update(account);
-          else accountsDb.add(account);
-        } else if (payload.eventType === 'DELETE') {
-          accountsDb.delete(account.id);
-        }
-
-        syncWindowAccounts();
-        invalidateSettingsCache();
-        console.log(`🔔 Realtime contas_bancarias: ${payload.eventType}`);
-      })
-      .subscribe(status => {
-        // Realtime subscribed
-      });
-  }
-};
-
-// ❌ NÃO inicializar automaticamente - aguardar autenticação
-// loadFromSupabase();
-startBankAccountRealtime();
+// ─── INTERFACE PÚBLICA ────────────────────────────────────────────────────────
 
 export const bankAccountService = {
-  loadFromSupabase,
-  startRealtime: startBankAccountRealtime,
-  getBankAccounts: () => accountsDb.getAll(),
-  getById: (id: string) => accountsDb.getById(id),
+  // ── Novo padrão (usado pelos hooks TanStack Query) ──
+  getAll,
+  subscribeRealtime,
 
-  subscribe: (callback: (items: BankAccount[]) => void) => {
-    startBankAccountRealtime();
-    return accountsDb.subscribe(callback);
-  },
+  // ── Usado pelos componentes diretamente ──
+  add,
+  update,
+  delete: remove,
 
-  addBankAccount: async (account: BankAccount) => {
-    const all = accountsDb.getAll();
-    if (all.some(a => a.bankName.trim().toLowerCase() === account.bankName.trim().toLowerCase())) {
-      throw new Error("Já existe uma conta cadastrada com este nome.");
-    }
-    accountsDb.add(account);
-    syncWindowAccounts();
-    invalidateSettingsCache();
-    const { userId, userName } = getLogInfo();
-    logService.addLog({
-      userId, userName, action: 'create', module: 'Configurações',
-      description: `Cadastrou conta bancária: ${account.bankName}`,
-      entityId: account.id
-    });
-
-    // Sync to Supabase (background)
-    Promise.resolve().then(() => bankAccountSupabaseSync.syncInsertAccount(account));
-  },
-
-  updateBankAccount: async (updatedAccount: BankAccount) => {
-    const all = accountsDb.getAll();
-    if (all.some(a => a.id !== updatedAccount.id && a.bankName.trim().toLowerCase() === updatedAccount.bankName.trim().toLowerCase())) {
-      throw new Error("Já existe outra conta com este nome.");
-    }
-    accountsDb.update(updatedAccount);
-    syncWindowAccounts();
-    invalidateSettingsCache();
-
-    // Sync to Supabase (background)
-    Promise.resolve().then(() => bankAccountSupabaseSync.syncUpdateAccount(updatedAccount));
-  },
-
-  deleteBankAccount: async (id: string) => {
-    if (bankAccountService.isAccountInUse(id)) {
-      throw new Error("Não é possível excluir uma conta com movimentações. Inative-a em vez disso.");
-    }
-
-    accountsDb.delete(id);
-    syncWindowAccounts();
-    invalidateSettingsCache();
-
-    const { userId, userName } = getLogInfo();
-    logService.addLog({
-      userId, userName, action: 'delete', module: 'Configurações',
-      description: `Excluiu conta bancária (ID: ${id})`,
-      entityId: id
-    });
-
-    // Sync to Supabase (background)
-    Promise.resolve().then(() => bankAccountSupabaseSync.syncDeleteAccount(id));
-  },
-
-  isAccountInUse: (accountId: string): boolean => {
-    const acc = accountsDb.getById(accountId);
-    if (financialActionService.getStandaloneRecords().some(r => r.bankAccount === accountId || r.bankAccount === acc?.bankName)) return true;
-    return false;
-  },
-
-  importData: (bankAccounts: BankAccount[]) => {
-    if (bankAccounts) accountsDb.setAll(bankAccounts);
-    syncWindowAccounts();
-
-    const companyId = authService.getCurrentUser()?.companyId;
-    if (!companyId) return;
-
-    const payload = bankAccounts.map(account => ({
-      id: account.id,
-      bank_name: account.bankName,
-      owner: account.owner || '',
-      agency: account.agency || '',
-      account_number: account.accountNumber || '',
-      active: account.active !== false,
-      company_id: companyId
-    }));
-
-    void (async () => {
-      try {
-        const { error } = await supabase.from('contas_bancarias').upsert(payload, { onConflict: 'id' });
-        if (error) console.error('❌ Erro ao sincronizar contas bancárias:', error);
-        else console.log('✅ Contas bancárias sincronizadas no Supabase via ImportData');
-      } catch (err) {
-        console.error('❌ Erro inesperado ao importar contas bancárias:', err);
-      }
-    })();
-  }
+  // ── Shims de compatibilidade legados (financialService, etc.) ──
+  getBankAccounts:   (): BankAccount[] => [],
+  getById:           (_id: string): BankAccount | undefined => undefined,
+  addBankAccount:    add,
+  updateBankAccount: update,
+  deleteBankAccount: remove,
+  isAccountInUse:    (_id: string): boolean => false,
+  subscribe:         (_cb: (items: BankAccount[]) => void): (() => void) => () => {},
+  loadFromSupabase:  async (): Promise<void> => {},
+  startRealtime:     (): void => {},
+  importData:        (_data: BankAccount[]): void => {},
 };

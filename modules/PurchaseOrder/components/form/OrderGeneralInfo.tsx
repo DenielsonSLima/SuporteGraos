@@ -2,7 +2,7 @@
 import React from 'react';
 import { Calendar, User, Hash, ChevronDown } from 'lucide-react';
 import { PurchaseOrder } from '../../types';
-import { Shareholder } from '../../../../services/shareholderService';
+import type { Shareholder } from '../../../../services/shareholderService';
 
 interface Props {
   data: Partial<PurchaseOrder>;

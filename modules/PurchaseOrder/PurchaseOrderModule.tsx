@@ -10,25 +10,21 @@ import FinalizedOrders from './tabs/FinalizedOrders';
 import AllOrders from './tabs/AllOrders';
 import OrderDeleteModal from './components/OrderDeleteModal';
 import ActionConfirmationModal from '../../components/ui/ActionConfirmationModal';
-import { purchaseService } from '../../services/purchaseService';
-import { shareholderService } from '../../services/shareholderService';
 import { useToast } from '../../contexts/ToastContext';
-import { waitForInit } from '../../services/supabaseInitService';
+import { usePurchaseOrders } from '../../hooks/usePurchaseOrders';
+import { useLoadings } from '../../hooks/useLoadings';
+import { usePurchaseOrderModule } from './hooks/usePurchaseOrderModule';
 
 export type GroupByOption = 'month' | 'harvest' | 'partner' | 'none';
 
 const PurchaseOrderModule: React.FC = () => {
   const { addToast } = useToast();
-
-  const generateUuid = () => {
-    if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
-    const s4 = () => Math.floor((1 + Math.random()) * 0x10000).toString(16).substring(1);
-    return `${s4()}${s4()}-${s4()}-${s4()}-${s4()}-${s4()}${s4()}${s4()}`;
-  };
+  const { shareholders, getOrderById, handleSave: saveOrder, executeDelete: deleteOrder, finalizeOrder } = usePurchaseOrderModule({ addToast });
   
-  // Data State
-  const [orders, setOrders] = useState<PurchaseOrder[]>([]);
-  const [shareholders, setShareholders] = useState<{id: string, name: string}[]>([]);
+  // Data State — Pedidos de Compra via TanStack Query (cache + realtime automático)
+  const { data: orders = [] } = usePurchaseOrders();
+  // Data State — Romaneios reativos para KPIs (evita cache com TTL de 30s)
+  const { data: loadings = [] } = useLoadings();
 
   // UI/Filter State
   const [activeTab, setActiveTab] = useState<'active' | 'finalized' | 'all'>('active');
@@ -55,21 +51,9 @@ const PurchaseOrderModule: React.FC = () => {
   });
 
   useEffect(() => {
-    const initModule = async () => {
-      await waitForInit();
-      purchaseService.startRealtime();
-      await purchaseService.loadFromSupabase();
-      setOrders(purchaseService.getAll());
-      setShareholders(shareholderService.getAll().map(s => ({ id: s.id, name: s.name })));
-    };
-
-    void initModule();
-
-    const unsubscribe = purchaseService.subscribe(setOrders);
-
     const handleNavigation = (e: any) => {
         if (e.detail?.moduleId === 'purchase_order' && e.detail?.orderId) {
-            const order = purchaseService.getById(e.detail.orderId);
+            const order = getOrderById(e.detail.orderId);
             if (order) {
                 setSelectedOrder(order);
                 setViewMode('details');
@@ -77,12 +61,22 @@ const PurchaseOrderModule: React.FC = () => {
         }
     };
     window.addEventListener('app:navigate', handleNavigation);
+
+    // Navegação pendente (definida antes do módulo montar)
+    const pending = (window as any).__pendingOrderNav;
+    if (pending && pending.moduleId === 'purchase_order' && pending.orderId) {
+      delete (window as any).__pendingOrderNav;
+      const order = getOrderById(pending.orderId);
+      if (order) {
+        setSelectedOrder(order);
+        setViewMode('details');
+      }
+    }
+
     return () => {
-      console.log('[PurchaseOrderModule] Cleaning up subscriptions...');
       window.removeEventListener('app:navigate', handleNavigation);
-      unsubscribe?.();
     };
-  }, []); 
+  }, [getOrderById]); 
 
   const handleAddNew = () => {
     setSelectedOrder(undefined);
@@ -90,26 +84,22 @@ const PurchaseOrderModule: React.FC = () => {
   };
 
   const handleOrderClick = (order: PurchaseOrder) => {
-    const freshOrder = purchaseService.getById(order.id);
+    const freshOrder = getOrderById(order.id);
     setSelectedOrder(freshOrder || order);
     setViewMode('details');
   };
 
-  const handleSave = (order: PurchaseOrder) => {
-    if (selectedOrder && selectedOrder.id === order.id) {
-      purchaseService.update(order);
-      // O subscriber já atualiza o state via purchaseService.subscribe(setOrders)
-      setSelectedOrder(order);
-      setViewMode('details');
-      addToast('success', 'Pedido Atualizado');
-    } else {
-      const newId = generateUuid();
-      const newOrder = { ...order, id: newId };
-      purchaseService.add(newOrder);
-      // O subscriber já atualiza o state via purchaseService.subscribe(setOrders)
-      setViewMode('list');
-      setSelectedOrder(undefined);
-      addToast('success', 'Pedido Criado');
+  const handleSave = async (order: PurchaseOrder) => {
+    const isEditing = !!(selectedOrder && selectedOrder.id === order.id);
+    const result = await saveOrder(order, isEditing);
+    if (result.success) {
+      if (isEditing) {
+        setSelectedOrder(order);
+        setViewMode('details');
+      } else {
+        setViewMode('list');
+        setSelectedOrder(undefined);
+      }
     }
   };
 
@@ -119,16 +109,11 @@ const PurchaseOrderModule: React.FC = () => {
 
   const executeDelete = async () => {
     if (!orderToDelete) return;
-    
-    const result = await purchaseService.delete(orderToDelete.id);
-    
-    if (result?.success) {
-      addToast('success', 'Pedido Excluído', 'Pedido, pagamentos e contas a pagar removidos com sucesso.');
-      // O subscriber já atualiza o state via purchaseService.subscribe(setOrders)
+    const success = await deleteOrder(orderToDelete.id);
+    if (success) {
       setOrderToDelete(null);
       if (viewMode === 'details') setViewMode('list');
     } else {
-      addToast('error', 'Erro ao Excluir', result?.error || 'Falha ao excluir pedido no banco de dados.');
       setOrderToDelete(null);
     }
   };
@@ -139,17 +124,9 @@ const PurchaseOrderModule: React.FC = () => {
       type: 'success',
       title: 'Finalizar Pedido de Compra',
       description: 'Deseja encerrar este contrato? Certifique-se que o saldo foi liquidado.',
-      onConfirm: () => {
-        const freshOrder = purchaseService.getById(order.id);
-        if (freshOrder) {
-            const updated = { ...freshOrder, status: 'completed' as const };
-            purchaseService.update(updated);
-            // O subscriber já atualiza o state via purchaseService.subscribe(setOrders)
-            if (viewMode === 'details') setSelectedOrder(updated);
-            addToast('success', 'Pedido Finalizado');
-        } else {
-            addToast('error', 'Erro ao finalizar', 'Pedido não encontrado.');
-        }
+      onConfirm: async () => {
+        const updated = await finalizeOrder(order.id);
+        if (updated && viewMode === 'details') setSelectedOrder(updated);
       }
     });
   };
@@ -159,14 +136,17 @@ const PurchaseOrderModule: React.FC = () => {
     return orders.filter(o => {
       // 1. Filtro de Texto (Nome, Número)
       const search = searchTerm.toLowerCase();
+      const partnerName = (o.partnerName || '').toLowerCase();
+      const orderNumber = (o.number || '').toLowerCase();
       const matchesSearch = 
-         o.partnerName.toLowerCase().includes(search) ||
-         o.number.toLowerCase().includes(search);
+        partnerName.includes(search) ||
+        orderNumber.includes(search);
 
       // 2. Filtro de Data
       let matchesDate = true;
-      if (startDate && o.date < startDate) matchesDate = false;
-      if (endDate && o.date > endDate) matchesDate = false;
+      const orderDate = o.date || '';
+      if (startDate && orderDate < startDate) matchesDate = false;
+      if (endDate && orderDate > endDate) matchesDate = false;
 
       // 3. Filtro de Sócio
       let matchesShareholder = true;
@@ -200,8 +180,8 @@ const PurchaseOrderModule: React.FC = () => {
     return (
       <div className="space-y-6 animate-in fade-in duration-500">
         
-        {/* KPI Section - Recebe a lista JÁ FILTRADA */}
-        <PurchaseKPIs orders={finalList} />
+        {/* KPI Section - Recebe a lista JÁ FILTRADA + loadings reativos */}
+        <PurchaseKPIs orders={finalList} loadings={loadings} />
         
         {/* Filter Bar (Estilo Sales Order) */}
         <div className="flex flex-col gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">

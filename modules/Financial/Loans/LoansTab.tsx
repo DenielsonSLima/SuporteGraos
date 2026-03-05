@@ -1,22 +1,41 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, Search, History, Landmark, ArrowUpRight, ArrowDownLeft, Filter } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Plus, Search, History, Landmark, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
 import { LoanRecord } from '../types';
 import LoanKPIs from './components/LoanKPIs';
 import LoanList from './components/LoanList';
 import LoanDetails from './components/LoanDetails';
 import LoanFormModal from './components/LoanFormModal';
 import LoanListPdfModal from './components/LoanListPdfModal';
-import { loansService } from '../../../services/financial/loansService';
+import type { Loan } from '../../../services/loansService';
+import { useLoans, useCreateLoan } from '../../../hooks/useLoans';
 import { useToast } from '../../../contexts/ToastContext';
-import { bankAccountService } from '../../../services/bankAccountService';
-import { waitForInit } from '../../../services/supabaseInitService';
+import { useQueryClient } from '@tanstack/react-query';
+import { QUERY_KEYS } from '../../../hooks/queryKeys';
 
 type TabType = 'all' | 'taken' | 'granted' | 'history';
 
+// Adaptador: Loan (DB) → LoanRecord (UI)
+function toLoanRecord(loan: Loan): LoanRecord {
+  return {
+    id: loan.id,
+    entityName: loan.lender_id || 'Empréstimo',
+    contractDate: loan.start_date,
+    originalValue: loan.principal_amount,
+    totalValue: loan.principal_amount,
+    interestRate: loan.interest_rate ?? 0,
+    installments: 1,
+    remainingValue: loan.remaining_amount,
+    nextDueDate: loan.end_date || loan.start_date,
+    status: loan.status === 'paid' ? 'settled' : loan.status === 'cancelled' ? 'settled' : 'active',
+    type: 'taken',
+    transactions: [],
+  };
+}
+
 const LoansTab: React.FC = () => {
   const { addToast } = useToast();
-  const [loans, setLoans] = useState<LoanRecord[]>([]);
+  const queryClient = useQueryClient();
   const [selectedLoanId, setSelectedLoanId] = useState<string | null>(null);
   const [selectedLoanSnapshot, setSelectedLoanSnapshot] = useState<LoanRecord | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -24,118 +43,49 @@ const LoansTab: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeSubTab, setActiveSubTab] = useState<TabType>('all');
 
-  const getBankAccountName = (bankAccountId?: string) => {
-    if (!bankAccountId) return 'Não informada';
-    const accounts = bankAccountService.getBankAccounts();
-    const account = accounts.find(a => a.id === bankAccountId);
-    return account?.bankName || bankAccountId;
-  };
-
-  const loadData = async () => {
-    const data = await loansService.loadFromSupabase();
-    // Filtrar SOMENTE registros de empréstimos (loan_taken e loan_granted)
-    // Excluir os registros auxiliares de crédito/débito (receipt e admin)
-    const loanRecords: LoanRecord[] = data
-      .filter(record => ['loan_taken', 'loan_granted'].includes(record.subType || ''))
-      .map(record => ({
-        id: record.id,
-        entityName: record.entityName,
-        contractDate: record.issueDate,
-        originalValue: record.originalValue || 0,
-        totalValue: record.originalValue,
-        interestRate: 0, // Não temos no FinancialRecord
-        installments: 1, // Não temos no FinancialRecord
-        remainingValue: record.originalValue - record.paidValue,
-        nextDueDate: record.dueDate,
-        bankAccount: record.bankAccount,
-        bankAccountName: getBankAccountName(record.bankAccount),
-        status: record.status === 'paid' ? 'settled' : record.status === 'overdue' ? 'default' : 'active',
-        type: record.subType === 'loan_granted' ? 'granted' : 'taken',
-        transactions: [],
-      }));
-    setLoans(loanRecords);
-  };
-
-  useEffect(() => {
-    const initTab = async () => {
-      await waitForInit();
-      loansService.startRealtime();
-      await loadData();
-    };
-
-    void initTab();
-    
-    // Debounce para evitar múltiplas atualizações quando cria os 2 registros (loan_taken + receipt)
-    let debounceTimer: NodeJS.Timeout | null = null;
-    
-    // Subscribe to real-time updates
-    const unsubscribe = loansService.subscribe((updatedRecords) => {
-      // Limpar timer anterior se existir
-      if (debounceTimer) clearTimeout(debounceTimer);
-      
-      // Aguardar 500ms antes de atualizar (agrupa múltiplas notificações em uma)
-      debounceTimer = setTimeout(() => {
-        setLoans(prevLoans => {
-          const loanRecords: LoanRecord[] = updatedRecords
-            .filter(record => ['loan_taken', 'loan_granted'].includes(record.subType || ''))
-            .map(record => ({
-              id: record.id,
-              entityName: record.entityName,
-              contractDate: record.issueDate,
-              originalValue: record.originalValue || 0,
-              totalValue: record.originalValue,
-              interestRate: 0,
-              installments: 1,
-              remainingValue: record.originalValue - record.paidValue,
-              nextDueDate: record.dueDate,
-              bankAccount: record.bankAccount,
-              bankAccountName: getBankAccountName(record.bankAccount),
-              status: record.status === 'paid' ? 'settled' : record.status === 'overdue' ? 'default' : 'active',
-              type: record.subType === 'loan_granted' ? 'granted' : 'taken',
-              transactions: [],
-            }));
-          
-          // Só atualizar se realmente mudou algo (evita piscamento)
-          if (JSON.stringify(prevLoans) !== JSON.stringify(loanRecords)) {
-            return loanRecords;
-          }
-          return prevLoans;
-        });
-      }, 500);
-    });
-
-    return () => {
-      if (debounceTimer) clearTimeout(debounceTimer);
-      unsubscribe();
-    };
-  }, []);
+  // TanStack Query: dados + realtime automático
+  const { data: rawLoans = [] } = useLoans();
+  const createLoanMutation = useCreateLoan();
+  const loans = useMemo(() => rawLoans.map(toLoanRecord), [rawLoans]);
 
   const selectedLoan = useMemo(() => 
     loans.find(l => l.id === selectedLoanId) || selectedLoanSnapshot,
   [loans, selectedLoanId, selectedLoanSnapshot]);
 
-  useEffect(() => {
-    if (!selectedLoanId) return;
-    const found = loans.find(l => l.id === selectedLoanId);
-    if (found) setSelectedLoanSnapshot(found);
-  }, [loans, selectedLoanId]);
-
   const filteredLoans = useMemo(() => {
     return loans.filter(l => {
       const matchesSearch = l.entityName.toLowerCase().includes(searchTerm.toLowerCase());
-      
-      // Lógica de Abas
-      if (activeSubTab === 'history') return matchesSearch; // Mostra tudo no histórico
-      
+      if (activeSubTab === 'history') return matchesSearch;
       const isActive = l.status === 'active';
-      if (!isActive) return false; // Nas outras abas, só mostra ativos
-
+      if (!isActive) return false;
       if (activeSubTab === 'taken') return matchesSearch && l.type === 'taken';
       if (activeSubTab === 'granted') return matchesSearch && l.type === 'granted';
-      
-      return matchesSearch; // Aba 'all' (ativos)
+      return matchesSearch;
     }).sort((a, b) => new Date(b.contractDate).getTime() - new Date(a.contractDate).getTime());
   }, [loans, searchTerm, activeSubTab]);
+
+  const handleCreateLoan = async (data: any) => {
+    createLoanMutation.mutate(
+      {
+        lenderId: data.lenderId || undefined,
+        principalAmount: data.contractValue || data.value,
+        interestRate: data.interestRate || 0,
+        startDate: data.date,
+        endDate: data.endDate || undefined,
+        numInstallments: data.installments || 1,
+        description: data.description,
+      },
+      {
+        onSuccess: () => {
+          setIsFormOpen(false);
+          addToast('success', 'Empréstimo Registrado com Sucesso!');
+        },
+        onError: (err: any) => {
+          addToast('error', 'Erro ao criar empréstimo', err.message);
+        },
+      }
+    );
+  };
 
   if (selectedLoanId && selectedLoan) {
     return (
@@ -145,7 +95,7 @@ const LoansTab: React.FC = () => {
           setSelectedLoanId(null);
           setSelectedLoanSnapshot(null);
         }} 
-        onUpdate={loadData}
+        onUpdate={() => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOANS })}
       />
     );
   }
@@ -153,7 +103,7 @@ const LoansTab: React.FC = () => {
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       
-      <LoanKPIs loans={loans} />
+      <LoanKPIs />
 
       <div className="flex flex-col xl:flex-row justify-between items-center gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
         <div className="flex bg-slate-100 p-1 rounded-xl w-full xl:w-auto shadow-inner">
@@ -209,28 +159,8 @@ const LoansTab: React.FC = () => {
       <LoanFormModal 
         isOpen={isFormOpen} 
         onClose={() => setIsFormOpen(false)} 
-        onSave={(data: any) => {
-          // Converter dados do formulário para FinancialRecord
-          const financialRecord = {
-            id: Math.random().toString(36).substr(2, 9),
-            description: data.description,
-            entityName: data.description,
-            category: 'Empréstimos',
-            issueDate: data.date,
-            dueDate: data.date, // Usando a mesma data por enquanto
-            originalValue: data.contractValue,
-            paidValue: data.contractValue - data.remainingValue,
-            discountValue: 0,
-            status: (data.remainingValue === 0 ? 'paid' : 'pending') as const,
-            subType: data.type === 'granted' ? 'loan_granted' : 'loan_taken' as const,
-            bankAccount: data.accountId,
-          };
-          loansService.add(financialRecord);
-          setIsFormOpen(false);
-          loadData();
-          addToast('success', 'Empréstimo Registrado com Sucesso!');
-        }} 
-        initialType={activeSubTab}
+        onSave={handleCreateLoan} 
+        initialType={activeSubTab === 'taken' || activeSubTab === 'granted' ? activeSubTab : 'taken'}
       />
 
       <LoanListPdfModal 

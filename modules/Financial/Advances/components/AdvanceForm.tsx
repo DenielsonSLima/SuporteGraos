@@ -2,10 +2,11 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { X, Save, Calendar, FileText, User, ArrowUpRight, ArrowDownLeft, Wallet, ArrowDown } from 'lucide-react';
 import { AdvanceType } from '../types';
-import { partnerService } from '../../../../services/partnerService';
-import { financialService } from '../../../../services/financialService';
-import { BankAccount } from '../../../Financial/types';
+import { parceirosService } from '../../../../services/parceirosService';
+import type { Account } from '../../../../services/accountsService';
+import { useAccounts } from '../../../../hooks/useAccounts';
 import { useToast } from '../../../../contexts/ToastContext';
+import { Partner } from '../../../Partners/types';
 
 interface Props {
   isOpen: boolean;
@@ -25,19 +26,20 @@ const AdvanceForm: React.FC<Props> = ({ isOpen, onClose, onSave }) => {
   const [displayValue, setDisplayValue] = useState(''); // Valor visual (R$ 1.000,00)
   const [numericValue, setNumericValue] = useState(0); // Valor real (1000.00)
   
-  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const { data: allAccounts = [] } = useAccounts();
+  const accounts = React.useMemo(() => allAccounts.filter(a => a.is_active !== false).sort((a, b) => a.account_name.localeCompare(b.account_name)), [allAccounts]);
+  const [partners, setPartners] = useState<Partner[]>([]);
 
   // Carrega Parceiros e Contas Bancárias
   const sortedPartners = useMemo(() => {
-    return partnerService.getAll().sort((a, b) => a.name.localeCompare(b.name));
-  }, []);
+    return [...partners].sort((a, b) => a.name.localeCompare(b.name));
+  }, [partners]);
 
   useEffect(() => {
     if (isOpen) {
-        const accounts = financialService.getBankAccounts()
-            .filter(acc => acc.active !== false)
-            .sort((a, b) => a.bankName.localeCompare(b.bankName));
-        setBankAccounts(accounts);
+        parceirosService.getPartners({ page: 1, pageSize: 2000 })
+          .then(({ data }) => setPartners(data || []))
+          .catch(() => setPartners([]));
         
         // Reset form
         setPartnerId('');
@@ -47,6 +49,17 @@ const AdvanceForm: React.FC<Props> = ({ isOpen, onClose, onSave }) => {
         setDescription('');
         setDate(new Date().toISOString().split('T')[0]);
     }
+  }, [isOpen]);
+
+  useEffect(() => {
+    const unsubscribe = parceirosService.subscribeRealtime(() => {
+      if (!isOpen) return;
+      parceirosService.getPartners({ page: 1, pageSize: 2000 })
+        .then(({ data }) => setPartners(data || []))
+        .catch(() => setPartners([]));
+    });
+
+    return unsubscribe;
   }, [isOpen]);
 
   if (!isOpen) return null;
@@ -80,7 +93,7 @@ const AdvanceForm: React.FC<Props> = ({ isOpen, onClose, onSave }) => {
         return;
     }
 
-    const selectedAccount = bankAccounts.find(a => a.id === accountId);
+    const selectedAccount = accounts.find(a => a.id === accountId);
 
     onSave({
       partnerId,
@@ -90,7 +103,7 @@ const AdvanceForm: React.FC<Props> = ({ isOpen, onClose, onSave }) => {
       value: numericValue,
       description,
       accountId,
-      accountName: selectedAccount?.bankName || 'Conta Bancária'
+      accountName: selectedAccount?.account_name || 'Conta'
     });
     onClose();
   };
@@ -193,8 +206,8 @@ const AdvanceForm: React.FC<Props> = ({ isOpen, onClose, onSave }) => {
                     className={`${inputClass} pl-10 appearance-none pr-8`}
                 >
                     <option value="">Selecione a Conta...</option>
-                    {bankAccounts.map(acc => (
-                    <option key={acc.id} value={acc.id}>{acc.bankName} - {acc.owner}</option>
+                    {accounts.map(acc => (
+                    <option key={acc.id} value={acc.id}>{acc.account_name}</option>
                     ))}
                 </select>
                 <ArrowDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />

@@ -39,7 +39,11 @@ const OpenFreights: React.FC<Props> = ({ freights, onFreightClick }) => {
   const summary = useMemo(() => {
     const payable = filteredData.reduce((acc, f) => acc + f.balanceValue, 0);
     const count = filteredData.length;
-    const mercVal = filteredData.reduce((acc, f) => acc + (f.merchandiseValue || 0), 0);
+    // Valor em Risco: apenas cargas que NÃO foram descarregadas (ainda em trânsito)
+    // Cargas já completadas (descarregadas) não têm mercadoria "em risco" no transporte
+    const mercVal = filteredData
+      .filter(f => f.status !== 'completed')
+      .reduce((acc, f) => acc + (f.merchandiseValue || 0), 0);
     const volumeTon = filteredData.reduce((acc, f) => acc + (f.weight / 1000), 0);
 
     return { payable, count, mercVal, volumeTon };

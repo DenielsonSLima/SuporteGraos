@@ -1,19 +1,17 @@
 
 import React from 'react';
 import { Landmark, ArrowUpRight, ArrowDownLeft, Scale } from 'lucide-react';
-import { LoanRecord } from '../../types';
+import { useLoansActiveTotals } from '../../../../hooks/useLoans';
 
-interface Props {
-  loans: LoanRecord[];
-}
-
-const LoanKPIs: React.FC<Props> = ({ loans }) => {
+const LoanKPIs: React.FC = () => {
   const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
 
+  // ✅ ZERO CÁLCULO NO FRONTEND — totais via RPC server-side
+  const { data: totals } = useLoansActiveTotals();
   const stats = {
-    takenTotal: loans.filter(l => l.type === 'taken' && l.status === 'active').reduce((acc, l) => acc + l.remainingValue, 0),
-    grantedTotal: loans.filter(l => l.type === 'granted' && l.status === 'active').reduce((acc, l) => acc + l.remainingValue, 0),
-    countActive: loans.filter(l => l.status === 'active').length
+    takenTotal: totals?.takenTotal ?? 0,
+    grantedTotal: totals?.grantedTotal ?? 0,
+    countActive: totals?.countActive ?? 0,
   };
 
   return (

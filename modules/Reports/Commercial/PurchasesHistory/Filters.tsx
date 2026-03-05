@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Calendar, User, Package } from 'lucide-react';
-import { purchaseService } from '../../../../services/purchaseService';
+import { financialIntegrationService } from '../../../../services/financialIntegrationService';
 
 interface Props {
   filters: any;
@@ -9,10 +9,9 @@ interface Props {
 }
 
 const Filters: React.FC<Props> = ({ filters, onChange }) => {
-  // Get unique partners and products from service for dropdowns
-  const purchases = purchaseService.getAll();
-  const partners = Array.from(new Set(purchases.map(p => p.partnerName))).sort();
-  const products = Array.from(new Set(purchases.flatMap(p => p.items.map(i => i.productName)))).sort();
+  const purchaseRecords = financialIntegrationService.getPayables().filter((record) => record.subType === 'purchase_order');
+  const partners = Array.from(new Set(purchaseRecords.map((record) => record.entityName).filter(Boolean))).sort();
+  const products = Array.from(new Set(purchaseRecords.map((record) => record.description).filter(Boolean))).sort();
 
   return (
     <div className="space-y-5 animate-in slide-in-from-left-2">

@@ -7,6 +7,7 @@ import { supabase, getSupabaseSession } from './supabase';
 import { transporterService } from './transporterService';
 import { vehicleService } from './vehicleService';
 import { driverService } from './driverService';
+import { isSqlCanonicalOpsEnabled } from './sqlCanonicalOps';
 
 interface InitStats {
   totalTime: number;
@@ -88,11 +89,9 @@ export const getInitDiagnostics = () => _initDiagnostics;
 
 const waitForSupabaseSession = async (maxWaitMs = 3000, intervalMs = 150) => {
   const start = performance.now();
-  console.log('[SUPABASE_INIT] ⏳ waitForSupabaseSession() iniciado - maxWait:', maxWaitMs, 'ms');
 
   let session = await getSupabaseSession();
   if (session) {
-    console.log('[SUPABASE_INIT] ✅ Sessão encontrada imediatamente!');
     return session;
   }
 
@@ -102,12 +101,10 @@ const waitForSupabaseSession = async (maxWaitMs = 3000, intervalMs = 150) => {
     await new Promise(resolve => setTimeout(resolve, intervalMs));
     session = await getSupabaseSession();
     if (session) {
-      console.log('[SUPABASE_INIT] ✅ Sessão encontrada após', attempts, 'tentativas,', Math.round(performance.now() - start), 'ms');
       return session;
     }
   }
 
-  console.error('[SUPABASE_INIT] ❌ TIMEOUT! Sessão NÃO encontrada após', attempts, 'tentativas,', Math.round(performance.now() - start), 'ms');
   return null;
 };
 
@@ -116,14 +113,11 @@ const waitForSupabaseSession = async (maxWaitMs = 3000, intervalMs = 150) => {
  * Muito mais rápido que carregar sequencialmente em cada serviço
  */
 export const initializeSupabaseData = async (): Promise<InitStats> => {
-  console.log('\\n[SUPABASE_INIT] 🚀 initializeSupabaseData() chamado');
-  console.log('[SUPABASE_INIT] ⏱️  Timestamp:', new Date().toISOString());
+  const canonicalOpsEnabled = isSqlCanonicalOpsEnabled();
 
   // ✅ Não iniciar se não estiver autenticado
-  console.log('[SUPABASE_INIT] 🔍 Verificando autenticação...');
   const session = await waitForSupabaseSession();
   if (!session) {
-    console.log('[SUPABASE_INIT] ❌ Não autenticado - abortando');
     _initPromise = null;
     _isInitialized = false;
     return {
@@ -133,19 +127,15 @@ export const initializeSupabaseData = async (): Promise<InitStats> => {
       data: {}
     };
   }
-  console.log('[SUPABASE_INIT] ✅ Sessão válida encontrada');
 
   // Se já está inicializando, retorna a mesma promise
   if (_initPromise) {
-    console.log('[SUPABASE_INIT] ⚡ Inicialização já em andamento - retornando promise existente');
     return _initPromise;
   }
 
   _initPromise = (async () => {
     const startTime = performance.now();
     startDiagnostics();
-    console.log('[SUPABASE_INIT] 📊 Iniciando Promise.allSettled() com 14 tabelas...');
-    console.log('[SUPABASE_INIT] ⏱️  Início das queries:', startTime.toFixed(2));
 
     const stats: InitStats = {
       totalTime: 0,
@@ -158,37 +148,132 @@ export const initializeSupabaseData = async (): Promise<InitStats> => {
       const user = await import('./authService').then(m => m.authService.getCurrentUser());
       const companyId = user?.companyId;
 
-      const [
-        ufsResult,
-        citiesResult,
-        partnerTypesResult,
-        productTypesResult,
-        bankAccountsResult,
-        initialBalancesResult,
-        expenseTypesResult,
-        expenseCategoriesResult,
-        shareholdersResult,
-        shareholderTransactionsResult,
-        transportersResult,
-        vehiclesResult,
-        driversResult,
-        partnersResult
-      ] = await Promise.allSettled([
-        supabase.from('ufs').select('id, uf, name, code').order('code'),
-        supabase.from('cities').select('id, name, uf_id, code').order('name'),
-        supabase.from('partner_types').select('id, name, description, is_system').order('name'),
-        supabase.from('product_types').select('id, name, description, is_system').order('name'),
-        supabase.from('contas_bancarias').select('id, bank_name, owner, agency, account_number, account_type, active').eq('active', true).order('bank_name'),
-        supabase.from('initial_balances').select('*').order('date'),
-        supabase.from('expense_types').select('*').order('id'),
-        supabase.from('expense_categories').select('*').order('expense_type_id, name'),
-        supabase.from('shareholders').select('*').order('name'),
-        supabase.from('shareholder_transactions').select('*').order('date', { ascending: false }),
-        supabase.from('transporters').select('*').order('name'),
-        supabase.from('vehicles').select('*').order('plate'),
-        supabase.from('drivers').select('*').order('name'),
-        supabase.from('partners').select('*').order('name')
-      ]);
+      if (canonicalOpsEnabled) {
+        const [
+          statesResult,
+          citiesResult,
+          partnerTypesResult,
+          productTypesResult,
+          accountsResult,
+          initialBalancesResult,
+          expenseCategoriesResult,
+          shareholdersResult,
+          shareholderTransactionsResult,
+          parceirosResult
+        ] = await Promise.allSettled([
+          supabase.from('states').select('id, uf, name').order('uf'),
+          supabase.from('cities').select('id, name, state_id').order('name'),
+          supabase.from('partner_types').select('id, name, description, is_system').order('name'),
+          supabase.from('product_types').select('id, name, description, is_system').order('name'),
+          supabase.from('accounts').select('id, account_name, balance, is_active').eq('is_active', true).order('account_name'),
+          supabase.from('initial_balances').select('*').order('date'),
+          supabase.from('expense_categories').select('*').order('name'),
+          supabase.from('shareholders').select('*').order('name'),
+          supabase.from('shareholder_transactions').select('*').order('date', { ascending: false }),
+          supabase.from('parceiros_parceiros').select('id, name, active, partner_type_id').order('name')
+        ]);
+
+        if (statesResult.status === 'fulfilled' && !statesResult.value.error) {
+          stats.data.ufs = statesResult.value.data || [];
+          stats.tablesLoaded++;
+        } else {
+          stats.errors.push('States: ' + (statesResult.status === 'rejected' ? statesResult.reason : (statesResult.value as any).error?.message));
+        }
+
+        if (citiesResult.status === 'fulfilled' && !citiesResult.value.error) {
+          stats.data.cities = citiesResult.value.data || [];
+          stats.tablesLoaded++;
+        } else {
+          stats.errors.push('Cities: ' + (citiesResult.status === 'rejected' ? citiesResult.reason : (citiesResult.value as any).error?.message));
+        }
+
+        if (partnerTypesResult.status === 'fulfilled' && !partnerTypesResult.value.error) {
+          stats.data.partnerTypes = partnerTypesResult.value.data || [];
+          stats.tablesLoaded++;
+        } else {
+          stats.errors.push('PartnerTypes: ' + (partnerTypesResult.status === 'rejected' ? partnerTypesResult.reason : (partnerTypesResult.value as any).error?.message));
+        }
+
+        if (productTypesResult.status === 'fulfilled' && !productTypesResult.value.error) {
+          stats.data.productTypes = productTypesResult.value.data || [];
+          stats.tablesLoaded++;
+        } else {
+          stats.errors.push('ProductTypes: ' + (productTypesResult.status === 'rejected' ? productTypesResult.reason : (productTypesResult.value as any).error?.message));
+        }
+
+        if (accountsResult.status === 'fulfilled' && !accountsResult.value.error) {
+          stats.data.bankAccounts = accountsResult.value.data || [];
+          stats.tablesLoaded++;
+        } else {
+          stats.errors.push('Accounts: ' + (accountsResult.status === 'rejected' ? accountsResult.reason : (accountsResult.value as any).error?.message));
+        }
+
+        if (initialBalancesResult.status === 'fulfilled' && !initialBalancesResult.value.error) {
+          stats.data.initialBalances = initialBalancesResult.value.data || [];
+          stats.tablesLoaded++;
+        } else {
+          stats.errors.push('InitialBalances: ' + (initialBalancesResult.status === 'rejected' ? initialBalancesResult.reason : (initialBalancesResult.value as any).error?.message));
+        }
+
+        if (expenseCategoriesResult.status === 'fulfilled' && !expenseCategoriesResult.value.error) {
+          stats.data.expenseCategories = expenseCategoriesResult.value.data || [];
+          stats.tablesLoaded++;
+        } else {
+          stats.errors.push('ExpenseCategories: ' + (expenseCategoriesResult.status === 'rejected' ? expenseCategoriesResult.reason : (expenseCategoriesResult.value as any).error?.message));
+        }
+
+        if (shareholdersResult.status === 'fulfilled' && !shareholdersResult.value.error) {
+          stats.data.shareholders = shareholdersResult.value.data || [];
+          stats.tablesLoaded++;
+        } else {
+          stats.errors.push('Shareholders: ' + (shareholdersResult.status === 'rejected' ? shareholdersResult.reason : (shareholdersResult.value as any).error?.message));
+        }
+
+        if (shareholderTransactionsResult.status === 'fulfilled' && !shareholderTransactionsResult.value.error) {
+          stats.data.shareholderTransactions = shareholderTransactionsResult.value.data || [];
+          stats.tablesLoaded++;
+        } else {
+          stats.errors.push('ShareholderTransactions: ' + (shareholderTransactionsResult.status === 'rejected' ? shareholderTransactionsResult.reason : (shareholderTransactionsResult.value as any).error?.message));
+        }
+
+        if (parceirosResult.status === 'fulfilled' && !parceirosResult.value.error) {
+          stats.data.partners = parceirosResult.value.data || [];
+          stats.tablesLoaded++;
+        } else {
+          stats.errors.push('Parceiros: ' + (parceirosResult.status === 'rejected' ? parceirosResult.reason : (parceirosResult.value as any).error?.message));
+        }
+      } else {
+        const [
+          ufsResult,
+          citiesResult,
+          partnerTypesResult,
+          productTypesResult,
+          bankAccountsResult,
+          initialBalancesResult,
+          expenseTypesResult,
+          expenseCategoriesResult,
+          shareholdersResult,
+          shareholderTransactionsResult,
+          transportersResult,
+          vehiclesResult,
+          driversResult,
+          partnersResult
+        ] = await Promise.allSettled([
+          supabase.from('ufs').select('id, uf, name, code').order('code'),
+          supabase.from('cities').select('id, name, uf_id, code').order('name'),
+          supabase.from('partner_types').select('id, name, description, is_system').order('name'),
+          supabase.from('product_types').select('id, name, description, is_system').order('name'),
+          supabase.from('contas_bancarias').select('id, bank_name, owner, agency, account_number, account_type, active, current_balance, initial_balance, allows_negative_balance').eq('active', true).order('bank_name'),
+          supabase.from('initial_balances').select('*').order('date'),
+          supabase.from('expense_types').select('*').order('id'),
+          supabase.from('expense_categories').select('*').order('expense_type_id, name'),
+          supabase.from('shareholders').select('*').order('name'),
+          supabase.from('shareholder_transactions').select('*').order('date', { ascending: false }),
+          supabase.from('transporters').select('*').order('name'),
+          supabase.from('vehicles').select('*').order('plate'),
+          supabase.from('drivers').select('*').order('name'),
+          supabase.from('partners').select('*').order('name')
+        ]);
 
       // Processar UFs
       if (ufsResult.status === 'fulfilled' && !ufsResult.value.error) {
@@ -269,51 +354,52 @@ export const initializeSupabaseData = async (): Promise<InitStats> => {
         stats.errors.push('Shareholders: ' + (shareholdersResult.status === 'rejected' ? shareholdersResult.reason : (shareholdersResult.value as any).error?.message));
       }
 
-      // Processar Shareholder Transactions
-      if (shareholderTransactionsResult.status === 'fulfilled' && !shareholderTransactionsResult.value.error) {
-        stats.data.shareholderTransactions = shareholderTransactionsResult.value.data || [];
-        stats.tablesLoaded++;
+        // Processar Shareholder Transactions
+        if (shareholderTransactionsResult.status === 'fulfilled' && !shareholderTransactionsResult.value.error) {
+          stats.data.shareholderTransactions = shareholderTransactionsResult.value.data || [];
+          stats.tablesLoaded++;
 
-      } else {
-        stats.errors.push('ShareholderTransactions: ' + (shareholderTransactionsResult.status === 'rejected' ? shareholderTransactionsResult.reason : (shareholderTransactionsResult.value as any).error?.message));
-      }
+        } else {
+          stats.errors.push('ShareholderTransactions: ' + (shareholderTransactionsResult.status === 'rejected' ? shareholderTransactionsResult.reason : (shareholderTransactionsResult.value as any).error?.message));
+        }
 
-      // ============= FASE 2: PARCEIROS =============
+        // ============= FASE 2: PARCEIROS =============
 
-      // Processar Transporters
-      if (transportersResult.status === 'fulfilled' && !transportersResult.value.error) {
-        stats.data.transporters = transportersResult.value.data || [];
-        stats.tablesLoaded++;
+        // Processar Transporters
+        if (transportersResult.status === 'fulfilled' && !transportersResult.value.error) {
+          stats.data.transporters = transportersResult.value.data || [];
+          stats.tablesLoaded++;
 
-      } else {
-        stats.errors.push('Transporters: ' + (transportersResult.status === 'rejected' ? transportersResult.reason : (transportersResult.value as any).error?.message));
-      }
+        } else {
+          stats.errors.push('Transporters: ' + (transportersResult.status === 'rejected' ? transportersResult.reason : (transportersResult.value as any).error?.message));
+        }
 
-      // Processar Vehicles
-      if (vehiclesResult.status === 'fulfilled' && !vehiclesResult.value.error) {
-        stats.data.vehicles = vehiclesResult.value.data || [];
-        stats.tablesLoaded++;
+        // Processar Vehicles
+        if (vehiclesResult.status === 'fulfilled' && !vehiclesResult.value.error) {
+          stats.data.vehicles = vehiclesResult.value.data || [];
+          stats.tablesLoaded++;
 
-      } else {
-        stats.errors.push('Vehicles: ' + (vehiclesResult.status === 'rejected' ? vehiclesResult.reason : (vehiclesResult.value as any).error?.message));
-      }
+        } else {
+          stats.errors.push('Vehicles: ' + (vehiclesResult.status === 'rejected' ? vehiclesResult.reason : (vehiclesResult.value as any).error?.message));
+        }
 
-      // Processar Drivers
-      if (driversResult.status === 'fulfilled' && !driversResult.value.error) {
-        stats.data.drivers = driversResult.value.data || [];
-        stats.tablesLoaded++;
+        // Processar Drivers
+        if (driversResult.status === 'fulfilled' && !driversResult.value.error) {
+          stats.data.drivers = driversResult.value.data || [];
+          stats.tablesLoaded++;
 
-      } else {
-        stats.errors.push('Drivers: ' + (driversResult.status === 'rejected' ? driversResult.reason : (driversResult.value as any).error?.message));
-      }
+        } else {
+          stats.errors.push('Drivers: ' + (driversResult.status === 'rejected' ? driversResult.reason : (driversResult.value as any).error?.message));
+        }
 
-      // Processar Partners
-      if (partnersResult.status === 'fulfilled' && !partnersResult.value.error) {
-        stats.data.partners = partnersResult.value.data || [];
-        stats.tablesLoaded++;
+        // Processar Partners
+        if (partnersResult.status === 'fulfilled' && !partnersResult.value.error) {
+          stats.data.partners = partnersResult.value.data || [];
+          stats.tablesLoaded++;
 
-      } else {
-        stats.errors.push('Partners: ' + (partnersResult.status === 'rejected' ? partnersResult.reason : (partnersResult.value as any).error?.message));
+        } else {
+          stats.errors.push('Partners: ' + (partnersResult.status === 'rejected' ? partnersResult.reason : (partnersResult.value as any).error?.message));
+        }
       }
 
       const endTime = performance.now();
@@ -324,74 +410,96 @@ export const initializeSupabaseData = async (): Promise<InitStats> => {
 
       _isInitialized = true;
 
-      console.log('[SUPABASE_INIT] \\n✅ TODAS AS QUERIES COMPLETADAS!');
-      console.log('[SUPABASE_INIT] 📊 Resumo de Carregamento:');
-      console.log('[SUPABASE_INIT]   - Tabelas carregadas:', stats.tablesLoaded);
-      console.log('[SUPABASE_INIT]   - UFs:', stats.data.ufs?.length || 0);
-      console.log('[SUPABASE_INIT]   - Cidades:', stats.data.cities?.length || 0);
-      console.log('[SUPABASE_INIT]   - Tipos de Parceiros:', stats.data.partnerTypes?.length || 0);
-      console.log('[SUPABASE_INIT]   - Tipos de Produtos:', stats.data.productTypes?.length || 0);
-      console.log('[SUPABASE_INIT]   - Contas Bancárias:', stats.data.bankAccounts?.length || 0);
-      console.log('[SUPABASE_INIT]   - Parceiros:', stats.data.partners?.length || 0);
-      console.log('[SUPABASE_INIT] ⏱️  Tempo total:', stats.totalTime.toFixed(2) + 'ms');
 
-      if (stats.errors.length > 0) {
-        console.warn('[SUPABASE_INIT] ⚠️ Erros durante carregamento:');
-        stats.errors.forEach((err, i) => console.warn(`[SUPABASE_INIT]   ${i + 1}. ${err}`));
-      } else {
-        console.log('[SUPABASE_INIT] ✅ Nenhum erro durante carregamento!');
-      }
 
-      console.log('[SUPABASE_INIT] _isInitialized = true');
-
-      if (stats.errors.length > 0) {
-        console.warn('⚠️ Erros durante carregamento:', stats.errors);
-      }
 
     } catch (error) {
-      console.error('❌ Erro crítico no carregamento:', error);
       stats.errors.push('Erro crítico: ' + (error as Error).message);
     }
 
     // ✅ INICIAR REALTIME SUBSCRIPTIONS (dados já foram carregados acima)
     if (stats.tablesLoaded > 0) {
-      console.log('[SUPABASE_INIT] � Carregando dados dos services individuais...');
+      if (canonicalOpsEnabled) {
+        _initCriticalCompleted = true;
+        _initFullCompleted = true;
+        emitInitEvent('supabase:init:critical', { diagnostics: _initDiagnostics });
+        emitInitEvent('supabase:init:complete', { diagnostics: _initDiagnostics });
+        emitInitEvent('supabase:init:full', { diagnostics: _initDiagnostics });
+        emitInitEvent('data:updated');
+      } else {
       try {
-        // Importar services dinamicamente para evitar circular dependency
-        const transporterModule = await import('./transporterService');
-        const vehicleModule = await import('./vehicleService');
-        const driverModule = await import('./driverService');
-        const shareholderModule = await import('./shareholderService');
-        const partnerAddressModule = await import('./partnerAddress/index');
-        const partnerModule = await import('./partnerService');
-        const salesModule = await import('./salesService');
-        const assetModule = await import('./assetService');
-        const loadingModule = await import('./loadingService');
-        const advancesModule = await import('./financial/advancesService');
-        const receivablesModule = await import('./financial/receivablesService');
-        const payablesModule = await import('./financial/payablesService');
-        const transfersModule = await import('./financial/transfersService');
-        const loansModule = await import('./financial/loansService');
-        const financialHistoryModule = await import('./financial/financialHistoryService');
-        const purchaseModule = await import('./purchaseService');
-        const standaloneModule = await import('./standaloneRecordsService');
-        const auditModule = await import('./auditService');
-        const logModule = await import('./logService');
-        const settingsModule = await import('./settingsService');
-        const bankAccountModule = await import('./bankAccountService');
-        const expenseCategoryModule = await import('./expenseCategoryService');
-        const initialBalanceModule = await import('./initialBalanceService');
-        const classificationModule = await import('./classificationService');
-        const locationModule = await import('./locationService');
-        const reconciliationModule = await import('./receivablesReconciliationService');
-        const payablesReconciliationModule = await import('./payablesReconciliationService');
-        const creditModule = await import('./financial/creditService');
-        const loginScreenModule = await import('./loginScreenService');
-        const reportAuditModule = await import('./reportAuditService');
-        const loanServiceModule = await import('./loanService');
+        // Importar services dinamicamente em PARALELO para máxima performance
+        const [
+          transporterModule,
+          vehicleModule,
+          driverModule,
+          shareholderModule,
+          partnerAddressModule,
+          partnerModule,
+          salesModule,
+          assetModule,
+          loadingModule,
+          advancesModule,
+          receivablesModule,
+          payablesModule,
+          transfersModule,
+          loansModule,
+          financialHistoryModule,
+          purchaseModule,
+          standaloneModule,
+          auditModule,
+          logModule,
+          settingsModule,
+          bankAccountModule,
+          expenseCategoryModule,
+          initialBalanceModule,
+          classificationModule,
+          locationModule,
+          reconciliationModule,
+          payablesReconciliationModule,
+          creditModule,
+          loginScreenModule,
+          reportAuditModule,
+          // loanServiceModule removido — consolidado no loansService canônico
+          ledgerModule,
+          financialTransactionModule,
+        ] = await Promise.all([
+          import('./transporterService'),
+          import('./vehicleService'),
+          import('./driverService'),
+          import('./shareholderService'),
+          import('./partnerAddress/index'),
+          import('./partnerService'),
+          import('./salesService'),
+          import('./assetService'),
+          import('./loadingService'),
+          import('./financial/advancesService'),
+          import('./financial/receivablesService'),
+          import('./financial/payablesService'),
+          import('./financial/transfersService'),
+          import('./financial/loansService'),
+          import('./financial/financialHistoryService'),
+          import('./purchaseService'),
+          import('./standaloneRecordsService'),
+          import('./auditService'),
+          import('./logService'),
+          import('./settingsService'),
+          import('./bankAccountService'),
+          import('./expenseCategoryService'),
+          import('./initialBalanceService'),
+          import('./classificationService'),
+          import('./locationService'),
+          import('./receivablesReconciliationService'),
+          import('./payablesReconciliationService'),
+          import('./financial/creditService'),
+          import('./loginScreenService'),
+          import('./reportAuditService'),
+          // import('./loanService'), — removido: consolidado no loansService canônico
+          import('./ledgerService'),
+          import('./financial/financialTransactionService'),
+        ]);
 
         // 📥 CARREGAR DADOS DE CADA SERVICE (em paralelo) - critico primeiro
-        console.log('[SUPABASE_INIT] 📥 Iniciando carga paralela dos services (critico)...');
         const criticalStartTime = performance.now();
 
         const withTimeout = async <T,>(promise: Promise<T>, serviceName: string, timeoutMs: number): Promise<T | null> => {
@@ -405,7 +513,6 @@ export const initializeSupabaseData = async (): Promise<InitStats> => {
             const timeoutPromise = new Promise<null>((resolve) => {
               timeoutId = setTimeout(() => {
                 timedOut = true;
-                console.warn(`[LOAD] TIMEOUT em ${serviceName} (${timeoutMs}ms)`);
                 resolve(null);
               }, timeoutMs);
             });
@@ -420,12 +527,10 @@ export const initializeSupabaseData = async (): Promise<InitStats> => {
               return null;
             }
 
-            console.log(`[LOAD] OK ${serviceName}`);
             return result as T;
           } catch (error: any) {
             status = 'error';
             errorMessage = error?.message || String(error);
-            console.warn(`[LOAD] ERROR ${serviceName}:`, errorMessage);
             return null;
           } finally {
             if (timeoutId) clearTimeout(timeoutId);
@@ -437,6 +542,15 @@ export const initializeSupabaseData = async (): Promise<InitStats> => {
             });
           }
         };
+
+        // normalizeLegacy roda em background — NÃO bloqueia critical path
+        if (typeof financialTransactionModule.financialTransactionService?.normalizeLegacyTransferTypesAndRecalculate === 'function') {
+          void withTimeout(
+            financialTransactionModule.financialTransactionService.normalizeLegacyTransferTypesAndRecalculate(),
+            'financialTransactionService.normalizeLegacyTransferTypesAndRecalculate',
+            CRITICAL_TIMEOUT_MS
+          );
+        }
 
         const criticalPromises: Promise<any>[] = [];
 
@@ -464,39 +578,40 @@ export const initializeSupabaseData = async (): Promise<InitStats> => {
         if (typeof standaloneModule.standaloneRecordsService?.initialize === 'function') {
           criticalPromises.push(withTimeout(standaloneModule.standaloneRecordsService.initialize(), 'standaloneRecordsService', CRITICAL_TIMEOUT_MS));
         }
+        if (typeof ledgerModule.ledgerService?.recalculateBalances === 'function') {
+          criticalPromises.push(withTimeout(ledgerModule.ledgerService.recalculateBalances(), 'ledgerService', CRITICAL_TIMEOUT_MS));
+        }
 
         await Promise.allSettled(criticalPromises);
         if (_initDiagnostics) {
           _initDiagnostics.criticalMs = Math.round(performance.now() - criticalStartTime);
         }
-        console.log('[SUPABASE_INIT] Services criticos carregados em', (performance.now() - criticalStartTime).toFixed(0), 'ms');
 
         _initCriticalCompleted = true;
 
-        // Reconcilia recebimentos e pagamentos antigos automaticamente (sem bloquear a UI)
-        // Delay de 1.5s para garantir que todos os serviços estejam carregados
-        setTimeout(() => {
-          console.log('[RECONCILE] Iniciando reconciliação automática de financeiro...');
-          void reconciliationModule.reconcileReceivablesFromHistory();
-          void payablesReconciliationModule.reconcilePayablesFromHistory();
-          // Reconciliar diretamente dos pedidos após 500ms extra
+        if (!isSqlCanonicalOpsEnabled()) {
+          // Reconcilia recebimentos e pagamentos antigos automaticamente (sem bloquear a UI)
+          // Delay de 1.5s para garantir que todos os serviços estejam carregados
           setTimeout(() => {
-            void payablesReconciliationModule.reconcilePayablesFromOrders();
-            void payablesReconciliationModule.reconcilePayablesFromFreights();
-            void reconciliationModule.reconcileReceivablesFromOrders();
-          }, 500);
-        }, 1500);
+            void reconciliationModule.reconcileReceivablesFromHistory();
+            void payablesReconciliationModule.reconcilePayablesFromHistory();
+            // Reconciliar diretamente dos pedidos após 500ms extra
+            setTimeout(() => {
+              void payablesReconciliationModule.reconcilePayablesFromOrders();
+              void payablesReconciliationModule.reconcilePayablesFromFreights();
+              void reconciliationModule.reconcileReceivablesFromOrders();
+            }, 500);
+          }, 1500);
+        }
         emitInitEvent('supabase:init:critical', { diagnostics: _initDiagnostics });
         emitInitEvent('supabase:init:complete', { diagnostics: _initDiagnostics });
         emitInitEvent('data:updated');
         if (shouldLogDiagnostics()) {
-          console.log('[SUPABASE_INIT] Diagnostics (critico):', _initDiagnostics);
         }
 
         // Carregar services nao criticos em background
         const runBackgroundLoad = async () => {
           try {
-            console.log('[SUPABASE_INIT] Iniciando carga paralela dos services (background)...');
             const backgroundStartTime = performance.now();
             const backgroundPromises: Promise<any>[] = [];
 
@@ -550,10 +665,8 @@ export const initializeSupabaseData = async (): Promise<InitStats> => {
             if (_initDiagnostics) {
               _initDiagnostics.backgroundMs = Math.round(performance.now() - backgroundStartTime);
             }
-            console.log('[SUPABASE_INIT] Services background carregados em', (performance.now() - backgroundStartTime).toFixed(0), 'ms');
 
             // 🔄 Iniciar subscriptions em tempo real
-            console.log('[SUPABASE_INIT] Iniciando Realtime Subscriptions...');
             const startServiceRealtime = (moduleRef: any, serviceKey?: string) => {
               const target = serviceKey ? moduleRef?.[serviceKey] : moduleRef;
               if (typeof target?.startRealtime === 'function') {
@@ -581,6 +694,7 @@ export const initializeSupabaseData = async (): Promise<InitStats> => {
             if (typeof logModule.logService?.startRealtime === 'function') logModule.logService.startRealtime();
             if (typeof settingsModule.settingsService?.startRealtime === 'function') settingsModule.settingsService.startRealtime();
             if (typeof bankAccountModule.bankAccountService?.startRealtime === 'function') bankAccountModule.bankAccountService.startRealtime();
+            if (typeof ledgerModule.ledgerService?.startRealtime === 'function') ledgerModule.ledgerService.startRealtime();
             if (typeof initialBalanceModule.initialBalanceService?.startRealtime === 'function') initialBalanceModule.initialBalanceService.startRealtime();
             if (typeof locationModule.locationService?.startRealtime === 'function') locationModule.locationService.startRealtime();
 
@@ -590,25 +704,23 @@ export const initializeSupabaseData = async (): Promise<InitStats> => {
             if (typeof creditModule.default?.startRealtime === 'function') creditModule.default.startRealtime();
             if (typeof loginScreenModule.loginScreenService?.startRealtime === 'function') loginScreenModule.loginScreenService.startRealtime();
             if (typeof reportAuditModule.reportAuditService?.startRealtime === 'function') reportAuditModule.reportAuditService.startRealtime();
-            if (typeof loanServiceModule.loanService?.startRealtime === 'function') loanServiceModule.loanService.startRealtime();
+            // loanServiceModule.loanService.startRealtime() removido — consolidado no loansService canônico
 
-            console.log('[SUPABASE_INIT] Realtime Subscriptions iniciadas');
 
-            console.log('[SUPABASE_INIT] Disparando evento global: supabase:init:full');
             _initFullCompleted = true;
             emitInitEvent('supabase:init:full', { diagnostics: _initDiagnostics });
             emitInitEvent('data:updated');
             if (shouldLogDiagnostics()) {
-              console.log('[SUPABASE_INIT] Diagnostics (full):', _initDiagnostics);
             }
           } catch (error) {
-            console.warn('[SUPABASE_INIT] Erro na carga background:', error);
+            console.error('[supabaseInitService] runBackgroundLoad:', error);
           }
         };
 
         void runBackgroundLoad();
       } catch (realtimeError) {
-        console.warn('[SUPABASE_INIT] ⚠️ Erro ao iniciar realtime:', realtimeError);
+        console.warn('[supabaseInitService] realtime setup:', realtimeError);
+      }
       }
     }
 
@@ -629,6 +741,9 @@ export const isSupabaseInitialized = () => _isInitialized;
 export const isSupabaseInitCompleted = () => _initCriticalCompleted;
 export const isSupabaseFullInitCompleted = () => _initFullCompleted;
 
+// stopAllRealtime extraído para supabaseRealtimeCleanup.ts
+export { stopAllRealtime } from './supabaseRealtimeCleanup';
+
 /**
  * Força reinicialização (útil para refresh)
  */
@@ -647,7 +762,6 @@ export const waitForInit = async (): Promise<InitStats> => {
   // ✅ VERIFICAR AUTENTICAÇÃO ANTES de tentar inicializar
   const session = await waitForSupabaseSession();
   if (!session) {
-    console.log('[SUPABASE_INIT] ⚠️ waitForInit() - Sem autenticação, retornando vazio');
     return {
       totalTime: 0,
       tablesLoaded: 0,

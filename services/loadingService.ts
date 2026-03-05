@@ -1,3 +1,15 @@
+/**
+ * ============================================================================
+ * LOADING SERVICE — Serviço de Carregamentos (Logística)
+ * ============================================================================
+ * 
+ * MODULARIZADO: Lógica extraída para módulos isolados:
+ *   loading/loadingMapper.ts         → Mapeamento Loading ↔ Supabase
+ *   loading/loadingPayableSync.ts    → Sync de payables (frete + fornecedor)
+ *   loading/loadingReceivableSync.ts → Sync de receivables (venda)
+ *   loading/loadingHistorySync.ts    → Sync de histórico financeiro
+ *   loading/loadingRecalculation.ts  → Funções de recálculo manual
+ */
 
 import { Loading } from '../modules/Loadings/types';
 import { logService } from './logService';
@@ -8,9 +20,18 @@ import { supabaseWithRetry } from '../utils/fetchWithRetry';
 import { payablesService } from './financial/payablesService';
 import { DashboardCache, invalidateDashboardCache } from './dashboardCache';
 import { purchaseService } from './purchaseService';
-import { receivablesService, Receivable } from './financial/receivablesService';
-import { salesService } from './salesService';
 import { auditService } from './auditService';
+import { commissionService } from './financial/commissionService';
+import { freightExpenseService } from './freightExpenseService';
+
+// Módulos extraídos
+import { mapLoadingToDb, mapLoadingFromDb, generateUUID } from './loading/loadingMapper';
+import { syncPurchaseOrderPayable, createFreightPayable, syncFreightPayable } from './loading/loadingPayableSync';
+import { syncReceivableFromLoading } from './loading/loadingReceivableSync';
+import { syncFinancialHistory } from './loading/loadingHistorySync';
+import { recalculateAllPurchasePayables as _recalcPurchase, recalculateAllFreightPayables as _recalcFreight } from './loading/loadingRecalculation';
+import { isSqlCanonicalOpsEnabled, sqlCanonicalOpsLog } from './sqlCanonicalOps';
+import { getTodayBR } from '../utils/dateUtils';
 
 const db = new Persistence<Loading>('logistics_loadings', [], { useStorage: false });
 let realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
@@ -19,187 +40,373 @@ let toastCallback: ((type: 'success' | 'error' | 'info', title: string, message?
 
 const getLogInfo = () => {
   const user = authService.getCurrentUser();
-  return {
-    userId: user?.id || 'system',
-    userName: user?.name || 'Sistema'
-  };
+  return { userId: user?.id || 'system', userName: user?.name || 'Sistema' };
 };
 
 const showToast = (type: 'success' | 'error' | 'info', title: string, message?: string) => {
-  if (toastCallback) {
-    toastCallback(type, title, message);
+  if (toastCallback) toastCallback(type, title, message);
+};
+
+const notifyFinancialRefresh = () => {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new Event('financial:updated'));
+  window.dispatchEvent(new Event('data:updated'));
+};
+
+const getCurrentCompanyId = () => authService.getCurrentUser()?.companyId || undefined;
+
+const resolveCompanyId = (fallbackCompanyId?: string) => {
+  return getCurrentCompanyId() || fallbackCompanyId;
+};
+
+/**
+ * Busca uma financial_entry existente por tipo, origin_type e origin_id.
+ * Schema real: coluna origin_type (origin_module NÃO existe).
+ */
+const findFinancialEntry = async (
+  type: 'payable' | 'receivable',
+  origin: string,
+  originId: string
+): Promise<string | null> => {
+  const companyId = resolveCompanyId();
+
+  let query = supabase
+    .from('financial_entries')
+    .select('id')
+    .eq('type', type)
+    .eq('origin_type', origin)
+    .eq('origin_id', originId)
+    .limit(1)
+    .maybeSingle();
+
+  if (companyId) query = query.eq('company_id', companyId);
+  const { data, error } = await query;
+
+  if (error) {
+    console.warn('[loadingService] findFinancialEntry error:', error.message);
+    return null;
+  }
+
+  return data?.id ?? null;
+};
+
+/**
+ * Upsert de obrigação financeira (payable) na tabela financial_entries.
+ * Schema real: usa origin_type (não origin_module), sem coluna description.
+ */
+const upsertFinancialPayableEntry = async (params: {
+  origin: 'purchase_order' | 'freight';
+  originId: string;
+  amount: number;
+  dueDate?: string;
+  partnerId?: string;
+  companyId?: string;
+}) => {
+  const companyId = resolveCompanyId(params.companyId);
+  if (!companyId || !params.originId) return;
+
+  const safeAmount = Number(params.amount) || 0;
+  const payload: Record<string, any> = {
+    company_id: companyId,
+    type: 'payable',
+    origin_type: params.origin,
+    origin_id: params.originId,
+    total_amount: safeAmount,
+    due_date: params.dueDate || getTodayBR(),
+    created_date: getTodayBR(),
+  };
+  if (params.partnerId) payload.partner_id = params.partnerId;
+
+  const existingId = await findFinancialEntry('payable', params.origin, params.originId);
+
+  if (existingId) {
+    const { error } = await supabase.from('financial_entries').update({
+      total_amount: safeAmount,
+      due_date: params.dueDate || getTodayBR(),
+      ...(params.partnerId ? { partner_id: params.partnerId } : {})
+    }).eq('id', existingId);
+    if (error) console.warn('[loadingService] update financial_entry error:', error.message);
+    return;
+  }
+
+  const { error } = await supabase.from('financial_entries').insert(payload);
+  if (error) console.warn('[loadingService] insert financial_entry error:', error.message);
+};
+
+const syncFinancialEntriesFromLoading = async (loading: Loading, isDelete = false) => {
+  const companyId = resolveCompanyId(loading.companyId);
+
+  const freightAmount = isDelete ? 0 : (Number(loading.totalFreightValue) || 0);
+  if (loading.id) {
+    // ✅ Guard: não criar financial_entry com frete zerado (evita registros órfãos)
+    if (freightAmount <= 0 && !isDelete) {
+      // Se for delete, precisamos zerar; senão, simplesmente não cria
+      console.info('[loadingService] Frete zerado — pulando criação de financial_entry para', loading.id);
+    } else {
+      await upsertFinancialPayableEntry({
+        origin: 'freight',
+        originId: loading.id,
+        amount: freightAmount,
+        dueDate: loading.date,
+        partnerId: loading.carrierId || undefined,
+        companyId
+      });
+    }
+  }
+
+  if (loading.purchaseOrderId) {
+    const order = purchaseService.getById(loading.purchaseOrderId);
+    const relatedLoadings = loadingService
+      .getByPurchaseOrder(loading.purchaseOrderId)
+      .filter(l => l.status !== 'canceled');
+    const purchaseAmount = relatedLoadings.reduce((sum, l) => sum + (Number(l.totalPurchaseValue) || 0), 0);
+    const dueDate = relatedLoadings[0]?.date || loading.date || getTodayBR();
+
+    await upsertFinancialPayableEntry({
+      origin: 'purchase_order',
+      originId: loading.purchaseOrderId,
+      amount: purchaseAmount,
+      dueDate,
+      partnerId: order?.partnerId || undefined,
+      companyId
+    });
+  }
+
+  notifyFinancialRefresh();
+};
+
+const rebuildFinancialEntriesFromLoadings = async (loadings: Loading[]) => {
+  for (const loading of loadings) {
+    try {
+      await syncFinancialEntriesFromLoading(loading, false);
+    } catch {
+    }
   }
 };
 
-const generateUUID = (): string => {
-  if (typeof self !== 'undefined' && self.crypto && self.crypto.randomUUID) {
-    return self.crypto.randomUUID();
-  }
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-};
+const mapLoadingFromOpsRow = (row: any): Loading => {
+  const payload = row?.raw_payload || row?.metadata || {};
+  const purchaseOrder = Array.isArray(row?.purchase_order) ? row.purchase_order[0] : row?.purchase_order;
+  const salesOrder = Array.isArray(row?.sales_order) ? row.sales_order[0] : row?.sales_order;
 
-const mapLoadingToDb = (l: Loading) => ({
-  id: l.id,
-  date: l.date,
-  invoice_number: l.invoiceNumber || null,
-  purchase_order_id: l.purchaseOrderId || null,
-  purchase_order_number: l.purchaseOrderNumber || null,
-  supplier_name: l.supplierName || null,
-  carrier_id: l.carrierId || null,
-  carrier_name: l.carrierName || null,
-  driver_id: l.driverId || null,
-  driver_name: l.driverName || null,
-  vehicle_id: null,
-  vehicle_plate: l.vehiclePlate,
-  is_client_transport: !!l.isClientTransport,
-  product: l.product,
-  weight_kg: l.weightKg,
-  weight_sc: l.weightSc || null,
-  unload_weight_kg: l.unloadWeightKg || null,
-  breakage_kg: l.breakageKg || null,
-  purchase_price_per_sc: l.purchasePricePerSc || null,
-  total_purchase_value: l.totalPurchaseValue || null,
-  product_paid: l.productPaid || 0,
-  freight_price_per_ton: l.freightPricePerTon || null,
-  total_freight_value: l.totalFreightValue || null,
-  freight_advances: l.freightAdvances || 0,
-  freight_paid: l.freightPaid || 0,
-  notes: l.notes || null,
-  sales_order_id: l.salesOrderId || null,
-  sales_order_number: l.salesOrderNumber || null,
-  customer_name: l.customerName || null,
-  sales_price: l.salesPrice || null,
-  total_sales_value: l.totalSalesValue || null,
-  status: l.status,
-  is_redirected: !!l.isRedirected,
-  original_destination: l.originalDestination || null,
-  redirect_displacement_value: l.redirectDisplacementValue || null,
-  metadata: l,
-  company_id: authService.getCurrentUser()?.companyId || null
-});
-
-export const mapLoadingFromDb = (row: any): Loading => {
-  const meta: Loading | undefined = row?.metadata;
-  const base: Loading = meta ? { ...meta } : {
-    id: row?.id,
-    date: row?.date,
-    invoiceNumber: row?.invoice_number || undefined,
-    purchaseOrderId: row?.purchase_order_id || '',
-    purchaseOrderNumber: row?.purchase_order_number || '',
-    supplierName: row?.supplier_name || '',
-    carrierId: row?.carrier_id || '',
-    carrierName: row?.carrier_name || '',
-    driverId: row?.driver_id || '',
-    driverName: row?.driver_name || '',
-    vehiclePlate: row?.vehicle_plate || '',
-    isClientTransport: !!row?.is_client_transport,
-    product: row?.product || '',
-    weightKg: Number(row?.weight_kg) || 0,
-    weightTon: Number(row?.weight_ton) || Number(row?.weight_kg || 0) / 1000,
-    weightSc: Number(row?.weight_sc) || 0,
-    unloadWeightKg: Number(row?.unload_weight_kg) || undefined,
-    breakageKg: Number(row?.breakage_kg) || undefined,
-    purchasePricePerSc: Number(row?.purchase_price_per_sc) || 0,
-    totalPurchaseValue: Number(row?.total_purchase_value) || 0,
-    productPaid: Number(row?.product_paid) || 0,
-    freightPricePerTon: Number(row?.freight_price_per_ton) || 0,
-    totalFreightValue: Number(row?.total_freight_value) || 0,
-    freightAdvances: Number(row?.freight_advances) || 0,
-    freightPaid: Number(row?.freight_paid) || 0,
-    notes: row?.notes || undefined,
-    salesOrderId: row?.sales_order_id || '',
-    salesOrderNumber: row?.sales_order_number || '',
-    customerName: row?.customer_name || '',
-    salesPrice: Number(row?.sales_price) || 0,
-    totalSalesValue: Number(row?.total_sales_value) || 0,
-    status: (row?.status || 'in_transit'),
-    isRedirected: !!row?.is_redirected,
-    originalDestination: row?.original_destination || undefined,
-    redirectDisplacementValue: Number(row?.redirect_displacement_value) || undefined,
-    extraExpenses: [],
-    transactions: []
-  } as Loading;
+  const weightKg = Number(row?.weight_kg ?? payload?.weightKg ?? 0) || 0;
+  const weightSc = Number(payload?.weightSc ?? (weightKg / 60)) || 0;
+  const weightTon = Number(payload?.weightTon ?? (weightKg / 1000)) || 0;
 
   return {
-    ...base,
-    id: row?.id ?? base.id,
-    date: row?.date ?? base.date,
-    status: row?.status ?? base.status
+    id: row?.legacy_id ?? row?.id ?? payload?.id ?? generateUUID(),
+    companyId: row?.company_id ?? payload?.companyId,
+    date: row?.loading_date ?? payload?.date ?? getTodayBR(),
+    invoiceNumber: payload?.invoiceNumber ?? payload?.invoice_number,
+    purchaseOrderId: payload?.purchaseOrderId ?? purchaseOrder?.legacy_id ?? purchaseOrder?.id ?? row?.purchase_order_id ?? '',
+    purchaseOrderNumber: payload?.purchaseOrderNumber ?? purchaseOrder?.number ?? '',
+    supplierName: payload?.supplierName ?? purchaseOrder?.partner_name ?? '',
+    carrierId: payload?.carrierId ?? payload?.carrier_id ?? '',
+    carrierName: payload?.carrierName ?? payload?.carrier_name ?? '',
+    driverId: payload?.driverId ?? payload?.driver_id ?? '',
+    driverName: row?.driver_name ?? payload?.driverName ?? payload?.driver_name ?? '',
+    vehiclePlate: row?.vehicle_plate ?? payload?.vehiclePlate ?? payload?.vehicle_plate ?? '',
+    isClientTransport: !!(payload?.isClientTransport ?? payload?.is_client_transport),
+    product: payload?.product ?? '',
+    weightKg,
+    weightTon,
+    weightSc,
+    unloadWeightKg: row?.unload_weight_kg != null ? Number(row.unload_weight_kg) : payload?.unloadWeightKg,
+    breakageKg: payload?.breakageKg,
+    purchasePricePerSc: Number(payload?.purchasePricePerSc ?? payload?.purchase_price_per_sc ?? 0),
+    totalPurchaseValue: Number(row?.total_purchase_value ?? payload?.totalPurchaseValue ?? 0),
+    productPaid: Number(payload?.productPaid ?? payload?.product_paid ?? 0),
+    freightPricePerTon: Number(payload?.freightPricePerTon ?? payload?.freight_price_per_ton ?? 0),
+    totalFreightValue: Number(row?.total_freight_value ?? payload?.totalFreightValue ?? 0),
+    freightAdvances: Number(payload?.freightAdvances ?? payload?.freight_advances ?? 0),
+    freightPaid: Number(payload?.freightPaid ?? payload?.freight_paid ?? 0),
+    extraExpenses: payload?.extraExpenses || [],
+    transactions: payload?.transactions || [],
+    salesOrderId: payload?.salesOrderId ?? salesOrder?.legacy_id ?? row?.sales_order_id ?? '',
+    salesOrderNumber: payload?.salesOrderNumber ?? salesOrder?.number ?? '',
+    customerName: payload?.customerName ?? salesOrder?.customer_name ?? '',
+    salesPrice: Number(payload?.salesPrice ?? payload?.sales_price ?? 0),
+    totalSalesValue: Number(row?.total_sales_value ?? payload?.totalSalesValue ?? 0),
+    status: (row?.status ?? payload?.status ?? 'in_transit') as any,
+    notes: payload?.notes,
+    isRedirected: !!(payload?.isRedirected ?? payload?.is_redirected),
+    originalDestination: payload?.originalDestination ?? payload?.original_destination,
+    redirectDisplacementValue: payload?.redirectDisplacementValue ?? payload?.redirect_displacement_value,
+    freightBase: (payload?.freightBase ?? row?.freight_base ?? 'Origem') as 'Origem' | 'Destino',
   };
 };
+
+// ============================================================================
+// SUPABASE I/O
+// ============================================================================
 
 const loadFromSupabase = async () => {
   if (isLoaded) return;
   try {
+    // Schema real: ops_loadings tem FK para ops_purchase_orders mas NÃO para ops_sales_orders.
+    // Tabela logistics_loadings NÃO existe.
+    // Sempre usar ops_loadings com JOIN apenas para purchase_order.
     const data = await supabaseWithRetry(() =>
       supabase
-        .from('logistics_loadings')
-        .select('*')
-        .order('created_at', { ascending: false })
+        .from('ops_loadings')
+        .select(`
+          *,
+          purchase_order:ops_purchase_orders(id, legacy_id, number, partner_id, partner_name)
+        `)
+        .order('loading_date', { ascending: false })
     );
-    const mapped = (data as any[] || []).map(mapLoadingFromDb);
+
+    const mapped = (data as any[] || []).map(mapLoadingFromOpsRow);
     db.setAll(mapped);
+    notifyFinancialRefresh();
+    void rebuildFinancialEntriesFromLoadings(mapped);
     isLoaded = true;
-    console.log('🔄 Carregamentos sincronizados em tempo real...');
     return mapped;
   } catch (error) {
-    console.error('❌ Erro ao carregar logistics_loadings:', error);
+    sqlCanonicalOpsLog('Falha ao carregar carregamentos do Supabase', error);
+    isLoaded = false;
+    return db.getAll();
   }
 };
 
 const startRealtime = () => {
   if (realtimeChannel) return;
 
+  const companyId = authService.getCurrentUser()?.companyId;
+  const tableName = 'ops_loadings';
+
   realtimeChannel = supabase
-    .channel('realtime:logistics_loadings')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'logistics_loadings' }, (payload) => {
+    .channel(`realtime:${tableName}`)
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: tableName,
+      ...(companyId ? { filter: `company_id=eq.${companyId}` } : {})
+    }, (payload) => {
       const rec = payload.new || payload.old;
       if (!rec) return;
       if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-        const mapped = mapLoadingFromDb(rec);
+        const mapped = mapLoadingFromOpsRow(rec);
         const existing = db.getById(mapped.id);
         if (existing) db.update(mapped);
         else db.add(mapped);
       } else if (payload.eventType === 'DELETE') {
-        db.delete(rec.id);
+        // Sempre usar legacy_id como ID principal (tabela é ops_loadings, id local é legacy_id)
+        const mappedId = rec.legacy_id || rec.id;
+        if (mappedId) db.delete(mappedId);
+        if (rec.id && rec.id !== mappedId) db.delete(rec.id);
       }
-      // console.log(`🔔 Realtime logistics_loadings: ${payload.eventType}`);
     })
     .subscribe();
 };
 
-const persistUpsert = async (loading: Loading) => {
+const stopRealtime = () => {
+  if (realtimeChannel) {
+    supabase.removeChannel(realtimeChannel);
+    realtimeChannel = null;
+  }
+};
+
+/**
+ * Persiste carregamento: tenta RPC v2/v1, se ambos falharem faz INSERT/UPSERT direto em ops_loadings.
+ * A tabela logistics_loadings NÃO existe — persistência é sempre via ops_loadings.
+ */
+const persistLoading = async (loading: Loading): Promise<boolean> => {
+  // 1. Tentar via RPC (procedimento ideal — SQL-first)
   try {
-    const payload: any = mapLoadingToDb(loading);
-    const isValidUuid = (v?: string) => !!v && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
-    if (!isValidUuid(payload.id)) delete payload.id;
-    const { error } = await supabase.from('logistics_loadings').upsert(payload).select();
-    if (error) {
-      console.error('Erro ao salvar carregamento no Supabase', error);
-      return;
+    const { error } = await supabase.rpc('rpc_ops_loading_upsert_v2', {
+      p_payload: loading as any
+    });
+    if (!error) return true;
+    sqlCanonicalOpsLog(`RPC v2 falhou (${loading.id}), tentando v1`, error);
+  } catch (err) {
+    sqlCanonicalOpsLog(`RPC v2 exception (${loading.id})`, err);
+  }
+
+  try {
+    const { error } = await supabase.rpc('rpc_ops_loading_upsert_v1', {
+      p_payload: loading as any
+    });
+    if (!error) return true;
+    sqlCanonicalOpsLog(`RPC v1 falhou (${loading.id}), tentando INSERT direto`, error);
+  } catch (err) {
+    sqlCanonicalOpsLog(`RPC v1 exception (${loading.id})`, err);
+  }
+
+  // 2. Fallback: INSERT/UPSERT direto em ops_loadings
+  try {
+    const companyId = resolveCompanyId(loading.companyId);
+    const row: Record<string, any> = {
+      company_id: companyId,
+      legacy_id: loading.id,
+      loading_date: loading.date || getTodayBR(),
+      purchase_order_id: null,  // FK UUID — precisa do UUID real do ops_purchase_orders
+      weight_kg: loading.weightKg || 0,
+      total_purchase_value: loading.totalPurchaseValue || 0,
+      total_freight_value: loading.totalFreightValue || 0,
+      total_sales_value: loading.totalSalesValue || 0,
+      status: loading.status || 'in_transit',
+      vehicle_plate: loading.vehiclePlate || '',
+      driver_name: loading.driverName || '',
+      raw_payload: loading,
+      metadata: loading,
+    };
+
+    // Resolver purchase_order_id UUID real
+    if (loading.purchaseOrderId) {
+      const { data: poRow } = await supabase
+        .from('ops_purchase_orders')
+        .select('id')
+        .or(`legacy_id.eq.${loading.purchaseOrderId},id.eq.${loading.purchaseOrderId}`)
+        .limit(1)
+        .maybeSingle();
+      if (poRow?.id) row.purchase_order_id = poRow.id;
     }
-    // Realtime subscription já sincroniza automaticamente (não precisa recarregar tudo)
+
+    const { error } = await supabase.from('ops_loadings').upsert(row, { onConflict: 'legacy_id' });
+    if (error) {
+      console.error('[loadingService] INSERT direto ops_loadings falhou:', error.message);
+      return false;
+    }
+    console.info('[loadingService] Carregamento salvo via INSERT direto em ops_loadings');
+    return true;
   } catch (err) {
-    console.error('Erro inesperado ao salvar carregamento no Supabase', err);
+    console.error('[loadingService] Fallback direto ops_loadings exception:', err);
+    return false;
   }
 };
 
-const persistDelete = async (id: string) => {
+/**
+ * Deleta carregamento: tenta RPC, se falhar faz DELETE direto.
+ */
+const deleteLoadingFromDb = async (loadingId: string): Promise<boolean> => {
+  // Tentar via RPC
   try {
-    const { error } = await supabase.from('logistics_loadings').delete().eq('id', id);
-    if (error) console.error('Erro ao excluir carregamento no Supabase', error);
+    const { error } = await supabase.rpc('rpc_ops_loading_delete_v1', {
+      p_legacy_id: loadingId
+    });
+    if (!error) return true;
+    sqlCanonicalOpsLog(`RPC delete falhou (${loadingId}), tentando DELETE direto`, error);
   } catch (err) {
-    console.error('Erro inesperado ao excluir carregamento no Supabase', err);
+    sqlCanonicalOpsLog(`RPC delete exception (${loadingId})`, err);
+  }
+
+  // Fallback: DELETE direto
+  try {
+    const { error } = await supabase
+      .from('ops_loadings')
+      .delete()
+      .or(`legacy_id.eq.${loadingId},id.eq.${loadingId}`);
+    if (error) {
+      console.error('[loadingService] DELETE direto falhou:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('[loadingService] DELETE direto exception:', err);
+    return false;
   }
 };
-
-// ❌ NÃO inicializar automaticamente - aguardar autenticação via supabaseInitService
-// void loadFromSupabase();
-// startRealtime();
 
 export const loadingService = {
   setToastCallback: (callback: (type: 'success' | 'error' | 'info', title: string, message?: string) => void) => {
@@ -218,15 +425,34 @@ export const loadingService = {
     return db.getAll().filter(l => l.salesOrderId === salesId);
   },
 
-  add: (loading: Loading) => {
-    console.log('🔵 loadingService.add() CHAMADO! Loading:', {
-      purchaseOrderId: loading.purchaseOrderId,
-      totalFreightValue: loading.totalFreightValue,
-      totalPurchaseValue: loading.totalPurchaseValue,
-      carrierId: loading.carrierId,
-      supplierName: loading.supplierName
-    });
+  fetchMonthlyFreightHistory: async (filters: { startDate?: string; endDate?: string; carrierName?: string }) => {
+    if (isSqlCanonicalOpsEnabled()) {
+      let query = supabase
+        .from('ops_loadings')
+        .select(`
+          *,
+          purchase_order:ops_purchase_orders(id, legacy_id, number, partner_id, partner_name)
+        `)
+        .neq('status', 'canceled');
 
+      if (filters.startDate) query = query.gte('loading_date', filters.startDate);
+      if (filters.endDate) query = query.lte('loading_date', filters.endDate);
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      let mapped = (data || []).map(mapLoadingFromOpsRow);
+      if (filters.carrierName) {
+        mapped = mapped.filter(l => l.carrierName === filters.carrierName);
+      }
+      return mapped;
+    }
+
+    // ops_loadings é a ÚNICA tabela — não existe logistics_loadings
+    return [];
+  },
+
+  add: async (loading: Loading) => {
     const normalizedPurchaseValue = Number(loading.totalPurchaseValue) || 0;
     if (normalizedPurchaseValue <= 0 && loading.weightKg && loading.purchasePricePerSc) {
       const calculatedSc = loading.weightKg / 60;
@@ -236,153 +462,54 @@ export const loadingService = {
     if (!loading.transactions) loading.transactions = [];
     if (!loading.extraExpenses) loading.extraExpenses = [];
     db.add(loading);
-    void persistUpsert(loading);
 
-    // ✅ Criar automaticamente um payable do FRETE se tiver compra associada
-    if (loading.purchaseOrderId && loading.totalFreightValue && loading.totalFreightValue > 0 && loading.carrierId) {
-      const freightAmount = Number(loading.totalFreightValue) || 0;
-      const freightPaidAmount = Number(loading.freightPaid) || 0;
+    // ✅ CRÍTICO: Persistir no banco (RPC → fallback INSERT direto em ops_loadings)
+    const persisted = await persistLoading(loading);
+    const canonicalAuthoritative = persisted;
 
-      console.log('🚚 Criando payable do FRETE:', {
-        carrierId: loading.carrierId,
-        carrierName: loading.carrierName,
-        driverName: loading.driverName,
-        weightKg: loading.weightKg,
-        freightAmount
-      });
-
-      payablesService.add({
-        id: generateUUID(),
-        loadingId: loading.id, // ID do carregamento para busca direta
-        purchaseOrderId: loading.purchaseOrderId,
-        partnerId: loading.carrierId,
-        partnerName: loading.carrierName,
-        driverName: loading.driverName,
-        weightKg: loading.weightKg,
-        description: `Frete do carregamento - Placa ${loading.vehiclePlate || 'N/A'}`,
-        dueDate: loading.date,
-        amount: freightAmount,
-        paidAmount: freightPaidAmount,
-        status: freightPaidAmount >= freightAmount ? 'paid' : 'pending',
-        subType: 'freight',
-        notes: `Carregamento: ${loading.weightKg}kg`
-      });
-
-      showToast('success', `💰 Frete ${loading.carrierName} criado no financeiro`);
+    // ✅ Só cria financial_entry via TS se a RPC não conseguiu (ela já faz via SQL)
+    if (!canonicalAuthoritative) {
+      await syncFinancialEntriesFromLoading(loading, false);
     }
 
-    // ✅ NOVO: Criar automaticamente um payable do FORNECEDOR do pedido de compra
-    if (loading.purchaseOrderId && loading.totalPurchaseValue && loading.totalPurchaseValue > 0) {
-      console.log('🔍 DEBUG FORNECEDOR - Buscando pedido de compra:', loading.purchaseOrderId);
-      const purchaseOrder = purchaseService.getById(loading.purchaseOrderId);
-      console.log('🔍 DEBUG FORNECEDOR - Pedido encontrado?', purchaseOrder ? 'SIM' : 'NÃO', purchaseOrder);
-
-      if (purchaseOrder && purchaseOrder.partnerId) {
-        console.log('✅ ENTROU NO IF - Tem partnerId:', purchaseOrder.partnerId);
-
-        // ✅ CORREÇÃO: Buscar TODAS as cargas do pedido e SOMAR os valores
-        const allLoadingsFromOrder = loadingService.getByPurchaseOrder(loading.purchaseOrderId);
-        const totalPurchaseAmount = allLoadingsFromOrder.reduce((sum, l) => sum + (Number(l.totalPurchaseValue) || 0), 0);
-        const totalPurchasePaid = allLoadingsFromOrder.reduce((sum, l) => sum + (Number(l.productPaid) || 0), 0);
-
-        console.log('🔢 Valores calculados (SOMA DE TODAS AS CARGAS):', {
-          totalCargas: allLoadingsFromOrder.length,
-          purchaseAmount: totalPurchaseAmount,
-          purchasePaidAmount: totalPurchasePaid,
-        });
-
-        console.log('🏭 Criando/Atualizando payable do FORNECEDOR:', {
-          partnerId: purchaseOrder.partnerId,
-          partnerName: purchaseOrder.partnerName || loading.supplierName,
-          orderNumber: purchaseOrder.number,
-          purchaseAmount: totalPurchaseAmount,
-          purchasePaidAmount: totalPurchasePaid
-        });
-
-        // Verifica se já existe um payable para este pedido de compra
-        const existingPayables = payablesService.getAll();
-        console.log('🔍 Total de payables existentes:', existingPayables.length);
-
-        const existingPayable = existingPayables.find(p =>
-          p.purchaseOrderId === loading.purchaseOrderId &&
-          p.subType === 'purchase_order'
-        );
-        invalidateDashboardCache();
-        console.log('🔍 Payable existente para este pedido?', existingPayable ? 'SIM' : 'NÃO');
-
-        if (existingPayable) {
-          console.log('⚠️ Já existe payable do fornecedor para este pedido, atualizando com SOMA de todas as cargas...');
-          payablesService.update({
-            ...existingPayable,
-            amount: totalPurchaseAmount,
-            paidAmount: totalPurchasePaid,
-            status: totalPurchasePaid >= totalPurchaseAmount ? 'paid' : 'pending'
-          });
-          console.log('✅ Payable atualizado com valor total correto!');
-        } else {
-          console.log('✅ Criando novo payable do fornecedor com valor TOTAL...');
-          try {
-            payablesService.add({
-              id: generateUUID(),
-              purchaseOrderId: loading.purchaseOrderId,
-              partnerId: purchaseOrder.partnerId,
-              partnerName: purchaseOrder.partnerName || loading.supplierName,
-              description: `Compra de Grãos - Pedido ${purchaseOrder.number}`,
-              dueDate: loading.date, // Data da primeira carga ou vencimento do pedido
-              amount: totalPurchaseAmount,
-              paidAmount: totalPurchasePaid,
-              status: totalPurchasePaid >= totalPurchaseAmount ? 'paid' : 'pending',
-              subType: 'purchase_order',
-              notes: `Gerado automaticamente via Logística. Total Cargas: ${allLoadingsFromOrder.length}`
-            });
-            console.log('✅ Payable do fornecedor criado com sucesso!');
-          } catch (err) {
-            console.error('❌ Erro ao criar payable do fornecedor:', err);
-          }
-        }
-
-        // ✅ NOVO: Criar automaticamente um payable de COMISSÃO DE CORRETOR se houver no pedido
-        if (purchaseOrder.brokerId && purchaseOrder.brokerCommissionPerSc && purchaseOrder.brokerCommissionPerSc > 0) {
-          console.log('🤝 Verificando comissão de corretor...', {
-            brokerId: purchaseOrder.brokerId,
-            commissionPerSc: purchaseOrder.brokerCommissionPerSc,
-            weightKg: loading.weightKg
-          });
-
-          // Calcula o valor da comissão para ESTA carga
-          // Peso em sc = kg / 60
-          const weightSc = (loading.weightKg || 0) / 60;
-          const commissionValue = Number((weightSc * purchaseOrder.brokerCommissionPerSc).toFixed(2));
-
-          if (commissionValue > 0) {
-            console.log('💰 Criando payable de COMISSÃO:', {
-              brokerId: purchaseOrder.brokerId,
-              commissionValue
-            });
-
-            payablesService.add({
-              id: generateUUID(),
-              loadingId: loading.id, // Vincula à carga específica
-              purchaseOrderId: loading.purchaseOrderId, // Vincula ao pedido
-              partnerId: purchaseOrder.brokerId,
-              partnerName: purchaseOrder.brokerName || 'Corretor', // Tenta usar nome se tiver
-              description: `Comissão - Placa ${loading.vehiclePlate || 'N/A'} - Pedido ${purchaseOrder.number}`,
-              dueDate: loading.date,
-              amount: commissionValue,
-              paidAmount: 0,
-              status: 'pending',
-              subType: 'commission',
-              notes: `Comissão: ${weightSc.toFixed(2)} sc * R$ ${purchaseOrder.brokerCommissionPerSc.toFixed(2)}/sc`
-            });
-
-            showToast('success', `💰 Comissão criada: R$ ${commissionValue.toFixed(2)}`);
-          }
-        }
-      } else {
-        console.warn('⚠️ Pedido de compra encontrado mas SEM partnerId:', loading.purchaseOrderId);
+    // ✅ SQL-first: com canônico ativo e RPC aplicada, o financeiro é reconstruído no banco
+    if (!canonicalAuthoritative) {
+      await createFreightPayable(loading);
+      if (loading.totalFreightValue && loading.totalFreightValue > 0 && loading.carrierId) {
+        showToast('success', `💰 Frete ${loading.carrierName} criado no financeiro`);
       }
-    } else {
-      console.log('⚠️ Condição de fornecedor não atendida - purchaseOrderId:', loading.purchaseOrderId, 'totalPurchaseValue:', loading.totalPurchaseValue);
+
+      if (loading.purchaseOrderId) {
+        void syncPurchaseOrderPayable(loading.purchaseOrderId, loading.companyId, loadingService.getByPurchaseOrder);
+      }
+    }
+
+    if (loading.purchaseOrderId) {
+      // Lógica de comissão (ainda no frontend ou migrável depois)
+      const purchaseOrder = purchaseService.getById(loading.purchaseOrderId);
+      if (purchaseOrder && purchaseOrder.brokerId && purchaseOrder.brokerCommissionPerSc && purchaseOrder.brokerCommissionPerSc > 0) {
+        // ... (mantém lógica de comissão original se necessário, ou move também)
+        // Para simplificar, vou manter a comissão aqui pois ela é gerada PER LOADING
+
+        // Calcula o valor da comissão para ESTA carga
+        // Peso em sc = kg / 60
+        const weightSc = (loading.weightKg || 0) / 60;
+        const commissionValue = Number((weightSc * purchaseOrder.brokerCommissionPerSc).toFixed(2));
+
+        if (commissionValue > 0) {
+          void commissionService.add({
+            loadingId: loading.id,
+            salesOrderId: loading.salesOrderId || undefined,
+            partnerId: purchaseOrder.brokerId,
+            amount: commissionValue,
+            date: loading.date,
+            status: 'pending',
+            description: `Comissão - Placa ${loading.vehiclePlate || 'N/A'} - Pedido ${purchaseOrder.number}`,
+            companyId: loading.companyId || ''
+          });
+          showToast('success', `💰 Comissão criada: R$ ${commissionValue.toFixed(2)}`);
+        }
+      }
     }
 
     const { userId, userName } = getLogInfo();
@@ -417,77 +544,33 @@ export const loadingService = {
     if (!updatedLoading.extraExpenses) updatedLoading.extraExpenses = [];
     if (!updatedLoading.transactions) updatedLoading.transactions = [];
     db.update(updatedLoading);
-    void persistUpsert(updatedLoading);
 
-    const shouldCreateReceivable = updatedLoading.salesOrderId && updatedLoading.unloadWeightKg && updatedLoading.unloadWeightKg > 0;
+    // ✅ Persistir atualização no banco (RPC → fallback UPSERT direto em ops_loadings)
+    const canonicalAttempt = persistLoading(updatedLoading);
+    // ✅ Sync financeiro via TS será feito apenas se a RPC falhar (ver abaixo)
 
-    if (shouldCreateReceivable) {
-      const sale = salesService.getById(updatedLoading.salesOrderId!);
-      const partnerId = sale?.customerId;
-
-      const relatedLoadings = db
-        .getAll()
-        .filter(l => l.salesOrderId === updatedLoading.salesOrderId && l.status !== 'canceled' && l.unloadWeightKg && l.unloadWeightKg > 0);
-
-      const totals = relatedLoadings.reduce(
-        (acc, l) => {
-          const unitPrice = l.salesPrice || sale?.unitPrice || 0;
-          const sc = l.weightSc || (l.unloadWeightKg ? l.unloadWeightKg / 60 : 0);
-          const value = l.totalSalesValue && l.totalSalesValue > 0
-            ? l.totalSalesValue
-            : Number((unitPrice * sc).toFixed(2));
-          return { totalSc: acc.totalSc + sc, amount: acc.amount + value };
-        },
-        { totalSc: 0, amount: 0 }
-      );
-
-      const amount = Number(totals.amount.toFixed(2));
-
-      if (partnerId && amount > 0) {
-        const existingReceivable = receivablesService.getAll().find(r => r.salesOrderId === updatedLoading.salesOrderId);
-        const receivedAmount = existingReceivable?.receivedAmount ?? sale?.paidValue ?? 0;
-        const status: Receivable['status'] = receivedAmount >= amount
-          ? 'received'
-          : receivedAmount > 0
-            ? 'partially_received'
-            : 'pending';
-
-        const receivablePayload: Receivable = {
-          id: existingReceivable?.id || generateUUID(),
-          salesOrderId: updatedLoading.salesOrderId!,
-          partnerId,
-          description: `Venda #${sale?.number || updatedLoading.salesOrderNumber || 'sem número'}`,
-          dueDate: sale?.date || updatedLoading.date,
-          amount,
-          receivedAmount,
-          status,
-          notes: `Consolidado ${relatedLoadings.length} cargas | Total destino ${totals.totalSc.toFixed(2)} SC`,
-          companyId: (sale as any)?.companyId || undefined
-        };
-
-        console.log('💰 Criando/Atualizando receivable:', {
-          id: receivablePayload.id.substring(0, 8),
-          salesOrderId: updatedLoading.salesOrderId,
-          partnerId,
-          amount,
-          status,
-          action: existingReceivable ? 'UPDATE' : 'CREATE'
-        });
-
-        if (existingReceivable) receivablesService.update(receivablePayload);
-        else receivablesService.add(receivablePayload);
-
-        showToast('success', `✅ Conta a Receber criada para ${(sale as any)?.partnerName || 'Cliente'}`);
-        console.log('✅ Receivable salvo! Aguarde atualização em tempo real...');
-      } else {
-        console.warn('⚠️ Receivable não criado: falta partnerId ou valor', {
-          salesOrderId: updatedLoading.salesOrderId,
-          partnerId,
-          amount,
-          unloadWeightKg: updatedLoading.unloadWeightKg
-        });
-      }
+    // ✅ DETECÇÃO DE MUDANÇAS FINANCEIRAS (via módulo isolado)
+    if (oldLoading) {
+      syncFinancialHistory(oldLoading, updatedLoading);
     }
+
+    void canonicalAttempt.then((canonicalUpserted) => {
+      const canonicalAuthoritative = canonicalUpserted;
+
+      // ✅ Se a RPC falhou, sincroniza financial entries via TypeScript
+      if (!canonicalAuthoritative) {
+        void syncFinancialEntriesFromLoading(updatedLoading, false);
+      }
+
+      // ✅ SQL-first: recebível é recalculado no banco quando canônico está autoritativo
+      if (!canonicalAuthoritative) {
+        const shouldSyncReceivable = !!updatedLoading.salesOrderId;
+        if (shouldSyncReceivable) {
+          const allLoadings = db.getAll();
+          void syncReceivableFromLoading(updatedLoading, allLoadings, showToast);
+        }
+      }
+    });
 
     const { userId, userName } = getLogInfo();
     let description = `Atualizou dados do carregamento ${updatedLoading.vehiclePlate}`;
@@ -499,6 +582,20 @@ export const loadingService = {
       } else if ((updatedLoading.extraExpenses?.length || 0) > (oldLoading.extraExpenses?.length || 0)) {
         description = `Lançou despesa extra no frete: ${updatedLoading.vehiclePlate}`;
       }
+    }
+
+    // Sync Extra Expenses to new table
+    if (updatedLoading.extraExpenses && updatedLoading.extraExpenses.length > 0) {
+      updatedLoading.extraExpenses.forEach(exp => {
+        void freightExpenseService.add({
+          loadingId: updatedLoading.id,
+          type: exp.type === 'deduction' ? 'quebra' : 'outros', // Map appropriately
+          amount: exp.value,
+          description: exp.description,
+          isDeduction: exp.type === 'deduction',
+          companyId: updatedLoading.companyId || ''
+        });
+      });
     }
 
     logService.addLog({
@@ -527,68 +624,100 @@ export const loadingService = {
       }
     });
 
-    // ✅ SYNC: Atualizar status do Payable de FRETE se houver pagamento no Logística
-    if (updatedLoading.totalFreightValue && updatedLoading.totalFreightValue > 0) {
-      const allPayables = payablesService.getAll();
-      const freightPayable = allPayables.find(
-        p => p.loadingId === updatedLoading.id && p.subType === 'freight'
-      );
+    void canonicalAttempt.then((canonicalUpserted) => {
+      const canonicalAuthoritative = isSqlCanonicalOpsEnabled() && canonicalUpserted;
 
-      if (freightPayable) {
-        const freightAmount = Number(updatedLoading.totalFreightValue) || 0;
-        const freightPaid = Number(updatedLoading.freightPaid) || 0;
-
-        // Se houve mudança significativa nos valores ou status
-        if (Math.abs(freightPayable.paidAmount - freightPaid) > 0.01 || Math.abs(freightPayable.amount - freightAmount) > 0.01) {
-          console.log(`🔄 Sincronizando Payable de Frete: ${freightPayable.description}`, {
-            antes: { amount: freightPayable.amount, paid: freightPayable.paidAmount },
-            agora: { amount: freightAmount, paid: freightPaid }
-          });
-
-          payablesService.update({
-            ...freightPayable,
-            amount: freightAmount,
-            paidAmount: freightPaid,
-            status: freightPaid >= freightAmount ? 'paid' : freightPaid > 0 ? 'partially_paid' : 'pending'
-          });
+      // ✅ SQL-first: payable de frete/compra é reconstruído no banco quando canônico está autoritativo
+      if (!canonicalAuthoritative) {
+        syncFreightPayable(updatedLoading);
+        if (updatedLoading.purchaseOrderId) {
+          void syncPurchaseOrderPayable(updatedLoading.purchaseOrderId, updatedLoading.companyId, loadingService.getByPurchaseOrder);
         }
       }
-    }
+    });
   },
 
-  delete: (id: string) => {
+  delete: async (id: string) => {
     const loading = db.getById(id);
-    db.delete(id);
-    void persistDelete(id);
+    if (!loading) return;
 
-    // ✅ DELETE EM CASCATA: Se o carregamento tinha um payable de frete OU comissão, delete também
-    if (loading) {
+    // ✅ SKIL §5.4 — Gap 6: Verificar pagamentos via financial_entries (fonte canônica), não payablesService
+    let hasPaidEntries = false;
+    try {
+      const { data: paidEntries } = await supabase
+        .from('financial_entries')
+        .select('id, paid_amount, origin_type')
+        .eq('origin_id', id)
+        .in('origin_type', ['freight', 'commission'])
+        .gt('paid_amount', 0);
+
+      hasPaidEntries = !!(paidEntries && paidEntries.length > 0);
+    } catch {
+      // Fallback: se financial_entries não estiver disponível, checar payablesService
       const allPayables = payablesService.getAll();
+      const freightPayable = allPayables.find((p: any) => p.subType === 'freight' && p.loadingId === id);
+      const commissionPayable = allPayables.find((p: any) => p.subType === 'commission' && p.loadingId === id);
+      hasPaidEntries = !!((freightPayable && freightPayable.paidAmount > 0) || (commissionPayable && commissionPayable.paidAmount > 0));
+    }
 
-      // Deletar payable de FRETE
-      if (loading.totalFreightValue && loading.totalFreightValue > 0) {
-        const freightPayable = allPayables.find(
-          p => p.purchaseOrderId === loading.purchaseOrderId &&
-            p.subType === 'freight' &&
-            p.partnerId === loading.carrierId &&
-            p.loadingId === loading.id // Garante que deleta apenas o frete DESTA carga (se tiver ID vinculado)
-        );
+    if (hasPaidEntries) {
+      showToast('error', 'Exclusão Bloqueada', 'O frete ou comissão deste romaneio possui pagamentos (baixas). Exclua o pagamento primeiro.');
+      return; // Interrompe a exclusão
+    }
 
-        if (freightPayable) {
-          console.log(`🗑️ Deletando payable associado ao frete: ${freightPayable.id}`);
-          payablesService.delete(freightPayable.id);
-        }
-      }
+    // Coletar IDs de payables (legado) para limpeza em cascata
+    const allPayables = payablesService.getAll();
+    const freightPayable = allPayables.find((p: any) => p.subType === 'freight' && p.loadingId === id);
+    const commissionPayable = allPayables.find((p: any) => p.subType === 'commission' && p.loadingId === id);
 
-      // Deletar payable de COMISSÃO
-      const commissionPayable = allPayables.find(
-        p => p.loadingId === loading.id && p.subType === 'commission'
-      );
+    db.delete(id);
+    // ✅ Deletar do banco (RPC → fallback DELETE direto em ops_loadings)
+    void deleteLoadingFromDb(id);
+    if (loading) {
+      void syncFinancialEntriesFromLoading(loading, true);
+    }
 
-      if (commissionPayable) {
-        console.log(`🗑️ Deletando payable associado à comissão: ${commissionPayable.id}`);
-        payablesService.delete(commissionPayable.id);
-      }
+    // ✅ DELETE EM CASCATA COMPLETA
+    if (loading) {
+      // 1. Delete specialized records (Commission, Expenses)
+      void commissionService.deleteByLoading(id);
+      void freightExpenseService.deleteByLoading(id);
+
+      const payableIds: string[] = [];
+
+      // 2. Coletar IDs de payables associados
+      if (freightPayable) payableIds.push(freightPayable.id);
+      if (commissionPayable) payableIds.push(commissionPayable.id);
+
+      // Limpeza financeira (sempre executar — o SQL cuida da parte dele via trigger, aqui limpamos o legado)
+      // 3. ✅ Limpeza COMPLETA via orquestrador centralizado
+      // Limpa: financial_history, admin_expenses (standalone), financial_transactions
+      void import('./financial/paymentOrchestrator').then(({ cleanupFinancialRecords }) => {
+        cleanupFinancialRecords({
+          entityId: id,
+          entityType: 'loading',
+          payableIds
+        }).then(() => {
+          // 4. Deletar os payables APÓS limpar as dependências
+          if (freightPayable) {
+            payablesService.delete(freightPayable.id);
+          }
+          if (commissionPayable) {
+            payablesService.delete(commissionPayable.id);
+          }
+
+          // 🚀 MIGRADO PARA TRIGGER NO SUPABASE (Fase 2)
+          /*
+              if (loading.purchaseOrderId) {
+                void syncPurchaseOrderPayable(loading.purchaseOrderId, loading.companyId, loadingService.getByPurchaseOrder);
+              }
+              if (loading.salesOrderId) {
+                const allLoadings = db.getAll(); // Agora sem a carga deletada
+                void syncReceivableFromLoading(loading, allLoadings, showToast);
+              }
+              */
+            });
+          });
     }
 
     const { userId, userName } = getLogInfo();
@@ -620,69 +749,27 @@ export const loadingService = {
 
   importData: (data: Loading[]) => {
     db.setAll(data);
-    const payload = data.map(mapLoadingToDb);
+    // Persistir cada loading via ops_loadings
     void (async () => {
-      try {
-        const { error } = await supabase.from('logistics_loadings').upsert(payload);
-        if (error) console.error('Erro ao importar carregamentos no Supabase', error);
-      } catch (err) {
-        console.error('Erro inesperado ao importar carregamentos no Supabase', err);
+      for (const loading of data) {
+        await persistLoading(loading);
       }
     })();
   },
 
-  // ✅ FUNÇÃO DE CORREÇÃO: Recalcular todos os payables de pedidos de compra
+  // ✅ FUNÇÃO DE CORREÇÃO: Recalcular todos os payables de pedidos de compra (módulo extraído)
   recalculateAllPurchasePayables: () => {
-    console.log('🔧 INICIANDO RECÁLCULO DE PAYABLES DE COMPRA...');
+    _recalcPurchase(loadingService.getByPurchaseOrder, showToast);
+  },
 
-    const allPayables = payablesService.getAll();
-    const purchasePayables = allPayables.filter(p => p.subType === 'purchase_order');
+  // ✅ NOVA FUNÇÃO: Recalcular todos os payables de FRETE (módulo extraído)
+  recalculateAllFreightPayables: () => {
+    _recalcFreight(loadingService.getAll, showToast);
+  },
 
-    console.log(`📊 Total de payables de compra encontrados: ${purchasePayables.length}`);
-
-    purchasePayables.forEach(payable => {
-      if (!payable.purchaseOrderId) {
-        console.log(`⚠️ Payable ${payable.id} sem purchaseOrderId, pulando...`);
-        return;
-      }
-
-      // Buscar todas as cargas deste pedido
-      const loadings = loadingService.getByPurchaseOrder(payable.purchaseOrderId);
-
-      if (loadings.length === 0) {
-        console.log(`⚠️ Nenhuma carga encontrada para pedido ${payable.purchaseOrderId}`);
-        return;
-      }
-
-      // Somar valores de todas as cargas
-      const totalPurchaseAmount = loadings.reduce((sum, l) => sum + (Number(l.totalPurchaseValue) || 0), 0);
-      const totalPurchasePaid = loadings.reduce((sum, l) => sum + (Number(l.productPaid) || 0), 0);
-
-      // Verificar se o valor está diferente
-      if (payable.amount !== totalPurchaseAmount || payable.paidAmount !== totalPurchasePaid) {
-        console.log(`🔄 CORRIGINDO Payable ${payable.description}:`, {
-          valorAntigo: payable.amount,
-          valorNovo: totalPurchaseAmount,
-          pagoAntigo: payable.paidAmount,
-          pagoNovo: totalPurchasePaid,
-          totalCargas: loadings.length
-        });
-
-        // Atualizar com valores corretos
-        payablesService.update({
-          ...payable,
-          amount: totalPurchaseAmount,
-          paidAmount: totalPurchasePaid,
-          status: totalPurchasePaid >= totalPurchaseAmount ? 'paid' : totalPurchasePaid > 0 ? 'partially_paid' : 'pending'
-        });
-
-        console.log(`✅ Payable corrigido com sucesso!`);
-      } else {
-        console.log(`✓ Payable ${payable.description} já está correto (${totalPurchaseAmount})`);
-      }
-    });
-
-    console.log('🎉 RECÁLCULO CONCLUÍDO!');
+  rebuildFinancialEntriesFromLoadings: async () => {
+    const all = loadingService.getAll();
+    await rebuildFinancialEntriesFromLoadings(all);
   },
 
   reload: () => {
@@ -690,13 +777,11 @@ export const loadingService = {
     return loadFromSupabase();
   },
   loadFromSupabase,
-  startRealtime
+  startRealtime,
+  stopRealtime
 };
 
-// ✅ EXECUTAR CORREÇÃO AUTOMATICAMENTE AO CARREGAR O MÓDULO
-setTimeout(() => {
-  if (isLoaded) {
-    console.log('🔧 Executando correção automática de payables...');
-    loadingService.recalculateAllPurchasePayables();
-  }
-}, 2000);
+// ❌ REMOVIDO: Recálculo automático de payables ao carregar o módulo
+// Motivo: Causava efeitos colaterais em cascata — editar um pedido recalculava TODOS os payables
+// As funções recalculateAllPurchasePayables() e recalculateAllFreightPayables() 
+// continuam disponíveis para uso manual (botão no admin ou chamada explícita)

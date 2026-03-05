@@ -3,17 +3,10 @@ import React, { useState, useRef, useEffect } from 'react';
 import { GoogleGenAI } from '@google/genai';
 // Added missing icons: AlertTriangle, TrendingUp
 import { Send, Loader2, Bot, User, Sparkles, Database, HelpCircle, ArrowRight, MessageSquareCode, BrainCircuit, BarChart3, Wallet, AlertTriangle, TrendingUp } from 'lucide-react';
-import { partnerService } from '../../../services/partnerService';
-import { purchaseService } from '../../../services/purchaseService';
-import { salesService } from '../../../services/salesService';
-import { loadingService } from '../../../services/loadingService';
-import { financialActionService } from '../../../services/financialActionService';
-import { shareholderService } from '../../../services/shareholderService';
-import { financialService } from '../../../services/financialService';
-import { authService } from '../../../services/authService';
+import { useAIAssistantContext } from '../hooks/useAIAssistantContext';
 
 const AIAssistant: React.FC = () => {
-  const currentUser = authService.getCurrentUser();
+  const { currentUser, getSystemContext } = useAIAssistantContext();
   const userName = currentUser?.name.split(' ')[0] || 'Usuário';
   
   const [input, setInput] = useState('');
@@ -31,37 +24,6 @@ const AIAssistant: React.FC = () => {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
-
-  const getSystemContext = () => {
-    const partners = partnerService.getAll();
-    const purchases = purchaseService.getAll();
-    const sales = salesService.getAll();
-    const loadings = loadingService.getAll().filter(l => l.status !== 'canceled');
-    const accounts = financialService.getBankAccounts();
-    const shareholders = shareholderService.getAll();
-    const standalone = financialActionService.getStandaloneRecords();
-
-    // Cálculos de insights para a IA
-    const totalQuebraKg = loadings.reduce((acc, l) => acc + (l.breakageKg || 0), 0);
-    const totalFinanceiroAberto = standalone.filter(r => r.status !== 'paid').reduce((acc, r) => acc + (r.originalValue - r.paidValue), 0);
-
-    const context = {
-      empresa: "Suporte Grãos ERP v1.8",
-      usuario_atual: currentUser?.name,
-      cargo_usuario: currentUser?.role,
-      insights_do_dia: {
-        pedidos_compra: purchases.filter(p => p.status !== 'completed').length,
-        pedidos_venda: sales.filter(s => s.status !== 'completed').length,
-        total_quebra_logistica_kg: totalQuebraKg,
-        contas_pendentes_total: totalFinanceiroAberto,
-        socios_em_credito: shareholders.filter(s => s.financial.currentBalance > 0).map(s => s.name),
-        ultima_carga: loadings[0] ? `Placa ${loadings[0].vehiclePlate} (${loadings[0].carrierName})` : 'Sem cargas registradas'
-      },
-      manual_base: "Venda baseada em peso destino (balança cliente). Compra baseada em peso origem (balança fazenda). Frete pode ser por origem ou destino. Quebras acima de 0.25% exigem auditoria. Lucro Líquido = Receita - (Grão + Frete + Despesas)."
-    };
-
-    return JSON.stringify(context);
-  };
 
   const handleSend = async (msgOverride?: string) => {
     const userMessage = msgOverride || input.trim();
@@ -101,7 +63,6 @@ const AIAssistant: React.FC = () => {
       const text = response.text || 'DLABS AI: Tive um problema ao processar essa análise. Tente novamente.';
       setMessages(prev => [...prev, { role: 'model', text }]);
     } catch (err) {
-      console.error(err);
       setMessages(prev => [...prev, { role: 'model', text: 'DLABS AI: Estou offline temporariamente. Verifique sua chave de API nas configurações.' }]);
     } finally {
       setLoading(false);

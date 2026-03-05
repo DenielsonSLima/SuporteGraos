@@ -2,15 +2,15 @@
 import React, { useEffect, useState } from 'react';
 import { Calendar } from 'lucide-react';
 import { ReportModule } from '../../types';
-import { loadingService, mapLoadingFromDb } from '../../../../services/loadingService';
 import UniversalReportTemplate from '../../templates/UniversalReportTemplate';
-import { supabase } from '../../../../services/supabase';
+import { getFreightCarrierOptions, fetchMonthlyFreightHistoryData } from './data';
 
 import DefaultFilters from '../../components/DefaultFilters';
 
+// TODO: Migrar para campo balance pré-computado no SQL de fetchMonthlyFreightHistory\nconst getOpenBalance = (total: number, paid: number) => Math.max(0, total - paid);
+
 const MonthlyFreightHistoryFilters: React.FC<any> = (props) => {
-  // TODO: Em um futuro ideal, buscar carriers via RPC/Query distinct para não depender do loadingService
-  const carriers = Array.from(new Set(loadingService.getAll().map(l => l.carrierName).filter(Boolean)));
+  const carriers = getFreightCarrierOptions();
   return <DefaultFilters {...props} carrierOptions={carriers} />;
 };
 
@@ -29,33 +29,11 @@ const monthlyFreightHistoryReport: ReportModule = {
   },
   FilterComponent: MonthlyFreightHistoryFilters,
   fetchData: async ({ startDate, endDate, carrierName }) => {
-
-    // Construir query no Supabase
-    let query = supabase
-      .from('logistics_loadings')
-      .select('*')
-      .neq('status', 'canceled');
-
-    if (startDate) query = query.gte('date', startDate);
-    if (endDate) query = query.lte('date', endDate);
-    // Adicionei filtro para buscar apenas finalizados se desejado, mas o original trazia tudo exceto cancelado
-
-    // Filtro por transportadora (case insensitive ou exato? O original era exato no ID ou nome?)
-    // O original filtrava por carrierName === carrierName.
-    // No banco, temos carrier_name.
-    if (carrierName) {
-      query = query.eq('carrier_name', carrierName);
-    }
-
-    const { data, error } = await query;
-
-    if (error) {
-      console.error('Erro ao buscar dados do relatório:', error);
-      throw error;
-    }
-
-    // Mapear dados crus snake_case para camelCase (Loading objects)
-    const records = (data || []).map(mapLoadingFromDb);
+    const records = await fetchMonthlyFreightHistoryData({
+      startDate,
+      endDate,
+      carrierName
+    });
 
     // Agregação em memória (agora segura pois só temos os dados filtrados)
     const totalTon = records.reduce((acc, l) => acc + ((l.weightKg || 0) / 1000), 0);
@@ -78,7 +56,7 @@ const monthlyFreightHistoryReport: ReportModule = {
       ],
       rows: records.map(l => ({
         ...l,
-        balance: (l.totalFreightValue || 0) - (l.freightPaid || 0),
+        balance: getOpenBalance(l.totalFreightValue || 0, l.freightPaid || 0),
         driverName: l.driverName || '-',
         weightType: l.unloadWeightKg ? 'Destino' : 'Origem',
         breakageKg: l.breakageKg || 0,

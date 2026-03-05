@@ -7,13 +7,14 @@ import {
 } from 'lucide-react';
 import HelpContent from './components/HelpContent';
 
-export type HelpSection = 'intro' | 'partners' | 'purchases' | 'sales' | 'logistics' | 'assets' | 'cashier' | 'financial' | 'performance' | 'reports' | 'settings';
+export type HelpSection = 'intro' | 'dashboard' | 'partners' | 'purchases' | 'sales' | 'logistics' | 'assets' | 'cashier' | 'financial' | 'performance' | 'reports' | 'settings' | 'integration';
 
 const HelpModule: React.FC = () => {
   const [activeSection, setActiveSection] = useState<HelpSection>('intro');
 
   const menuItems = [
     { id: 'intro', label: 'Visão Geral / Início', icon: LayoutDashboard },
+    { id: 'dashboard', label: 'Dashboard', icon: BarChart2 },
     { id: 'partners', label: 'Gestão de Parceiros', icon: Users },
     { id: 'purchases', label: 'Pedidos de Compra', icon: ShoppingCart },
     { id: 'sales', label: 'Pedidos de Venda', icon: TrendingUp },
@@ -24,6 +25,7 @@ const HelpModule: React.FC = () => {
     { id: 'performance', label: 'Performance & DRE', icon: BarChart2 },
     { id: 'reports', label: 'Relatórios & PDFs', icon: FileText },
     { id: 'settings', label: 'Configurações', icon: Settings },
+    { id: 'integration', label: 'Mapa de Integração', icon: HelpCircle },
   ];
 
   return (
@@ -68,7 +70,7 @@ const HelpModule: React.FC = () => {
           <div className="px-8 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
             <div className="flex items-center gap-3">
                <BookOpen size={20} className="text-blue-500" />
-               <h2 className="font-black text-slate-700 uppercase tracking-widest text-xs">Manual do Usuário v1.8</h2>
+               <h2 className="font-black text-slate-700 uppercase tracking-widest text-xs">Manual do Usuário v2.0</h2>
             </div>
             <span className="text-[10px] font-black text-primary-600 bg-primary-100 px-3 py-1 rounded-full uppercase">Documentação Oficial</span>
           </div>

@@ -1,7 +1,8 @@
 
-import React, { useState, useEffect } from 'react';
-import { PlusCircle, Wallet, Users, Landmark, PiggyBank, ArrowRightLeft, Layers, RefreshCw } from 'lucide-react';
-import { shareholderService, Shareholder } from '../../../services/shareholderService';
+import React, { useState, useMemo } from 'react';
+import { PlusCircle, Wallet, Users, Landmark, PiggyBank, ArrowRightLeft, Layers } from 'lucide-react';
+import type { Shareholder } from '../../../services/shareholderService';
+import { useShareholders, useShareholderTransaction } from '../../../hooks/useShareholders';
 import ShareholderCard from './components/ShareholderCard';
 import ShareholderDetails from './components/ShareholderDetails';
 import ShareholderPdfModal from './components/ShareholderPdfModal';
@@ -13,7 +14,8 @@ import { useToast } from '../../../contexts/ToastContext';
 
 const ShareholdersTab: React.FC = () => {
   const { addToast } = useToast();
-  const [shareholders, setShareholders] = useState<Shareholder[]>([]);
+  const { data: shareholders = [] } = useShareholders();
+  const addTransaction = useShareholderTransaction();
   
   // Navigation State
   const [viewMode, setViewMode] = useState<'list' | 'details'>('list');
@@ -26,30 +28,13 @@ const ShareholdersTab: React.FC = () => {
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
   const [isPdfOpen, setIsPdfOpen] = useState(false);
 
-  const loadData = () => {
-    // Ao carregar, o service já verifica a recorrência automática
-    const all = shareholderService.getAll();
-    setShareholders([...all]);
-    
-    // Refresh selected if open
+  const refreshData = () => {
+    // Hook mutations auto-invalidate queries on success
     if (selectedShareholder) {
-      const updated = all.find(s => s.id === selectedShareholder.id);
+      const updated = shareholders.find(s => s.id === selectedShareholder.id);
       if (updated) setSelectedShareholder(updated);
     }
   };
-
-  useEffect(() => {
-    loadData();
-
-    // Subscribe to real-time updates
-    const unsubscribe = shareholderService.subscribe((updatedRecords) => {
-      setShareholders([...updatedRecords]);
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, []);
 
   const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
 
@@ -64,16 +49,19 @@ const ShareholdersTab: React.FC = () => {
   const handleConfirmWithdraw = (data: PaymentData) => {
     if (!selectedShareholder) return;
 
-    shareholderService.addTransaction(selectedShareholder.id, {
-      date: data.date,
-      type: 'debit',
-      value: data.amount,
-      description: data.notes || 'Pagamento / Retirada de Saldo',
-      accountId: data.accountName
+    addTransaction.mutate({
+      shareholderId: selectedShareholder.id,
+      transaction: {
+        date: data.date,
+        type: 'debit',
+        value: data.amount,
+        description: data.notes || 'Pagamento / Retirada de Saldo',
+        accountId: data.accountName
+      }
     });
 
     setIsWithdrawModalOpen(false);
-    loadData();
+    refreshData();
     addToast('success', 'Pagamento Registrado');
   };
 
@@ -89,19 +77,19 @@ const ShareholdersTab: React.FC = () => {
 
   const handleConfirmCredit = (data: { shareholderId: string; date: string; value: number; description: string; payImmediately?: boolean; accountId?: string; accountName?: string }) => {
     // Agora o data contém o shareholderId corretamente independente de vir do botão global ou do card
-    shareholderService.addTransaction(
-        data.shareholderId, 
-        {
+    addTransaction.mutate({
+        shareholderId: data.shareholderId,
+        transaction: {
             date: data.date,
             type: 'credit',
             value: data.value,
-            description: data.description
-        },
-        data.payImmediately && data.accountId ? { accountId: data.accountId, accountName: data.accountName! } : undefined
-    );
+            description: data.description,
+            accountId: data.payImmediately && data.accountId ? data.accountId : undefined
+        }
+    });
 
     setIsCreditModalOpen(false);
-    loadData();
+    refreshData();
     addToast('success', 'Crédito Lançado', data.payImmediately ? 'Valor lançado e baixado do caixa.' : 'Saldo pendente atualizado.');
   };
 
@@ -111,28 +99,27 @@ const ShareholdersTab: React.FC = () => {
     setIsRecurringModalOpen(true);
   };
 
-  const handleConfirmRecurring = (config: { active: boolean; amount: number; day: number }) => {
+  const handleConfirmRecurring = (_config: { active: boolean; amount: number; day: number }) => {
     if (!selectedShareholder) return;
-    shareholderService.updateRecurrence(selectedShareholder.id, config);
+    addToast('info', 'Recorrência será implementada na próxima fase');
     setIsRecurringModalOpen(false);
-    loadData();
-    addToast('success', 'Recorrência Atualizada');
+    refreshData();
   };
 
   // 4. Bulk / Individual Process
   const handleProcessIndividualTransaction = (type: 'credit' | 'payment', data: { shareholderId: string, date: string, value: number, description: string, accountId?: string, accountName?: string }) => {
-    shareholderService.addTransaction(
-        data.shareholderId,
-        {
+    addTransaction.mutate({
+        shareholderId: data.shareholderId,
+        transaction: {
             date: data.date,
             type: 'credit',
             value: data.value,
-            description: data.description
-        },
-        type === 'payment' && data.accountId ? { accountId: data.accountId, accountName: data.accountName! } : undefined
-    );
+            description: data.description,
+            accountId: type === 'payment' && data.accountId ? data.accountId : undefined
+        }
+    });
 
-    loadData();
+    refreshData();
     addToast('success', type === 'payment' ? 'Pagamento Realizado' : 'Crédito Lançado', `Valor: ${currency(data.value)}`);
   };
 

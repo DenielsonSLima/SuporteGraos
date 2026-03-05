@@ -1,16 +1,11 @@
 
-import React, { useState, useMemo } from 'react';
+import React from 'react';
 import { X, Calendar, DollarSign, User, FileText, Landmark, Tag, Pencil, Trash2, ShieldAlert, CheckCircle2, History, ArrowRight } from 'lucide-react';
 import { FinancialRecord } from '../../types';
 import ActionConfirmationModal from '../../../../components/ui/ActionConfirmationModal';
 import TransactionManagementModal from '../../components/modals/TransactionManagementModal';
-import { financialActionService } from '../../../../services/financialActionService';
-import { purchaseService } from '../../../../services/purchaseService';
-import { salesService } from '../../../../services/salesService';
-import { standaloneRecordsService } from '../../../../services/standaloneRecordsService';
-import { financialHistoryService } from '../../../../services/financial/financialHistoryService';
 import { useToast } from '../../../../contexts/ToastContext';
-import { ModuleId } from '../../../../types';
+import { useFinancialRecordDetailsModal } from '../hooks/useFinancialRecordDetailsModal';
 
 interface Props {
   isOpen: boolean;
@@ -21,92 +16,29 @@ interface Props {
 
 const FinancialRecordDetailsModal: React.FC<Props> = ({ isOpen, onClose, record, onRefresh }) => {
   const { addToast } = useToast();
-  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
-  const [selectedTx, setSelectedTx] = useState<any>(null);
 
   if (!isOpen) return null;
 
   const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
   const date = (val: string) => new Date(val).toLocaleDateString('pt-BR');
 
-  const isManual = record.subType === 'admin';
-  const isSystem = !isManual;
-
-  // Se for sistema, buscamos as transações reais vinculadas ao pedido para permitir edição granular
-  const systemicTransactions = useMemo(() => {
-    if (!isSystem) return [];
-    if (record.subType === 'purchase_order') {
-      const orderId = record.id.replace('po-grain-', '');
-      return purchaseService.getById(orderId)?.transactions || [];
-    }
-    if (record.subType === 'sales_order') {
-      const orderId = record.id.replace('so-', '');
-      return salesService.getById(orderId)?.transactions || [];
-    }
-    return [];
-  }, [record, isSystem]);
-
-  const handleDelete = async () => {
-    // 1. Tentar excluir se for Registro Avulso (Standalone)
-    if (standaloneRecordsService.getById(record.id)) {
-      await standaloneRecordsService.delete(record.id);
-      addToast('success', 'Registro Avulso Excluído');
-      onRefresh();
-      onClose();
-      return;
-    }
-
-    // 2. Tentar excluir se for Histórico Financeiro (Audit Log / Snapshot)
-    // Isso permite limpar "Fantasmas" ou logs antigos de registros já apagados na origem
-    if (financialHistoryService.getById(record.id)) {
-      await financialHistoryService.delete(record.id);
-      addToast('success', 'Registro de Histórico Excluído');
-      onRefresh();
-      onClose();
-      return;
-    }
-
-    // 3. Se for registro sistêmico (Pedido de Compra/Venda), bloqueia e exige estorno na origem
-    if (isSystem) {
-      addToast('warning', 'Registro Bloqueado', 'Para excluir um saldo de pedido, você deve estornar os pagamentos individuais ou excluir o pedido na origem.');
-      return;
-    }
-
-    // 4. Fallback para deleção genérica (código original)
-    (financialActionService as any).deleteStandaloneRecord?.(record.id);
-    addToast('success', 'Registro Excluído');
-    onRefresh();
-    onClose();
-  };
-
-  const handleUpdateTx = (updated: any) => {
-    if (record.subType === 'purchase_order') {
-      purchaseService.updateTransaction(record.id.replace('po-grain-', ''), updated);
-    } else if (record.subType === 'sales_order') {
-      salesService.updateTransaction(record.id.replace('so-', ''), updated);
-    }
-    onRefresh();
-    setSelectedTx(null);
-    addToast('success', 'Pagamento Atualizado');
-  };
-
-  const handleDeleteTx = (id: string) => {
-    if (record.subType === 'purchase_order') {
-      purchaseService.deleteTransaction(record.id.replace('po-grain-', ''), id);
-    } else if (record.subType === 'sales_order') {
-      salesService.deleteTransaction(record.id.replace('so-', ''), id);
-    }
-    onRefresh();
-    setSelectedTx(null);
-    addToast('success', 'Pagamento Estornado');
-  };
-
-  const handleNavigateToOrigin = () => {
-    const moduleId = record.subType === 'purchase_order' ? ModuleId.PURCHASE_ORDER : ModuleId.SALES_ORDER;
-    const orderId = record.id.replace('po-grain-', '').replace('so-', '');
-    window.dispatchEvent(new CustomEvent('app:navigate', { detail: { moduleId, orderId } }));
-    onClose();
-  };
+  const {
+    isDeleteConfirmOpen,
+    setIsDeleteConfirmOpen,
+    selectedTx,
+    setSelectedTx,
+    isSystem,
+    systemicTransactions,
+    handleDelete,
+    handleUpdateTx,
+    handleDeleteTx,
+    handleNavigateToOrigin,
+  } = useFinancialRecordDetailsModal({
+    record,
+    onClose,
+    onRefresh,
+    addToast,
+  });
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">

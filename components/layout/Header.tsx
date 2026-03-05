@@ -3,7 +3,6 @@ import { Search, Bell, Menu, HelpCircle, ShoppingCart, Truck, AlertTriangle, Che
 import { ModuleId } from '../../types';
 import { useNotification } from '../../contexts/NotificationContext';
 import { searchService, SearchResult } from '../../services/searchService';
-import LatencyIndicator from '../monitoring/LatencyIndicator';
 
 interface HeaderProps {
   toggleSidebar: () => void;
@@ -36,32 +35,8 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar, title, onNavigate }) => 
       }
     };
 
-  // 🔄 Atualizar cache info quando dados mudarem
-  useEffect(() => {
-    const updateCacheInfo = () => {
-      try {
-        const info = DashboardCache.getCacheInfo();
-        setCacheInfo(info);
-      } catch (error) {
-        console.error('Error getting cache info:', error);
-      }
-    };
+  // 🔄 Atualizar cache info quando dados mudarem — removido (DashboardCache foi migrado para TanStack Query)
 
-    // Atualizar inicialmente
-    updateCacheInfo();
-
-    window.addEventListener('data:updated', updateCacheInfo);
-    window.addEventListener('financial:updated', updateCacheInfo);
-
-    // Atualizar a cada 10 segundos
-    const interval = setInterval(updateCacheInfo, 10000);
-
-    return () => {
-      window.removeEventListener('data:updated', updateCacheInfo);
-      window.removeEventListener('financial:updated', updateCacheInfo);
-      clearInterval(interval);
-    };
-  }, []);
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
@@ -178,9 +153,6 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar, title, onNavigate }) => 
         </div>
         
         <div className="flex items-center gap-x-4 lg:gap-x-6">
-          {/* ⚡ Indicador de Latência */}
-          <LatencyIndicator size="md" showLabel={true} />
-          
           {/* 🔧 Botões alinhados verticalmente */}
           <button 
             type="button" 

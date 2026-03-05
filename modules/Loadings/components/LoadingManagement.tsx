@@ -7,18 +7,14 @@ import {
   ArrowRightLeft, Check, LayoutGrid, Info, MapPin
 } from 'lucide-react';
 import { Loading } from '../types';
-import { SalesOrder } from '../../SalesOrder/types';
-import { salesService } from '../../../services/salesService';
-import { partnerService } from '../../../services/partnerService';
-import { fleetService } from '../../../services/fleetService';
-import { driverService } from '../../../services/driverService';
-import { loadingService } from '../../../services/loadingService';
-import { invalidateLoadingCache } from '../../../services/loadingCache';
-import { PARTNER_CATEGORY_IDS } from '../../../constants';
-import { Partner, Driver, Vehicle } from '../../Partners/types';
 import TransactionModal from '../../PurchaseOrder/components/modals/TransactionModal';
 import LoadingFinancialTab from './LoadingFinancialTab';
 import { useToast } from '../../../contexts/ToastContext';
+import { useActiveSales } from '../../../hooks/useActiveSales';
+import { useCarrierPartners } from '../../../hooks/useCarrierPartners';
+import { usePartnerDrivers, usePartnerVehicles } from '../../../hooks/useParceiros';
+import { useUpdateLoading, useDeleteLoading, useSaveLoadingTransaction } from '../../../hooks/useLoadingMutations';
+import { computeLoadingStats, recalcFreightValue, recalcSalesValue } from '../calculations';
 
 interface Props {
   loading: Loading;
@@ -29,21 +25,15 @@ interface Props {
 
 const LoadingManagement: React.FC<Props> = ({ loading, onClose, onUpdate, originContext = 'logistics' }) => {
   const { addToast } = useToast();
-  
-  // Configura o callback de toast no loadingService
-  useEffect(() => {
-    loadingService.setToastCallback((type, title, message) => {
-      addToast(type, title, message);
-    });
-  }, [addToast]);
+
+  // ─── TanStack Query Hooks ──────────────────────────────────────────────────
+  const { data: activeSales = [] } = useActiveSales();
+  const { data: allCarriers = [] } = useCarrierPartners();
+  const updateLoadingMut = useUpdateLoading();
+  const deleteLoadingMut = useDeleteLoading();
+  const saveTransactionMut = useSaveLoadingTransaction();
   
   const [activeTab, setActiveTab] = useState<'info' | 'financial'>('info');
-
-  const [activeSales, setActiveSales] = useState<SalesOrder[]>([]);
-  const [allCarriers, setAllCarriers] = useState<Partner[]>([]);
-  const [availableDrivers, setAvailableDrivers] = useState<Driver[]>([]);
-  const [availableVehicles, setAvailableVehicles] = useState<Vehicle[]>([]);
-
   const [isEditing, setIsEditing] = useState(false);
   const [isQuickRedirecting, setIsQuickRedirecting] = useState(false);
   const [isTxModalOpen, setIsTxModalOpen] = useState(false);
@@ -52,6 +42,13 @@ const LoadingManagement: React.FC<Props> = ({ loading, onClose, onUpdate, origin
   const [editForm, setEditForm] = useState<Loading>({ ...loading });
   const [freightBase, setFreightBase] = useState<'origin' | 'destination'>('origin');
   const [quickWeight, setQuickWeight] = useState<string>(loading.unloadWeightKg?.toString() || '');
+
+  // ─── Fleet data via hooks (substituem loadCarrierFleetData manual) ─────────
+  const activeCarrierId = isEditing ? editForm.carrierId : '';
+  const { data: rawDrivers = [] } = usePartnerDrivers(activeCarrierId);
+  const { data: rawVehicles = [] } = usePartnerVehicles(activeCarrierId);
+  const availableDrivers = useMemo(() => rawDrivers.filter(d => d.active !== false), [rawDrivers]);
+  const availableVehicles = useMemo(() => rawVehicles.filter(v => v.active !== false), [rawVehicles]);
 
   useEffect(() => {
     setEditForm({ ...loading });
@@ -69,68 +66,8 @@ const LoadingManagement: React.FC<Props> = ({ loading, onClose, onUpdate, origin
     }
   }, [loading.id]);
 
-  useEffect(() => {
-    setActiveSales(salesService.getAll().filter(s => ['approved', 'pending'].includes(s.status)));
-    setAllCarriers(partnerService.getAll().filter(p => p.categories.includes(PARTNER_CATEGORY_IDS.CARRIER)));
-  }, []);
-
-  useEffect(() => {
-    if (isEditing && editForm.carrierId) {
-      const mapDriver = (d: any): Driver => ({
-        id: d.id,
-        partnerId: d.partner_id || '',
-        name: d.name,
-        cpf: d.document || '',
-        cnh: d.license_number || '',
-        cnhCategory: '',
-        phone: d.phone || '',
-        linkedVehicleId: undefined,
-        active: !!d.active
-      });
-      setAvailableDrivers(driverService.getByPartner(editForm.carrierId).map(mapDriver));
-      setAvailableVehicles(fleetService.getVehicles(editForm.carrierId));
-    }
-  }, [isEditing, editForm.carrierId]);
-
-  // Atualiza lista de motoristas ao receber eventos do Supabase
-  useEffect(() => {
-    if (!isEditing || !editForm.carrierId) return;
-    const mapDriver = (d: any): Driver => ({
-      id: d.id,
-      partnerId: d.partner_id || '',
-      name: d.name,
-      cpf: d.document || '',
-      cnh: d.license_number || '',
-      cnhCategory: '',
-      phone: d.phone || '',
-      linkedVehicleId: undefined,
-      active: !!d.active
-    });
-    const unsub = driverService.subscribe(() => {
-      setAvailableDrivers(driverService.getByPartner(editForm.carrierId).map(mapDriver));
-    });
-    return unsub;
-  }, [isEditing, editForm.carrierId]);
-
-  const stats = useMemo(() => {
-    const wOri = editForm.weightKg || 0;
-    const wDest = editForm.unloadWeightKg || 0;
-    const brk = Math.max(0, wOri - wDest);
-    
-    const purVal = (wOri / 60) * (editForm.purchasePricePerSc || 0);
-    const weightForRevenue = (wDest > 0) ? wDest : wOri;
-    const salVal = (weightForRevenue / 60) * (editForm.salesPrice || 0);
-    
-    const frVal = (freightBase === 'origin' 
-      ? (wOri / 1000) * (editForm.freightPricePerTon || 0)
-      : (wDest / 1000) * (editForm.freightPricePerTon || 0)) + (editForm.redirectDisplacementValue || 0);
-
-    const totalCost = purVal + frVal;
-    const profit = salVal - totalCost;
-    const margin = salVal > 0 ? (profit / salVal) * 100 : 0;
-
-    return { wOri, wDest, brk, purVal, salVal, frVal, totalCost, profit, margin };
-  }, [editForm, freightBase]);
+  // ─── Stats calculados via função pura ──────────────────────────────────────
+  const stats = useMemo(() => computeLoadingStats(editForm, freightBase), [editForm, freightBase]);
 
   const handleToggleFreightBase = (newBase: 'origin' | 'destination') => {
     if (newBase === freightBase) return;
@@ -141,17 +78,18 @@ const LoadingManagement: React.FC<Props> = ({ loading, onClose, onUpdate, origin
     }
 
     const wRef = newBase === 'origin' ? editForm.weightKg : editForm.unloadWeightKg!;
-    const newTotalFreight = parseFloat(((wRef / 1000) * editForm.freightPricePerTon).toFixed(2)) + (editForm.redirectDisplacementValue || 0);
+    const newTotalFreight = recalcFreightValue(wRef, editForm.freightPricePerTon, editForm.redirectDisplacementValue);
 
+    // ✅ SKIL: freightBase persistido — trigger SQL recomputa totais com autoridade
     const updated = {
         ...editForm,
+        freightBase: (newBase === 'origin' ? 'Origem' : 'Destino') as Loading['freightBase'],
         totalFreightValue: newTotalFreight
     };
 
     setFreightBase(newBase);
     setEditForm(updated);
-    loadingService.update(updated);
-    invalidateLoadingCache();
+    updateLoadingMut.mutate(updated);
     onUpdate(updated); 
 
     const baseLabel = newBase === 'origin' ? 'Peso de Origem' : 'Peso de Destino';
@@ -163,48 +101,53 @@ const LoadingManagement: React.FC<Props> = ({ loading, onClose, onUpdate, origin
     if (isNaN(wDest) || wDest <= 0) return addToast('warning', 'Peso Inválido');
 
     const wRef = freightBase === 'destination' ? wDest : editForm.weightKg;
-    const newTotalFreight = parseFloat(((wRef / 1000) * editForm.freightPricePerTon).toFixed(2)) + (editForm.redirectDisplacementValue || 0);
+    const newTotalFreight = recalcFreightValue(wRef, editForm.freightPricePerTon, editForm.redirectDisplacementValue);
 
+    // ✅ SKIL: totais são preview UX — trigger SQL recomputa com autoridade no persist
     const updated: Loading = {
       ...editForm,
       unloadWeightKg: wDest,
       breakageKg: Math.max(0, editForm.weightKg - wDest),
       status: 'completed' as const,
-      totalSalesValue: parseFloat(((wDest / 60) * editForm.salesPrice).toFixed(2)),
+      freightBase: (freightBase === 'destination' ? 'Destino' : 'Origem') as Loading['freightBase'],
+      totalSalesValue: recalcSalesValue(wDest, editForm.salesPrice),
       totalFreightValue: newTotalFreight
     };
 
     setEditForm(updated);
-    loadingService.update(updated);
-    invalidateLoadingCache();
+    updateLoadingMut.mutate(updated);
     onUpdate(updated); 
     addToast('success', 'Peso Confirmado', 'Contas a receber atualizado (dividido em etapas).');
   };
 
   const handleSaveStructural = () => {
+    // ✅ SKIL: valores derivados são preview UX. O trigger fn_ops_loading_compute_totals
+    // recomputa total_purchase_value, total_freight_value, total_sales_value no banco
+    // a partir dos campos-base (peso, preço unitário, freightBase). SQL é a autoridade.
     const finalData = {
         ...editForm,
+        freightBase: (freightBase === 'destination' ? 'Destino' : 'Origem') as Loading['freightBase'],
         totalPurchaseValue: parseFloat(stats.purVal.toFixed(2)),
         totalSalesValue: parseFloat(stats.salVal.toFixed(2)),
         totalFreightValue: parseFloat(stats.frVal.toFixed(2)),
         breakageKg: stats.brk
     };
     
-    loadingService.update(finalData);
-    invalidateLoadingCache();
+    updateLoadingMut.mutate(finalData);
     onUpdate(finalData);
     setIsEditing(false);
     addToast('success', 'Carregamento Confirmado', 'Contas a pagar atualizado.');
   };
 
   const handleSaveDisplacement = () => {
+    // ✅ SKIL: trigger SQL recomputa — valor aqui é preview UX
     const updated = {
         ...editForm,
+        freightBase: (freightBase === 'destination' ? 'Destino' : 'Origem') as Loading['freightBase'],
         totalFreightValue: parseFloat(stats.frVal.toFixed(2))
     };
     setEditForm(updated);
-    loadingService.update(updated);
-    invalidateLoadingCache();
+    updateLoadingMut.mutate(updated);
     onUpdate(updated);
     addToast('success', 'Deslocamento Atualizado', 'O valor foi somado ao total do frete.');
   };
@@ -220,8 +163,7 @@ const LoadingManagement: React.FC<Props> = ({ loading, onClose, onUpdate, origin
     };
 
     setEditForm(updated);
-    loadingService.update(updated);
-    invalidateLoadingCache();
+    updateLoadingMut.mutate(updated);
     onUpdate(updated);
     setIsQuickRedirecting(false);
     addToast('success', 'Carga Redirecionada', `Vínculo alterado para ${updated.customerName}`);
@@ -236,7 +178,7 @@ const LoadingManagement: React.FC<Props> = ({ loading, onClose, onUpdate, origin
       transactions: [newTx, ...(editForm.transactions || [])]
     };
     setEditForm(updated);
-    loadingService.update(updated);
+    saveTransactionMut.mutate(updated);
     onUpdate(updated);
     setIsTxModalOpen(false);
   };
@@ -275,8 +217,7 @@ const LoadingManagement: React.FC<Props> = ({ loading, onClose, onUpdate, origin
                     ? `⚠️ Excluir carga?\n\n⚡ AVISO: O frete (${loading.totalFreightValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}) será DELETADO do Financeiro também!`
                     : 'Excluir carga?';
                   if(window.confirm(msg)) { 
-                    loadingService.delete(loading.id);
-                    invalidateLoadingCache();
+                    deleteLoadingMut.mutate(loading.id);
                     addToast('success', 'Carregamento Deletado', 'O frete foi removido do Financeiro também.');
                     onUpdate(null); 
                     onClose(); 
@@ -427,7 +368,7 @@ const LoadingManagement: React.FC<Props> = ({ loading, onClose, onUpdate, origin
                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-black text-indigo-400">R$</span>
                              <input 
                                 type="number" step="0.01" 
-                                className="bg-indigo-800 border-2 border-indigo-700 rounded-xl pl-9 pr-3 py-2 font-black text-lg text-white focus:outline-none focus:border-emerald-400 transition-all w-48"
+                                className="bg-white border-2 border-indigo-300 rounded-xl pl-9 pr-3 py-2 font-black text-lg text-slate-900 focus:outline-none focus:border-emerald-500 transition-all w-48"
                                 placeholder="0,00"
                                 value={editForm.redirectDisplacementValue || ''}
                                 onChange={e => setEditForm({...editForm, redirectDisplacementValue: parseFloat(e.target.value) || 0})}
@@ -530,7 +471,7 @@ const LoadingManagement: React.FC<Props> = ({ loading, onClose, onUpdate, origin
                      <div>
                         <span className={labelClass}>Preço (TON)</span>
                         {isEditing ? (
-                            <input type="number" step="0.01" className={`${inputClass} bg-slate-800 border-slate-700 text-white focus:border-rose-500`} value={editForm.freightPricePerTon} onChange={e => setEditForm({...editForm, freightPricePerTon: parseFloat(e.target.value)})} />
+                            <input type="number" step="0.01" className={inputClass} value={editForm.freightPricePerTon} onChange={e => setEditForm({...editForm, freightPricePerTon: parseFloat(e.target.value)})} />
                         ) : (
                             <p className="text-lg font-black text-slate-700">{currency(editForm.freightPricePerTon)}</p>
                         )}
@@ -580,7 +521,7 @@ const LoadingManagement: React.FC<Props> = ({ loading, onClose, onUpdate, origin
           ) : (
             <LoadingFinancialTab 
                 loading={editForm} 
-                onUpdate={(up) => { setEditForm(up); loadingService.update(up); onUpdate(up); }}
+                onUpdate={(up) => { setEditForm(up); updateLoadingMut.mutate(up); onUpdate(up); }}
                 onAddPayment={() => { setTxType('payment'); setIsTxModalOpen(true); }}
             />
           )}

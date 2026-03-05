@@ -24,7 +24,24 @@ const OrderPartnerSection: React.FC<Props> = ({ data, partners, onChange }) => {
   const [availableLocations, setAvailableLocations] = useState<{city: string, state: string}[]>([]);
 
   useEffect(() => {
-    setAvailableLocations(locationService.getAllCitiesFlat());
+    let mounted = true;
+
+    const loadLocations = async () => {
+      try {
+        const cities = await locationService.getAllCitiesFlat();
+        if (!mounted) return;
+        setAvailableLocations(Array.isArray(cities) ? cities : []);
+      } catch {
+        if (!mounted) return;
+        setAvailableLocations([]);
+      }
+    };
+
+    void loadLocations();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   // Atualizar citySearchTerm quando o pedido tem cidade de carregamento
@@ -49,11 +66,11 @@ const OrderPartnerSection: React.FC<Props> = ({ data, partners, onChange }) => {
   const filteredPartners = validPartners.filter(p => {
     const searchLower = partnerSearchTerm.toLowerCase();
     return p.name.toLowerCase().includes(searchLower) ||
-           p.document.includes(searchLower) ||
+           (p.document || '').toLowerCase().includes(searchLower) ||
            (p.nickname && p.nickname.toLowerCase().includes(searchLower));
   });
 
-  const filteredCities = availableLocations.filter(loc => 
+  const filteredCities = (Array.isArray(availableLocations) ? availableLocations : []).filter(loc => 
     loc.city.toLowerCase().includes(citySearchTerm.toLowerCase()) ||
     loc.state.toLowerCase().includes(citySearchTerm.toLowerCase())
   );
@@ -63,16 +80,18 @@ const OrderPartnerSection: React.FC<Props> = ({ data, partners, onChange }) => {
     setPartnerSearchTerm(displayName);
     setIsSearchingPartner(false);
     
+    const cityName = partner.address?.cityName || (partner.address as any)?.city || '';
+    const stateUf = partner.address?.stateUf || (partner.address as any)?.state || '';
     onChange({
       partnerId: partner.id,
       partnerName: partner.name,
       partnerDocument: partner.document,
-      partnerCity: partner.address?.city || '',
-      partnerState: partner.address?.state || '',
+      partnerCity: cityName,
+      partnerState: stateUf,
       useRegisteredLocation: true,
-      loadingCity: partner.address?.city || '',
-      loadingState: partner.address?.state || '',
-      harvest: partner.address?.state ? `SAFRA/${partner.address.state} ${new Date().getFullYear()}` : ''
+      loadingCity: cityName,
+      loadingState: stateUf,
+      harvest: stateUf ? `SAFRA/${stateUf} ${new Date().getFullYear()}` : ''
     });
   };
 
@@ -108,7 +127,7 @@ const OrderPartnerSection: React.FC<Props> = ({ data, partners, onChange }) => {
                   <div className="font-bold text-slate-900 uppercase">{partner.name}</div>
                   <div className="flex justify-between text-[10px] text-slate-400 font-bold mt-0.5">
                     <span>{partner.document}</span>
-                    <span>{partner.address?.city}/{partner.address?.state}</span>
+                    <span>{partner.address?.cityName || (partner.address as any)?.city || 'N/D'}/{partner.address?.stateUf || (partner.address as any)?.state || '??'}</span>
                   </div>
                 </li>
               ))}
@@ -131,8 +150,8 @@ const OrderPartnerSection: React.FC<Props> = ({ data, partners, onChange }) => {
               if (partner?.address) {
                 onChange({ 
                   useRegisteredLocation: true,
-                  loadingCity: partner.address.city || '',
-                  loadingState: partner.address.state || ''
+                  loadingCity: partner.address.cityName || '',
+                  loadingState: partner.address.stateUf || ''
                 });
               } else {
                 onChange({ useRegisteredLocation: true });
@@ -144,9 +163,9 @@ const OrderPartnerSection: React.FC<Props> = ({ data, partners, onChange }) => {
                 <div className="text-xs text-slate-500 font-semibold space-y-0.5">
                   <div>{partners.find(p => p.id === data.partnerId)!.address!.street}, {partners.find(p => p.id === data.partnerId)!.address!.number}</div>
                   <div>{partners.find(p => p.id === data.partnerId)!.address!.neighborhood}</div>
-                  <div>{partners.find(p => p.id === data.partnerId)!.address!.city} - {partners.find(p => p.id === data.partnerId)!.address!.state}</div>
-                  {partners.find(p => p.id === data.partnerId)!.address!.zip && (
-                    <div>CEP: {partners.find(p => p.id === data.partnerId)!.address!.zip}</div>
+                  <div>{partners.find(p => p.id === data.partnerId)!.address!.cityName} - {partners.find(p => p.id === data.partnerId)!.address!.stateUf}</div>
+                  {partners.find(p => p.id === data.partnerId)!.address!.cep && (
+                    <div>CEP: {partners.find(p => p.id === data.partnerId)!.address!.cep}</div>
                   )}
                 </div>
               ) : (

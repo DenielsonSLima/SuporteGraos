@@ -44,7 +44,6 @@ export const marketService = {
         return [dollarItem, ...commodities];
       }
     } catch (error) {
-      console.warn('[MarketService] Falha ao buscar cotação real do dólar. Usando fallback.', error);
     }
 
     // Fallback completo se a rede falhar

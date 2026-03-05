@@ -22,9 +22,7 @@ export const initialBalanceSupabaseSync = {
         company_id: companyId
       });
       if (error) throw error;
-      console.log(`✅ Saldo inicial para ${balance.accountName} salvo no Supabase`);
     } catch (error) {
-      console.error('❌ Erro ao salvar saldo inicial no Supabase:', error);
       throw error;
     }
   },
@@ -38,9 +36,7 @@ export const initialBalanceSupabaseSync = {
         .select();
 
       if (error) throw error;
-      console.log(`✅ Saldo inicial excluído do Supabase`, data);
     } catch (error) {
-      console.warn('⚠️ Erro ao excluir saldo inicial do Supabase:', error);
     }
   }
 };

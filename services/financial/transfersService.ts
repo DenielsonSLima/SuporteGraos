@@ -5,6 +5,7 @@ import { supabaseWithRetry } from '../../utils/fetchWithRetry';
 import { invalidateDashboardCache } from '../dashboardCache';
 import { invalidateFinancialCache } from '../financialCache';
 import { auditService } from '../auditService';
+import { getTodayBR } from '../../utils/dateUtils';
 
 export interface Transfer {
   id: string;
@@ -40,7 +41,8 @@ const mapToDb = (item: Transfer) => ({
   transfer_date: item.transferDate,
   description: item.description,
   notes: item.notes || null,
-  company_id: item.companyId || null
+  company_id: item.companyId || authService.getCurrentUser()?.companyId || null,
+  created_by: authService.getCurrentUser()?.id || null
 });
 
 const mapFromDb = (row: any): Transfer => ({
@@ -48,7 +50,7 @@ const mapFromDb = (row: any): Transfer => ({
   fromAccountId: row.from_account_id,
   toAccountId: row.to_account_id,
   amount: Number(row.amount),
-  transferDate: row.transfer_date,
+  transferDate: row.transfer_date || getTodayBR(),
   description: row.description,
   notes: row.notes,
   companyId: row.company_id
@@ -71,6 +73,10 @@ const fetchPage = async (options: TransfersPageOptions): Promise<Transfer[]> => 
     const user = authService.getCurrentUser();
     const companyId = user?.companyId;
 
+    if (!companyId) {
+      return [];
+    }
+
     let query = supabase
       .from('transfers')
       .select(TRANSFERS_SELECT_FIELDS)
@@ -85,7 +91,6 @@ const fetchPage = async (options: TransfersPageOptions): Promise<Transfer[]> => 
     const data = await supabaseWithRetry(() => query);
     return (data as any[] || []).map(mapFromDb);
   } catch (error) {
-    console.error('❌ Erro ao paginar transfers:', error);
     return [];
   }
 };
@@ -99,6 +104,10 @@ const loadFromSupabase = async (): Promise<Transfer[]> => {
     const user = authService.getCurrentUser();
     const companyId = user?.companyId;
 
+    if (!companyId) {
+      return [];
+    }
+
     const data = await supabaseWithRetry(() =>
       supabase
         .from('transfers')
@@ -110,11 +119,9 @@ const loadFromSupabase = async (): Promise<Transfer[]> => {
     const mapped = (data as any[] || []).map(mapFromDb);
     db.setAll(mapped);
     isLoaded = true;
-    console.log('🔄 Transferências sincronizando em tempo real...');
 
     return mapped;
   } catch (error) {
-    console.error('❌ Erro ao carregar transfers:', error);
     return [];
   }
 };
@@ -150,6 +157,13 @@ const startRealtime = () => {
     .subscribe();
 };
 
+const stopRealtime = () => {
+  if (realtimeChannel) {
+    supabase.removeChannel(realtimeChannel);
+    realtimeChannel = null;
+  }
+};
+
 // ============================================================================
 // PERSISTÊNCIA
 // ============================================================================
@@ -159,12 +173,10 @@ const persistUpsert = async (item: Transfer) => {
     const payload = mapToDb(item);
     const { error } = await supabase.from('transfers').upsert(payload).select();
     if (error) {
-      console.error('Erro ao salvar transfer no Supabase', error);
       return;
     }
     await loadFromSupabase();
   } catch (err) {
-    console.error('Erro inesperado ao salvar transfer', err);
   }
 };
 
@@ -173,8 +185,89 @@ const persistDelete = async (id: string) => {
     const { error } = await supabase.from('transfers').delete().eq('id', id);
     if (error) console.error('Erro ao excluir transfer', error);
   } catch (err) {
-    console.error('Erro inesperado ao excluir transfer', err);
   }
+};
+
+const reverseTransferFinancialMovements = async (item: Transfer) => {
+  const { registerFinancialRecords } = await import('./handlers/orchestratorHelpers');
+  const txId = Math.random().toString(36).substr(2, 9);
+
+  await registerFinancialRecords({
+    txId,
+    date: item.transferDate,
+    amount: item.amount,
+    discount: 0,
+    accountId: item.fromAccountId,
+    accountName: 'Transferência (Origem)',
+    type: 'receipt',
+    recordId: item.id,
+    referenceType: 'standalone',
+    referenceId: item.id,
+    description: `Estorno transferência [TRANSFER_REV:${item.id}] retorno para origem`,
+    historyType: 'Estorno Transferência Bancária',
+    entityName: 'Transferência',
+    partnerId: '',
+    notes: `[TRANSFER_REV_IN:${item.id}]`
+  });
+
+  await registerFinancialRecords({
+    txId,
+    date: item.transferDate,
+    amount: item.amount,
+    discount: 0,
+    accountId: item.toAccountId,
+    accountName: 'Transferência (Destino)',
+    type: 'payment',
+    recordId: item.id,
+    referenceType: 'standalone',
+    referenceId: item.id,
+    description: `Estorno transferência [TRANSFER_REV:${item.id}] retirada do destino`,
+    historyType: 'Estorno Transferência Bancária',
+    entityName: 'Transferência',
+    partnerId: '',
+    notes: `[TRANSFER_REV_OUT:${item.id}]`
+  });
+};
+
+const createTransferFinancialMovements = async (item: Transfer) => {
+  const { registerFinancialRecords } = await import('./handlers/orchestratorHelpers');
+  const txId = Math.random().toString(36).substr(2, 9);
+
+  await registerFinancialRecords({
+    txId,
+    date: item.transferDate,
+    amount: item.amount,
+    discount: 0,
+    accountId: item.fromAccountId,
+    accountName: 'Transferência (Origem)',
+    type: 'payment',
+    recordId: item.id,
+    referenceType: 'standalone',
+    referenceId: item.id,
+    description: `Transferência p/ ${item.toAccountId}: ${item.description}`,
+    historyType: 'Transferência Bancária',
+    entityName: 'Transferência',
+    partnerId: '',
+    notes: `[TRANSFER_OUT:${item.id}]`
+  });
+
+  await registerFinancialRecords({
+    txId,
+    date: item.transferDate,
+    amount: item.amount,
+    discount: 0,
+    accountId: item.toAccountId,
+    accountName: 'Transferência (Destino)',
+    type: 'receipt',
+    recordId: item.id,
+    referenceType: 'standalone',
+    referenceId: item.id,
+    description: `Transferência de ${item.fromAccountId}: ${item.description}`,
+    historyType: 'Transferência Bancária',
+    entityName: 'Transferência',
+    partnerId: '',
+    notes: `[TRANSFER_IN:${item.id}]`
+  });
 };
 
 // ❌ NÃO inicializar automaticamente - aguardar autenticação via supabaseInitService
@@ -192,25 +285,59 @@ export const transfersService = {
   loadFromSupabase,
   fetchPage,
   startRealtime,
+  stopRealtime,
 
-  add: (item: Transfer) => {
+  add: async (item: Transfer) => {
     db.add(item);
-    void persistUpsert(item);
+
+    const user = authService.getCurrentUser();
+    const companyId = user?.companyId;
+    if (!companyId) throw new Error('Usuário sem empresa vinculada');
+
+    const { error } = await supabase.rpc('rpc_transfer_accounts', {
+      p_id: item.id,
+      p_company_id: companyId,
+      p_from_account_id: item.fromAccountId,
+      p_to_account_id: item.toAccountId,
+      p_amount: item.amount,
+      p_transfer_date: item.transferDate,
+      p_description: item.description,
+      p_notes: item.notes || null,
+      p_created_by: user.id
+    });
+
+    if (error) {
+      console.error('[transfersService] Erro ao registrar transferência rpc:', error);
+      throw error;
+    }
+
+    try {
+      const { financialTransactionService } = await import('./financialTransactionService');
+      await financialTransactionService.normalizeLegacyTransferTypesAndRecalculate();
+    } catch {
+    }
+
     invalidateFinancialCache();
     invalidateDashboardCache();
     window.dispatchEvent(new Event('financial:updated'));
-
-    // Audit Log
-    void auditService.logAction('create', 'Financeiro', `Transferência criada: R$ ${item.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} - ${item.description}`, {
-      entityType: 'Transfer',
-      entityId: item.id,
-      metadata: { amount: item.amount, fromAccountId: item.fromAccountId, toAccountId: item.toAccountId }
-    });
   },
 
-  update: (item: Transfer) => {
+  update: async (item: Transfer) => {
+    const previous = db.getById(item.id);
     db.update(item);
-    void persistUpsert(item);
+
+    await persistUpsert(item);
+    if (previous) {
+      await reverseTransferFinancialMovements(previous);
+    }
+    await createTransferFinancialMovements(item);
+
+    try {
+      const { financialTransactionService } = await import('./financialTransactionService');
+      await financialTransactionService.normalizeLegacyTransferTypesAndRecalculate();
+    } catch {
+    }
+
     invalidateFinancialCache();
     invalidateDashboardCache();
     window.dispatchEvent(new Event('financial:updated'));
@@ -219,14 +346,32 @@ export const transfersService = {
     void auditService.logAction('update', 'Financeiro', `Transferência alterada: R$ ${item.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} - ${item.description}`, {
       entityType: 'Transfer',
       entityId: item.id,
-      metadata: { amount: item.amount }
+      metadata: {
+        previousAmount: previous?.amount,
+        amount: item.amount,
+        previousFrom: previous?.fromAccountId,
+        previousTo: previous?.toAccountId,
+        from: item.fromAccountId,
+        to: item.toAccountId
+      }
     });
   },
 
-  delete: (id: string) => {
+  delete: async (id: string) => {
     const item = db.getById(id);
     db.delete(id);
-    void persistDelete(id);
+
+    if (item) {
+      await reverseTransferFinancialMovements(item);
+    }
+    await persistDelete(id);
+
+    try {
+      const { financialTransactionService } = await import('./financialTransactionService');
+      await financialTransactionService.normalizeLegacyTransferTypesAndRecalculate();
+    } catch {
+    }
+
     invalidateFinancialCache();
     invalidateDashboardCache();
     window.dispatchEvent(new Event('financial:updated'));
@@ -254,12 +399,9 @@ export const transfersService = {
       }));
       const { error } = await supabase.from('transfers').upsert(payload, { onConflict: 'id' });
       if (error) {
-        console.error('❌ Erro ao sincronizar transferências no Supabase:', error);
       } else {
-        console.log(`✅ [TransfersService] ${data.length} transferências sincronizadas via ImportData`);
       }
     } catch (err) {
-      console.error('❌ Erro inesperado ao importar transferências:', err);
     }
     invalidateFinancialCache();
     invalidateDashboardCache();

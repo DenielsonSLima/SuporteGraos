@@ -29,8 +29,6 @@ import ExpenseFormModal from './details/Expenses/ExpenseFormModal';
 import LoadingForm from '../../Loadings/components/LoadingForm';
 import LoadingManagement from '../../Loadings/components/LoadingManagement';
 import { Loading } from '../../Loadings/types';
-import { loadingService } from '../../../services/loadingService';
-import { invalidateLoadingCache } from '../../../services/loadingCache';
 
 interface Props {
   order: PurchaseOrder;
@@ -264,7 +262,7 @@ const OrderDetails: React.FC<Props> = ({ order, onBack, onEdit, onDelete, onFina
       <ActionConfirmationModal 
           isOpen={!!pendingDeleteLoadingId} 
           onClose={() => setPendingDeleteLoadingId(null)} 
-            onConfirm={() => { if(pendingDeleteLoadingId) { loadingService.delete(pendingDeleteLoadingId); invalidateLoadingCache(); } actions.refreshLoadings(); setPendingDeleteLoadingId(null); }} 
+            onConfirm={() => { if(pendingDeleteLoadingId) { actions.handleDeleteLoading(pendingDeleteLoadingId); } setPendingDeleteLoadingId(null); }} 
           title="Excluir Romaneio?" 
           description="⚠️ AVISO: O frete será DELETADO do Financeiro também! Esta ação é permanente." 
           type="danger" 

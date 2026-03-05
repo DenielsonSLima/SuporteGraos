@@ -1,100 +1,104 @@
+/**
+ * ============================================================================
+ * FINANCIAL ACTION SERVICE — Fachada de Alto Nível
+ * ============================================================================
+ * 
+ * REFATORADO: Agora delega toda a lógica de pagamento/recebimento para
+ * o paymentOrchestrator, que garante consistência entre TODAS as tabelas.
+ * 
+ * MODULARIZADO:
+ *   financial/handlers/*         → Handlers de pagamento por domínio
+ *   financial/actions/transferActions.ts → Operações de transferência bancária
+ * 
+ * Este arquivo mantém apenas:
+ * - processRecord(): ponto de entrada que roteia para o handler correto
+ * - Operações CRUD de registros standalone (delegados)
+ * - Re-exports de transferências
+ */
 
-import { FinancialRecord, TransferRecord } from '../modules/Financial/types';
-import { purchaseService } from './purchaseService';
-import { salesService } from './salesService';
-import { loadingService } from './loadingService';
+import { FinancialRecord, TransferRecord, FinancialStatus } from '../modules/Financial/types';
 import { assetService } from './assetService';
 import { logService } from './logService';
 import { authService } from './authService';
 import { invalidateFinancialCache } from './financialCache';
 import { invalidateDashboardCache } from './dashboardCache';
 import { standaloneRecordsService } from './standaloneRecordsService';
-import { transfersService, Transfer } from './financial/transfersService';
-import { receivablesService, Receivable } from './financial/receivablesService';
-import { payablesService, Payable } from './financial/payablesService';
+import creditService from './financial/creditService';
+import { shareholderService } from './shareholderService';
+import { receiptService } from './financial/receiptService';
 import { formatMoney as formatCurrency } from '../utils/formatters';
+import {
+  handleFreightPayment,
+  handlePurchaseOrderPayment,
+  handleSalesOrderReceipt,
+  handleCommissionPayment,
+  handleStandalonePayment,
+  PaymentData
+} from './financial/paymentOrchestrator';
+
+// Módulo de transferências (extraído)
+import {
+  getTransfers,
+  addTransfer,
+  updateTransfer,
+  deleteTransfer,
+  importTransfers
+} from './financial/actions/transferActions';
+import type { Shareholder } from './shareholderService';
 
 const getLogInfo = () => {
   const user = authService.getCurrentUser();
   return { userId: user?.id || 'system', userName: user?.name || 'Sistema' };
 };
 
-
-
-const resolveAccountId = (value: string) => {
-  if (!value || typeof window === 'undefined') return value;
-  const accounts = ((window as any).bankAccountsList || []);
-  if (accounts.length === 0) {
-    console.warn('[resolveAccountId] ⚠️ bankAccountsList está vazio — conta não resolvida:', value);
-    return value;
-  }
-  // 1. Busca exata por ID (mais confiável)
-  const byId = accounts.find((a: any) => a.id === value);
-  if (byId) return byId.id;
-  // 2. Busca por nome exato
-  const byName = accounts.find((a: any) => a.bankName === value);
-  if (byName) return byName.id;
-  // 3. Busca case-insensitive (fallback)
-  const byNameCI = accounts.find((a: any) => a.bankName?.toLowerCase() === value.toLowerCase());
-  if (byNameCI) return byNameCI.id;
-  console.warn(`[resolveAccountId] ⚠️ Conta "${value}" não encontrada entre ${accounts.length} contas cadastradas`);
-  return value;
-};
-
-const resolveAccountLabel = (accountId: string) => {
-  if (typeof window === 'undefined') return accountId;
-  const accounts = ((window as any).bankAccountsList || []);
-  const acc = accounts.find((a: any) => a.id === accountId) || accounts.find((a: any) => a.bankName === accountId);
-  return acc ? `${acc.bankName}${acc.owner ? ` - ${acc.owner}` : ''}` : accountId;
-};
-
-const mapTransferToRecord = (transfer: Transfer): TransferRecord => ({
-  id: transfer.id,
-  date: transfer.transferDate,
-  originAccount: resolveAccountLabel(transfer.fromAccountId),
-  destinationAccount: resolveAccountLabel(transfer.toAccountId),
-  value: transfer.amount,
-  description: transfer.description,
-  user: authService.getCurrentUser()?.name || 'Sistema'
-});
-
-const mapRecordToTransfer = (record: TransferRecord): Transfer => ({
-  id: record.id,
-  transferDate: record.date,
-  fromAccountId: resolveAccountId(record.originAccount),
-  toAccountId: resolveAccountId(record.destinationAccount),
-  amount: record.value,
-  description: record.description,
-  notes: undefined
-});
+/**
+ * Mapeia um Shareholder para FinancialRecord (obrigações com sócios).
+ * Garante tipo homogêneo no array de getStandaloneRecords().
+ */
+function mapShareholderToFinancialRecord(s: Shareholder): FinancialRecord {
+  const today = new Date().toISOString().slice(0, 10);
+  return {
+    id: s.id,
+    description: `Pró-labore — ${s.name}`,
+    entityName: s.name,
+    category: 'Sócio',
+    dueDate: s.financial?.lastProLaboreDate || today,
+    issueDate: s.financial?.lastProLaboreDate || today,
+    originalValue: s.financial?.proLaboreValue ?? 0,
+    paidValue: 0,
+    remainingValue: s.financial?.proLaboreValue ?? 0,
+    discountValue: 0,
+    status: 'pending',
+    subType: 'shareholder',
+    notes: `CPF: ${s.cpf}`,
+  };
+}
 
 export const financialActionService = {
-  getStandaloneRecords: () => standaloneRecordsService.getAll(),
-  getTransfers: () => transfersService.getAll().map(mapTransferToRecord),
+  getStandaloneRecords: (): FinancialRecord[] => [
+    ...standaloneRecordsService.getAll(),
+    ...creditService.getCredits(),
+    ...shareholderService.getAll().map(mapShareholderToFinancialRecord),
+    ...receiptService.getAll()
+  ],
+  getTransfers: () => getTransfers(),
 
   processRecord: async (recordId: string, data: any, subType?: string) => {
-    if (subType === 'purchase_order' || subType === 'freight' || subType === 'commission') {
-      await payablesService.loadFromSupabase();
-    }
-    if (subType === 'sales_order') {
-      await receivablesService.loadFromSupabase();
-    }
     const { userId, userName } = getLogInfo();
     const transactionValue = parseFloat(data.amount) || 0;
     const discountValue = parseFloat(data.discount) || 0;
-    const isPureAdjustment = transactionValue === 0 && discountValue > 0;
-    // Corrigir para salvar o nome da conta bancária
+
+    // Resolver nome da conta bancária
     let accountName = data.accountName;
-    if (!accountName && data.accountId && typeof window !== 'undefined') {
-      // Buscar nome do banco pelo id se necessário
-      const bankAccounts = ((window as any).bankAccountsList || []);
-      const found = bankAccounts.find((a: any) => a.id === data.accountId);
-      accountName = found ? found.bankName : data.accountId;
+    if (!accountName && data.accountId) {
+      const { resolveAccountLabel } = await import('./financial/handlers/orchestratorHelpers');
+      accountName = resolveAccountLabel(data.accountId);
     }
 
+    // Registrar ativo se aplicável
     if (data.isAsset && data.assetName) {
       assetService.add({
-        id: Math.random().toString(36).substr(2, 9),
+        id: crypto.randomUUID(),
         name: data.assetName,
         type: 'other',
         status: 'active',
@@ -105,426 +109,58 @@ export const financialActionService = {
       });
     }
 
-    const standalone = standaloneRecordsService.getById(recordId);
-    if (standalone) {
-      const currentPaid = standalone.paidValue || 0;
-      const currentDisc = standalone.discountValue || 0;
-
-      await standaloneRecordsService.update({
-        ...standalone,
-        paidValue: currentPaid + transactionValue,
-        discountValue: currentDisc + discountValue,
-        settlementDate: data.date,
-        status: (currentPaid + transactionValue + currentDisc + discountValue) >= standalone.originalValue - 0.01 ? 'paid' : 'partial',
-        bankAccount: isPureAdjustment ? 'ABATIMENTO/QUEBRA' : accountName,
-        notes: data.notes
-      });
-    }
-
-    const txId = Math.random().toString(36).substr(2, 9);
-    const commonTx = {
-      id: txId,
+    // Montar dados padronizados para o orquestrador
+    const paymentData: PaymentData = {
       date: data.date,
-      value: transactionValue,
-      discountValue: discountValue,
-      accountId: data.accountId || 'discount_virtual',
-      accountName: isPureAdjustment ? 'ABATIMENTO' : accountName,
+      amount: transactionValue,
+      discount: discountValue,
+      accountId: data.accountId,
+      accountName,
       notes: data.notes,
-      type: subType === 'sales_order' ? 'receipt' : 'payment'
+      entityName: data.entityName,
+      partnerId: data.partnerId,
+      isAsset: data.isAsset,
+      assetName: data.assetName
     };
 
-    if (subType === 'purchase_order') {
-      // CORREÇÃO: Detectar se recordId é UUID (do payable) ou formatado (po-grain-...)
-      const isPayableUUID = !recordId.startsWith('po-grain-');
-      let orderId: string = '';
-      let payable: Payable | undefined;
-      let order: any;
+    // =====================================================================
+    // ROTEAR para o handler correto do orquestrador
+    // Each handler cuida de: payable/receivable + financial_transactions + 
+    // financial_history + admin_expenses de forma CONSISTENTE
+    // =====================================================================
 
-      // Se for UUID do payable, buscar primeiro para obter o purchaseOrderId
-      if (isPayableUUID) {
-        payable = payablesService.getById(recordId);
-        if (payable) {
-          orderId = payable.purchaseOrderId || '';
-          console.log(`[PAGAMENTO] ID é UUID do payable: ${recordId.substring(0, 8)}..., purchaseOrderId=${orderId || 'VAZIO'}`);
+    let result: any = { success: true };
 
-          // Se purchaseOrderId estiver vazio, tentar buscar pelo número do pedido na descrição
-          if (!orderId && payable.description) {
-            const match = payable.description.match(/PC-\d{4}-\d+|#PC-\d+/i);
-            if (match) {
-              const orderNumber = match[0];
-              order = purchaseService.getAll().find(o => o.number === orderNumber);
-              if (order) {
-                orderId = order.id;
-                console.log(`[PAGAMENTO] Pedido encontrado pelo número ${orderNumber}: ${orderId}`);
-                // Corrigir o purchaseOrderId no payable para futuras operações
-                payablesService.update({ ...payable, purchaseOrderId: orderId });
-              }
-            }
-          }
-
-          // Se ainda não encontrou, tentar pelo partnerId + valor (tolerância 0.5%)
-          if (!orderId && payable.partnerId && payable.amount > 0) {
-            const tolerance = payable.amount * 0.005; // 0.5% do valor
-            const candidates = purchaseService.getAll().filter(o =>
-              o.partnerId === payable!.partnerId &&
-              o.status !== 'canceled' &&
-              Math.abs((o.totalValue || 0) - payable!.amount) < tolerance
-            );
-            // Só usa se encontrou EXATAMENTE 1 candidato (evita ambiguidade)
-            if (candidates.length === 1) {
-              order = candidates[0];
-              orderId = order.id;
-              console.log(`[PAGAMENTO] Pedido encontrado pelo partnerId+valor (único match): ${orderId}`);
-              payablesService.update({ ...payable, purchaseOrderId: orderId });
-            } else if (candidates.length > 1) {
-              console.warn(`[PAGAMENTO] ⚠️ ${candidates.length} pedidos encontrados pelo partnerId+valor - busca ambígua, ignorando`);
-            }
-          }
-        } else {
-          orderId = recordId;
-          console.log(`[PAGAMENTO] ⚠️ Payable não encontrado pelo UUID: ${recordId}`);
-        }
-      } else {
-        orderId = recordId.replace('po-grain-', '');
-      }
-
-      console.log(`[PAGAMENTO] processRecord: recordId=${recordId}, orderId=${orderId}, isPayableUUID=${isPayableUUID}`);
-
-      // Buscar o pedido se ainda não foi encontrado
-      if (!order && orderId) {
-        order = purchaseService.getById(orderId);
-      }
-
-      if (order) {
-        // Recalcula o total pago e descontos a partir de todas as transações (evita perder pagamentos anteriores)
-        const newTxs = [commonTx as any, ...(order.transactions || [])];
-        const newPaid = newTxs
-          .filter(t => t.type === 'payment' || t.type === 'advance')
-          .reduce((acc, t) => acc + (t.value || 0), 0);
-        const newDiscount = newTxs.reduce((acc, t) => acc + (t.discountValue || 0), 0);
-
-        console.log(`[PAGAMENTO] Pedido encontrado: ${order.number}, paidValue=${order.paidValue} -> ${newPaid}`);
-        purchaseService.update({
-          ...order,
-          paidValue: Number(newPaid.toFixed(2)),
-          discountValue: Number(newDiscount.toFixed(2)),
-          transactions: newTxs
-        });
-      } else {
-        console.log(`[PAGAMENTO] Pedido NÃO encontrado: ${orderId}`);
-      }
-
-      // Atualizar o payable correspondente - BUSCA ROBUSTA (apenas purchase_order!)
-      // Se já encontramos o payable antes (quando veio como UUID), usar ele
-      if (!payable) {
-        if (payablesService.getAll().length === 0) {
-          await payablesService.loadFromSupabase();
-        }
-        const allPayables = payablesService.getAll().filter(p => p.subType === 'purchase_order');
-        console.log(`[PAGAMENTO] Total payables do tipo purchase_order: ${allPayables.length}`);
-
-        // Log de todos os payables de purchase_order para debug
-        allPayables.forEach(p => {
-          console.log(`[PAGAMENTO] PayableDB: id=${p.id.substring(0, 8)}..., purchaseOrderId=${p.purchaseOrderId || 'VAZIO'}, desc=${p.description}, amount=${p.amount}, paidAmount=${p.paidAmount}`);
-        });
-
-        // Estratégia 1: Por ID direto (recordId)
-        payable = payablesService.getById(recordId);
-        console.log(`[PAGAMENTO] Busca 1 (ID direto ${recordId}): ${payable?.id || 'N/A'}`);
-
-        // Estratégia 2: Por purchaseOrderId
-        if (!payable && orderId) {
-          payable = allPayables.find(p => p.purchaseOrderId === orderId);
-          console.log(`[PAGAMENTO] Busca 2 (purchaseOrderId=${orderId}): ${payable?.id || 'N/A'}`);
-        }
-
-        // Estratégia 3: Por número do pedido na descrição + partnerId
-        if (!payable && order) {
-          payable = allPayables.find(p =>
-            p.description.includes(order.number || '') &&
-            p.partnerId === order.partnerId
-          );
-          console.log(`[PAGAMENTO] Busca 3 (número ${order.number} + partnerId): ${payable?.id || 'N/A'}`);
-        }
-
-        // Estratégia 4: Por valor total + partnerId (fallback)
-        if (!payable && order) {
-          payable = allPayables.find(p =>
-            Math.abs(p.amount - (order.totalValue || 0)) < 0.01 &&
-            p.partnerId === order.partnerId
-          );
-          console.log(`[PAGAMENTO] Busca 4 (valor ${order.totalValue} + partnerId): ${payable?.id || 'N/A'}`);
-        }
-      }
-
-      if (payable) {
-        const newPaidAmount = (payable.paidAmount || 0) + transactionValue + discountValue;
-        const status: Payable['status'] = newPaidAmount >= payable.amount - 0.01
-          ? 'paid'
-          : newPaidAmount > 0
-            ? 'partially_paid'
-            : 'pending';
-
-        console.log(`[PAGAMENTO] ✅ Atualizando payable ${payable.id}: ${payable.paidAmount} -> ${newPaidAmount}, status=${status}`);
-
-        // Garantir que o purchaseOrderId está correto
-        payablesService.update({
-          ...payable,
-          purchaseOrderId: payable.purchaseOrderId || orderId, // Corrigir se estiver vazio
-          paidAmount: Number(newPaidAmount.toFixed(2)),
-          status
-        });
-      } else {
-        console.log(`[PAGAMENTO] ⚠️ NENHUM PAYABLE ENCONTRADO para recordId=${recordId} ou orderId=${orderId}`);
-        // Criar payable se não existir
-        if (order) {
-          console.log(`[PAGAMENTO] 🔧 Criando payable para o pedido ${order.number}...`);
-          const newPayableId = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `pay-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-          payablesService.add({
-            id: newPayableId,
-            purchaseOrderId: order.id,
-            partnerId: order.partnerId,
-            partnerName: order.partnerName,
-            description: `Pedido de Compra ${order.number}`,
-            dueDate: new Date(new Date(order.date).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            amount: order.totalValue || 0,
-            paidAmount: transactionValue + discountValue,
-            status: (transactionValue + discountValue) >= (order.totalValue || 0) - 0.01 ? 'paid' : 'partially_paid',
-            subType: 'purchase_order',
-            notes: `Fornecedor: ${order.partnerName}`
-          });
-          console.log(`[PAGAMENTO] ✅ Payable criado: ${newPayableId}`);
-        }
-      }
+    if (subType === 'freight') {
+      result = await handleFreightPayment(recordId, paymentData);
+    } else if (subType === 'purchase_order') {
+      result = await handlePurchaseOrderPayment(recordId, paymentData);
     } else if (subType === 'sales_order') {
-      const orderIdFromPrefix = recordId.startsWith('so-') ? recordId.replace('so-', '') : '';
-      const directReceivable = receivablesService.getById(recordId);
-      const orderId = orderIdFromPrefix || directReceivable?.salesOrderId || '';
-
-      const receivable = directReceivable || (orderId ? receivablesService.getAll().find(r => r.salesOrderId === orderId) : undefined);
-      let totalReceivedFromOrder: number | null = null;
-
-      if (orderId) {
-        const order = salesService.getById(orderId);
-        if (order) {
-          const newTxs = [commonTx as any, ...(order.transactions || [])];
-          const totalReceived = newTxs.reduce((acc, t) => acc + (t.value || 0) + (t.discountValue || 0), 0);
-          totalReceivedFromOrder = Number(totalReceived.toFixed(2));
-
-          salesService.update({
-            ...order,
-            paidValue: totalReceivedFromOrder,
-            transactions: newTxs
-          });
-        }
-      }
-
-      if (receivable) {
-        const baseReceived = totalReceivedFromOrder ?? ((receivable.receivedAmount || 0) + transactionValue + discountValue);
-        const newReceived = Number(baseReceived.toFixed(2));
-        const status: Receivable['status'] = newReceived >= receivable.amount - 0.01
-          ? 'received'
-          : newReceived > 0
-            ? 'partially_received'
-            : 'pending';
-
-        receivablesService.update({
-          ...receivable,
-          receivedAmount: newReceived,
-          status
-        });
-      }
-    } else if (subType === 'freight') {
-      // CORREÇÃO: Detectar se recordId é UUID (do payable) ou formatado (fr-...)
-      const isPayableUUID = !recordId.startsWith('fr-');
-      let loadingId: string = '';
-      let payable: Payable | undefined;
-
-      // Se for UUID do payable de frete, buscar o payable primeiro para obter o loadingId
-      if (isPayableUUID) {
-        payable = payablesService.getById(recordId);
-        if (payable) {
-          // Estratégia 1: Usar loadingId do payable (novo campo)
-          loadingId = payable.loadingId || '';
-          console.log(`[PAGAMENTO FRETE] ID é UUID do payable: ${recordId.substring(0, 8)}..., loadingId=${loadingId || 'VAZIO'}`);
-
-          // Estratégia 2: Buscar pelo peso + transportadora
-          if (!loadingId && payable.weightKg && payable.partnerId) {
-            const loading = loadingService.getAll().find(l =>
-              l.carrierId === payable!.partnerId &&
-              Math.abs((l.weightKg || 0) - (payable!.weightKg || 0)) < 1
-            );
-            if (loading) {
-              loadingId = loading.id;
-              console.log(`[PAGAMENTO FRETE] Loading encontrado por peso+carrierId: ${loadingId}`);
-              // Corrigir o loadingId no payable para futuras operações
-              payablesService.update({ ...payable, loadingId });
-            }
-          }
-
-          // Estratégia 3: Buscar pela placa na descrição
-          if (!loadingId && payable.description) {
-            const plateMatch = payable.description.match(/[A-Z]{3}[-\s]?\d{1}[A-Z0-9]\d{2}/i);
-            if (plateMatch) {
-              const plate = plateMatch[0].replace(/\s/g, '').toUpperCase();
-              const loading = loadingService.getAll().find(l =>
-                l.vehiclePlate?.toUpperCase() === plate
-              );
-              if (loading) {
-                loadingId = loading.id;
-                console.log(`[PAGAMENTO FRETE] Loading encontrado por placa ${plate}: ${loadingId}`);
-                // Corrigir o loadingId no payable
-                payablesService.update({ ...payable, loadingId });
-              }
-            }
-          }
-
-          // Estratégia 4: Buscar pelo valor + transportadora
-          if (!loadingId && payable.amount && payable.partnerId) {
-            const loading = loadingService.getAll().find(l =>
-              l.carrierId === payable!.partnerId &&
-              Math.abs((l.totalFreightValue || 0) - payable!.amount) < 0.01
-            );
-            if (loading) {
-              loadingId = loading.id;
-              console.log(`[PAGAMENTO FRETE] Loading encontrado por valor+carrierId: ${loadingId}`);
-              payablesService.update({ ...payable, loadingId });
-            }
-          }
-        } else {
-          console.log(`[PAGAMENTO FRETE] ⚠️ Payable de frete não encontrado: ${recordId}`);
-        }
-      } else {
-        loadingId = recordId.replace('fr-', '');
-        // Quando vem do módulo Logística, buscar o payable pelo loadingId
-        const allFreightPayables = payablesService.getAll().filter(p => p.subType === 'freight');
-
-        // Estratégia 1: Por loadingId
-        payable = allFreightPayables.find(p => p.loadingId === loadingId);
-
-        // Estratégia 2: Buscar loading primeiro, depois por peso+carrierId
-        if (!payable) {
-          const loadingTemp = loadingService.getAll().find(l => l.id === loadingId);
-          if (loadingTemp) {
-            payable = allFreightPayables.find(p =>
-              p.partnerId === loadingTemp.carrierId &&
-              Math.abs((p.weightKg || 0) - (loadingTemp.weightKg || 0)) < 1
-            );
-
-            // Estratégia 3: Por valor do frete + carrierId
-            if (!payable) {
-              payable = allFreightPayables.find(p =>
-                p.partnerId === loadingTemp.carrierId &&
-                Math.abs(p.amount - (loadingTemp.totalFreightValue || 0)) < 0.01
-              );
-            }
-
-            // Estratégia 4: Por placa na descrição
-            if (!payable && loadingTemp.vehiclePlate) {
-              payable = allFreightPayables.find(p =>
-                p.description?.includes(loadingTemp.vehiclePlate!)
-              );
-            }
-          }
-        }
-
-        if (payable) {
-          console.log(`[PAGAMENTO FRETE] Payable encontrado para fr-${loadingId}: ${payable.id.substring(0, 8)}...`);
-          // Corrigir o loadingId no payable para futuras operações
-          if (!payable.loadingId) {
-            payablesService.update({ ...payable, loadingId });
-          }
-        } else {
-          console.log(`[PAGAMENTO FRETE] ⚠️ Payable não encontrado para fr-${loadingId}`);
-        }
-      }
-
-      // Buscar o loading
-      let loading = loadingId ? loadingService.getAll().find(l => l.id === loadingId) : undefined;
-
-      if (loading) {
-        const newTxs = [commonTx as any, ...(loading.transactions || [])];
-        const totalPaid = newTxs.reduce((acc, t) => acc + (t.value || 0), 0);
-        console.log(`[PAGAMENTO FRETE] ✅ Loading encontrado: ${loading.id}, freightPaid=${loading.freightPaid} -> ${totalPaid}`);
-        loadingService.update({
-          ...loading,
-          freightPaid: Number(totalPaid.toFixed(2)),
-          transactions: newTxs
-        });
-
-        // Também atualizar o payable de frete
-        if (payable) {
-          const newPaidAmount = (payable.paidAmount || 0) + transactionValue + discountValue;
-          const status: Payable['status'] = newPaidAmount >= payable.amount - 0.01 ? 'paid' : newPaidAmount > 0 ? 'partially_paid' : 'pending';
-          payablesService.update({
-            ...payable,
-            paidAmount: Number(newPaidAmount.toFixed(2)),
-            status
-          });
-          console.log(`[PAGAMENTO FRETE] ✅ Payable atualizado: ${payable.id.substring(0, 8)}..., paidAmount=${newPaidAmount}`);
-        }
-      } else {
-        console.log(`[PAGAMENTO FRETE] ⚠️ Loading NÃO encontrado para: ${loadingId}`);
-      }
+      result = await handleSalesOrderReceipt(recordId, paymentData);
     } else if (subType === 'commission') {
-      // COMISSÕES: Buscar e atualizar o payable de comissão
-      console.log(`[PAGAMENTO COMISSÃO] processRecord: recordId=${recordId}`);
+      result = await handleCommissionPayment(recordId, paymentData);
+    } else {
+      // Standalone / admin / crédito / sócio / recibo
+      let standalone: any = standaloneRecordsService.getById(recordId);
+      let serviceToUpdate: any = standaloneRecordsService;
 
-      // O recordId pode ser UUID do payable diretamente
-      let payable = payablesService.getById(recordId);
-
-      // Se não encontrar, buscar por purchaseOrderId ou outras estratégias
-      if (!payable) {
-        const allCommissionPayables = payablesService.getAll().filter(p => p.subType === 'commission');
-        console.log(`[PAGAMENTO COMISSÃO] Total payables de comissão: ${allCommissionPayables.length}`);
-
-        // Tentar buscar por purchaseOrderId se vier no formato esperado
-        const orderId = recordId.replace('com-', '');
-        payable = allCommissionPayables.find(p => p.purchaseOrderId === orderId);
-
-        if (!payable) {
-          console.log(`[PAGAMENTO COMISSÃO] ⚠️ Payable não encontrado para: ${recordId}`);
-        }
+      if (!standalone) {
+        standalone = creditService.getCredits().find((c: any) => c.id === recordId);
+        if (standalone) serviceToUpdate = creditService;
+      }
+      if (!standalone) {
+        standalone = shareholderService.getById(recordId);
+        if (standalone) serviceToUpdate = shareholderService;
+      }
+      if (!standalone) {
+        standalone = receiptService.getById(recordId);
+        if (standalone) serviceToUpdate = receiptService;
       }
 
-      if (payable) {
-        const newPaidAmount = (payable.paidAmount || 0) + transactionValue + discountValue;
-        const status: Payable['status'] = newPaidAmount >= payable.amount - 0.01
-          ? 'paid'
-          : newPaidAmount > 0
-            ? 'partially_paid'
-            : 'pending';
-
-        console.log(`[PAGAMENTO COMISSÃO] ✅ Atualizando payable ${payable.id.substring(0, 8)}...: ${payable.paidAmount} -> ${newPaidAmount}, status=${status}`);
-
-        payablesService.update({
-          ...payable,
-          paidAmount: Number(newPaidAmount.toFixed(2)),
-          status
-        });
-      }
+      result = await handleStandalonePayment(recordId, paymentData, standalone, serviceToUpdate);
     }
 
-    const shouldSkipHistory = standalone?.subType === 'admin' && subType === 'admin';
-    if (!recordId.startsWith('hist-') && !shouldSkipHistory) {
-      await standaloneRecordsService.add({
-        id: `hist-${txId}`,
-        description: `${isPureAdjustment ? 'Abatimento' : 'Baixa'} de ${subType === 'sales_order' ? 'Recebimento' : 'Pagamento'}`,
-        entityName: data.entityName || 'Parceiro',
-        category: isPureAdjustment ? 'Desconto/Ajuste' : 'Liquidação Operacional',
-        dueDate: data.date,
-        issueDate: data.date,
-        settlementDate: data.date,
-        originalValue: transactionValue + discountValue,
-        paidValue: transactionValue,
-        discountValue: discountValue,
-        status: 'paid',
-        subType: (subType as any) || 'admin',
-        bankAccount: isPureAdjustment ? 'ABATIMENTO' : accountName,
-        notes: `${data.notes || ''} [ORIGIN:${recordId}]`.trim()
-      });
-    }
-
+    // Log geral de ação
     logService.addLog({
       userId, userName, action: 'approve', module: 'Financeiro',
       description: `Baixa Realizada: ${formatCurrency(transactionValue)} ${discountValue > 0 ? `(+ Abatimento: ${formatCurrency(discountValue)})` : ''}`,
@@ -533,59 +169,43 @@ export const financialActionService = {
 
     invalidateFinancialCache();
     invalidateDashboardCache();
+
+    return result;
   },
 
   addAdminExpense: async (record: FinancialRecord) => {
     await standaloneRecordsService.add(record);
-    // Cache já é invalidado no standaloneRecordsService
   },
   deleteStandaloneRecord: async (id: string) => {
-    await standaloneRecordsService.delete(id);
-    // Cache já é invalidado no standaloneRecordsService
+    if (standaloneRecordsService.getById(id)) {
+      await standaloneRecordsService.delete(id);
+    } else if (creditService.getCredits().find((c: any) => c.id === id)) {
+      await creditService.remove(id);
+    } else if (shareholderService.getById(id)) {
+      await shareholderService.delete(id);
+    } else if (receiptService.getById(id)) {
+      await receiptService.delete(id);
+    }
   },
 
   importData: async (expenses: FinancialRecord[], transfers: TransferRecord[]) => {
     if (expenses) await standaloneRecordsService.importData(expenses);
-    if (transfers && transfers.length > 0) {
-      // Usar a nova função de importação em lote para eficiência
-      const items = transfers.map(mapRecordToTransfer);
-      await (transfersService as any).importData(items);
-    }
+    if (transfers && transfers.length > 0) await importTransfers(transfers);
     invalidateFinancialCache();
     invalidateDashboardCache();
   },
 
   syncDeleteFromOrigin: async (originTxId: string) => {
+    // 1. Delete from standalone (hist and adjust)
     await standaloneRecordsService.delete(`hist-${originTxId}`);
-    // Cache já é invalidado no standaloneRecordsService
+    await standaloneRecordsService.delete(`adjust-${originTxId}`);
+
+    // 2. Reverter transações financeiras (ledger imutável, sem delete)
+    const { financialTransactionService } = await import('./financial/financialTransactionService');
+    await financialTransactionService.deleteByRef(originTxId);
   },
 
-  addTransfer: (transfer: TransferRecord) => {
-    const mapped = mapRecordToTransfer(transfer);
-    transfersService.add(mapped);
-    const { userId, userName } = getLogInfo();
-    logService.addLog({ userId, userName, action: 'create', module: 'Financeiro', description: `Transferência bancária: ${transfer.originAccount} -> ${transfer.destinationAccount} no valor de ${formatCurrency(transfer.value)}` });
-    invalidateFinancialCache();
-    invalidateDashboardCache();
-  },
-
-  updateTransfer: (transfer: TransferRecord) => {
-    const mapped = mapRecordToTransfer(transfer);
-    transfersService.update(mapped);
-    const { userId, userName } = getLogInfo();
-    logService.addLog({ userId, userName, action: 'update', module: 'Financeiro', description: `Editou transferência ID ${transfer.id}` });
-    invalidateFinancialCache();
-    invalidateDashboardCache();
-  },
-
-  deleteTransfer: (id: string) => {
-    const t = transfersService.getById(id);
-    transfersService.delete(id);
-    const { userId, userName } = getLogInfo();
-    const origin = t ? resolveAccountLabel(t.fromAccountId) : 'Conta origem';
-    const dest = t ? resolveAccountLabel(t.toAccountId) : 'Conta destino';
-    logService.addLog({ userId, userName, action: 'delete', module: 'Financeiro', description: `Excluiu transferência de ${formatCurrency(t?.amount || 0)} entre ${origin} e ${dest}` });
-    invalidateFinancialCache();
-    invalidateDashboardCache();
-  }
+  addTransfer: (transfer: TransferRecord) => addTransfer(transfer),
+  updateTransfer: (transfer: TransferRecord) => updateTransfer(transfer),
+  deleteTransfer: (id: string) => deleteTransfer(id)
 };

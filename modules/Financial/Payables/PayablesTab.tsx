@@ -1,216 +1,142 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { ShoppingCart, Truck, Percent, RefreshCw, Layers, Calendar, X, Search } from 'lucide-react';
+import { ShoppingCart, Truck, Percent, Layers, Calendar, X, Search } from 'lucide-react';
 import UnifiedPayableManager from './components/UnifiedPayableManager';
 import { FinancialRecord } from '../types';
-import { payablesService, Payable } from '../../../services/financial/payablesService';
-import { loadingService } from '../../../services/loadingService';
-import { purchaseService } from '../../../services/purchaseService';
-import { waitForInit } from '../../../services/supabaseInitService';
+import { usePayables } from '../../../hooks/useFinancialEntries';
+import type { EnrichedPayableEntry } from '../../../services/financialEntriesService';
+import { useQueryClient } from '@tanstack/react-query';
+import { QUERY_KEYS } from '../../../hooks/queryKeys';
 
-// Converter Payable → FinancialRecord
-const convertToFinancialRecord = (
-  payable: Payable,
-  totalWeightKg?: number,
-  totalSc?: number,
-  loadCount?: number,
-  unitPriceTon?: number,
-  unitPriceSc?: number
-): FinancialRecord => {
-  // Para pedidos de compra, recalcula pago/abatimentos com base nas transações do pedido (evita exibir só o primeiro pagamento)
-  let paidValue = payable.paidAmount;
-  let discountValue = 0;
+// ============================================================================
+// Adaptador: EnrichedPayableEntry (VIEW SQL) → FinancialRecord (UI)
+// Zero cálculo no frontend — tudo vem pronto do banco de dados
+// ============================================================================
+const toFinancialRecord = (entry: EnrichedPayableEntry): FinancialRecord => {
+  const origin = entry.origin_type || '';
+  const status = entry.status === 'paid' ? 'paid'
+    : entry.status === 'partially_paid' ? 'partial'
+    : entry.status === 'overdue' ? 'overdue'
+    : 'pending';
 
-  if (payable.subType === 'purchase_order' && payable.purchaseOrderId) {
-    const order = purchaseService.getById(payable.purchaseOrderId);
-    const txs = order?.transactions || [];
-    const paidTx = txs
-      .filter(t => t.type === 'payment' || t.type === 'advance')
-      .reduce((sum, t) => sum + (t.value || 0), 0);
-    const discTx = txs.reduce((sum, t) => sum + (t.discountValue || 0), 0);
-    paidValue = Math.max(paidValue, order?.paidValue || 0, paidTx);
-    discountValue = Math.max(order?.discountValue || 0, discTx);
+  const subType = origin === 'purchase_order' ? 'purchase_order'
+    : origin === 'commission' ? 'commission'
+    : origin === 'expense' ? 'admin'
+    : origin === 'loan' ? 'loan_taken'
+    : origin === 'freight' ? 'freight'
+    : 'freight';
+
+  // Dados vindos do SQL (partner_name já resolvido pela VIEW)
+  const partnerName = entry.partner_name;
+
+  let description = partnerName;
+  let entityName = partnerName;
+  let driverName: string | undefined;
+  let weightKg: number | undefined;
+  let totalTon: number | undefined;
+  let totalSc: number | undefined;
+  let unitPriceSc: number | undefined;
+  let unitPriceTon: number | undefined;
+  let loadCount: number | undefined;
+
+  if (subType === 'purchase_order') {
+    // Dados do pedido e carregamentos já agregados pela VIEW
+    description = entry.order_number ? `#${entry.order_number}` : partnerName;
+    entityName = entry.order_partner_name || partnerName;
+    loadCount = entry.load_count;
+    weightKg = entry.total_weight_kg;
+    totalTon = entry.total_weight_ton;
+    totalSc = entry.total_weight_sc;
+    unitPriceSc = entry.unit_price_sc || undefined;
+  } else if (subType === 'freight') {
+    // Dados de frete já resolvidos pela VIEW
+    description = entry.freight_vehicle_plate || partnerName;
+    driverName = entry.freight_driver_name;
+    weightKg = entry.freight_weight_kg;
+    totalTon = entry.freight_weight_ton;
+    unitPriceTon = entry.freight_price_per_ton || undefined;
+  } else if (subType === 'commission') {
+    description = `Comissão - ${partnerName}`;
   }
 
-  const status = payable.amount <= 0
-    ? 'pending'
-    : (paidValue + discountValue) >= payable.amount - 0.05
-      ? 'paid'
-      : paidValue + discountValue > 0
-        ? 'partial'
-        : payable.status === 'overdue'
-          ? 'overdue'
-          : 'pending';
-
   return {
-    id: payable.id,
-    description: payable.description,
-    entityName: payable.partnerName || 'Parceiro',
-    driverName: payable.driverName,
-    category: payable.subType === 'purchase_order' ? 'Compras' : payable.subType === 'freight' ? 'Frete' : 'Outros',
-    dueDate: payable.dueDate,
-    issueDate: payable.dueDate,
-    originalValue: payable.amount,
-    paidValue,
-    discountValue,
+    id: entry.id,
+    originId: entry.origin_id,
+    description,
+    entityName,
+    driverName,
+    category: subType === 'purchase_order' ? 'Compras' : subType === 'freight' ? 'Frete' : subType === 'commission' ? 'Comissão' : 'Outros',
+    dueDate: entry.due_date || entry.created_date,
+    issueDate: entry.created_date,
+    originalValue: entry.total_amount,
+    paidValue: entry.paid_amount,
+    remainingValue: entry.remaining_amount,
+    discountValue: 0,
     status,
-    subType: payable.subType as any,
-    notes: payable.notes,
-    weightSc: payable.weightKg,
-    weightKg: totalWeightKg ?? payable.weightKg,
-    unitPriceTon,
+    subType: subType as any,
+    weightKg,
+    totalTon,
+    totalSc,
     unitPriceSc,
+    unitPriceTon,
     loadCount,
-    totalTon: totalWeightKg ? totalWeightKg / 1000 : undefined,
-    totalSc
   };
 };
 
 const PayablesTab: React.FC = () => {
+  const queryClient = useQueryClient();
   const [activeSubTab, setActiveSubTab] = useState<'all' | 'purchase' | 'freight' | 'commission'>('purchase');
-  const [records, setRecords] = useState<FinancialRecord[]>([]);
-  const [loading, setLoading] = useState(true);
 
   // Filtros de período (apenas Visão Geral)
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Paginação (apenas Visão Geral)
+  // Paginação
   const PAGE_SIZE = 100;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      // 🔥 FORCE REFRESH: Garante que temos dados frescos do Supabase
-      await payablesService.loadFromSupabase();
-      const all = payablesService.getAll();
+  // TanStack Query: dados + realtime automático (VIEW já vem enriquecida)
+  const { data: rawPayables = [], isLoading: loading } = usePayables();
+  const records = useMemo(() => rawPayables.map(toFinancialRecord), [rawPayables]);
 
-      console.log('📊 Payables Loaded:', all.length, 'Freights:', all.filter(p => p.subType === 'freight').length);
-
-      const converted = all.map((payable) => {
-        // CORREÇÃO: Para Fretes, usar o peso do próprio payable (carregamento específico)
-        // Para Compras, soma tudo vinculada ao pedido
-        let totalWeightKg = payable.weightKg;
-        let totalSc = undefined;
-        let loadCount = undefined;
-
-        if (payable.subType === 'purchase_order' && payable.purchaseOrderId) {
-          const loadings = loadingService.getByPurchaseOrder(payable.purchaseOrderId);
-          totalWeightKg = loadings.reduce((sum, l) => sum + (l.weightKg || 0), 0);
-          totalSc = loadings.reduce((sum, l) => sum + (l.weightSc || 0), 0) || undefined;
-          loadCount = loadings.length;
-        }
-
-        // Calcula unitários com base no peso correto
-        const unitPriceTon = totalWeightKg && totalWeightKg > 0 ? payable.amount / (totalWeightKg / 1000) : undefined;
-        // const unitPriceSc = totalSc && totalSc > 0 ? payable.amount / totalSc : undefined; // Removido uso de Sc para simplificar se não necessário, ou manter lógica original
-
-        return convertToFinancialRecord(payable, totalWeightKg, totalSc, loadCount, unitPriceTon, undefined);
-      });
-      setRecords(converted);
-    } finally {
-      setLoading(false);
-    }
+  const refreshData = () => {
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_PAYABLES });
   };
 
-  useEffect(() => {
-    const initTab = async () => {
-      await waitForInit();
-      payablesService.startRealtime();
-      await loadData();
-    };
-
-    const unsubscribe = payablesService.subscribe((updatedRecords) => {
-      const converted = updatedRecords.map((payable) => {
-        // MESMA CORREÇÃO NO REALTIME
-        let totalWeightKg = payable.weightKg;
-        let totalSc = undefined;
-        let loadCount = undefined;
-
-        if (payable.subType === 'purchase_order' && payable.purchaseOrderId) {
-          const loadings = loadingService.getByPurchaseOrder(payable.purchaseOrderId);
-          totalWeightKg = loadings.reduce((sum, l) => sum + (l.weightKg || 0), 0);
-          totalSc = loadings.reduce((sum, l) => sum + (l.weightSc || 0), 0) || undefined;
-          loadCount = loadings.length;
-        }
-
-        const unitPriceTon = totalWeightKg && totalWeightKg > 0 ? payable.amount / (totalWeightKg / 1000) : undefined;
-
-        return convertToFinancialRecord(payable, totalWeightKg, totalSc, loadCount, unitPriceTon, undefined);
-      });
-      setRecords(converted);
-    });
-
-    void initTab(); // Call init AFTER defining unsubscribe to avoid race? No, logic is fine.
-
-    return () => {
-      unsubscribe();
-    };
-  }, []);
-
-  // --- LÓGICA DE FILTRAGEM ---
   const getFilteredRecords = (type: 'purchase' | 'freight' | 'commission' | 'all') => {
-    // Se for aba específica, MOSTRAR APENAS O QUE ESTÁ ABERTO (pending/partial/overdue)
-    // Para 'all' (Visão Geral), mostra tudo (incluindo pagos)
-    // OBS: O UnifiedPayableManager trata a visualização, mas aqui filtramos a fonte.
-
-    // Se for aba "Todos", mostrar tudo (inclusive pagos)
-
-    if (type === 'all') {
-      return records;
-    }
-
-    const filtered = records.filter(r => {
+    if (type === 'all') return records;
+    return records.filter(r => {
       const isTypeMatch = (
         (type === 'purchase' && r.subType === 'purchase_order') ||
         (type === 'freight' && r.subType === 'freight') ||
         (type === 'commission' && r.subType === 'commission')
       );
-      // CRÍTICO: Ocultar itens com status 'paid' nas abas específicas
       const isPending = r.status !== 'paid';
-
       return isTypeMatch && isPending;
     });
-
-    console.log(`🔍 Filtro [${type}]: Total=${records.length}, Filtrados=${filtered.length}`, {
-      porTipo: records.reduce((acc, r) => { acc[r.subType || 'undefined'] = (acc[r.subType || 'undefined'] || 0) + 1; return acc; }, {} as any),
-      porStatus: records.reduce((acc, r) => { acc[r.status] = (acc[r.status] || 0) + 1; return acc; }, {} as any)
-    });
-
-    return filtered;
   };
 
-  // Filtro por período e termo para Visão Geral
   const filteredRecords = useMemo(() => {
     if (!startDate && !endDate && !searchTerm) return records;
-
     const searchLower = searchTerm.toLowerCase();
-
     return records.filter(r => {
-      // Filtro Data
       const d = r.dueDate || r.issueDate || '';
       if (startDate && d < startDate) return false;
       if (endDate && d > endDate) return false;
-
-      // Filtro Texto
       if (searchTerm) {
         return r.description.toLowerCase().includes(searchLower) ||
           r.entityName.toLowerCase().includes(searchLower) ||
           r.notes?.toLowerCase().includes(searchLower);
       }
-
       return true;
     });
   }, [records, startDate, endDate, searchTerm]);
 
-  // Separação para a visão "Todos" agrupada (com filtros aplicados)
   const allPurchases = useMemo(() => filteredRecords.filter(r => r.subType === 'purchase_order'), [filteredRecords]);
   const allFreights = useMemo(() => filteredRecords.filter(r => r.subType === 'freight'), [filteredRecords]);
   const allCommissions = useMemo(() => filteredRecords.filter(r => r.subType === 'commission'), [filteredRecords]);
 
-  // Paginação: limita registros visíveis por seção
   const paginatedPurchases = useMemo(() => allPurchases.slice(0, visibleCount), [allPurchases, visibleCount]);
   const paginatedFreights = useMemo(() => allFreights.slice(0, visibleCount), [allFreights, visibleCount]);
   const paginatedCommissions = useMemo(() => allCommissions.slice(0, visibleCount), [allCommissions, visibleCount]);
@@ -218,7 +144,6 @@ const PayablesTab: React.FC = () => {
   const totalFiltered = allPurchases.length + allFreights.length + allCommissions.length;
   const totalVisible = Math.min(allPurchases.length, visibleCount) + Math.min(allFreights.length, visibleCount) + Math.min(allCommissions.length, visibleCount);
 
-  // Reset paginação quando filtro muda
   useEffect(() => { setVisibleCount(PAGE_SIZE); }, [startDate, endDate, searchTerm]);
 
   return (
@@ -260,9 +185,7 @@ const PayablesTab: React.FC = () => {
             Visão Geral (Todos)
           </button>
         </div>
-        <button onClick={loadData} className="p-2 text-slate-400 hover:text-primary-600 hover:bg-slate-100 rounded-full transition-colors" title="Atualizar">
-          <RefreshCw size={18} />
-        </button>
+
       </div>
 
       {/* RENDERIZAÇÃO CONDICIONAL */}
@@ -329,7 +252,7 @@ const PayablesTab: React.FC = () => {
               <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">Histórico Fornecedores</h3>
               <span className="text-xs font-bold bg-slate-100 px-2 py-0.5 rounded text-slate-500">{allPurchases.length} títulos</span>
             </div>
-            <UnifiedPayableManager type="purchase" records={paginatedPurchases} onRefresh={loadData} searchTerm={searchTerm} hideSearchBar={true} />
+            <UnifiedPayableManager type="purchase" records={paginatedPurchases} onRefresh={refreshData} searchTerm={searchTerm} hideSearchBar={true} />
           </section>
 
           {/* Bloco Fretes */}
@@ -338,7 +261,7 @@ const PayablesTab: React.FC = () => {
               <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">Histórico de Fretes</h3>
               <span className="text-xs font-bold bg-slate-100 px-2 py-0.5 rounded text-slate-500">{allFreights.length} títulos</span>
             </div>
-            <UnifiedPayableManager type="freight" records={paginatedFreights} onRefresh={loadData} searchTerm={searchTerm} hideSearchBar={true} />
+            <UnifiedPayableManager type="freight" records={paginatedFreights} onRefresh={refreshData} searchTerm={searchTerm} hideSearchBar={true} />
           </section>
 
           {/* Bloco Comissões */}
@@ -347,7 +270,7 @@ const PayablesTab: React.FC = () => {
               <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">Histórico de Comissões</h3>
               <span className="text-xs font-bold bg-slate-100 px-2 py-0.5 rounded text-slate-500">{allCommissions.length} títulos</span>
             </div>
-            <UnifiedPayableManager type="commission" records={paginatedCommissions} onRefresh={loadData} searchTerm={searchTerm} hideSearchBar={true} />
+            <UnifiedPayableManager type="commission" records={paginatedCommissions} onRefresh={refreshData} searchTerm={searchTerm} hideSearchBar={true} />
           </section>
 
           {/* Paginação */}
@@ -371,7 +294,7 @@ const PayablesTab: React.FC = () => {
           key={activeSubTab}
           type={activeSubTab as any}
           records={getFilteredRecords(activeSubTab)}
-          onRefresh={loadData}
+          onRefresh={refreshData}
         />
       )}
 

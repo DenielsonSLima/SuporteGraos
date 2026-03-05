@@ -64,9 +64,10 @@ const persistLog = async (log: LogEntry) => {
     await waitForInit();
     const payload = mapLogToDb(log);
     const { error } = await supabase.from('audit_logs').insert(payload);
-    if (error) console.error('❌ Erro ao salvar log:', error);
+    if (error && error.code !== 'PGRST205' && error.code !== 'PGRST25') {
+      console.error('❌ Erro ao salvar log:', error);
+    }
   } catch (err) {
-    console.error('❌ Erro inesperado ao salvar log:', err);
   }
 };
 
@@ -85,7 +86,6 @@ const loadFromSupabase = async () => {
 
     if (error) {
       if (error.code !== 'PGRST25') {
-        console.warn('⚠️ Erro ao carregar logs:', error);
       }
       return;
     }
@@ -93,7 +93,6 @@ const loadFromSupabase = async () => {
     const mapped = data.map(mapLogFromDb);
     db.setAll(mapped);
   } catch (err) {
-    console.warn('⚠️ LogService: Usando fallback para logs:', err);
   }
 };
 
@@ -115,11 +114,18 @@ const startRealtime = () => {
       )
       .subscribe((status) => {
         if (status === 'CHANNEL_ERROR') {
-          console.error('❌ Erro no canal audit_logs realtime');
         }
       });
 
     _realtimeStarted = true;
+  }
+};
+
+const stopRealtime = () => {
+  if (logChannel) {
+    supabase.removeChannel(logChannel);
+    logChannel = null;
+    _realtimeStarted = false;
   }
 };
 
@@ -181,7 +187,8 @@ export const logService = {
 
   importData: (data: LogEntry[]) => db.setAll(data),
 
-  startRealtime
+  startRealtime,
+  stopRealtime
 };
 
 // ❌ NÃO inicializar automaticamente - aguardar autenticação via supabaseInitService

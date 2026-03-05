@@ -74,8 +74,8 @@ const SnapshotModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) => {
       // Obtém email do usuário (você pode pegar do contexto de autenticação)
       const userEmail = localStorage.getItem('user_email') || 'Usuario';
       
-      // Cria snapshot
-      snapshotService.createSnapshot(selectedYear, selectedMonth, userEmail, notes || undefined);
+      // Cria snapshot (async — via RPC)
+      await snapshotService.createSnapshot(selectedYear, selectedMonth, userEmail, notes || undefined);
       
       setSuccess(true);
       
@@ -90,7 +90,6 @@ const SnapshotModal: React.FC<Props> = ({ isOpen, onClose, onSuccess }) => {
         setNotes('');
       }, 1500);
     } catch (err) {
-      console.error('Erro ao criar snapshot:', err);
       setLoading(false);
     }
   };

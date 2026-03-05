@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, Save, Calendar, DollarSign, Wallet, FileText, ArrowDown, CheckSquare, Square, MinusCircle, HelpCircle } from 'lucide-react';
-import { financialService } from '../../../../services/financialService';
+import type { Account } from '../../../../services/accountsService';
+import { useAccounts } from '../../../../hooks/useAccounts';
 import { useToast } from '../../../../contexts/ToastContext';
-import { BankAccount, LoanTransaction } from '../../types';
+import { LoanTransaction } from '../../types';
 
 interface Props {
   isOpen: boolean;
@@ -13,10 +14,8 @@ interface Props {
    initialTx?: (Omit<LoanTransaction, 'id'> & { id?: string });
 }
 
-type BankAccountWithBalance = BankAccount & { currentBalance: number };
-
 const LoanTransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, loanType, initialTx }) => {
-   const [bankAccounts, setBankAccounts] = useState<BankAccountWithBalance[]>([]);
+   const { data: bankAccounts = [] } = useAccounts();
    const { addToast } = useToast();
   const [type, setType] = useState<'increase' | 'decrease'>('decrease');
   const [isAdjustment, setIsAdjustment] = useState(false); // NOVO: Flag para Desconto/Ajuste
@@ -43,7 +42,6 @@ const LoanTransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, loanTy
 
    useEffect(() => {
       if (isOpen) {
-         setBankAccounts(financialService.getBankAccountsWithBalances().filter(a => a.active !== false));
          if (initialTx) {
             setType(initialTx.type);
             setIsAdjustment(!!initialTx.isHistorical);
@@ -89,7 +87,7 @@ const LoanTransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, loanTy
       value: val,
       description: description || (isAdjustment ? 'Ajuste / Abatimento de Saldo' : (type === 'increase' ? 'Reforço de Capital' : 'Pagamento de Parcela')),
       accountId: (isHistorical || isAdjustment) ? undefined : accountId,
-      accountName: (isHistorical || isAdjustment) ? undefined : account?.bankName,
+      accountName: (isHistorical || isAdjustment) ? undefined : account?.account_name,
       isHistorical: isHistorical || isAdjustment // Ajustes funcionam como históricos (não geram caixa)
     });
   };
@@ -167,7 +165,7 @@ const LoanTransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, loanTy
                                        <option value="">Selecione a conta ativa...</option>
                                        {bankAccounts.map(acc => (
                                           <option key={acc.id} value={acc.id}>
-                                             {acc.bankName} - {acc.owner} (Saldo: {currency(acc.currentBalance || 0)})
+                                             {acc.account_name} (Saldo: {currency(acc.balance || 0)})
                                           </option>
                                        ))}
                                  </select>

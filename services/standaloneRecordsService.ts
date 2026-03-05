@@ -1,3 +1,12 @@
+/**
+ * ============================================================================
+ * STANDALONE RECORDS SERVICE — Despesas Administrativas (admin_expenses)
+ * ============================================================================
+ * 
+ * MODULARIZADO:
+ *   standalone/standaloneMapper.ts → Mapeamento FinancialRecord ↔ Supabase
+ */
+
 import { supabase } from './supabase';
 import { Persistence } from './persistence';
 import { FinancialRecord } from '../modules/Financial/types';
@@ -6,8 +15,14 @@ import { invalidateDashboardCache } from './dashboardCache';
 import { logService } from './logService';
 import { authService } from './authService';
 
+// Módulo de mapeamento extraído
+import { fromSupabase, toSupabase, STANDALONE_SELECT_FIELDS } from './standalone/standaloneMapper';
+
+// Re-export para manter compatibilidade de imports externos
+export { fromSupabase, toSupabase, STANDALONE_SELECT_FIELDS };
+
 // In-memory persistence (no localStorage)
-const db = new Persistence<FinancialRecord>('standalone_records', [], { useStorage: false });
+const db = new Persistence<FinancialRecord>('admin_expenses', [], { useStorage: false });
 
 let isInitialized = false;
 let realtimeSubscription: any = null;
@@ -19,104 +34,18 @@ export interface StandaloneRecordsPageOptions {
   endDate?: string;
 }
 
-/**
- * Converte registro do Supabase (snake_case) para o formato do app (camelCase)
- */
-const fromSupabase = (record: any): FinancialRecord => ({
-  id: record.id,
-  description: record.description,
-  entityName: record.entity_name,
-  driverName: record.driver_name,
-  category: record.category,
-  dueDate: record.due_date,
-  issueDate: record.issue_date,
-  settlementDate: record.settlement_date,
-  originalValue: parseFloat(record.original_value),
-  paidValue: parseFloat(record.paid_value || 0),
-  discountValue: parseFloat(record.discount_value || 0),
-  status: record.status,
-  subType: record.sub_type,
-  bankAccount: record.bank_account,
-  notes: record.notes,
-  assetId: record.asset_id,
-  isAssetReceipt: record.is_asset_receipt,
-  assetName: record.asset_name,
-  weightSc: record.weight_sc ? parseFloat(record.weight_sc) : undefined,
-  weightKg: record.weight_kg ? parseFloat(record.weight_kg) : undefined,
-  unitPriceTon: record.unit_price_ton ? parseFloat(record.unit_price_ton) : undefined,
-  unitPriceSc: record.unit_price_sc ? parseFloat(record.unit_price_sc) : undefined,
-  loadCount: record.load_count,
-  totalTon: record.total_ton ? parseFloat(record.total_ton) : undefined,
-  totalSc: record.total_sc ? parseFloat(record.total_sc) : undefined,
-});
-
-/**
- * Converte registro do app (camelCase) para o formato do Supabase (snake_case)
- */
-const toSupabase = (record: FinancialRecord): any => ({
-  id: record.id,
-  description: record.description,
-  entity_name: record.entityName,
-  driver_name: record.driverName,
-  category: record.category,
-  due_date: record.dueDate,
-  issue_date: record.issueDate,
-  settlement_date: record.settlementDate,
-  original_value: record.originalValue,
-  paid_value: record.paidValue || 0,
-  discount_value: record.discountValue || 0,
-  status: record.status,
-  sub_type: record.subType,
-  bank_account: record.bankAccount,
-  notes: record.notes,
-  asset_id: record.assetId,
-  is_asset_receipt: record.isAssetReceipt,
-  asset_name: record.assetName,
-  weight_sc: record.weightSc,
-  weight_kg: record.weightKg,
-  unit_price_ton: record.unitPriceTon,
-  unit_price_sc: record.unitPriceSc,
-  load_count: record.loadCount,
-  total_ton: record.totalTon,
-  total_sc: record.totalSc,
-});
-
-const STANDALONE_SELECT_FIELDS = [
-  'id',
-  'description',
-  'entity_name',
-  'driver_name',
-  'category',
-  'due_date',
-  'issue_date',
-  'settlement_date',
-  'original_value',
-  'paid_value',
-  'discount_value',
-  'status',
-  'sub_type',
-  'bank_account',
-  'notes',
-  'asset_id',
-  'is_asset_receipt',
-  'asset_name',
-  'weight_sc',
-  'weight_kg',
-  'unit_price_ton',
-  'unit_price_sc',
-  'load_count',
-  'total_ton',
-  'total_sc'
-].join(',');
-
 const fetchPage = async (options: StandaloneRecordsPageOptions): Promise<FinancialRecord[]> => {
   try {
     const { limit, beforeDate, startDate, endDate } = options;
     const user = authService.getCurrentUser();
     const companyId = user?.companyId;
 
+    if (!companyId) {
+      return [];
+    }
+
     let query = supabase
-      .from('standalone_records')
+      .from('admin_expenses')
       .select(STANDALONE_SELECT_FIELDS)
       .eq('company_id', companyId)
       .order('issue_date', { ascending: false })
@@ -130,7 +59,6 @@ const fetchPage = async (options: StandaloneRecordsPageOptions): Promise<Financi
     if (error) throw error;
     return (data || []).map(fromSupabase);
   } catch (error) {
-    console.error('❌ [StandaloneRecordsService] Erro ao paginar:', error);
     return [];
   }
 };
@@ -143,8 +71,12 @@ const loadFromSupabase = async (): Promise<void> => {
     const user = authService.getCurrentUser();
     const companyId = user?.companyId;
 
+    if (!companyId) {
+      return;
+    }
+
     const { data, error } = await supabase
-      .from('standalone_records')
+      .from('admin_expenses')
       .select('*')
       .eq('company_id', companyId)
       .order('issue_date', { ascending: false });
@@ -155,10 +87,8 @@ const loadFromSupabase = async (): Promise<void> => {
       const records = data.map(fromSupabase);
       db.clear();
       records.forEach(record => db.add(record));
-      console.log(`✅ [StandaloneRecordsService] Carregados ${records.length} registros do Supabase`);
     }
   } catch (error) {
-    console.error('❌ [StandaloneRecordsService] Erro ao carregar do Supabase:', error);
   }
 };
 
@@ -167,20 +97,31 @@ const loadFromSupabase = async (): Promise<void> => {
  */
 const setupRealtimeSubscription = (): void => {
   if (realtimeSubscription) {
-    console.log('⚠️ [StandaloneRecordsService] Subscription já existe');
     return;
   }
 
   realtimeSubscription = supabase
-    .channel('standalone_records_changes')
+    .channel('admin_expenses_changes')
     .on(
       'postgres_changes',
-      { event: '*', schema: 'public', table: 'standalone_records' },
+      { event: '*', schema: 'public', table: 'admin_expenses' },
       (payload) => {
-        console.log('🔄 [StandaloneRecordsService] Mudança detectada:', payload.eventType);
 
-        // Recarregar dados do Supabase
-        loadFromSupabase();
+        // ✅ Atualização GRANULAR — não apaga toda a memória
+        // Evita o bug onde um INSERT em memória some ao recarregar do Supabase
+        if (payload.eventType === 'INSERT' && payload.new) {
+          const record = fromSupabase(payload.new);
+          const existing = db.getById(record.id);
+          if (!existing) db.add(record);
+          else db.update(record); // garante sincronização se divergir
+        } else if (payload.eventType === 'UPDATE' && payload.new) {
+          const record = fromSupabase(payload.new);
+          const existing = db.getById(record.id);
+          if (existing) db.update(record);
+          else db.add(record);
+        } else if (payload.eventType === 'DELETE' && payload.old) {
+          db.delete((payload.old as any).id);
+        }
 
         // Invalidar caches
         invalidateFinancialCache();
@@ -189,7 +130,6 @@ const setupRealtimeSubscription = (): void => {
     )
     .subscribe();
 
-  console.log('✅ [StandaloneRecordsService] Realtime subscription ativa');
 };
 
 /**
@@ -226,23 +166,53 @@ export const standaloneRecordsService = {
    */
   add: async (record: FinancialRecord): Promise<void> => {
     try {
+      const user = authService.getCurrentUser();
       const supabaseRecord = toSupabase(record);
 
-      const { error } = await supabase
-        .from('standalone_records')
-        .insert([supabaseRecord]);
-
-      if (error) throw error;
-
-      // Adicionar em memória
+      // ✅ Adicionar em memória PRIMEIRO (optimistic update)
+      // Garante que o saldo bancário é atualizado imediatamente
       db.add(record);
-
-      // Invalidar caches
       invalidateFinancialCache();
       invalidateDashboardCache();
 
+      const { error } = await supabase
+        .from('admin_expenses')
+        .insert([supabaseRecord]);
+
+      if (error) {
+        // ✅ ROLLBACK: se o INSERT falhou, remove da memória para evitar
+        // inconsistência após reload (o registro não estaria no Supabase).
+        db.delete(record.id);
+        invalidateFinancialCache();
+        invalidateDashboardCache();
+        throw error; // propaga para o caller tratar (ex: mostrar erro ao usuário)
+      }
+
+      // ✅ SINGLE LEDGER: Criar a entrada financeira
+      try {
+        const companyId = user?.companyId;
+        if (companyId) {
+          // If it's a receipt (like an asset sale), the type should be 'receivable'
+          const entryType = record.subType === 'receipt' ? 'receivable' : 'expense';
+
+          await supabase.from('financial_entries').insert({
+            company_id: companyId,
+            type: entryType,
+            origin_type: 'standalone_expense',
+            origin_id: record.id,
+            total_amount: record.originalValue,
+            due_date: record.dueDate,
+            status: 'open',
+            paid_amount: 0,
+            remaining_amount: record.originalValue,
+            created_date: new Date().toISOString().split('T')[0]
+          });
+        }
+      } catch (err) {
+        console.error('[standaloneRecordsService] add financial_entries insert:', err);
+      }
+
       // Log
-      const user = authService.getCurrentUser();
       logService.addLog({
         userId: user?.id || 'system',
         userName: user?.name || 'Sistema',
@@ -252,10 +222,8 @@ export const standaloneRecordsService = {
         entityId: record.id
       });
 
-      console.log('✅ [StandaloneRecordsService] Registro adicionado:', record.id);
     } catch (error) {
-      console.error('❌ [StandaloneRecordsService] Erro ao adicionar:', error);
-      throw error;
+      throw error; // ✅ Re-lança para o registerFinancialRecords propagar ao UI
     }
   },
 
@@ -267,11 +235,21 @@ export const standaloneRecordsService = {
       const supabaseRecord = toSupabase(record);
 
       const { error } = await supabase
-        .from('standalone_records')
+        .from('admin_expenses')
         .update(supabaseRecord)
         .eq('id', record.id);
 
       if (error) throw error;
+
+      // ✅ SINGLE LEDGER: Atualizar a entrada financeira
+      try {
+        await supabase.from('financial_entries').update({
+          total_amount: record.originalValue,
+          due_date: record.dueDate
+        }).eq('origin_id', record.id).eq('origin_type', 'standalone_expense');
+      } catch (err) {
+        console.error('[standaloneRecordsService] update financial_entries:', err);
+      }
 
       // Atualizar em memória
       db.update(record);
@@ -291,9 +269,7 @@ export const standaloneRecordsService = {
         entityId: record.id
       });
 
-      console.log('✅ [StandaloneRecordsService] Registro atualizado:', record.id);
     } catch (error) {
-      console.error('❌ [StandaloneRecordsService] Erro ao atualizar:', error);
       throw error;
     }
   },
@@ -304,11 +280,21 @@ export const standaloneRecordsService = {
   delete: async (id: string): Promise<void> => {
     try {
       const { error } = await supabase
-        .from('standalone_records')
+        .from('admin_expenses')
         .delete()
         .eq('id', id);
 
       if (error) throw error;
+
+      // ✅ SINGLE LEDGER: Marcar entrada como estornada (imutabilidade do ledger)
+      try {
+        await supabase.from('financial_entries')
+          .update({ status: 'reversed', description: `[ESTORNO] ${id}` })
+          .eq('origin_id', id)
+          .eq('origin_type', 'standalone_expense');
+      } catch (err) {
+        console.error('[standaloneRecordsService] reverse financial_entries:', err);
+      }
 
       // Remover da memória
       db.delete(id);
@@ -328,9 +314,7 @@ export const standaloneRecordsService = {
         entityId: id
       });
 
-      console.log('✅ [StandaloneRecordsService] Registro excluído:', id);
     } catch (error) {
-      console.error('❌ [StandaloneRecordsService] Erro ao excluir:', error);
       throw error;
     }
   },
@@ -345,7 +329,7 @@ export const standaloneRecordsService = {
       const supabaseRecords = records.map(toSupabase);
 
       const { error } = await supabase
-        .from('standalone_records')
+        .from('admin_expenses')
         .upsert(supabaseRecords, { onConflict: 'id' });
 
       if (error) throw error;
@@ -368,9 +352,7 @@ export const standaloneRecordsService = {
         entityId: 'bulk'
       });
 
-      console.log(`✅ [StandaloneRecordsService] ${records.length} registros importados`);
     } catch (error) {
-      console.error('❌ [StandaloneRecordsService] Erro ao importar:', error);
       throw error;
     }
   },
@@ -389,9 +371,26 @@ export const standaloneRecordsService = {
     if (realtimeSubscription) {
       supabase.removeChannel(realtimeSubscription);
       realtimeSubscription = null;
-      console.log('✅ [StandaloneRecordsService] Realtime subscription removida');
     }
   },
+
+  /**
+   * Exclui registros por referência [REF:xxx] ou [ORIGIN:xxx]
+   */
+  deleteByRef: async (refId: string): Promise<void> => {
+    try {
+      const { error } = await supabase
+        .from('admin_expenses')
+        .delete()
+        .or(`notes.ilike.%[REF:${refId}]%,notes.ilike.%[ORIGIN:${refId}]%`);
+
+      if (error) throw error;
+
+      // A atualização da memória (db) virá via realtime
+    } catch (error) {
+      throw error;
+    }
+  }
 };
 
 // ❌ NÃO inicializar automaticamente - aguardar autenticação via supabaseInitService

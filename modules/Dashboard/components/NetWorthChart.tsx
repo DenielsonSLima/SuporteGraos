@@ -1,15 +1,15 @@
 
-import React, { useMemo } from 'react';
-import { 
-  ComposedChart, 
-  Bar, 
-  Line, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  Legend, 
-  ResponsiveContainer 
+import React, { useMemo, useRef, useEffect, useState } from 'react';
+import {
+  ComposedChart,
+  Bar,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
 } from 'recharts';
 import { TrendingUp, TrendingDown } from 'lucide-react';
 import { formatCurrency } from '../../../utils/formatters';
@@ -29,44 +29,69 @@ interface Props {
 
 const NetWorthChart: React.FC<Props> = React.memo(({ data, growthPercent }) => {
   const CHART_HEIGHT = 300;
+  const chartRef = useRef<HTMLDivElement>(null);
+  const [midLabels, setMidLabels] = useState<{ x: number; y: number; label: string; positive: boolean }[]>([]);
 
-  const tooltipFormatter = useMemo(() => {
-    return (value: number, name: string) => {
-      const labels: Record<string, string> = {
-        netWorth: 'Patrimônio Líquido',
-        assets: 'Ativos',
-        liabilities: 'Passivos'
-      };
-      return [formatCurrency(value), labels[name] || name];
-    };
-  }, []);
+  // Após o chart renderizar, extrair coordenadas dos dots da Line
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!chartRef.current) return;
+      const dots = chartRef.current.querySelectorAll('.recharts-line-dots .recharts-dot');
+      if (!dots.length) return;
+
+      const containerRect = chartRef.current.getBoundingClientRect();
+      const coords: { x: number; y: number }[] = [];
+
+      dots.forEach((dot) => {
+        const cx = parseFloat(dot.getAttribute('cx') || '0');
+        const cy = parseFloat(dot.getAttribute('cy') || '0');
+        coords.push({ x: cx, y: cy });
+      });
+
+      const labels: typeof midLabels = [];
+      for (let i = 1; i < coords.length; i++) {
+        const change = data[i]?.monthlyChange;
+        if (!change || change === 0) continue;
+
+        labels.push({
+          x: (coords[i - 1].x + coords[i].x) / 2,
+          y: Math.min(coords[i - 1].y, coords[i].y) - 18,
+          label: `${change > 0 ? '+' : ''}${change.toFixed(1)}%`,
+          positive: change > 0,
+        });
+      }
+      setMidLabels(labels);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [data]);
 
   // Custom Tooltip com variação mensal
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
-      const data = payload[0].payload;
+      const d = payload[0].payload;
       return (
         <div className="bg-white p-4 rounded-xl border-2 border-slate-200 shadow-xl">
-          <p className="font-bold text-slate-700 mb-2">{data.name}</p>
+          <p className="font-bold text-slate-700 mb-2">{d.name}</p>
           <div className="space-y-1 text-sm">
             <p className="flex items-center gap-2">
               <span className="w-3 h-3 rounded-full bg-emerald-500"></span>
               <span className="text-slate-600">Ativos:</span>
-              <span className="font-bold text-emerald-700">{formatCurrency(data.assets)}</span>
+              <span className="font-bold text-emerald-700">{formatCurrency(d.assets)}</span>
             </p>
             <p className="flex items-center gap-2">
               <span className="w-3 h-3 rounded-full bg-rose-500"></span>
               <span className="text-slate-600">Passivos:</span>
-              <span className="font-bold text-rose-700">{formatCurrency(data.liabilities)}</span>
+              <span className="font-bold text-rose-700">{formatCurrency(d.liabilities)}</span>
             </p>
             <p className="flex items-center gap-2 pt-2 border-t border-slate-200">
               <span className="w-3 h-3 rounded-full bg-purple-500"></span>
               <span className="text-slate-600">Patrimônio:</span>
-              <span className="font-bold text-purple-700">{formatCurrency(data.netWorth)}</span>
+              <span className="font-bold text-purple-700">{formatCurrency(d.netWorth)}</span>
             </p>
-            {data.monthlyChange !== 0 && (
-              <p className={`text-xs font-bold pt-1 ${data.monthlyChange > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                {data.monthlyChange > 0 ? '+' : ''}{data.monthlyChange.toFixed(1)}% vs mês anterior
+            {d.monthlyChange !== 0 && (
+              <p className={`text-xs font-bold pt-1 ${d.monthlyChange > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                {d.monthlyChange > 0 ? '+' : ''}{d.monthlyChange.toFixed(1)}% vs mês anterior
               </p>
             )}
           </div>
@@ -88,13 +113,12 @@ const NetWorthChart: React.FC<Props> = React.memo(({ data, growthPercent }) => {
           </h3>
           <p className="text-xs text-slate-500 mt-1">Ativos - Passivos = Patrimônio Líquido</p>
         </div>
-        
+
         {/* Badge de Crescimento */}
-        <div className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm ${
-          isPositiveGrowth 
-            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+        <div className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm ${isPositiveGrowth
+            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
             : 'bg-red-50 text-red-700 border border-red-200'
-        }`}>
+          }`}>
           {isPositiveGrowth ? (
             <TrendingUp size={18} />
           ) : (
@@ -106,51 +130,75 @@ const NetWorthChart: React.FC<Props> = React.memo(({ data, growthPercent }) => {
           <span className="text-xs font-medium opacity-70">no período</span>
         </div>
       </div>
-      
-      <div style={{ height: CHART_HEIGHT, width: '100%' }}>
-        <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
-          <ComposedChart data={data} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+
+      <div ref={chartRef} style={{ height: CHART_HEIGHT, width: '100%', position: 'relative' }}>
+        <ResponsiveContainer width="100%" height={CHART_HEIGHT} minWidth={0}>
+          <ComposedChart data={data} margin={{ top: 25, right: 10, left: 10, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-            
-            <XAxis 
-              dataKey="name" 
-              axisLine={false} 
-              tickLine={false} 
-              tick={{fill: '#64748b', fontSize: 12, fontWeight: 'bold'}} 
-              dy={10} 
-            />
-            
-            <YAxis 
-              axisLine={false} 
-              tickLine={false} 
-              tick={{fill: '#94a3b8', fontSize: 10}} 
-              tickFormatter={(val) => `R$${(val/1000).toFixed(0)}k`}
+
+            <XAxis
+              dataKey="name"
+              axisLine={false}
+              tickLine={false}
+              tick={{ fill: '#64748b', fontSize: 12, fontWeight: 'bold' }}
+              dy={10}
             />
 
-            <Tooltip 
+            <YAxis
+              axisLine={false}
+              tickLine={false}
+              tick={{ fill: '#94a3b8', fontSize: 10 }}
+              tickFormatter={(val) => `R$${(val / 1000).toFixed(0)}k`}
+            />
+
+            <Tooltip
               content={<CustomTooltip />}
             />
-            
-            <Legend 
+
+            <Legend
               wrapperStyle={{ paddingTop: '20px' }}
               iconType="circle"
             />
-            
+
             {/* Barras: Ativos e Passivos */}
             <Bar dataKey="assets" name="Ativos" fill="#10b981" radius={[4, 4, 0, 0]} barSize={30} />
             <Bar dataKey="liabilities" name="Passivos" fill="#f43f5e" radius={[4, 4, 0, 0]} barSize={30} />
-            
+
             {/* Linha: Patrimônio Líquido */}
-            <Line 
-              type="monotone" 
-              dataKey="netWorth" 
-              name="Patrimônio Líquido" 
-              stroke="#8b5cf6" 
-              strokeWidth={3} 
-              dot={{r: 5, fill: '#8b5cf6', strokeWidth: 2, stroke: '#fff'}} 
+            <Line
+              type="monotone"
+              dataKey="netWorth"
+              name="Patrimônio Líquido"
+              stroke="#8b5cf6"
+              strokeWidth={3}
+              dot={{ r: 5, fill: '#8b5cf6', strokeWidth: 2, stroke: '#fff' }}
             />
           </ComposedChart>
         </ResponsiveContainer>
+
+        {/* Badges de % entre os meses — posicionamento absoluto sobre o SVG */}
+        {midLabels.map((ml, i) => (
+          <div
+            key={`ml-${i}`}
+            style={{
+              position: 'absolute',
+              left: ml.x,
+              top: ml.y,
+              transform: 'translate(-50%, -50%)',
+              pointerEvents: 'none',
+            }}
+          >
+            <span
+              className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                ml.positive
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  : 'bg-red-50 text-red-700 border-red-200'
+              }`}
+            >
+              {ml.label}
+            </span>
+          </div>
+        ))}
       </div>
     </div>
   );

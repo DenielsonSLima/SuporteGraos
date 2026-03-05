@@ -11,24 +11,24 @@ const QuantityChart: React.FC<{ data: MonthlyData[] }> = ({ data }) => {
         Fluxo Físico Mensal (Sacas)
       </h3>
       <div className="h-64 w-full">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
           <LineChart data={data}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10}} dy={10} />
-            <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10}} />
-            <Tooltip 
+            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} dy={10} />
+            <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} />
+            <Tooltip
               contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontWeight: 'bold' }}
               formatter={(value: number) => [value.toLocaleString() + ' SC', 'Volume']}
             />
-            <Line 
-                type="monotone" 
-                dataKey="totalQuantitySc" 
-                name="Volume" 
-                stroke="#6366f1" 
-                strokeWidth={4} 
-                dot={{r: 4, fill: '#6366f1', strokeWidth: 2, stroke: '#fff'}} 
-                activeDot={{r: 6}} 
-                isAnimationActive={false}
+            <Line
+              type="monotone"
+              dataKey="totalQuantitySc"
+              name="Volume"
+              stroke="#6366f1"
+              strokeWidth={4}
+              dot={{ r: 4, fill: '#6366f1', strokeWidth: 2, stroke: '#fff' }}
+              activeDot={{ r: 6 }}
+              isAnimationActive={false}
             />
           </LineChart>
         </ResponsiveContainer>

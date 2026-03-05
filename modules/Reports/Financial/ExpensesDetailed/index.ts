@@ -1,8 +1,7 @@
 
 import { Briefcase } from 'lucide-react';
 import { ReportModule } from '../../types';
-import { financialActionService } from '../../../../services/financialActionService';
-import { financialService } from '../../../../services/financialService';
+import { financialIntegrationService } from '../../../../services/financialIntegrationService';
 import UniversalReportTemplate from '../../templates/UniversalReportTemplate';
 import DefaultFilters from '../../components/DefaultFilters';
 
@@ -21,10 +20,10 @@ const expensesDetailedReport: ReportModule = {
   },
   FilterComponent: DefaultFilters,
   fetchData: ({ startDate, endDate }) => {
-    const standalone = financialActionService.getStandaloneRecords();
+    const payables = financialIntegrationService.getPayables();
     
     // Filtra apenas despesas administrativas (exclui compras, fretes e recebíveis)
-    const records = standalone.filter(r => {
+    const records = payables.filter(r => {
         if (r.subType !== 'admin') return false;
         if (startDate && r.issueDate < startDate) return false;
         if (endDate && r.issueDate > endDate) return false;

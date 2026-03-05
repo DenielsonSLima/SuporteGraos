@@ -9,11 +9,12 @@ interface Props {
 }
 
 // ⚡ OTIMIZADO: Recebe dados via props + usa formatter global (sem re-criação)
+// ✅ REGRA: Frontend NÃO faz cálculos — netWorth vem pré-calculado do RPC
 const FinancialSummary: React.FC<Props> = React.memo(({ data }) => {
   if (!data) return <div className="h-32 animate-pulse bg-slate-100 rounded-xl"></div>;
 
-  // Cálculo do Patrimônio Líquido: Ativos - Passivos
-  const netWorth = data.totalAssets - data.totalLiabilities;
+  // netWorth vem direto do RPC (Ativos - Passivos calculado no servidor)
+  const netWorth = data.netWorth ?? 0;
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">

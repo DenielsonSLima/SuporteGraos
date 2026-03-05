@@ -2,12 +2,10 @@
 import React, { useRef, useState } from 'react';
 import { GoogleGenAI } from '@google/genai';
 import { BrainCircuit, X, Minimize2, Maximize2, Trash2, RefreshCw } from 'lucide-react';
-import { authService } from '../../services/authService';
+import { useCurrentUser } from '../../hooks/useCurrentUser';
 import { useToast } from '../../contexts/ToastContext';
 
-// Import Services
-import { aiContextCache } from './services/aiContextCache';
-import { aiTools, executeToolAction } from './services/aiToolService';
+import { useAIAssistantServices } from './hooks/useAIAssistantServices';
 
 // Import Components
 import ChatInterface from './components/ChatInterface';
@@ -27,8 +25,9 @@ const FloatingAssistant: React.FC = () => {
     { role: 'model', text: '🤖 Olá! Eu sou o seu assistente virtual do ERP Suporte Grãos. Estou aqui para tirar suas dúvidas, realizar cadastros e consultas. Como posso ajudá-lo?' }
   ]);
 
-  const currentUser = authService.getCurrentUser();
-  const userName = currentUser?.name.split(' ')[0] || 'Usuário';
+  const currentUser = useCurrentUser();
+  const userName = currentUser?.name?.split(' ')[0] || 'Usuário';
+  const { contextData, aiTools, executeToolAction, invalidateContext } = useAIAssistantServices(userName);
 
   const handleSendText = async () => {
     if (!input.trim() && !attachment) return;
@@ -68,9 +67,6 @@ const FloatingAssistant: React.FC = () => {
       if (!process.env.API_KEY) throw new Error("Chave de API não configurada.");
 
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      
-      // ✅ Usar cache de contexto
-      const contextData = aiContextCache.getSystemContext(userName);
       
       // 2. Construct History for API (Context Window) — limitar histórico para reduzir latência
       const limitedMessages = newMessages.slice(Math.max(0, newMessages.length - 8));
@@ -147,7 +143,7 @@ const FloatingAssistant: React.FC = () => {
                  const result = executeToolAction(fc.name, fc.args, userName);
                  const toolMessage = result.success ? `✅ ${result.message}` : `❌ ${result.message}`;
                  toolOutputs.push(toolMessage);
-                 aiContextCache.invalidate();
+                 invalidateContext();
              }
           }
         }
@@ -161,7 +157,7 @@ const FloatingAssistant: React.FC = () => {
               const result = executeToolAction(fc.name, fc.args, userName);
               const toolMessage = result.success ? `✅ ${result.message}` : `❌ ${result.message}`;
               toolOutputs.push(toolMessage);
-              aiContextCache.invalidate();
+              invalidateContext();
           }
         }
       };
@@ -224,7 +220,7 @@ const FloatingAssistant: React.FC = () => {
     setMessages([
       { role: 'model', text: '🤖 Olá! Eu sou o seu assistente virtual do ERP Suporte Grãos. Estou aqui para tirar suas dúvidas, realizar cadastros e consultas. Como posso ajudá-lo?' }
     ]);
-    aiContextCache.invalidate();
+    invalidateContext();
     addToast('info', 'Histórico Limpo', 'Conversa reiniciada.');
   };
 

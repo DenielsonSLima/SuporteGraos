@@ -79,15 +79,15 @@ const ReportGeneratorModal: React.FC<Props> = ({ isOpen, onClose, reportId }) =>
     const options = {
       margin: 0,
       filename: `${reportModule.metadata.title.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`,
-      image: { type: 'jpeg', quality: 1.0 },
-      html2canvas: { 
-        scale: 2, 
-        useCORS: true, 
+      image: { type: 'jpeg' as const, quality: 1.0 },
+      html2canvas: {
+        scale: 2,
+        useCORS: true,
         letterRendering: true,
         width: reportData?.landscape ? 1123 : 794,
         windowWidth: reportData?.landscape ? 1123 : 794
       },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: reportData?.landscape ? 'landscape' : 'portrait', compress: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: (reportData?.landscape ? 'landscape' : 'portrait') as 'landscape' | 'portrait', compress: true },
       pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
     };
 
@@ -95,18 +95,17 @@ const ReportGeneratorModal: React.FC<Props> = ({ isOpen, onClose, reportId }) =>
       await new Promise(r => setTimeout(r, 200));
       await html2pdf().set(options).from(content).save();
     } catch (error) {
-      console.error('Erro ao gerar PDF:', error);
     } finally {
       setIsGenerating(false);
     }
   };
 
-  const TemplateComponent = UniversalReportTemplate;
+  const TemplateComponent = reportModule.Template || UniversalReportTemplate;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
       <div className={`w-full ${reportData?.landscape ? 'max-w-[95vw]' : 'max-w-5xl'} bg-slate-200 rounded-xl shadow-2xl overflow-hidden flex flex-col h-[90vh]`}>
-        
+
         {/* Toolbar */}
         <div className="bg-slate-900 text-white px-4 py-3 flex justify-between items-center shadow-md z-20">
           <div className="flex items-center gap-4">
@@ -114,30 +113,30 @@ const ReportGeneratorModal: React.FC<Props> = ({ isOpen, onClose, reportId }) =>
               <FileText size={20} />
               {reportModule.metadata.title}
             </h3>
-            
+
             {/* Filters */}
             {reportModule.metadata.needsDateFilter && (
               <div className="flex items-center gap-2 bg-slate-800 p-1 rounded-lg border border-slate-700 ml-4">
                 <Calendar size={14} className="ml-2 text-slate-400" />
-                <input 
-                  type="date" 
-                  value={startDate} 
-                  onChange={(e) => setStartDate(e.target.value)} 
-                  className="bg-transparent border-none text-xs text-white focus:ring-0" 
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="bg-transparent border-none text-xs text-white focus:ring-0"
                 />
                 <span className="text-slate-500 text-xs">até</span>
-                <input 
-                  type="date" 
-                  value={endDate} 
-                  onChange={(e) => setEndDate(e.target.value)} 
-                  className="bg-transparent border-none text-xs text-white focus:ring-0" 
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="bg-transparent border-none text-xs text-white focus:ring-0"
                 />
               </div>
             )}
           </div>
 
           <div className="flex gap-2">
-            <button 
+            <button
               onClick={handleDownload}
               disabled={isLoading || !reportData || isGenerating}
               className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-all shadow-sm disabled:opacity-50 active:scale-95"
@@ -162,12 +161,12 @@ const ReportGeneratorModal: React.FC<Props> = ({ isOpen, onClose, reportId }) =>
               <p>Gerando relatório...</p>
             </div>
           ) : reportData ? (
-            <div 
-              className="bg-white shadow-2xl origin-top" 
-              style={{ 
-                width: reportData?.landscape ? '297mm' : '210mm', 
-                minHeight: reportData?.landscape ? undefined : '297mm' 
-              }} 
+            <div
+              className="bg-white shadow-2xl origin-top"
+              style={{
+                width: reportData?.landscape ? '297mm' : '210mm',
+                minHeight: reportData?.landscape ? undefined : '297mm'
+              }}
             >
               <div ref={contentRef} style={{ width: reportData?.landscape ? '1123px' : '794px', margin: '0 auto', overflow: 'hidden' }}>
                 <TemplateComponent data={reportData} />

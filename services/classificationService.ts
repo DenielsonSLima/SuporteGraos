@@ -1,18 +1,22 @@
+/**
+ * classificationService.ts
+ *
+ * CRUD de tipos de produtos e tipos de parceiros via supabase-js direto.
+ *
+ * Estratégia de dados:
+ *   - company_id = NULL → registros de sistema, visíveis a todas as empresas (read-only)
+ *   - company_id = uuid → registros personalizados de cada empresa
+ *
+ * O RLS das tabelas garante que cada empresa vê os registros de sistema + os próprios.
+ *
+ * Tabelas:
+ *   public.product_types
+ *   public.partner_types
+ */
 
-import { Persistence } from './persistence';
-import { logService } from './logService';
-import { authService } from './authService';
-import { DEFAULT_PARTNER_CATEGORIES } from '../constants';
 import { supabase } from './supabase';
-import { waitForInit } from './supabaseInitService';
 
-// Interfaces reused from components to standardize
-export interface PartnerType {
-  id: string;
-  name: string;
-  description: string;
-  isSystem: boolean;
-}
+// ─── TIPOS EXPORTADOS ─────────────────────────────────────────────────────────
 
 export interface ProductType {
   id: string;
@@ -21,321 +25,165 @@ export interface ProductType {
   isSystem: boolean;
 }
 
-// Initial Data
-const INITIAL_PRODUCT_TYPES: ProductType[] = [
-  {
-    id: '1',
-    name: 'Milho em Grãos',
-    description: 'Grãos de milho in natura destinados à comercialização ou consumo.',
-    isSystem: true
-  }
-];
+export interface PartnerType {
+  id: string;
+  name: string;
+  description: string;
+  isSystem: boolean;
+}
 
-// Persistence DBs
-const partnerTypesDb = new Persistence<PartnerType>('partner_types', DEFAULT_PARTNER_CATEGORIES as PartnerType[]);
-const productTypesDb = new Persistence<ProductType>('product_types', INITIAL_PRODUCT_TYPES);
-let _isSupabaseLoaded = false;
-let _realtimeStarted = false;
+// ─── MAPEADORES ───────────────────────────────────────────────────────────────
 
-// Load from optimized parallel Supabase loader
-const loadFromSupabase = async () => {
-  try {
-    const stats = await waitForInit();
-
-    // Load Partner Types
-    if (stats.data.partnerTypes && stats.data.partnerTypes.length > 0) {
-      const mappedPartners: PartnerType[] = stats.data.partnerTypes.map((p: any) => ({
-        id: p.id,
-        name: p.name,
-        description: p.description || '',
-        isSystem: p.is_system || false
-      }));
-      partnerTypesDb.setAll(mappedPartners);
-    }
-
-    // Load Product Types
-    if (stats.data.productTypes && stats.data.productTypes.length > 0) {
-      const mappedProducts: ProductType[] = stats.data.productTypes.map((p: any) => ({
-        id: p.id,
-        name: p.name,
-        description: p.description || '',
-        isSystem: p.is_system || false
-      }));
-      productTypesDb.setAll(mappedProducts);
-    }
-
-    _isSupabaseLoaded = true;
-  } catch (error) {
-    console.warn('⚠️ ClassificationService: Erro ao carregar:', error);
-    _isSupabaseLoaded = false;
-  }
-};
-
-// ============================================================================
-// REALTIME
-// ============================================================================
-
-const startRealtime = () => {
-  if (_realtimeStarted) return;
-  _realtimeStarted = true;
-
-  supabase
-    .channel('realtime:classifications')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'partner_types' }, () => {
-      console.log('🔔 Realtime partner_types: mudança detectada');
-      _isSupabaseLoaded = false;
-      void loadFromSupabase();
-    })
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'product_types' }, () => {
-      console.log('🔔 Realtime product_types: mudança detectada');
-      _isSupabaseLoaded = false;
-      void loadFromSupabase();
-    })
-    .subscribe(status => {
-      if (status === 'SUBSCRIBED') {
-        console.log('✅ Realtime classifications ativo');
-      }
-    });
-};
-
-// Initialize
-// ❌ NÃO inicializar automaticamente - aguardar autenticação
-// loadFromSupabase();
-
-const getLogInfo = () => {
-  const user = authService.getCurrentUser();
+function mapProductRow(row: any): ProductType {
   return {
-    userId: user?.id || 'system',
-    userName: user?.name || 'Sistema'
+    id:          row.id,
+    name:        row.name        ?? '',
+    description: row.description ?? '',
+    isSystem:    row.is_system   ?? false,
   };
-};
+}
+
+function mapPartnerRow(row: any): PartnerType {
+  return {
+    id:          row.id,
+    name:        row.name        ?? '',
+    description: row.description ?? '',
+    isSystem:    row.is_system   ?? false,
+  };
+}
+
+// ─── HELPER: buscar company_id do usuário logado ──────────────────────────────
+
+async function getCompanyId(): Promise<string> {
+  const { data, error } = await supabase
+    .from('app_users')
+    .select('company_id')
+    .single();
+  if (error || !data?.company_id) throw new Error('Usuário sem empresa vinculada');
+  return data.company_id as string;
+}
+
+// ─── SERVICE ──────────────────────────────────────────────────────────────────
 
 export const classificationService = {
-  loadFromSupabase,
-  startRealtime,
-  // --- PARTNER TYPES ---
-  getPartnerTypes: () => partnerTypesDb.getAll(),
 
-  addPartnerType: async (type: PartnerType) => {
-    partnerTypesDb.add(type);
-    const { userId, userName } = getLogInfo();
-    logService.addLog({
-      userId,
-      userName,
-      action: 'create',
-      module: 'Configurações',
-      description: `Criou tipo de parceiro: ${type.name}`,
-      entityId: type.id
-    });
+  // ── PRODUCT TYPES ──────────────────────────────────────────────────────────
 
-    // Save to Supabase
-    if (_isSupabaseLoaded) {
-      try {
-        await supabase
-          .from('partner_types')
-          .insert({
-            id: type.id,
-            name: type.name,
-            description: type.description || null,
-            is_system: type.isSystem || false,
-            company_id: authService.getCurrentUser()?.companyId || null
-          });
-        console.log(`✅ Tipo de parceiro ${type.name} salvo no Supabase`);
-      } catch (error) {
-        console.warn('⚠️ Erro ao salvar tipo no Supabase:', error);
-      }
-    }
+  getProductTypes: async (): Promise<ProductType[]> => {
+    const { data, error } = await supabase
+      .from('product_types')
+      .select('*')
+      .order('name', { ascending: true });
+    if (error) throw new Error(`Erro ao buscar tipos de produto: ${error.message}`);
+    return (data ?? []).map(mapProductRow);
   },
 
-  updatePartnerType: async (type: PartnerType) => {
-    partnerTypesDb.update(type);
-    const { userId, userName } = getLogInfo();
-    logService.addLog({
-      userId,
-      userName,
-      action: 'update',
-      module: 'Configurações',
-      description: `Atualizou tipo de parceiro: ${type.name}`,
-      entityId: type.id
+  addProductType: async (type: Omit<ProductType, 'id' | 'isSystem'>): Promise<void> => {
+    const companyId = await getCompanyId();
+    const { error } = await supabase.from('product_types').insert({
+      id:          crypto.randomUUID(),
+      company_id:  companyId,
+      name:        type.name,
+      description: type.description || null,
+      is_system:   false,
     });
-
-    // Update in Supabase
-    if (_isSupabaseLoaded) {
-      try {
-        await supabase
-          .from('partner_types')
-          .update({
-            name: type.name,
-            description: type.description || null,
-            is_system: type.isSystem || false
-          })
-          .eq('id', type.id);
-        console.log(`✅ Tipo de parceiro ${type.name} atualizado no Supabase`);
-      } catch (error) {
-        console.warn('⚠️ Erro ao atualizar tipo no Supabase:', error);
-      }
-    }
+    if (error) throw new Error(`Erro ao cadastrar tipo de produto: ${error.message}`);
   },
 
-  deletePartnerType: async (id: string) => {
-    const t = partnerTypesDb.getById(id);
-    partnerTypesDb.delete(id);
-    const { userId, userName } = getLogInfo();
-    logService.addLog({
-      userId,
-      userName,
-      action: 'delete',
-      module: 'Configurações',
-      description: `Excluiu tipo de parceiro: ${t?.name || 'Desconhecido'}`,
-      entityId: id
-    });
-
-    // Delete from Supabase
-    if (_isSupabaseLoaded) {
-      try {
-        await supabase
-          .from('partner_types')
-          .delete()
-          .eq('id', id);
-        console.log(`✅ Tipo de parceiro excluído do Supabase`);
-      } catch (error) {
-        console.warn('⚠️ Erro ao excluir tipo do Supabase:', error);
-      }
-    }
+  updateProductType: async (type: ProductType): Promise<void> => {
+    const { error } = await supabase
+      .from('product_types')
+      .update({
+        name:        type.name,
+        description: type.description || null,
+      })
+      .eq('id', type.id);
+    if (error) throw new Error(`Erro ao atualizar tipo de produto: ${error.message}`);
   },
 
-  // --- PRODUCT TYPES ---
-  getProductTypes: () => productTypesDb.getAll(),
-
-  addProductType: async (type: ProductType) => {
-    productTypesDb.add(type);
-    const { userId, userName } = getLogInfo();
-    logService.addLog({
-      userId,
-      userName,
-      action: 'create',
-      module: 'Configurações',
-      description: `Criou tipo de produto: ${type.name}`,
-      entityId: type.id
-    });
-
-    // Save to Supabase
-    if (_isSupabaseLoaded) {
-      try {
-        await supabase
-          .from('product_types')
-          .insert({
-            id: type.id,
-            name: type.name,
-            description: type.description || null,
-            is_system: type.isSystem || false,
-            company_id: authService.getCurrentUser()?.companyId || null
-          });
-        console.log(`✅ Tipo de produto ${type.name} salvo no Supabase`);
-      } catch (error) {
-        console.warn('⚠️ Erro ao salvar tipo no Supabase:', error);
-      }
-    }
+  deleteProductType: async (id: string): Promise<void> => {
+    const { error } = await supabase
+      .from('product_types')
+      .delete()
+      .eq('id', id);
+    if (error) throw new Error(`Erro ao excluir tipo de produto: ${error.message}`);
   },
 
-  updateProductType: async (type: ProductType) => {
-    productTypesDb.update(type);
-    const { userId, userName } = getLogInfo();
-    logService.addLog({
-      userId,
-      userName,
-      action: 'update',
-      module: 'Configurações',
-      description: `Atualizou tipo de produto: ${type.name}`,
-      entityId: type.id
-    });
+  // ── PARTNER TYPES ──────────────────────────────────────────────────────────
 
-    // Update in Supabase
-    if (_isSupabaseLoaded) {
-      try {
-        await supabase
-          .from('product_types')
-          .update({
-            name: type.name,
-            description: type.description || null,
-            is_system: type.isSystem || false
-          })
-          .eq('id', type.id);
-        console.log(`✅ Tipo de produto ${type.name} atualizado no Supabase`);
-      } catch (error) {
-        console.warn('⚠️ Erro ao atualizar tipo no Supabase:', error);
-      }
-    }
+  getPartnerTypes: async (): Promise<PartnerType[]> => {
+    const { data, error } = await supabase
+      .from('partner_types')
+      .select('*')
+      .order('name', { ascending: true });
+    if (error) throw new Error(`Erro ao buscar tipos de parceiro: ${error.message}`);
+    return (data ?? []).map(mapPartnerRow);
   },
 
-  deleteProductType: async (id: string) => {
-    const t = productTypesDb.getById(id);
-    productTypesDb.delete(id);
-    const { userId, userName } = getLogInfo();
-    logService.addLog({
-      userId,
-      userName,
-      action: 'delete',
-      module: 'Configurações',
-      description: `Excluiu tipo de produto: ${t?.name || 'Desconhecido'}`,
-      entityId: id
+  addPartnerType: async (type: Omit<PartnerType, 'id' | 'isSystem'>): Promise<void> => {
+    const companyId = await getCompanyId();
+    const { error } = await supabase.from('partner_types').insert({
+      id:          crypto.randomUUID(),
+      company_id:  companyId,
+      name:        type.name,
+      description: type.description || null,
+      is_system:   false,
     });
-
-    // Delete from Supabase
-    if (_isSupabaseLoaded) {
-      try {
-        await supabase
-          .from('product_types')
-          .delete()
-          .eq('id', id);
-        console.log(`✅ Tipo de produto excluído do Supabase`);
-      } catch (error) {
-        console.warn('⚠️ Erro ao excluir tipo do Supabase:', error);
-      }
-    }
+    if (error) throw new Error(`Erro ao cadastrar tipo de parceiro: ${error.message}`);
   },
 
-  // Restore
-  importData: (partnerTypes: PartnerType[], productTypes: ProductType[]) => {
-    if (partnerTypes && Array.isArray(partnerTypes)) {
-      partnerTypesDb.setAll(partnerTypes);
-    }
-    if (productTypes && Array.isArray(productTypes)) {
-      productTypesDb.setAll(productTypes);
-    }
+  updatePartnerType: async (type: PartnerType): Promise<void> => {
+    const { error } = await supabase
+      .from('partner_types')
+      .update({
+        name:        type.name,
+        description: type.description || null,
+      })
+      .eq('id', type.id);
+    if (error) throw new Error(`Erro ao atualizar tipo de parceiro: ${error.message}`);
+  },
 
-    const companyId = authService.getCurrentUser()?.companyId;
-    if (!companyId) return;
+  deletePartnerType: async (id: string): Promise<void> => {
+    const { error } = await supabase
+      .from('partner_types')
+      .delete()
+      .eq('id', id);
+    if (error) throw new Error(`Erro ao excluir tipo de parceiro: ${error.message}`);
+  },
 
-    void (async () => {
-      try {
-        if (partnerTypes?.length > 0) {
-          const pPayload = partnerTypes.map(t => ({
-            id: t.id,
-            name: t.name,
-            description: t.description || null,
-            is_system: t.isSystem || false,
-            company_id: companyId
-          }));
-          const { error } = await supabase.from('partner_types').upsert(pPayload, { onConflict: 'id' });
-          if (error) console.error('❌ Erro ao sincronizar tipos de parceiros:', error);
-        }
+  // ── REALTIME ───────────────────────────────────────────────────────────────
 
-        if (productTypes?.length > 0) {
-          const prPayload = productTypes.map(t => ({
-            id: t.id,
-            name: t.name,
-            description: t.description || null,
-            is_system: t.isSystem || false,
-            company_id: companyId
-          }));
-          const { error } = await supabase.from('product_types').upsert(prPayload, { onConflict: 'id' });
-          if (error) console.error('❌ Erro ao sincronizar tipos de produtos:', error);
-        }
-        console.log('✅ Classificações sincronizadas no Supabase');
-      } catch (err) {
-        console.error('❌ Erro inesperado ao importar classificações:', err);
+  /**
+   * Assina mudanças em tempo real nas tabelas de classificações.
+   * Dispara onAnyChange() para qualquer INSERT/UPDATE/DELETE em
+   * product_types ou partner_types.
+   * Retorna função para cancelar a assinatura (usar no cleanup do useEffect).
+   */
+  subscribeRealtime: (() => {
+    const listeners = new Set<() => void>();
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    return (onAnyChange: () => void): (() => void) => {
+      listeners.add(onAnyChange);
+      if (!channel) {
+        channel = supabase
+          .channel('realtime:classifications')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'product_types' }, () => listeners.forEach(fn => fn()))
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'partner_types' }, () => listeners.forEach(fn => fn()))
+          .subscribe();
       }
-    })();
-  }
+      return () => {
+        listeners.delete(onAnyChange);
+        if (listeners.size === 0 && channel) { supabase.removeChannel(channel); channel = null; }
+      };
+    };
+  })(),
+
+  // ── COMPAT: métodos legados utilizados em outros módulos ──────────────────
+
+  /**
+   * @deprecated Use getProductTypes() (async)
+   */
+  loadFromSupabase: async () => {},
+  startRealtime:    () => {},
+  importData:       (_pt: any[], _prt: any[]) => {},
 };

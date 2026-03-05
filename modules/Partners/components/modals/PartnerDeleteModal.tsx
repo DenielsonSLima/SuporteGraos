@@ -1,12 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { X, AlertTriangle, Lock, ChevronDown } from 'lucide-react';
 import { Partner } from '../../types';
-import { purchaseService } from '../../../../services/purchaseService';
-import { salesService } from '../../../../services/salesService';
-import { payablesService } from '../../../../services/financial/payablesService';
-import { receivablesService } from '../../../../services/financial/receivablesService';
-import { partnerService } from '../../../../services/partnerService';
 import { useToast } from '../../../../contexts/ToastContext';
+import { usePartnerDeleteModal } from '../../hooks/usePartnerDeleteModal';
 
 interface Props {
   isOpen: boolean;
@@ -17,70 +13,17 @@ interface Props {
 
 const PartnerDeleteModal: React.FC<Props> = ({ isOpen, partner, onClose, onConfirm }) => {
   const { addToast } = useToast();
-  const [isDeactivating, setIsDeactivating] = useState(false);
   const [expandedSection, setExpandedSection] = useState<'orders' | 'financial' | null>(null);
-
-  const linkedData = useMemo(() => {
-    if (!partner) return { purchases: [], sales: [], payables: [], receivables: [], canDeactivate: false, canDelete: false, totalDebt: 0, totalReceivable: 0 };
-
-    const purchases = purchaseService.getAll().filter(p => p.partnerId === partner.id && p.status !== 'canceled');
-    const sales = salesService.getAll().filter(s => s.customerId === partner.id && s.status !== 'canceled');
-    const payables = payablesService.getAll().filter(p => p.partnerId === partner.id);
-    const receivables = receivablesService.getAll().filter(r => r.partnerId === partner.id);
-
-    // O que REALMENTE importa: saldo pendente no financeiro
-    const totalDebt = payables.reduce((acc, p) => acc + Math.max(0, p.amount - p.paidAmount), 0);
-    const totalReceivable = receivables.reduce((acc, r) => acc + Math.max(0, r.amount - r.receivedAmount), 0);
-
-    // Bloqueia se tem dívida pendente (isso é crítico)
-    const hasPendingFinancial = totalDebt > 0 || totalReceivable > 0;
-
-    // Bloqueia se tem pedidos ativos (independente do valor)
-    const hasActiveOrders = purchases.length > 0 || sales.length > 0;
-
-    // Pode inativar: sem dívida E sem pedidos ativos
-    const canDeactivate = !hasPendingFinancial && !hasActiveOrders;
-
-    // Pode deletar: absolutamente nada vinculado
-    const canDelete = purchases.length === 0 && sales.length === 0 && payables.length === 0 && receivables.length === 0;
-
-    return {
-      purchases,
-      sales,
-      payables,
-      receivables,
-      totalDebt,
-      totalReceivable,
-      hasPendingFinancial,
-      hasActiveOrders,
-      canDeactivate,
-      canDelete
-    };
-  }, [partner]);
+  const { linkedData, isDeactivating, handleDeactivate } = usePartnerDeleteModal({
+    partner,
+    onClose,
+    addToast
+  });
 
   const hasLinks = linkedData.purchases.length > 0 || 
                    linkedData.sales.length > 0 || 
                    linkedData.payables.length > 0 || 
                    linkedData.receivables.length > 0;
-
-  const handleDeactivate = async () => {
-    if (!partner || !linkedData.canDeactivate) return;
-
-    setIsDeactivating(true);
-    try {
-      await partnerService.update({
-        ...partner,
-        active: false
-      });
-      addToast('success', 'Parceiro inativado com sucesso');
-      onClose();
-    } catch (error) {
-      console.error('Erro ao inativar parceiro:', error);
-      addToast('error', 'Erro', 'Falha ao inativar parceiro');
-    } finally {
-      setIsDeactivating(false);
-    }
-  };
 
   if (!isOpen || !partner) return null;
 
@@ -149,7 +92,7 @@ const PartnerDeleteModal: React.FC<Props> = ({ isOpen, partner, onClose, onConfi
                       <div className="space-y-2">
                         {linkedData.purchases.map(p => {
                           const linkedPayables = linkedData.payables.filter(pay => pay.purchaseOrderId === p.id);
-                          const debtAmount = linkedPayables.reduce((acc, pay) => acc + Math.max(0, pay.amount - pay.paidAmount), 0);
+                          const debtAmount = linkedPayables.reduce((acc, pay) => acc + Math.max(0, (pay as any).remainingValue ?? (pay.amount - pay.paidAmount)), 0);
                           return (
                             <div key={p.id} className="bg-slate-50 px-3 py-2.5 rounded-lg border-l-4 border-red-400">
                               <div className="flex justify-between items-start">
@@ -176,7 +119,7 @@ const PartnerDeleteModal: React.FC<Props> = ({ isOpen, partner, onClose, onConfi
                       <div className="space-y-2">
                         {linkedData.sales.map(s => {
                           const linkedReceivables = linkedData.receivables.filter(rec => rec.salesOrderId === s.id);
-                          const receivableAmount = linkedReceivables.reduce((acc, rec) => acc + Math.max(0, rec.amount - rec.receivedAmount), 0);
+                          const receivableAmount = linkedReceivables.reduce((acc, rec) => acc + Math.max(0, (rec as any).remainingValue ?? (rec.amount - rec.receivedAmount)), 0);
                           return (
                             <div key={s.id} className="bg-slate-50 px-3 py-2.5 rounded-lg border-l-4 border-red-400">
                               <div className="flex justify-between items-start">
@@ -220,7 +163,7 @@ const PartnerDeleteModal: React.FC<Props> = ({ isOpen, partner, onClose, onConfi
                       <div className="space-y-1">
                         {linkedData.payables.map(p => (
                           <div key={p.id} className="text-sm font-bold text-slate-700 bg-slate-50 px-3 py-2 rounded-lg">
-                            {p.description} • Vencimento: {p.dueDate} • Saldo: R$ {(p.amount - p.paidAmount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            {p.description} • Vencimento: {p.dueDate} • Saldo: R$ {((p as any).remainingValue ?? Math.max(0, p.amount - p.paidAmount)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                           </div>
                         ))}
                       </div>
@@ -232,7 +175,7 @@ const PartnerDeleteModal: React.FC<Props> = ({ isOpen, partner, onClose, onConfi
                       <div className="space-y-1">
                         {linkedData.receivables.map(r => (
                           <div key={r.id} className="text-sm font-bold text-slate-700 bg-slate-50 px-3 py-2 rounded-lg">
-                            {r.description} • Vencimento: {r.dueDate} • Saldo: R$ {(r.amount - r.receivedAmount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            {r.description} • Vencimento: {r.dueDate} • Saldo: R$ {((r as any).remainingValue ?? Math.max(0, r.amount - r.receivedAmount)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                           </div>
                         ))}
                       </div>

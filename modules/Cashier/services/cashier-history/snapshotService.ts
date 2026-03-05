@@ -9,7 +9,7 @@
  */
 
 import { Persistence } from '../../../../services/persistence';
-import { supabase } from '../../../../services/supabase';
+import { cashierSnapshotService } from '../../../../services/cashierSnapshotService';
 import { MonthlySnapshot } from './types';
 import { calculateMonthlyReport } from './historyService';
 
@@ -20,7 +20,7 @@ const snapshotsDb = new Persistence<MonthlySnapshot>('cashier_monthly_snapshots'
   useStorage: false 
 });
 
-let realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
+let stopRealtime: (() => void) | null = null;
 
 // ============================================================================
 // MAPEAMENTO
@@ -54,23 +54,10 @@ const mapFromDb = (row: any): MonthlySnapshot => ({
 
 const loadFromSupabase = async (): Promise<MonthlySnapshot[]> => {
   try {
-    const { data, error } = await supabase
-      .from('cashier_monthly_snapshots')
-      .select('*')
-      .order('closed_date', { ascending: false });
-
-    if (error) {
-      console.warn('⚠️ Erro ao acessar tabela cashier_monthly_snapshots:', {
-        code: (error as any)?.code,
-        message: error.message,
-        details: (error as any)?.details
-      });
-      throw error;
-    }
+    const data = await cashierSnapshotService.list();
     
     const mapped = (data || []).map(mapFromDb);
     snapshotsDb.setAll(mapped);
-    console.log(`✅ ${mapped.length} snapshots de caixa carregados`);
     
     return mapped;
   } catch (err) {
@@ -78,10 +65,8 @@ const loadFromSupabase = async (): Promise<MonthlySnapshot[]> => {
     const errorMsg = (err as any)?.message || String(err);
     
     if (code === 'PGRST205' || errorMsg.includes('404')) {
-      console.warn('⚠️ Tabela public.cashier_monthly_snapshots não encontrada ou sem permissão RLS. Snapshots desativados.');
       return [];
     }
-    console.error('❌ Erro ao carregar snapshots:', err);
     return [];
   }
 };
@@ -91,30 +76,23 @@ const loadFromSupabase = async (): Promise<MonthlySnapshot[]> => {
 // ============================================================================
 
 const startRealtime = () => {
-  if (realtimeChannel) return;
+  if (stopRealtime) return;
 
   try {
-    realtimeChannel = supabase
-      .channel('realtime:cashier_monthly_snapshots')
-      .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'cashier_monthly_snapshots' }, 
-        (payload) => {
-          const rec = payload.new || payload.old;
-          if (!rec) return;
+    stopRealtime = cashierSnapshotService.subscribe((payload) => {
+      const rec = payload.new || payload.old;
+      if (!rec) return;
 
-          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-            const mapped = mapFromDb(rec);
-            const existing = snapshotsDb.getById(mapped.id);
-            if (existing) snapshotsDb.update(mapped);
-            else snapshotsDb.add(mapped);
-          } else if (payload.eventType === 'DELETE') {
-            snapshotsDb.delete(rec.id);
-          }
-        }
-      )
-      .subscribe();
+      if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+        const mapped = mapFromDb(rec);
+        const existing = snapshotsDb.getById(mapped.id);
+        if (existing) snapshotsDb.update(mapped);
+        else snapshotsDb.add(mapped);
+      } else if (payload.eventType === 'DELETE') {
+        snapshotsDb.delete(rec.id);
+      }
+    });
   } catch (err) {
-    console.error('⚠️ Erro ao iniciar realtime de snapshots:', err);
   }
 };
 
@@ -125,32 +103,17 @@ const startRealtime = () => {
 const persistUpsert = async (snapshot: MonthlySnapshot) => {
   try {
     const payload = mapToDb(snapshot);
-    const { error } = await supabase
-      .from('cashier_monthly_snapshots')
-      .upsert(payload)
-      .select();
-
-    if (error) {
-      console.error('❌ Erro ao salvar snapshot:', error);
-      return;
-    }
+    await cashierSnapshotService.upsert(payload);
     
-    console.log(`✅ Snapshot ${snapshot.monthKey} salvo`);
   } catch (err) {
-    console.error('❌ Erro inesperado ao salvar snapshot:', err);
   }
 };
 
 const persistDelete = async (id: string) => {
   try {
-    const { error } = await supabase
-      .from('cashier_monthly_snapshots')
-      .delete()
-      .eq('id', id);
-
-    if (error) console.error('❌ Erro ao deletar snapshot:', error);
+    await cashierSnapshotService.deleteById(id);
   } catch (err) {
-    console.error('❌ Erro inesperado ao deletar snapshot:', err);
+    console.error('❌ Erro ao deletar snapshot:', err);
   }
 };
 
@@ -196,18 +159,17 @@ export const snapshotService = {
    * @param closedBy Email/nome do usuário
    * @param notes Notas opcionais
    */
-  createSnapshot: (year: number, month: number, closedBy: string, notes?: string): MonthlySnapshot => {
+  createSnapshot: async (year: number, month: number, closedBy: string, notes?: string): Promise<MonthlySnapshot> => {
     const monthKey = `${year}-${String(month).padStart(2, '0')}`;
     
     // Verifica se já existe snapshot deste mês
     const existing = snapshotService.getByMonth(year, month);
     if (existing) {
-      console.warn(`⚠️ Snapshot de ${monthKey} já existe`);
       return existing;
     }
 
-    // Calcula o relatório do mês
-    const report = calculateMonthlyReport(year, month);
+    // Calcula o relatório do mês (agora é async via RPC)
+    const report = await calculateMonthlyReport(year, month);
     (report as any).isSnapshot = true;
     (report as any).snapshotClosedDate = new Date().toISOString();
     (report as any).snapshotClosedBy = closedBy;
@@ -230,7 +192,6 @@ export const snapshotService = {
     // Sincroniza com Supabase
     void persistUpsert(snapshot);
 
-    console.log(`✅ Snapshot criado: ${monthKey}`);
     return snapshot;
   },
 
@@ -260,7 +221,6 @@ export const snapshotService = {
     snapshotsDb.delete(id);
     void persistDelete(id);
 
-    console.log(`✅ Snapshot deletado: ${snapshot.monthKey}`);
     return true;
   },
 

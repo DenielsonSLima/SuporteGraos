@@ -1,3 +1,8 @@
+// ⚠️ LEGACY SERVICE — Em modo canônico (SQL Canonical Ops), todas as operações
+// são ignoradas via shouldSkipLegacyTableOps('payables').
+// O PayablesTab agora usa vw_payables_enriched (VIEW SQL) via usePayables.
+// TODO: Remover completamente quando todos os consumidores forem migrados.
+
 import { Persistence } from '../persistence';
 import { supabase } from '../supabase';
 import { supabaseWithRetry } from '../../utils/fetchWithRetry';
@@ -6,6 +11,9 @@ import { invalidateFinancialCache } from '../financialCache';
 import { auditService } from '../auditService';
 import { logService } from '../logService';
 import { authService } from '../authService';
+import { getTodayBR } from '../../utils/dateUtils';
+import { shouldSkipLegacyTableOps } from '../realtimeTableAvailability';
+import { sqlCanonicalOpsLog } from '../sqlCanonicalOps';
 // import { purchaseService } from '../purchaseService'; // Removido para evitar dependência circular
 
 const generateUUID = (): string => {
@@ -23,6 +31,7 @@ export interface Payable {
   id: string;
   purchaseOrderId?: string;
   loadingId?: string; // ID do carregamento (para fretes)
+  commissionId?: string; // ID da comissão
   partnerId: string;
   partnerName?: string;
   description: string;
@@ -38,6 +47,7 @@ export interface Payable {
   companyId?: string;
   driverName?: string;
   weightKg?: number;
+  loadCount?: number;
 }
 
 export interface PayablesPageOptions {
@@ -59,6 +69,7 @@ const mapToDb = (item: Payable) => ({
   id: item.id,
   purchase_order_id: item.purchaseOrderId || null,
   loading_id: item.loadingId || null,
+  commission_id: item.commissionId || null,
   partner_id: item.partnerId,
   partner_name: item.partnerName || null,
   description: item.description,
@@ -72,18 +83,21 @@ const mapToDb = (item: Payable) => ({
   payment_date: item.paymentDate || null,
   notes: item.notes || null,
   company_id: item.companyId || authService.getCurrentUser()?.companyId || null,
+  created_by: authService.getCurrentUser()?.id || null,
   driver_name: item.driverName || null,
-  weight_kg: item.weightKg || null
+  weight_kg: item.weightKg || null,
+  load_count: item.loadCount || 0
 });
 
 const mapFromDb = (row: any): Payable => ({
   id: row.id,
   purchaseOrderId: row.purchase_order_id,
   loadingId: row.loading_id,
+  commissionId: row.commission_id,
   partnerId: row.partner_id,
   partnerName: row.partner_name,
   description: row.description,
-  dueDate: row.due_date,
+  dueDate: row.due_date || getTodayBR(),
   amount: Number(row.amount),
   paidAmount: Number(row.paid_amount || 0),
   status: row.status,
@@ -94,13 +108,15 @@ const mapFromDb = (row: any): Payable => ({
   notes: row.notes,
   companyId: row.company_id,
   driverName: row.driver_name,
-  weightKg: row.weight_kg ? Number(row.weight_kg) : undefined
+  weightKg: row.weight_kg ? Number(row.weight_kg) : undefined,
+  loadCount: row.load_count ? Number(row.load_count) : undefined
 });
 
 const PAYABLES_SELECT_FIELDS = [
   'id',
   'purchase_order_id',
   'loading_id',
+  'commission_id',
   'partner_id',
   'partner_name',
   'description',
@@ -115,10 +131,17 @@ const PAYABLES_SELECT_FIELDS = [
   'notes',
   'company_id',
   'driver_name',
-  'weight_kg'
+  'driver_name',
+  'weight_kg',
+  'load_count'
 ].join(',');
 
 const fetchPage = async (options: PayablesPageOptions): Promise<Payable[]> => {
+  if (shouldSkipLegacyTableOps('payables')) {
+    sqlCanonicalOpsLog('payablesService.fetchPage ignorado: tabela payables indisponível no modo canônico');
+    return [];
+  }
+
   try {
     const { limit, beforeDate, startDate, endDate } = options;
     const user = authService.getCurrentUser();
@@ -138,7 +161,6 @@ const fetchPage = async (options: PayablesPageOptions): Promise<Payable[]> => {
     const data = await supabaseWithRetry(() => query);
     return (data as any[] || []).map(mapFromDb);
   } catch (error) {
-    console.error('❌ Erro ao paginar payables:', error);
     return [];
   }
 };
@@ -148,6 +170,13 @@ const fetchPage = async (options: PayablesPageOptions): Promise<Payable[]> => {
 // ============================================================================
 
 const loadFromSupabase = async (): Promise<Payable[]> => {
+  if (shouldSkipLegacyTableOps('payables')) {
+    sqlCanonicalOpsLog('payablesService.loadFromSupabase ignorado: tabela payables indisponível no modo canônico');
+    db.setAll([]);
+    isLoaded = true;
+    return [];
+  }
+
   try {
     const user = authService.getCurrentUser();
     let query = supabase
@@ -166,12 +195,10 @@ const loadFromSupabase = async (): Promise<Payable[]> => {
       const mapped = (data as any[]).map(mapFromDb);
       db.setAll(mapped);
       isLoaded = true;
-      console.log('🔄 Contas a pagar sincronizando em tempo real...');
       return mapped;
     }
     return [];
   } catch (error) {
-    console.error('❌ Erro ao carregar payables:', error);
     return [];
   }
 };
@@ -181,6 +208,11 @@ const loadFromSupabase = async (): Promise<Payable[]> => {
 // ============================================================================
 
 const startRealtime = () => {
+  if (shouldSkipLegacyTableOps('payables')) {
+    sqlCanonicalOpsLog('payablesService.startRealtime ignorado: tabela payables indisponível no modo canônico');
+    return;
+  }
+
   if (realtimeChannel) return;
 
   realtimeChannel = supabase
@@ -209,27 +241,39 @@ const startRealtime = () => {
 // ============================================================================
 
 const persistUpsert = async (item: Payable) => {
+  if (shouldSkipLegacyTableOps('payables')) {
+    return;
+  }
+
   try {
     const payload = mapToDb(item);
-    const { error } = await supabase.from('payables').upsert(payload).select();
+    const { data: savedData, error } = await supabase.from('payables').upsert(payload).select().single();
 
     if (error) {
-      console.error('Erro ao salvar conta a pagar no Supabase', error);
       return;
     }
-    // Atualiza cache local para refletir possíveis IDs gerados no banco
-    await loadFromSupabase(); // Changed from syncFromSupabase to loadFromSupabase as syncFromSupabase is not defined
+
+    if (savedData) {
+      const mapped = mapFromDb(savedData);
+      const existing = db.getById(mapped.id);
+      if (existing) db.update(mapped);
+      else db.add(mapped);
+    }
   } catch (err) {
-    console.error('❌ Erro inesperado ao salvar payable:', err);
   }
 };
 
 const persistDelete = async (id: string) => {
+  if (shouldSkipLegacyTableOps('payables')) {
+    return;
+  }
+
   try {
     const { error } = await supabase.from('payables').delete().eq('id', id);
-    if (error) console.error('Erro ao excluir payable', error);
+    if (error) {
+      return;
+    }
   } catch (err) {
-    console.error('Erro inesperado ao excluir payable', err);
   }
 };
 
@@ -239,6 +283,13 @@ const getLogInfo = () => {
     userId: user?.id || 'unknown',
     userName: user?.email || 'unknown'
   };
+};
+
+const stopRealtime = () => {
+  if (realtimeChannel) {
+    supabase.removeChannel(realtimeChannel);
+    realtimeChannel = null;
+  }
 };
 
 // ❌ NÃO inicializar automaticamente - aguardar autenticação via supabaseInitService
@@ -256,6 +307,8 @@ export const payablesService = {
   loadFromSupabase,
   fetchPage,
   startRealtime,
+  stopRealtime,
+  persistUpsert,
 
   add: (item: Payable) => {
     db.add(item);
@@ -295,10 +348,46 @@ export const payablesService = {
     // ✅ Sincronizar status financeiro via EventBus
     if (item.purchaseOrderId && (item.subType === 'purchase_order' || item.subType === 'commission')) {
       // Emite evento para quem estiver ouvindo (purchaseService)
+      // Passa paidAmount para evitar condição de corrida com cache desatualizado
       import('../eventBus').then(({ eventBus }) => {
-        eventBus.emit('payable:updated', { purchaseOrderId: item.purchaseOrderId });
+        eventBus.emit('payable:updated', { purchaseOrderId: item.purchaseOrderId, paidAmount: item.paidAmount, subType: item.subType });
       });
     }
+  },
+
+  /**
+   * Registra um pagamento parcial ou total para um payable
+   */
+  recordPayment: async (payableId: string, data: { amount: number; date: string; description: string; bankAccountId: string }) => {
+    const payable = db.getById(payableId);
+    if (!payable) throw new Error('Payable not found');
+
+    const { financialTransactionService } = await import('./financialTransactionService');
+
+    // 1. Criar a transação financeira
+    await financialTransactionService.add({
+      date: data.date,
+      description: data.description || `Pagamento: ${payable.description}`,
+      amount: data.amount,
+      type: 'payment',
+      bankAccountId: data.bankAccountId,
+      financialRecordId: payableId,
+      companyId: payable.companyId
+    });
+
+    // 2. Atualizar o payable com o novo valor pago
+    const newPaidAmount = (payable.paidAmount || 0) + data.amount;
+    const newStatus = newPaidAmount >= payable.amount ? 'paid' : 'partially_paid';
+
+    payablesService.update({
+      ...payable,
+      paidAmount: newPaidAmount,
+      status: newStatus,
+      paymentDate: data.date,
+      bankAccountId: data.bankAccountId
+    });
+
+    return { success: true };
   },
 
   delete: async (id: string) => {
@@ -307,6 +396,10 @@ export const payablesService = {
 
     db.delete(id);
     void persistDelete(id);
+
+    // ✅ Clean up associated transactions
+    const { financialTransactionService } = await import('./financialTransactionService');
+    void financialTransactionService.deleteByRecordId(id, 'payable');
 
     const { userId, userName } = getLogInfo();
     logService.addLog({
@@ -332,7 +425,7 @@ export const payablesService = {
     if (payable.purchaseOrderId && (payable.subType === 'purchase_order' || payable.subType === 'commission')) {
       // Emite evento para quem estiver ouvindo (purchaseService)
       import('../eventBus').then(({ eventBus }) => {
-        eventBus.emit('payable:updated', { purchaseOrderId: payable.purchaseOrderId });
+        eventBus.emit('payable:updated', { purchaseOrderId: payable.purchaseOrderId, paidAmount: 0, subType: payable.subType });
       });
     }
   }

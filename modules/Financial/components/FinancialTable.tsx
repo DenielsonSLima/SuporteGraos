@@ -1,8 +1,9 @@
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { MoreHorizontal, Calendar, CheckCircle2, AlertCircle, Clock, ArrowDownCircle, ArrowUpCircle, Landmark, MinusCircle } from 'lucide-react';
 import { FinancialRecord, FinancialStatus } from '../types';
-import { bankAccountService } from '../../../services/bankAccountService';
+import type { Account } from '../../../services/accountsService';
+import { useAccounts } from '../../../hooks/useAccounts';
 
 interface Props {
   records: FinancialRecord[];
@@ -20,26 +21,29 @@ const statusConfig: Record<FinancialStatus, { label: string; color: string; icon
   partial: { label: 'Parcial', color: 'bg-blue-100 text-blue-700', icon: Clock },
 };
 
-const FinancialTable: React.FC<Props> = ({ 
-  records, 
-  type, 
-  onPay, 
+const FinancialTable: React.FC<Props> = ({
+  records,
+  type,
+  onPay,
   selectable = false,
   selectedIds = [],
-  onToggleSelection 
+  onToggleSelection
 }) => {
   const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
-  
+
+  const { data: accountsList = [] } = useAccounts();
+
   const getBankAccountName = (bankAccountId?: string, description?: string) => {
     if (!bankAccountId) {
       if (description && /abatimento|desconto|ajuste/i.test(description)) return 'Desconto';
       return '';
     }
-    const accounts = bankAccountService.getBankAccounts();
-    const account = accounts.find(a => a.id === bankAccountId);
-    return account?.bankName || bankAccountId;
+    if (bankAccountId === 'ABATIMENTO' || bankAccountId === 'discount_virtual') return 'Desconto/Abatimento';
+    if (bankAccountId === 'advance_virtual') return 'Adiantamento';
+    const account = accountsList.find(a => a.id === bankAccountId) || accountsList.find(a => a.account_name === bankAccountId);
+    return account?.account_name || bankAccountId;
   };
-  
+
   // CORREÇÃO DE FUSO HORÁRIO
   const date = (val: string) => {
     if (!val) return '-';
@@ -55,6 +59,38 @@ const FinancialTable: React.FC<Props> = ({
     }
     return ['purchase_order', 'freight', 'commission', 'admin', 'loan_taken', 'shareholder'].includes(record.subType || '');
   };
+
+  const freightPartialLabels = useMemo(() => {
+    const grouped = new Map<string, Array<{ id: string; date: string }>>();
+
+    records.forEach((record) => {
+      if (!record.id.startsWith('frtx:')) return;
+      const parts = record.id.split(':');
+      const commitmentId = parts[1];
+      if (!commitmentId) return;
+      const list = grouped.get(commitmentId) || [];
+      list.push({ id: record.id, date: record.issueDate || record.dueDate || '' });
+      grouped.set(commitmentId, list);
+    });
+
+    const labels = new Map<string, string>();
+    grouped.forEach((list) => {
+      if (list.length <= 1) return;
+
+      const ordered = [...list].sort((a, b) => {
+        const da = a.date ? new Date(a.date).getTime() : 0;
+        const db = b.date ? new Date(b.date).getTime() : 0;
+        if (da !== db) return da - db;
+        return a.id.localeCompare(b.id);
+      });
+
+      ordered.forEach((item, index) => {
+        labels.set(item.id, `Parcial ${index + 1}/${ordered.length}`);
+      });
+    });
+
+    return labels;
+  }, [records]);
 
   if (records.length === 0) {
     return (
@@ -76,8 +112,14 @@ const FinancialTable: React.FC<Props> = ({
               <th className="px-4 py-3 border-r border-slate-800">Ref. (Pedido/Mot/Placa)</th>
               <th className="px-4 py-3 border-r border-slate-800">Categoria</th>
               <th className="px-4 py-3 border-r border-slate-800">Conta Bancária</th>
-              <th className="px-4 py-3 text-right border-r border-slate-800">Valor Total</th>
-              <th className="px-4 py-3 text-right border-r border-slate-800">Valor Liquidado</th>
+              {type === 'history' ? (
+                <th className="px-4 py-3 text-right border-r border-slate-800">Valor Movimentado</th>
+              ) : (
+                <>
+                  <th className="px-4 py-3 text-right border-r border-slate-800">Valor Total</th>
+                  <th className="px-4 py-3 text-right border-r border-slate-800">Valor Liquidado</th>
+                </>
+              )}
               <th className="px-4 py-3 text-center border-r border-slate-800">Fluxo</th>
               <th className="px-4 py-3 text-center">Ações</th>
             </tr>
@@ -87,13 +129,13 @@ const FinancialTable: React.FC<Props> = ({
               const debit = isDebit(record);
               const totalSettled = (record.paidValue || 0) + (record.discountValue || 0);
               const bankInfo = getBankAccountName(record.bankAccount, record.description) || (record.description && /abatimento|desconto|ajuste/i.test(record.description) ? 'Desconto' : record.status === 'paid' ? 'Ajuste Contábil' : 'Pendente');
-              
+
               return (
                 <tr key={record.id} className={`hover:bg-slate-50 transition-colors ${selectable && selectedIds.includes(record.id) ? 'bg-blue-50/50' : ''}`}>
                   {selectable && (
                     <td className="px-4 py-4 text-center">
-                      <input 
-                        type="checkbox" 
+                      <input
+                        type="checkbox"
                         disabled={record.status === 'paid'}
                         checked={selectedIds.includes(record.id)}
                         onChange={() => onToggleSelection && onToggleSelection(record.id)}
@@ -101,7 +143,7 @@ const FinancialTable: React.FC<Props> = ({
                       />
                     </td>
                   )}
-                  
+
                   <td className="px-4 py-4 font-black text-slate-900">
                     <div className="flex items-center gap-2">
                       <Calendar size={14} className="text-slate-400" />
@@ -115,8 +157,13 @@ const FinancialTable: React.FC<Props> = ({
 
                   <td className="px-4 py-4">
                     <div className="flex flex-col">
-                        <span className="font-bold text-blue-600">{record.description}</span>
-                        {record.driverName && <span className="text-[10px] text-slate-400 font-black uppercase">Mot: {record.driverName}</span>}
+                      <span className="font-bold text-blue-600">{record.description}</span>
+                      {freightPartialLabels.get(record.id) && (
+                        <span className="text-[9px] font-black uppercase text-amber-600 tracking-wider">
+                          {freightPartialLabels.get(record.id)}
+                        </span>
+                      )}
+                      {record.driverName && <span className="text-[10px] text-slate-400 font-black uppercase">Mot: {record.driverName}</span>}
                     </div>
                   </td>
 
@@ -133,21 +180,28 @@ const FinancialTable: React.FC<Props> = ({
                     </div>
                   </td>
 
-                  <td className="px-4 py-4 text-right font-bold text-slate-500">
-                    {currency(record.originalValue)}
-                  </td>
-
-                  <td className={`px-4 py-4 text-right font-black ${totalSettled > 0 ? 'text-emerald-600' : 'text-slate-300'}`}>
-                    <div className="flex flex-col items-end">
-                        <span>{currency(totalSettled)}</span>
-                        {record.discountValue! > 0 && record.paidValue! > 0 && (
+                  {type === 'history' ? (
+                    <td className="px-4 py-4 text-right font-black text-emerald-600">
+                      {currency(record.paidValue)}
+                    </td>
+                  ) : (
+                    <>
+                      <td className="px-4 py-4 text-right font-bold text-slate-500">
+                        {currency(record.originalValue)}
+                      </td>
+                      <td className={`px-4 py-4 text-right font-black ${totalSettled > 0 ? 'text-emerald-600' : 'text-slate-300'}`}>
+                        <div className="flex flex-col items-end">
+                          <span>{currency(totalSettled)}</span>
+                          {record.discountValue! > 0 && record.paidValue! > 0 && (
                             <span className="text-[8px] text-amber-600 uppercase">Incl. Abatimento</span>
-                        )}
-                        {record.discountValue! > 0 && record.paidValue! === 0 && (
-                            <span className="text-[8px] text-amber-600 uppercase flex items-center gap-0.5"><MinusCircle size={8}/> Abatimento Puro</span>
-                        )}
-                    </div>
-                  </td>
+                          )}
+                          {record.discountValue! > 0 && record.paidValue! === 0 && (
+                            <span className="text-[8px] text-amber-600 uppercase flex items-center gap-0.5"><MinusCircle size={8} /> Abatimento Puro</span>
+                          )}
+                        </div>
+                      </td>
+                    </>
+                  )}
 
                   <td className="px-4 py-4 text-center">
                     {debit ? (
@@ -163,7 +217,7 @@ const FinancialTable: React.FC<Props> = ({
 
                   <td className="px-4 py-4 text-center">
                     <div className="flex items-center justify-center gap-2">
-                      <button 
+                      <button
                         onClick={() => onPay && onPay(record)}
                         className="rounded-lg p-2 text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition-all active:scale-95"
                         title="Ver Ações / Detalhes"
@@ -185,13 +239,13 @@ const FinancialTable: React.FC<Props> = ({
 export default React.memo(FinancialTable, (prevProps, nextProps) => {
   // Se os records têm tamanho diferente, precisa re-renderizar
   if (prevProps.records.length !== nextProps.records.length) return false;
-  
+
   // Se os records estão na mesma ordem e com os mesmos IDs, não precisa re-renderizar
   const isSameOrder = prevProps.records.every((r, i) => r.id === nextProps.records[i]?.id);
   if (!isSameOrder) return false;
-  
+
   // Compara outros props
-  return prevProps.type === nextProps.type && 
-         prevProps.selectable === nextProps.selectable &&
-         JSON.stringify(prevProps.selectedIds) === JSON.stringify(nextProps.selectedIds);
+  return prevProps.type === nextProps.type &&
+    prevProps.selectable === nextProps.selectable &&
+    JSON.stringify(prevProps.selectedIds) === JSON.stringify(nextProps.selectedIds);
 });

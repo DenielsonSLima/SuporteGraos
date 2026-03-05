@@ -2,8 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, Trash2, Calendar, DollarSign, Wallet, FileText, AlertTriangle } from 'lucide-react';
 import { OrderTransaction } from '../../../PurchaseOrder/types';
-import { financialService } from '../../../../services/financialService';
-import { BankAccount } from '../../types';
+import type { Account } from '../../../../services/accountsService';
+import { useAccounts } from '../../../../hooks/useAccounts';
 import ActionConfirmationModal from '../../../../components/ui/ActionConfirmationModal';
 
 interface Props {
@@ -16,7 +16,8 @@ interface Props {
 }
 
 const TransactionManagementModal: React.FC<Props> = ({ isOpen, onClose, transaction, onUpdate, onDelete, title }) => {
-  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const { data: allBankAccounts = [] } = useAccounts();
+  const bankAccounts = React.useMemo(() => allBankAccounts.sort((a, b) => a.account_name.localeCompare(b.account_name)), [allBankAccounts]);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   
   const [formData, setFormData] = useState<OrderTransaction>({ ...transaction });
@@ -24,10 +25,6 @@ const TransactionManagementModal: React.FC<Props> = ({ isOpen, onClose, transact
   useEffect(() => {
     if (isOpen) {
       setFormData({ ...transaction });
-      // SORT ALPHABETICALLY
-      const sorted = financialService.getBankAccounts()
-        .sort((a, b) => a.bankName.localeCompare(b.bankName));
-      setBankAccounts(sorted);
     }
   }, [isOpen, transaction]);
 
@@ -38,7 +35,7 @@ const TransactionManagementModal: React.FC<Props> = ({ isOpen, onClose, transact
     const account = bankAccounts.find(a => a.id === formData.accountId);
     onUpdate({
       ...formData,
-      accountName: account?.bankName || formData.accountName
+      accountName: account?.account_name || formData.accountName
     });
     onClose();
   };
@@ -90,7 +87,7 @@ const TransactionManagementModal: React.FC<Props> = ({ isOpen, onClose, transact
               >
                 <option value="">Selecione a conta...</option>
                 {bankAccounts.map(acc => (
-                  <option key={acc.id} value={acc.id}>{acc.bankName} - {acc.owner}</option>
+                  <option key={acc.id} value={acc.id}>{acc.account_name}</option>
                 ))}
               </select>
             </div>

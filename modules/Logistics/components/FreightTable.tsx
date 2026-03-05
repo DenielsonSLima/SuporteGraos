@@ -2,6 +2,7 @@
 import React from 'react';
 import { ArrowRight, MoreHorizontal, FileText, CheckCircle2, Clock, MapPin, Truck, CheckSquare, PackageCheck, FileDigit } from 'lucide-react';
 import { Freight, FreightStatus } from '../types';
+import { formatDateBR } from '../../../utils/dateUtils';
 
 interface Props {
   freights: Freight[];
@@ -10,14 +11,9 @@ interface Props {
 
 const FreightTable: React.FC<Props> = ({ freights, onFreightClick }) => {
   const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
-  
+
   // CORREÇÃO DE FUSO HORÁRIO
-  const date = (val: string) => {
-    if (!val) return '-';
-    if (val.includes('T')) return new Date(val).toLocaleDateString('pt-BR');
-    const [year, month, day] = val.split('-');
-    return `${day}/${month}/${year}`;
-  };
+  const date = (val: string) => formatDateBR(val);
 
   // Status Helpers
   const isPaid = (f: Freight) => f.financialStatus === 'paid';
@@ -51,8 +47,8 @@ const FreightTable: React.FC<Props> = ({ freights, onFreightClick }) => {
               const invoiceNum = (freight as any).invoiceNumber;
 
               return (
-                <tr 
-                  key={freight.id} 
+                <tr
+                  key={freight.id}
                   className="hover:bg-slate-50 transition-colors group cursor-pointer"
                   onClick={() => onFreightClick(freight)}
                 >
@@ -141,13 +137,13 @@ const FreightTable: React.FC<Props> = ({ freights, onFreightClick }) => {
                     <div className="flex flex-col gap-1 items-end">
                       <span className="text-xs text-slate-400 font-medium">Total</span>
                       <span className="font-bold text-slate-800 text-sm">{currency(freight.totalFreight)}</span>
-                      
+
                       {freight.paidValue > 0 && (
                         <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-1.5 rounded mt-1">
                           Pago: {currency(freight.paidValue)}
                         </span>
                       )}
-                      
+
                       {freight.balanceValue > 0 && (
                         <span className="text-[10px] text-amber-600 font-bold bg-amber-50 px-1.5 rounded">
                           Falta: {currency(freight.balanceValue)}
@@ -158,7 +154,7 @@ const FreightTable: React.FC<Props> = ({ freights, onFreightClick }) => {
 
                   {/* AÇÕES */}
                   <td className="px-6 py-4 text-center">
-                    <button 
+                    <button
                       onClick={(e) => { e.stopPropagation(); onFreightClick(freight); }}
                       className="rounded p-2 text-slate-400 hover:bg-blue-50 hover:text-blue-600 transition-colors"
                       title="Gerenciar Carga"

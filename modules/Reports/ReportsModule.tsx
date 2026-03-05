@@ -1,56 +1,57 @@
 
-import React, { useState, useEffect } from 'react';
-import { 
-  Users, 
-  ShoppingCart, 
-  Truck, 
-  DollarSign, 
-  BarChart2, 
+import React, { useState } from 'react';
+import {
+  Users,
+  ShoppingCart,
+  Truck,
+  DollarSign,
+  BarChart2,
   Search,
   FileText,
   ChevronRight,
   Activity,
   Loader2
 } from 'lucide-react';
-import { ReportCategory, ReportModule as ReportModuleType } from './types';
+import { ReportCategory } from './types';
 import ReportCard from './components/ReportCard';
 import ReportScreen from './components/ReportScreen';
 import ReportsAnalytics from './components/ReportsAnalytics';
-import { REPORT_METADATA, getReportById } from './registry';
+import { REPORT_METADATA } from './registry';
+import { useReport } from '../../hooks/useReports';
 
 const CATEGORIES: { id: ReportCategory; label: string; icon: any; color: string; description: string }[] = [
-  { 
-    id: 'commercial', 
-    label: 'Comercial', 
-    icon: ShoppingCart, 
-    color: 'text-blue-600 bg-blue-50 border-blue-100', 
+  {
+    id: 'commercial',
+    label: 'Comercial',
+    icon: ShoppingCart,
+    color: 'text-blue-600 bg-blue-50 border-blue-100',
     description: 'Vendas, compras e negociações de grãos.'
   },
-  { 
-    id: 'logistics', 
-    label: 'Logística', 
-    icon: Truck, 
+  {
+    id: 'logistics',
+    label: 'Logística',
+    icon: Truck,
     color: 'text-amber-600 bg-amber-50 border-amber-100',
     description: 'Controle de fretes, rotas e transportadoras.'
   },
-  { 
-    id: 'financial', 
-    label: 'Financeiro', 
-    icon: DollarSign, 
+  {
+    id: 'financial',
+    label: 'Financeiro',
+    icon: DollarSign,
     color: 'text-emerald-600 bg-emerald-50 border-emerald-100',
     description: 'Fluxo de caixa, contas a pagar e receber.'
   },
-  { 
-    id: 'analytics', 
-    label: 'Indicadores', 
-    icon: BarChart2, 
+  {
+    id: 'analytics',
+    label: 'Indicadores',
+    icon: BarChart2,
     color: 'text-violet-600 bg-violet-50 border-violet-100',
     description: 'Análise de performance e KPIs gerenciais.'
   },
-  { 
-    id: 'registration', 
-    label: 'Cadastros', 
-    icon: Users, 
+  {
+    id: 'registration',
+    label: 'Cadastros',
+    icon: Users,
     color: 'text-slate-600 bg-slate-50 border-slate-200',
     description: 'Listagens de parceiros e contatos.'
   },
@@ -58,28 +59,11 @@ const CATEGORIES: { id: ReportCategory; label: string; icon: any; color: string;
 
 const ReportsModule: React.FC = () => {
   const [activeReportId, setActiveReportId] = useState<string | null>(null);
-  const [activeReportModule, setActiveReportModule] = useState<ReportModuleType | null>(null);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [isLoadingReport, setIsLoadingReport] = useState(false);
 
-  // Carregar relatório quando um ID for selecionado
-  useEffect(() => {
-    if (activeReportId) {
-      setIsLoadingReport(true);
-      getReportById(activeReportId)
-        .then(module => {
-          setActiveReportModule(module || null);
-          setIsLoadingReport(false);
-        })
-        .catch(err => {
-          console.error('Erro ao carregar relatório:', err);
-          setIsLoadingReport(false);
-        });
-    } else {
-      setActiveReportModule(null);
-    }
-  }, [activeReportId]);
+  // TanStack Query: lazy loading automático
+  const { data: activeReportModule, isLoading: isLoadingReport } = useReport(activeReportId);
 
   // Se o analytics estiver ativo, mostra tela de analytics
   if (showAnalytics) {
@@ -120,13 +104,12 @@ const ReportsModule: React.FC = () => {
 
     if (activeReportModule) {
       return (
-        <ReportScreen 
-          reportModule={activeReportModule} 
+        <ReportScreen
+          reportModule={activeReportModule}
           reportId={activeReportId}
           onBack={() => {
             setActiveReportId(null);
-            setActiveReportModule(null);
-          }} 
+          }}
         />
       );
     }
@@ -138,6 +121,7 @@ const ReportsModule: React.FC = () => {
     'freight_open_report': { title: 'Fretes em Aberto (Pendentes)', description: 'Cargas com saldo financeiro a pagar ou ainda em trânsito/descarregamento.', icon: Truck },
     'freight_monthly_history': { title: 'Histórico de Fretes do Mês', description: 'Relatório completo de todas as cargas do mês com volumes e quebras.', icon: Truck },
     'freight_payments_report': { title: 'Pagamentos de Frete (Mês)', description: 'Lista de adiantamentos e pagamentos de saldo realizados no período.', icon: DollarSign },
+    'freight_payments_detailed': { title: 'Relatório Detalhado de Fretes e Pagamentos', description: 'Visualização completa das cargas, pagamentos efetuados e saldos pendentes.', icon: Truck },
     'abc_clients': { title: 'Análise ABC de Clientes', description: 'Classificação de clientes por volume de compras.', icon: BarChart2 },
     'abc_states': { title: 'Análise ABC por Estado', description: 'Distribuição de vendas por estado (UF).', icon: BarChart2 },
     'dre': { title: 'DRE - Demonstrativo de Resultados', description: 'Receitas, despesas e resultado líquido do período.', icon: DollarSign },
@@ -174,7 +158,7 @@ const ReportsModule: React.FC = () => {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-10">
-      
+
       {/* Header & Search */}
       <div className="bg-slate-900 text-white p-8 rounded-2xl shadow-lg relative overflow-hidden flex items-start justify-between">
         <div className="relative z-10 max-w-2xl flex-1">
@@ -185,11 +169,11 @@ const ReportsModule: React.FC = () => {
           <p className="text-slate-300 mb-6 text-sm">
             Acesse todos os dados do sistema organizados por departamento. Selecione um relatório para visualizar, filtrar e exportar em PDF.
           </p>
-          
+
           <div className="relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-            <input 
-              type="text" 
+            <input
+              type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="O que você está procurando? (Ex: Vendas, Fretes, Caixa...)"
@@ -240,9 +224,9 @@ const ReportsModule: React.FC = () => {
                 {categoryReports.map(meta => {
                   const info = reportInfo[meta.id];
                   if (!info) return null;
-                  
+
                   return (
-                    <ReportCard 
+                    <ReportCard
                       key={meta.id}
                       title={info.title}
                       description={info.description}

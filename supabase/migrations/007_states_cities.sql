@@ -1,0 +1,409 @@
+-- ============================================================
+-- Migration 007 — states + cities
+-- Todos os 27 estados brasileiros com cidades pré-populadas.
+-- Tabelas são de sistema (sem company_id): somente leitura via RLS.
+-- Cidades adicionais por empresa serão adicionadas com company_id.
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS public.states (
+  id         UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
+  uf         TEXT    NOT NULL UNIQUE,
+  name       TEXT    NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.cities (
+  id         UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
+  state_id   UUID    NOT NULL REFERENCES public.states(id) ON DELETE CASCADE,
+  name       TEXT    NOT NULL,
+  company_id UUID    REFERENCES public.companies(id) ON DELETE CASCADE,  -- NULL = sistema
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  CONSTRAINT cities_unique_per_state UNIQUE (state_id, name)
+);
+
+-- ── Inserir os 27 estados ────────────────────────────────────
+INSERT INTO public.states (id, uf, name) VALUES
+  ('10000000-0000-0000-0000-000000000001', 'AC', 'Acre'),
+  ('10000000-0000-0000-0000-000000000002', 'AL', 'Alagoas'),
+  ('10000000-0000-0000-0000-000000000003', 'AP', 'Amapá'),
+  ('10000000-0000-0000-0000-000000000004', 'AM', 'Amazonas'),
+  ('10000000-0000-0000-0000-000000000005', 'BA', 'Bahia'),
+  ('10000000-0000-0000-0000-000000000006', 'CE', 'Ceará'),
+  ('10000000-0000-0000-0000-000000000007', 'DF', 'Distrito Federal'),
+  ('10000000-0000-0000-0000-000000000008', 'ES', 'Espírito Santo'),
+  ('10000000-0000-0000-0000-000000000009', 'GO', 'Goiás'),
+  ('10000000-0000-0000-0000-000000000010', 'MA', 'Maranhão'),
+  ('10000000-0000-0000-0000-000000000011', 'MT', 'Mato Grosso'),
+  ('10000000-0000-0000-0000-000000000012', 'MS', 'Mato Grosso do Sul'),
+  ('10000000-0000-0000-0000-000000000013', 'MG', 'Minas Gerais'),
+  ('10000000-0000-0000-0000-000000000014', 'PA', 'Pará'),
+  ('10000000-0000-0000-0000-000000000015', 'PB', 'Paraíba'),
+  ('10000000-0000-0000-0000-000000000016', 'PR', 'Paraná'),
+  ('10000000-0000-0000-0000-000000000017', 'PE', 'Pernambuco'),
+  ('10000000-0000-0000-0000-000000000018', 'PI', 'Piauí'),
+  ('10000000-0000-0000-0000-000000000019', 'RJ', 'Rio de Janeiro'),
+  ('10000000-0000-0000-0000-000000000020', 'RN', 'Rio Grande do Norte'),
+  ('10000000-0000-0000-0000-000000000021', 'RS', 'Rio Grande do Sul'),
+  ('10000000-0000-0000-0000-000000000022', 'RO', 'Rondônia'),
+  ('10000000-0000-0000-0000-000000000023', 'RR', 'Roraima'),
+  ('10000000-0000-0000-0000-000000000024', 'SC', 'Santa Catarina'),
+  ('10000000-0000-0000-0000-000000000025', 'SP', 'São Paulo'),
+  ('10000000-0000-0000-0000-000000000026', 'SE', 'Sergipe'),
+  ('10000000-0000-0000-0000-000000000027', 'TO', 'Tocantins')
+ON CONFLICT (uf) DO NOTHING;
+
+-- ── Inserir cidades ──────────────────────────────────────────
+-- Acre
+INSERT INTO public.cities (state_id, name) VALUES
+  ('10000000-0000-0000-0000-000000000001', 'Rio Branco'),
+  ('10000000-0000-0000-0000-000000000001', 'Cruzeiro do Sul'),
+  ('10000000-0000-0000-0000-000000000001', 'Sena Madureira'),
+  ('10000000-0000-0000-0000-000000000001', 'Tarauacá'),
+  ('10000000-0000-0000-0000-000000000001', 'Feijó')
+ON CONFLICT (state_id, name) DO NOTHING;
+
+-- Alagoas
+INSERT INTO public.cities (state_id, name) VALUES
+  ('10000000-0000-0000-0000-000000000002', 'Maceió'),
+  ('10000000-0000-0000-0000-000000000002', 'Arapiraca'),
+  ('10000000-0000-0000-0000-000000000002', 'Palmeira dos Índios'),
+  ('10000000-0000-0000-0000-000000000002', 'Rio Largo'),
+  ('10000000-0000-0000-0000-000000000002', 'Penedo')
+ON CONFLICT (state_id, name) DO NOTHING;
+
+-- Amapá
+INSERT INTO public.cities (state_id, name) VALUES
+  ('10000000-0000-0000-0000-000000000003', 'Macapá'),
+  ('10000000-0000-0000-0000-000000000003', 'Santana'),
+  ('10000000-0000-0000-0000-000000000003', 'Laranjal do Jari'),
+  ('10000000-0000-0000-0000-000000000003', 'Oiapoque'),
+  ('10000000-0000-0000-0000-000000000003', 'Mazagão')
+ON CONFLICT (state_id, name) DO NOTHING;
+
+-- Amazonas
+INSERT INTO public.cities (state_id, name) VALUES
+  ('10000000-0000-0000-0000-000000000004', 'Manaus'),
+  ('10000000-0000-0000-0000-000000000004', 'Parintins'),
+  ('10000000-0000-0000-0000-000000000004', 'Itacoatiara'),
+  ('10000000-0000-0000-0000-000000000004', 'Manacapuru'),
+  ('10000000-0000-0000-0000-000000000004', 'Coari')
+ON CONFLICT (state_id, name) DO NOTHING;
+
+-- Bahia
+INSERT INTO public.cities (state_id, name) VALUES
+  ('10000000-0000-0000-0000-000000000005', 'Salvador'),
+  ('10000000-0000-0000-0000-000000000005', 'Feira de Santana'),
+  ('10000000-0000-0000-0000-000000000005', 'Vitória da Conquista'),
+  ('10000000-0000-0000-0000-000000000005', 'Camaçari'),
+  ('10000000-0000-0000-0000-000000000005', 'Juazeiro'),
+  ('10000000-0000-0000-0000-000000000005', 'Lauro de Freitas'),
+  ('10000000-0000-0000-0000-000000000005', 'Itabuna'),
+  ('10000000-0000-0000-0000-000000000005', 'Ilhéus'),
+  ('10000000-0000-0000-0000-000000000005', 'Porto Seguro'),
+  ('10000000-0000-0000-0000-000000000005', 'Jequié')
+ON CONFLICT (state_id, name) DO NOTHING;
+
+-- Ceará
+INSERT INTO public.cities (state_id, name) VALUES
+  ('10000000-0000-0000-0000-000000000006', 'Fortaleza'),
+  ('10000000-0000-0000-0000-000000000006', 'Caucaia'),
+  ('10000000-0000-0000-0000-000000000006', 'Juazeiro do Norte'),
+  ('10000000-0000-0000-0000-000000000006', 'Maracanaú'),
+  ('10000000-0000-0000-0000-000000000006', 'Sobral'),
+  ('10000000-0000-0000-0000-000000000006', 'Crato'),
+  ('10000000-0000-0000-0000-000000000006', 'Itapipoca')
+ON CONFLICT (state_id, name) DO NOTHING;
+
+-- Distrito Federal
+INSERT INTO public.cities (state_id, name) VALUES
+  ('10000000-0000-0000-0000-000000000007', 'Brasília'),
+  ('10000000-0000-0000-0000-000000000007', 'Ceilândia'),
+  ('10000000-0000-0000-0000-000000000007', 'Taguatinga'),
+  ('10000000-0000-0000-0000-000000000007', 'Samambaia'),
+  ('10000000-0000-0000-0000-000000000007', 'Planaltina')
+ON CONFLICT (state_id, name) DO NOTHING;
+
+-- Espírito Santo
+INSERT INTO public.cities (state_id, name) VALUES
+  ('10000000-0000-0000-0000-000000000008', 'Vitória'),
+  ('10000000-0000-0000-0000-000000000008', 'Serra'),
+  ('10000000-0000-0000-0000-000000000008', 'Vila Velha'),
+  ('10000000-0000-0000-0000-000000000008', 'Cariacica'),
+  ('10000000-0000-0000-0000-000000000008', 'Cachoeiro de Itapemirim'),
+  ('10000000-0000-0000-0000-000000000008', 'Linhares'),
+  ('10000000-0000-0000-0000-000000000008', 'Colatina')
+ON CONFLICT (state_id, name) DO NOTHING;
+
+-- Goiás
+INSERT INTO public.cities (state_id, name) VALUES
+  ('10000000-0000-0000-0000-000000000009', 'Goiânia'),
+  ('10000000-0000-0000-0000-000000000009', 'Anápolis'),
+  ('10000000-0000-0000-0000-000000000009', 'Rio Verde'),
+  ('10000000-0000-0000-0000-000000000009', 'Aparecida de Goiânia'),
+  ('10000000-0000-0000-0000-000000000009', 'Jataí'),
+  ('10000000-0000-0000-0000-000000000009', 'Cristalina'),
+  ('10000000-0000-0000-0000-000000000009', 'Luziânia'),
+  ('10000000-0000-0000-0000-000000000009', 'Itumbiara')
+ON CONFLICT (state_id, name) DO NOTHING;
+
+-- Maranhão
+INSERT INTO public.cities (state_id, name) VALUES
+  ('10000000-0000-0000-0000-000000000010', 'São Luís'),
+  ('10000000-0000-0000-0000-000000000010', 'Imperatriz'),
+  ('10000000-0000-0000-0000-000000000010', 'São José de Ribamar'),
+  ('10000000-0000-0000-0000-000000000010', 'Timon'),
+  ('10000000-0000-0000-0000-000000000010', 'Caxias'),
+  ('10000000-0000-0000-0000-000000000010', 'Codó'),
+  ('10000000-0000-0000-0000-000000000010', 'Paço do Lumiar'),
+  ('10000000-0000-0000-0000-000000000010', 'Açailândia'),
+  ('10000000-0000-0000-0000-000000000010', 'Bacabal'),
+  ('10000000-0000-0000-0000-000000000010', 'Balsas')
+ON CONFLICT (state_id, name) DO NOTHING;
+
+-- Mato Grosso
+INSERT INTO public.cities (state_id, name) VALUES
+  ('10000000-0000-0000-0000-000000000011', 'Cuiabá'),
+  ('10000000-0000-0000-0000-000000000011', 'Várzea Grande'),
+  ('10000000-0000-0000-0000-000000000011', 'Rondonópolis'),
+  ('10000000-0000-0000-0000-000000000011', 'Sinop'),
+  ('10000000-0000-0000-0000-000000000011', 'Sorriso'),
+  ('10000000-0000-0000-0000-000000000011', 'Lucas do Rio Verde'),
+  ('10000000-0000-0000-0000-000000000011', 'Nova Mutum'),
+  ('10000000-0000-0000-0000-000000000011', 'Primavera do Leste'),
+  ('10000000-0000-0000-0000-000000000011', 'Tangará da Serra'),
+  ('10000000-0000-0000-0000-000000000011', 'Barra do Garças')
+ON CONFLICT (state_id, name) DO NOTHING;
+
+-- Mato Grosso do Sul
+INSERT INTO public.cities (state_id, name) VALUES
+  ('10000000-0000-0000-0000-000000000012', 'Campo Grande'),
+  ('10000000-0000-0000-0000-000000000012', 'Dourados'),
+  ('10000000-0000-0000-0000-000000000012', 'Três Lagoas'),
+  ('10000000-0000-0000-0000-000000000012', 'Corumbá'),
+  ('10000000-0000-0000-0000-000000000012', 'Ponta Porã'),
+  ('10000000-0000-0000-0000-000000000012', 'Naviraí'),
+  ('10000000-0000-0000-0000-000000000012', 'Nova Andradina')
+ON CONFLICT (state_id, name) DO NOTHING;
+
+-- Minas Gerais
+INSERT INTO public.cities (state_id, name) VALUES
+  ('10000000-0000-0000-0000-000000000013', 'Belo Horizonte'),
+  ('10000000-0000-0000-0000-000000000013', 'Uberlândia'),
+  ('10000000-0000-0000-0000-000000000013', 'Contagem'),
+  ('10000000-0000-0000-0000-000000000013', 'Juiz de Fora'),
+  ('10000000-0000-0000-0000-000000000013', 'Betim'),
+  ('10000000-0000-0000-0000-000000000013', 'Montes Claros'),
+  ('10000000-0000-0000-0000-000000000013', 'Ribeirão das Neves'),
+  ('10000000-0000-0000-0000-000000000013', 'Uberaba'),
+  ('10000000-0000-0000-0000-000000000013', 'Governador Valadares'),
+  ('10000000-0000-0000-0000-000000000013', 'Ipatinga')
+ON CONFLICT (state_id, name) DO NOTHING;
+
+-- Pará
+INSERT INTO public.cities (state_id, name) VALUES
+  ('10000000-0000-0000-0000-000000000014', 'Belém'),
+  ('10000000-0000-0000-0000-000000000014', 'Ananindeua'),
+  ('10000000-0000-0000-0000-000000000014', 'Santarém'),
+  ('10000000-0000-0000-0000-000000000014', 'Marabá'),
+  ('10000000-0000-0000-0000-000000000014', 'Castanhal'),
+  ('10000000-0000-0000-0000-000000000014', 'Altamira'),
+  ('10000000-0000-0000-0000-000000000014', 'Parauapebas')
+ON CONFLICT (state_id, name) DO NOTHING;
+
+-- Paraíba
+INSERT INTO public.cities (state_id, name) VALUES
+  ('10000000-0000-0000-0000-000000000015', 'João Pessoa'),
+  ('10000000-0000-0000-0000-000000000015', 'Campina Grande'),
+  ('10000000-0000-0000-0000-000000000015', 'Santa Rita'),
+  ('10000000-0000-0000-0000-000000000015', 'Patos'),
+  ('10000000-0000-0000-0000-000000000015', 'Bayeux'),
+  ('10000000-0000-0000-0000-000000000015', 'Sousa'),
+  ('10000000-0000-0000-0000-000000000015', 'Cabedelo'),
+  ('10000000-0000-0000-0000-000000000015', 'Cajazeiras'),
+  ('10000000-0000-0000-0000-000000000015', 'Guarabira'),
+  ('10000000-0000-0000-0000-000000000015', 'Sapé')
+ON CONFLICT (state_id, name) DO NOTHING;
+
+-- Paraná
+INSERT INTO public.cities (state_id, name) VALUES
+  ('10000000-0000-0000-0000-000000000016', 'Curitiba'),
+  ('10000000-0000-0000-0000-000000000016', 'Londrina'),
+  ('10000000-0000-0000-0000-000000000016', 'Maringá'),
+  ('10000000-0000-0000-0000-000000000016', 'Ponta Grossa'),
+  ('10000000-0000-0000-0000-000000000016', 'Cascavel'),
+  ('10000000-0000-0000-0000-000000000016', 'São José dos Pinhais'),
+  ('10000000-0000-0000-0000-000000000016', 'Foz do Iguaçu'),
+  ('10000000-0000-0000-0000-000000000016', 'Colombo'),
+  ('10000000-0000-0000-0000-000000000016', 'Guarapuava'),
+  ('10000000-0000-0000-0000-000000000016', 'Paranaguá')
+ON CONFLICT (state_id, name) DO NOTHING;
+
+-- Pernambuco
+INSERT INTO public.cities (state_id, name) VALUES
+  ('10000000-0000-0000-0000-000000000017', 'Recife'),
+  ('10000000-0000-0000-0000-000000000017', 'Jaboatão dos Guararapes'),
+  ('10000000-0000-0000-0000-000000000017', 'Olinda'),
+  ('10000000-0000-0000-0000-000000000017', 'Caruaru'),
+  ('10000000-0000-0000-0000-000000000017', 'Petrolina'),
+  ('10000000-0000-0000-0000-000000000017', 'Paulista'),
+  ('10000000-0000-0000-0000-000000000017', 'Cabo de Santo Agostinho'),
+  ('10000000-0000-0000-0000-000000000017', 'Camaragibe'),
+  ('10000000-0000-0000-0000-000000000017', 'Garanhuns'),
+  ('10000000-0000-0000-0000-000000000017', 'Vitória de Santo Antão')
+ON CONFLICT (state_id, name) DO NOTHING;
+
+-- Piauí
+INSERT INTO public.cities (state_id, name) VALUES
+  ('10000000-0000-0000-0000-000000000018', 'Teresina'),
+  ('10000000-0000-0000-0000-000000000018', 'Parnaíba'),
+  ('10000000-0000-0000-0000-000000000018', 'Picos'),
+  ('10000000-0000-0000-0000-000000000018', 'Piripiri'),
+  ('10000000-0000-0000-0000-000000000018', 'Floriano'),
+  ('10000000-0000-0000-0000-000000000018', 'Barras'),
+  ('10000000-0000-0000-0000-000000000018', 'Campo Maior'),
+  ('10000000-0000-0000-0000-000000000018', 'União'),
+  ('10000000-0000-0000-0000-000000000018', 'Altos'),
+  ('10000000-0000-0000-0000-000000000018', 'Esperantina')
+ON CONFLICT (state_id, name) DO NOTHING;
+
+-- Rio de Janeiro
+INSERT INTO public.cities (state_id, name) VALUES
+  ('10000000-0000-0000-0000-000000000019', 'Rio de Janeiro'),
+  ('10000000-0000-0000-0000-000000000019', 'São Gonçalo'),
+  ('10000000-0000-0000-0000-000000000019', 'Duque de Caxias'),
+  ('10000000-0000-0000-0000-000000000019', 'Nova Iguaçu'),
+  ('10000000-0000-0000-0000-000000000019', 'Niterói'),
+  ('10000000-0000-0000-0000-000000000019', 'Belford Roxo'),
+  ('10000000-0000-0000-0000-000000000019', 'Campos dos Goytacazes'),
+  ('10000000-0000-0000-0000-000000000019', 'São João de Meriti'),
+  ('10000000-0000-0000-0000-000000000019', 'Petrópolis'),
+  ('10000000-0000-0000-0000-000000000019', 'Volta Redonda')
+ON CONFLICT (state_id, name) DO NOTHING;
+
+-- Rio Grande do Norte
+INSERT INTO public.cities (state_id, name) VALUES
+  ('10000000-0000-0000-0000-000000000020', 'Natal'),
+  ('10000000-0000-0000-0000-000000000020', 'Mossoró'),
+  ('10000000-0000-0000-0000-000000000020', 'Parnamirim'),
+  ('10000000-0000-0000-0000-000000000020', 'São Gonçalo do Amarante'),
+  ('10000000-0000-0000-0000-000000000020', 'Macaíba'),
+  ('10000000-0000-0000-0000-000000000020', 'Ceará-Mirim'),
+  ('10000000-0000-0000-0000-000000000020', 'Caicó')
+ON CONFLICT (state_id, name) DO NOTHING;
+
+-- Rio Grande do Sul
+INSERT INTO public.cities (state_id, name) VALUES
+  ('10000000-0000-0000-0000-000000000021', 'Porto Alegre'),
+  ('10000000-0000-0000-0000-000000000021', 'Caxias do Sul'),
+  ('10000000-0000-0000-0000-000000000021', 'Pelotas'),
+  ('10000000-0000-0000-0000-000000000021', 'Canoas'),
+  ('10000000-0000-0000-0000-000000000021', 'Santa Maria'),
+  ('10000000-0000-0000-0000-000000000021', 'Gravataí'),
+  ('10000000-0000-0000-0000-000000000021', 'Viamão'),
+  ('10000000-0000-0000-0000-000000000021', 'Novo Hamburgo'),
+  ('10000000-0000-0000-0000-000000000021', 'São Leopoldo'),
+  ('10000000-0000-0000-0000-000000000021', 'Rio Grande')
+ON CONFLICT (state_id, name) DO NOTHING;
+
+-- Rondônia
+INSERT INTO public.cities (state_id, name) VALUES
+  ('10000000-0000-0000-0000-000000000022', 'Porto Velho'),
+  ('10000000-0000-0000-0000-000000000022', 'Ji-Paraná'),
+  ('10000000-0000-0000-0000-000000000022', 'Ariquemes'),
+  ('10000000-0000-0000-0000-000000000022', 'Cacoal'),
+  ('10000000-0000-0000-0000-000000000022', 'Vilhena')
+ON CONFLICT (state_id, name) DO NOTHING;
+
+-- Roraima
+INSERT INTO public.cities (state_id, name) VALUES
+  ('10000000-0000-0000-0000-000000000023', 'Boa Vista'),
+  ('10000000-0000-0000-0000-000000000023', 'Rorainópolis'),
+  ('10000000-0000-0000-0000-000000000023', 'Caracaraí'),
+  ('10000000-0000-0000-0000-000000000023', 'Alto Alegre'),
+  ('10000000-0000-0000-0000-000000000023', 'Mucajaí')
+ON CONFLICT (state_id, name) DO NOTHING;
+
+-- Santa Catarina
+INSERT INTO public.cities (state_id, name) VALUES
+  ('10000000-0000-0000-0000-000000000024', 'Florianópolis'),
+  ('10000000-0000-0000-0000-000000000024', 'Joinville'),
+  ('10000000-0000-0000-0000-000000000024', 'Blumenau'),
+  ('10000000-0000-0000-0000-000000000024', 'São José'),
+  ('10000000-0000-0000-0000-000000000024', 'Criciúma'),
+  ('10000000-0000-0000-0000-000000000024', 'Chapecó'),
+  ('10000000-0000-0000-0000-000000000024', 'Itajaí'),
+  ('10000000-0000-0000-0000-000000000024', 'Laguna')
+ON CONFLICT (state_id, name) DO NOTHING;
+
+-- São Paulo
+INSERT INTO public.cities (state_id, name) VALUES
+  ('10000000-0000-0000-0000-000000000025', 'São Paulo'),
+  ('10000000-0000-0000-0000-000000000025', 'Guarulhos'),
+  ('10000000-0000-0000-0000-000000000025', 'Campinas'),
+  ('10000000-0000-0000-0000-000000000025', 'São Bernardo do Campo'),
+  ('10000000-0000-0000-0000-000000000025', 'Santo André'),
+  ('10000000-0000-0000-0000-000000000025', 'Osasco'),
+  ('10000000-0000-0000-0000-000000000025', 'Ribeirão Preto'),
+  ('10000000-0000-0000-0000-000000000025', 'Sorocaba'),
+  ('10000000-0000-0000-0000-000000000025', 'Mauá'),
+  ('10000000-0000-0000-0000-000000000025', 'São José dos Campos')
+ON CONFLICT (state_id, name) DO NOTHING;
+
+-- Sergipe
+INSERT INTO public.cities (state_id, name) VALUES
+  ('10000000-0000-0000-0000-000000000026', 'Aracaju'),
+  ('10000000-0000-0000-0000-000000000026', 'Nossa Senhora do Socorro'),
+  ('10000000-0000-0000-0000-000000000026', 'Lagarto'),
+  ('10000000-0000-0000-0000-000000000026', 'Itabaiana'),
+  ('10000000-0000-0000-0000-000000000026', 'São Cristóvão'),
+  ('10000000-0000-0000-0000-000000000026', 'Estância'),
+  ('10000000-0000-0000-0000-000000000026', 'Tobias Barreto'),
+  ('10000000-0000-0000-0000-000000000026', 'Simão Dias'),
+  ('10000000-0000-0000-0000-000000000026', 'Nossa Senhora da Glória'),
+  ('10000000-0000-0000-0000-000000000026', 'Poço Verde')
+ON CONFLICT (state_id, name) DO NOTHING;
+
+-- Tocantins
+INSERT INTO public.cities (state_id, name) VALUES
+  ('10000000-0000-0000-0000-000000000027', 'Palmas'),
+  ('10000000-0000-0000-0000-000000000027', 'Araguaína'),
+  ('10000000-0000-0000-0000-000000000027', 'Gurupi'),
+  ('10000000-0000-0000-0000-000000000027', 'Porto Nacional'),
+  ('10000000-0000-0000-0000-000000000027', 'Paraíso do Tocantins'),
+  ('10000000-0000-0000-0000-000000000027', 'Araguatins'),
+  ('10000000-0000-0000-0000-000000000027', 'Colinas do Tocantins'),
+  ('10000000-0000-0000-0000-000000000027', 'Guaraí'),
+  ('10000000-0000-0000-0000-000000000027', 'Tocantinópolis'),
+  ('10000000-0000-0000-0000-000000000027', 'Dianópolis')
+ON CONFLICT (state_id, name) DO NOTHING;
+
+-- ── RLS ─────────────────────────────────────────────────────
+ALTER TABLE public.states ENABLE ROW LEVEL SECURITY;
+
+-- States: leitura pública para todos os autenticados
+CREATE POLICY "states_select" ON public.states
+  FOR SELECT USING (true);
+
+ALTER TABLE public.cities ENABLE ROW LEVEL SECURITY;
+
+-- Cities: leitura de cidades de sistema (company_id IS NULL) + cidades da própria empresa
+CREATE POLICY "cities_select" ON public.cities
+  FOR SELECT USING (
+    company_id IS NULL
+    OR company_id = public.my_company_id()
+  );
+
+-- Escrita: apenas cidades da própria empresa
+CREATE POLICY "cities_insert" ON public.cities
+  FOR INSERT WITH CHECK (company_id = public.my_company_id());
+
+CREATE POLICY "cities_delete" ON public.cities
+  FOR DELETE USING (
+    company_id = public.my_company_id()
+    AND company_id IS NOT NULL
+  );
+
+-- ── Realtime ─────────────────────────────────────────────────
+ALTER PUBLICATION supabase_realtime ADD TABLE public.states;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.cities;

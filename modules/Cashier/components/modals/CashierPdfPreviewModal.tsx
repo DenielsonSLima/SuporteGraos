@@ -27,7 +27,6 @@ const CashierPdfPreviewModal: React.FC<Props> = ({ isOpen, onClose, report, titl
           url = URL.createObjectURL(blob);
           setPdfUrl(url);
         } catch (error) {
-          console.error('Erro ao gerar preview:', error);
         }
       }
     };
@@ -50,7 +49,6 @@ const CashierPdfPreviewModal: React.FC<Props> = ({ isOpen, onClose, report, titl
       const blob = await pdf(<CashierPdfDocument report={report} title={title} />).toBlob();
       saveAs(blob, filename);
     } catch (error) {
-      console.error('Erro ao gerar PDF:', error);
       alert("Ocorreu um erro técnico ao processar o arquivo.");
     } finally {
       setIsGenerating(false);

@@ -1,3 +1,9 @@
+/**
+ * @deprecated SKIL Gap 7 — LoadingCache foi substituído por leitura direta via
+ * loadingService.getByPurchaseOrder() / getBySalesOrder() + TanStack Query.
+ * Este arquivo é mantido apenas para compatibilidade temporária.
+ * NÃO adicione novos imports deste módulo.
+ */
 import { loadingService } from './loadingService';
 
 // Tipos genéricos para manter compatibilidade sem acoplar aos módulos

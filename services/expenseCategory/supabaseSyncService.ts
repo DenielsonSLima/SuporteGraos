@@ -36,9 +36,7 @@ export const expenseCategorySupabaseSync = {
         await supabase.from('expense_categories').upsert(categoriesToInsert, { onConflict: 'id' });
       }
 
-      console.log(`✅ Categoria ${category.name} sincronizada no Supabase`);
     } catch (error) {
-      console.warn('⚠️ Erro ao sincronizar categoria no Supabase:', error);
     }
   },
 
@@ -68,9 +66,7 @@ export const expenseCategorySupabaseSync = {
         await supabase.from('expense_categories').insert(categoriesToInsert);
       }
 
-      console.log(`✅ Categoria ${category.name} atualizada no Supabase`);
     } catch (error) {
-      console.warn('⚠️ Erro ao atualizar categoria no Supabase:', error);
     }
   },
 
@@ -78,9 +74,7 @@ export const expenseCategorySupabaseSync = {
     try {
       await supabase.from('expense_categories').delete().eq('expense_type_id', categoryId);
       await supabase.from('expense_types').delete().eq('id', categoryId);
-      console.log(`✅ Categoria deletada no Supabase`);
     } catch (error) {
-      console.warn('⚠️ Erro ao deletar categoria no Supabase:', error);
     }
   },
 
@@ -114,7 +108,6 @@ export const expenseCategorySupabaseSync = {
 
       return Array.from(typesMap.values());
     } catch (error) {
-      console.warn('⚠️ Falha ao carregar categorias do Supabase:', error);
       return [];
     }
   }

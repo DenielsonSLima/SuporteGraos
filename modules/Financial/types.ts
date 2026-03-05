@@ -3,6 +3,7 @@ export type FinancialStatus = 'pending' | 'paid' | 'overdue' | 'partial';
 
 export interface FinancialRecord {
   id: string;
+  originId?: string; // ID do registro de origem (pedido, carregamento, etc.)
   description: string;
   entityName: string;
   driverName?: string;
@@ -14,7 +15,7 @@ export interface FinancialRecord {
   paidValue: number;
   discountValue?: number;
   status: FinancialStatus;
-  subType?: 'purchase_order' | 'freight' | 'commission' | 'sales_order' | 'loan_taken' | 'loan_granted' | 'admin' | 'shareholder' | 'receipt' | 'credit_income' | 'investment';
+  subType?: 'purchase_order' | 'freight' | 'commission' | 'sales_order' | 'loan_taken' | 'loan_granted' | 'admin' | 'shareholder' | 'receipt' | 'credit_income' | 'investment' | 'transfer';
   bankAccount?: string;
   notes?: string;
   assetId?: string;
@@ -27,6 +28,9 @@ export interface FinancialRecord {
   loadCount?: number; // total de carregamentos vinculados
   totalTon?: number; // total em toneladas das cargas
   totalSc?: number; // total em sacas (se disponível)
+  orderNumber?: string; // número do pedido vinculado (ex: PV-2026-389)
+  companyId?: string;
+  remainingValue?: number;
 }
 
 export interface LoanTransaction {
@@ -64,11 +68,15 @@ export interface LoanRecord {
 export interface BankAccount {
   id: string;
   bankName: string;
+  bank?: string;
   owner?: string;
   active?: boolean;
   agency?: string;
   accountNumber?: string;
-  balance?: number;
+  initialBalance?: number;
+  currentBalance?: number; // Foundation V2 atomic balance
+  allowsNegative?: boolean;
+  type?: string;
 }
 
 export interface TransferRecord {
@@ -79,4 +87,38 @@ export interface TransferRecord {
   value: number;
   description: string;
   user: string;
+}
+
+export interface FinancialTransaction {
+  id: string;
+  financialRecordId?: string; // Link to Payable/Receivable
+  date: string;
+  description: string;
+  amount: number;
+  type: 'payment' | 'receipt' | 'transfer' | 'adjustment';
+  bankAccountId?: string;
+  categoryId?: string;
+  companyId: string;
+}
+
+export interface Commission {
+  id: string;
+  partnerId: string;
+  salesOrderId?: string;
+  loadingId?: string;
+  amount: number;
+  date: string;
+  status: 'pending' | 'paid' | 'cancelled';
+  description?: string;
+  companyId: string;
+}
+
+export interface FreightExpense {
+  id: string;
+  loadingId: string;
+  type: 'quebra' | 'adiantamento' | 'secagem' | 'outros';
+  amount: number;
+  description?: string;
+  isDeduction: boolean;
+  companyId: string;
 }

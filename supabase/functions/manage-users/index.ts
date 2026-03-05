@@ -1,286 +1,273 @@
-import { serve } from 'https://deno.land/std@0.203.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
+/**
+ * Edge Function: manage-users
+ *
+ * Responsabilidade: operações que exigem auth.admin (criar, atualizar, excluir).
+ * A LISTAGEM é feita diretamente pelo frontend via supabase-js + RLS — sem passar por aqui.
+ *
+ * Ações: create | update | delete
+ *
+ * Padrão canônico Supabase:
+ *  - userClient (ANON_KEY + JWT) → identifica o chamador
+ *  - adminClient (SERVICE_ROLE)  → operações privilegiadas
+ */
 
-const corsHeaders = {
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+// ─── HEADERS CORS ─────────────────────────────────────────────────────────────
+
+const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS'
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-const jsonResponse = (body: any, status = 200) => {
-  return new Response(JSON.stringify(body), {
+// ─── HELPERS DE RESPOSTA ──────────────────────────────────────────────────────
+
+const respond = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
   });
-};
 
-const readJsonBody = async (req: Request) => {
-  const rawBody = await req.text();
-  if (!rawBody) {
-    return { error: 'Missing body' };
-  }
-  try {
-    const payload = JSON.parse(rawBody);
-    return { payload };
-  } catch (e) {
-    console.error('❌ Invalid JSON:', e);
-    return { error: 'Invalid JSON' };
-  }
-};
+const fail = (message: string, status = 400) =>
+  respond({ success: false, error: message }, status);
 
-serve(async (req) => {
+// ─── NORMALIZAR ROLE ──────────────────────────────────────────────────────────
+
+function normalizeRole(role?: string): 'admin' | 'manager' | 'user' {
+  const r = (role ?? '').toLowerCase().trim();
+  if (['admin', 'administrator', 'administrador'].includes(r)) return 'admin';
+  if (['manager', 'gerente'].includes(r)) return 'manager';
+  return 'user';
+}
+
+// ─── HANDLER PRINCIPAL ────────────────────────────────────────────────────────
+
+serve(async (req: Request) => {
+  // Preflight CORS
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response('ok', { headers: CORS_HEADERS });
   }
 
   if (req.method !== 'POST') {
-    return jsonResponse({ success: false, error: 'Method not allowed' }, 405);
+    return fail('Método não permitido', 405);
   }
 
-  const supabaseUrl = Deno.env.get('SUPABASE_URL');
-  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-
-  if (!supabaseUrl || !serviceRoleKey) {
-    console.error('❌ Missing env vars:', { hasUrl: !!supabaseUrl, hasKey: !!serviceRoleKey });
-    return jsonResponse({ success: false, error: 'Missing env vars' }, 500);
+  // 1. Ler body
+  let body: Record<string, unknown>;
+  try {
+    body = await req.json();
+  } catch {
+    return fail('Body inválido — esperado JSON');
   }
 
-  // 1. Verificar Autorização do Chamador
-  const authHeader = req.headers.get('Authorization');
-  if (!authHeader) {
-    return jsonResponse({ success: false, error: 'Authorization header missing' }, 401);
+  const action = (body.action as string | undefined)?.trim();
+  if (!action) {
+    return fail('Campo "action" ausente');
   }
 
-  const userClient = createClient(supabaseUrl, serviceRoleKey, {
-    global: { headers: { Authorization: authHeader } }
+  // 2. Env vars
+  const SUPABASE_URL     = Deno.env.get('SUPABASE_URL')!;
+  const ANON_KEY         = Deno.env.get('SUPABASE_ANON_KEY')!;
+  const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+  if (!SUPABASE_URL || !ANON_KEY || !SERVICE_ROLE_KEY) {
+    return fail('Variáveis de ambiente não configuradas', 500);
+  }
+
+  // 3. Validar o JWT do chamador
+  //    Padrão oficial Supabase: createClient com ANON_KEY + Authorization header
+  const authHeader = req.headers.get('Authorization') ?? '';
+  if (!authHeader.startsWith('Bearer ')) {
+    return fail('Authorization header ausente ou inválido', 401);
+  }
+
+  const userClient = createClient(SUPABASE_URL, ANON_KEY, {
+    global: { headers: { Authorization: authHeader } },
+    auth: { persistSession: false },
   });
 
-  // Extrair o JWT (remover 'Bearer ')
-  const token = authHeader.replace('Bearer ', '');
-  const { data: { user: caller }, error: authError } = await userClient.auth.getUser(token);
-
-  if (authError || !caller) {
-    console.error('❌ AUTH ERROR:', authError);
-    return jsonResponse({ success: false, error: 'Unauthorized: Invalid token' }, 401);
+  const { data: { user: caller }, error: callerErr } = await userClient.auth.getUser();
+  if (callerErr || !caller) {
+    return fail(`Token inválido: ${callerErr?.message ?? 'sem usuário'}`, 401);
   }
 
-  // Verificar se o chamador é administrativo e está ativo
-  const callerMetadata = caller.user_metadata || {};
-  const callerCompanyId = callerMetadata.company_id;
-  const isCallerAdmin = callerMetadata.role === 'Admin';
-  const isCallerActive = callerMetadata.active !== false;
+  // 4. Buscar perfil do chamador em app_users (dados sempre frescos, nunca do JWT)
+  const adminClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+    auth: { persistSession: false },
+  });
 
-  if (!isCallerActive) {
-    return jsonResponse({ success: false, error: 'Chamador está inativo' }, 403);
+  const { data: profile, error: profileErr } = await adminClient
+    .from('app_users')
+    .select('company_id, role, active')
+    .eq('auth_user_id', caller.id)
+    .single();
+
+  if (profileErr || !profile) {
+    return fail(`Perfil não encontrado (uid=${caller.id})`, 403);
   }
 
-  if (!isCallerAdmin) {
-    return jsonResponse({ success: false, error: 'Permissão negada: Apenas administradores podem gerenciar usuários' }, 403);
+  if (!profile.active) {
+    return fail('Usuário inativo', 403);
   }
 
-  if (!callerCompanyId) {
-    return jsonResponse({ success: false, error: 'Chamador sem empresa vinculada' }, 403);
+  const companyId  = profile.company_id as string;
+  const callerRole = (profile.role as string ?? '').toLowerCase();
+  const isAdmin    = ['admin', 'administrator', 'administrador'].includes(callerRole);
+
+  if (!companyId) {
+    return fail('Usuário sem empresa vinculada', 403);
   }
 
-  const { payload, error: bodyError } = await readJsonBody(req);
-  if (bodyError) {
-    return jsonResponse({ success: false, error: bodyError }, 400);
+  // create / update / delete exigem admin
+  if (['create', 'update', 'delete'].includes(action) && !isAdmin) {
+    return fail('Apenas administradores podem gerenciar usuários', 403);
   }
 
-  const action = payload.action;
-  if (!action) {
-    console.error('❌ Missing action field in payload:', payload);
-    return jsonResponse({ success: false, error: 'Missing action field' }, 400);
-  }
-
-  console.log('📢 manage-users invoked by:', { callerEmail: caller.email, companyId: callerCompanyId, action });
-
-  const supabase = createClient(supabaseUrl, serviceRoleKey);
-
+  // 5. Executar a ação solicitada
   try {
-    // CREATE USER
+
+    // ────────────────────────────────────────────────────────────── CREATE ───
     if (action === 'create') {
       const {
-        firstName,
-        lastName,
-        cpf,
-        email,
-        phone,
-        role,
-        permissions,
-        active,
-        allowRecovery,
-        password,
-        generatePassword
-      } = payload;
+        firstName, lastName, cpf, email, phone,
+        role, permissions, active, allowRecovery,
+        password, generatePassword,
+      } = body as any;
 
-      if (!firstName || !lastName || !cpf || !email) {
-        return jsonResponse({ success: false, error: 'Campos obrigatórios ausentes' }, 400);
+      if (!firstName || !lastName || !email) {
+        return fail('Campos obrigatórios: firstName, lastName, email');
       }
 
-      const passwordToUse = generatePassword
-        ? Math.random().toString(36).substr(2, 12)
-        : password;
+      // Gerar senha aleatória forte ou usar a fornecida
+      const finalPassword: string = generatePassword
+        ? Math.random().toString(36).slice(2, 10) +
+          Math.random().toString(36).slice(2, 6).toUpperCase() + '1!'
+        : (password as string | undefined) ?? '';
 
-      if (!passwordToUse) {
-        return jsonResponse({ success: false, error: 'Senha é obrigatória' }, 400);
+      if (!finalPassword) {
+        return fail('Senha é obrigatória quando generatePassword=false');
       }
 
-      const { data, error } = await supabase.auth.admin.createUser({
-        email: email.toLowerCase().trim(),
-        password: passwordToUse,
+      const roleNorm = normalizeRole(role);
+
+      // a) Criar no Supabase Auth
+      const { data: authData, error: authErr } = await adminClient.auth.admin.createUser({
+        email:         (email as string).toLowerCase().trim(),
+        password:      finalPassword,
         email_confirm: true,
         user_metadata: {
-          first_name: firstName,
-          last_name: lastName,
-          cpf,
-          phone,
-          role: role || 'Operador',
-          permissions: permissions || [],
-          active: active !== undefined ? active : true,
-          allow_recovery: allowRecovery !== undefined ? allowRecovery : true,
-          company_id: callerCompanyId // 🔒 Vínculo forçado à empresa do chamador
-        }
+          first_name:     firstName,
+          last_name:      lastName,
+          cpf:            cpf ?? '',
+          phone:          phone ?? '',
+          role:           roleNorm,
+          company_id:     companyId,
+          permissions:    permissions ?? [],
+          active:         active !== false,
+          allow_recovery: allowRecovery !== false,
+        },
       });
 
-      if (error) {
-        if (error.message?.includes('already exists')) {
-          return jsonResponse({ success: false, error: 'Este e-mail já está em uso.' }, 409);
-        }
-        return jsonResponse({ success: false, error: error.message }, 400);
+      if (authErr) {
+        const already = authErr.message?.toLowerCase().includes('already');
+        return fail(
+          already ? 'Este e-mail já está em uso' : `Erro no Auth: ${authErr.message}`,
+          already ? 409 : 400,
+        );
       }
 
-      return jsonResponse({
-        success: true,
-        user_id: data.user.id,
-        email,
-        generated_password: generatePassword ? passwordToUse : null
+      // b) Inserir em app_users
+      const { error: insertErr } = await adminClient.from('app_users').insert({
+        auth_user_id:   authData.user.id,
+        company_id:     companyId,
+        first_name:     firstName,
+        last_name:      lastName,
+        cpf:            cpf ?? null,
+        email:          (email as string).toLowerCase().trim(),
+        phone:          phone ?? null,
+        role:           roleNorm,
+        active:         active !== false,
+        permissions:    permissions ?? [],
+        allow_recovery: allowRecovery !== false,
+      });
+
+      if (insertErr) {
+        // Rollback
+        await adminClient.auth.admin.deleteUser(authData.user.id);
+        return fail(`Erro ao salvar perfil: ${insertErr.message}`, 500);
+      }
+
+      return respond({
+        success:           true,
+        userId:            authData.user.id,
+        generatedPassword: generatePassword ? finalPassword : undefined,
       });
     }
 
-    // UPDATE USER
+    // ────────────────────────────────────────────────────────────── UPDATE ───
     if (action === 'update') {
-      const {
-        userId,
-        firstName,
-        lastName,
-        cpf,
-        email,
-        phone,
-        role,
-        permissions,
-        active,
-        allowRecovery,
-        password
-      } = payload;
+      const { userId, firstName, lastName, cpf, phone, role, permissions, active, allowRecovery } = body as any;
 
-      if (!userId) {
-        return jsonResponse({ success: false, error: 'userId ausente' }, 400);
-      }
+      if (!userId) return fail('userId é obrigatório');
 
-      // 1. Verificar se o usuário alvo pertence à mesma empresa
-      const { data: targetUser, error: getError } = await supabase.auth.admin.getUserById(userId);
-      if (getError || !targetUser?.user) {
-        return jsonResponse({ success: false, error: 'Usuário não encontrado' }, 404);
-      }
+      const roleNorm = role !== undefined ? normalizeRole(role) : undefined;
 
-      if (targetUser.user.user_metadata?.company_id !== callerCompanyId) {
-        return jsonResponse({ success: false, error: 'Acesso negado: Usuário pertence a outra empresa' }, 403);
-      }
+      // Atualizar Auth metadata
+      const metaUpdate: Record<string, unknown> = {};
+      if (firstName     !== undefined) metaUpdate.first_name = firstName;
+      if (lastName      !== undefined) metaUpdate.last_name = lastName;
+      if (cpf           !== undefined) metaUpdate.cpf = cpf;
+      if (phone         !== undefined) metaUpdate.phone = phone;
+      if (roleNorm      !== undefined) metaUpdate.role = roleNorm;
+      if (permissions   !== undefined) metaUpdate.permissions = permissions;
+      if (active        !== undefined) metaUpdate.active = active;
+      if (allowRecovery !== undefined) metaUpdate.allow_recovery = allowRecovery;
 
-      const updateData: any = {
-        user_metadata: { ...targetUser.user.user_metadata }
-      };
+      const { error: authErr } = await adminClient.auth.admin.updateUserById(userId, {
+        user_metadata: metaUpdate,
+      });
+      if (authErr) return fail(`Erro ao atualizar Auth: ${authErr.message}`);
 
-      if (firstName) updateData.user_metadata.first_name = firstName;
-      if (lastName) updateData.user_metadata.last_name = lastName;
-      if (cpf) updateData.user_metadata.cpf = cpf;
-      if (phone) updateData.user_metadata.phone = phone;
-      if (role) updateData.user_metadata.role = role;
-      if (permissions) updateData.user_metadata.permissions = permissions;
-      if (active !== undefined) updateData.user_metadata.active = active;
-      if (allowRecovery !== undefined) updateData.user_metadata.allow_recovery = allowRecovery;
+      // Atualizar app_users
+      const updates: Record<string, unknown> = {};
+      if (firstName     !== undefined) updates.first_name = firstName;
+      if (lastName      !== undefined) updates.last_name = lastName;
+      if (cpf           !== undefined) updates.cpf = cpf;
+      if (phone         !== undefined) updates.phone = phone;
+      if (roleNorm      !== undefined) updates.role = roleNorm;
+      if (permissions   !== undefined) updates.permissions = permissions;
+      if (active        !== undefined) updates.active = active;
+      if (allowRecovery !== undefined) updates.allow_recovery = allowRecovery;
 
-      if (email) updateData.email = email.toLowerCase().trim();
-      if (password) updateData.password = password;
+      const { error: updateErr } = await adminClient
+        .from('app_users')
+        .update(updates)
+        .eq('auth_user_id', userId);
 
-      const { error } = await supabase.auth.admin.updateUserById(userId, updateData);
+      if (updateErr) return fail(`Erro ao atualizar perfil: ${updateErr.message}`);
 
-      if (error) {
-        return jsonResponse({ success: false, error: error.message }, 400);
-      }
-
-      return jsonResponse({ success: true });
+      return respond({ success: true });
     }
 
-    // DELETE USER
+    // ────────────────────────────────────────────────────────────── DELETE ───
     if (action === 'delete') {
-      const { userId } = payload;
+      const { userId } = body as any;
+      if (!userId) return fail('userId é obrigatório');
 
-      if (!userId) {
-        return jsonResponse({ success: false, error: 'userId ausente' }, 400);
-      }
+      // Deletar do Auth — CASCADE remove automaticamente de app_users
+      const { error: authErr } = await adminClient.auth.admin.deleteUser(userId);
+      if (authErr) return fail(`Erro ao excluir: ${authErr.message}`);
 
-      // 1. Verificar se o usuário alvo pertence à mesma empresa
-      const { data: targetUser, error: getError } = await supabase.auth.admin.getUserById(userId);
-      if (getError || !targetUser?.user) {
-        return jsonResponse({ success: false, error: 'Usuário não encontrado' }, 404);
-      }
-
-      if (targetUser.user.user_metadata?.company_id !== callerCompanyId) {
-        return jsonResponse({ success: false, error: 'Acesso negado: Usuário pertence a outra empresa' }, 403);
-      }
-
-      const { error } = await supabase.auth.admin.deleteUser(userId);
-
-      if (error) {
-        return jsonResponse({ success: false, error: error.message }, 400);
-      }
-
-      return jsonResponse({ success: true });
+      return respond({ success: true });
     }
 
-    // LIST USERS
-    if (action === 'list') {
-      let filteredUsers: any[] = [];
-      let page = 1;
-      const perPage = 100;
+    return fail(`Ação desconhecida: "${action}"`);
 
-      while (true) {
-        const { data, error } = await supabase.auth.admin.listUsers({ page, perPage });
-        if (error) {
-          return jsonResponse({ success: false, error: error.message }, 400);
-        }
-
-        const users = (data?.users || [])
-          .filter((u: any) => u.user_metadata?.company_id === callerCompanyId) // 🔒 Filtro por empresa
-          .map((u: any) => ({
-            id: u.id,
-            email: u.email,
-            phone: u.phone,
-            first_name: u.user_metadata?.first_name || u.email?.split('@')[0],
-            last_name: u.user_metadata?.last_name || '',
-            cpf: u.user_metadata?.cpf || '',
-            role: u.user_metadata?.role || 'Operador',
-            permissions: u.user_metadata?.permissions || [],
-            active: u.user_metadata?.active !== undefined ? u.user_metadata.active : true,
-            allow_recovery: u.user_metadata?.allow_recovery !== undefined ? u.user_metadata.allow_recovery : true,
-            last_sign_in_at: u.last_sign_in_at,
-            created_at: u.created_at
-          }));
-
-        filteredUsers = [...filteredUsers, ...users];
-
-        if (data?.users.length < perPage) break;
-        page++;
-      }
-
-      return jsonResponse({ success: true, users: filteredUsers });
-    }
-
-    return jsonResponse({ success: false, error: 'Invalid action' }, 400);
-  } catch (err) {
-    console.error('❌ UNHANDLED ERROR in manage-users:', err);
-    return jsonResponse({ success: false, error: err instanceof Error ? err.message : 'Internal server error' }, 500);
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error('[manage-users] erro interno:', msg);
+    return fail(`Erro interno: ${msg}`, 500);
   }
 });

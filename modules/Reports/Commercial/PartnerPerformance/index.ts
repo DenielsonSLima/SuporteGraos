@@ -1,8 +1,7 @@
 
 import { BarChart2 } from 'lucide-react';
 import { ReportModule } from '../../types';
-import { purchaseService } from '../../../../services/purchaseService';
-import { salesService } from '../../../../services/salesService';
+import { financialIntegrationService } from '../../../../services/financialIntegrationService';
 import Template from './Template';
 import PdfDocument from './PdfDocument';
 import DefaultFilters from '../../components/DefaultFilters';
@@ -22,43 +21,45 @@ const partnerPerformanceReport: ReportModule = {
   },
   FilterComponent: DefaultFilters,
   fetchData: ({ startDate, endDate }) => {
-    // 1. Purchases
-    const purchases = purchaseService.getAll().filter(p => {
-        if (p.status === 'canceled') return false;
-        if (!startDate || !endDate) return true;
-        return p.date >= startDate && p.date <= endDate;
-    });
+    const filterByDate = (dateStr: string) => {
+      if (!startDate && !endDate) return true;
+      const d = new Date(dateStr).getTime();
+      const start = startDate ? new Date(startDate).getTime() : 0;
+      const end = endDate ? new Date(endDate).getTime() : Infinity;
+      return d >= start && d <= end;
+    };
 
-    // 2. Sales
-    const sales = salesService.getAll().filter(s => {
-        if (s.status === 'canceled') return false;
-        if (!startDate || !endDate) return true;
-        return s.date >= startDate && s.date <= endDate;
-    });
+    const purchaseFinancial = financialIntegrationService
+      .getPayables()
+      .filter((r) => r.subType === 'purchase_order')
+      .filter((r) => filterByDate(r.issueDate || r.dueDate));
+
+    const salesFinancial = financialIntegrationService
+      .getReceivables()
+      .filter((r) => r.subType === 'sales_order')
+      .filter((r) => filterByDate(r.issueDate || r.dueDate));
 
     // Grouping
     const partnerMap: Record<string, { name: string, type: string, volume: number, total: number, count: number }> = {};
 
-    // Process Purchases (Suppliers)
-    purchases.forEach(p => {
-        const key = `SUP-${p.partnerId}`;
-        if (!partnerMap[key]) partnerMap[key] = { name: p.partnerName, type: 'Fornecedor', volume: 0, total: 0, count: 0 };
-        
-        // Sum items volume (SC)
-        const vol = p.items.reduce((acc, i) => acc + i.quantity, 0);
-        partnerMap[key].volume += vol;
-        partnerMap[key].total += p.totalValue;
-        partnerMap[key].count += 1;
+    purchaseFinancial.forEach((record) => {
+      const key = `SUP-${record.entityName}`;
+      if (!partnerMap[key]) {
+        partnerMap[key] = { name: record.entityName, type: 'Fornecedor', volume: 0, total: 0, count: 0 };
+      }
+      partnerMap[key].volume += record.totalSc || record.weightSc || 0;
+      partnerMap[key].total += record.originalValue;
+      partnerMap[key].count += 1;
     });
 
-    // Process Sales (Customers)
-    sales.forEach(s => {
-        const key = `CUST-${s.customerId}`;
-        if (!partnerMap[key]) partnerMap[key] = { name: s.customerName, type: 'Cliente', volume: 0, total: 0, count: 0 };
-        
-        partnerMap[key].volume += (s.quantity || 0);
-        partnerMap[key].total += s.totalValue;
-        partnerMap[key].count += 1;
+    salesFinancial.forEach((record) => {
+      const key = `CUST-${record.entityName}`;
+      if (!partnerMap[key]) {
+        partnerMap[key] = { name: record.entityName, type: 'Cliente', volume: 0, total: 0, count: 0 };
+      }
+      partnerMap[key].volume += record.totalSc || record.weightSc || 0;
+      partnerMap[key].total += record.originalValue;
+      partnerMap[key].count += 1;
     });
 
     const rows = Object.values(partnerMap).sort((a, b) => b.total - a.total);

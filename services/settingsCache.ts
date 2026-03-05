@@ -1,5 +1,6 @@
 import { bankAccountService } from './bankAccountService';
 import { BankAccount } from '../modules/Financial/types';
+import { ledgerService } from './ledgerService';
 
 export type BankAccountWithBalance = BankAccount & { currentBalance: number };
 
@@ -33,14 +34,16 @@ export class SettingsCache {
   private static readonly TTL = 60_000; // 60 segundos
 
   private static calculateBalances(): BankAccountWithBalance[] {
-    // Importa financialService apenas quando necessário (lazy) para evitar ciclo
-    const { financialService } = require('./financialService');
-    return financialService.getBankAccountsWithBalances();
+    const accounts = ledgerService.getAll();
+    return accounts.map((acc: any) => ({
+      ...acc,
+      currentBalance: acc.currentBalance || 0
+    }));
   }
 
   private static load(): void {
     const startTime = performance.now();
-    
+
     this.cache = {
       bankAccounts: bankAccountService.getBankAccounts(),
       bankAccountsWithBalances: this.calculateBalances(),

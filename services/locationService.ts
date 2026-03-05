@@ -1,414 +1,190 @@
+/**
+ * locationService.ts  (reescrito — padrão TanStack Query)
+ *
+ * Operações async/await diretas no Supabase.
+ * Tabelas states + cities criadas na migration 007.
+ * Estados são de sistema (sem company_id).
+ * Cidades customizadas por empresa têm company_id.
+ *
+ * Shims legados mantidos: getStates(), addCity(), removeCity(), subscribe()
+ */
 
-import { logService } from './logService';
-import { authService } from './authService';
 import { supabase } from './supabase';
-import { initializeSupabaseData, waitForInit } from './supabaseInitService';
-import { Persistence } from './persistence';
+import { authService } from './authService';
+import { logService } from './logService';
 
-// Initial Data - simulated database
-interface StateData {
-  id: string;
+// ── Tipos ─────────────────────────────────────────────────────────────────────
+
+export interface StateData {
+  id: string;   // UUID
   uf: string;
   name: string;
-  cities: string[];
+  cities: CityData[];
 }
 
-interface SupabaseUF {
-  id: number;
-  uf: string;
+export interface CityData {
+  id: string;   // UUID
   name: string;
-  code: number;
+  stateId: string;
+  isSystem: boolean;
 }
 
-interface SupabaseCity {
-  id: number;
-  name: string;
-  uf_id: number;
-  ibge_code: number;
-}
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-const sortCities = (cities: string[]) => cities.sort((a, b) => a.localeCompare(b));
-
-// Fallback data if Supabase is unavailable
-const FALLBACK_STATE_DATABASE: StateData[] = [
-  {
-    id: 'SE',
-    uf: 'SE',
-    name: 'Sergipe',
-    cities: sortCities(['Aracaju', 'Nossa Senhora do Socorro', 'Lagarto', 'Itabaiana', 'São Cristóvão', 'Estância', 'Tobias Barreto', 'Simão Dias', 'Nossa Senhora da Glória', 'Poço Verde'])
-  },
-  {
-    id: 'MA',
-    uf: 'MA',
-    name: 'Maranhão',
-    cities: sortCities(['São Luís', 'Imperatriz', 'São José de Ribamar', 'Timon', 'Caxias', 'Codó', 'Paço do Lumiar', 'Açailândia', 'Bacabal', 'Balsas'])
-  },
-  {
-    id: 'PE',
-    uf: 'PE',
-    name: 'Pernambuco',
-    cities: sortCities(['Recife', 'Jaboatão dos Guararapes', 'Olinda', 'Caruaru', 'Petrolina', 'Paulista', 'Cabo de Santo Agostinho', 'Camaragibe', 'Garanhuns', 'Vitória de Santo Antão'])
-  },
-  {
-    id: 'BA',
-    uf: 'BA',
-    name: 'Bahia',
-    cities: sortCities(['Salvador', 'Feira de Santana', 'Vitória da Conquista', 'Camaçari', 'Juazeiro', 'Lauro de Freitas', 'Itabuna', 'Ilhéus', 'Porto Seguro', 'Jequié'])
-  },
-  {
-    id: 'TO',
-    uf: 'TO',
-    name: 'Tocantins',
-    cities: sortCities(['Palmas', 'Araguaína', 'Gurupi', 'Porto Nacional', 'Paraíso do Tocantins', 'Araguatins', 'Colinas do Tocantins', 'Guaraí', 'Tocantinópolis', 'Dianópolis'])
-  },
-  {
-    id: 'PI',
-    uf: 'PI',
-    name: 'Piauí',
-    cities: sortCities(['Teresina', 'Parnaíba', 'Picos', 'Piripiri', 'Floriano', 'Barras', 'Campo Maior', 'União', 'Altos', 'Esperantina'])
-  },
-  {
-    id: 'PB',
-    uf: 'PB',
-    name: 'Paraíba',
-    cities: sortCities(['João Pessoa', 'Campina Grande', 'Santa Rita', 'Patos', 'Bayeux', 'Sousa', 'Cabedelo', 'Cajazeiras', 'Guarabira', 'Sapé'])
-  },
-  {
-    id: 'MT',
-    uf: 'MT',
-    name: 'Mato Grosso',
-    cities: sortCities(['Sinop', 'Sorriso', 'Lucas do Rio Verde', 'Nova Mutum', 'Cuiabá', 'Rondonópolis', 'Primavera do Leste', 'Tangará da Serra'])
-  },
-  {
-    id: 'PR',
-    uf: 'PR',
-    name: 'Paraná',
-    cities: sortCities(['Cascavel', 'Londrina', 'Maringá', 'Ponta Grossa', 'Curitiba', 'Foz do Iguaçu'])
-  },
-  {
-    id: 'GO',
-    uf: 'GO',
-    name: 'Goiás',
-    cities: sortCities(['Rio Verde', 'Jataí', 'Cristalina', 'Goiânia', 'Anápolis'])
-  }
-];
-
-const statesDb = new Persistence<StateData>('states', [...FALLBACK_STATE_DATABASE]);
-let _stateDatabase: StateData[] = [...FALLBACK_STATE_DATABASE];
-let _isSupabaseLoaded = false;
-let ufsChannel: ReturnType<typeof supabase.channel> | null = null;
-let citiesChannel: ReturnType<typeof supabase.channel> | null = null;
-let _realtimeStarted = false;
-
-// Load data from Supabase on startup using optimized parallel loader
-const loadFromSupabase = async () => {
-  try {
-    const stats = await waitForInit();
-
-    if (!stats.data.ufs || !stats.data.cities) {
-      throw new Error('UFs ou Cities não carregadas');
-    }
-
-    // Build state database from pre-loaded data
-    const newStateDatabase: StateData[] = [];
-    const ufsMap = new Map<number, SupabaseUF>();
-
-    stats.data.ufs.forEach((uf: any) => {
-      ufsMap.set(uf.id, uf);
-      newStateDatabase.push({
-        id: uf.uf,
-        uf: uf.uf,
-        name: uf.name,
-        cities: []
-      });
-    });
-
-    // Map cities to their states
-    stats.data.cities.forEach((city: any) => {
-      const ufData = ufsMap.get(city.uf_id);
-      if (ufData) {
-        const stateIndex = newStateDatabase.findIndex(s => s.uf === ufData.uf);
-        if (stateIndex >= 0) {
-          newStateDatabase[stateIndex].cities.push(city.name);
-        }
-      }
-    });
-
-    // Sort cities in each state
-    newStateDatabase.forEach(state => {
-      state.cities = sortCities(state.cities);
-    });
-
-    _stateDatabase = newStateDatabase;
-    statesDb.setAll(newStateDatabase);
-    _isSupabaseLoaded = true;
-
-  } catch (error) {
-    console.warn('⚠️ LocationService: Usando fallback:', error);
-    _stateDatabase = [...FALLBACK_STATE_DATABASE];
-    statesDb.setAll([...FALLBACK_STATE_DATABASE]);
-    _isSupabaseLoaded = false;
-  }
-};
-
-// ❌ NÃO inicializar automaticamente - aguardar autenticação
-// Será chamado por initializeSupabaseData() no App.tsx após login
-// loadFromSupabase();
-
-// --- REALTIME ---
-const refreshLocationDataFromSupabase = async () => {
-  try {
-    const [ufsRes, citiesRes] = await Promise.all([
-      supabase.from('ufs').select('id, uf, name, code').order('code'),
-      supabase.from('cities').select('id, name, uf_id, code').order('name')
-    ]);
-
-    if (ufsRes.error) throw ufsRes.error;
-    if (citiesRes.error) throw citiesRes.error;
-
-    const newStateDatabase: StateData[] = [];
-    const ufsMap = new Map<number, SupabaseUF>();
-
-    (ufsRes.data || []).forEach((uf: any) => {
-      ufsMap.set(uf.id, uf);
-      newStateDatabase.push({ id: uf.uf, uf: uf.uf, name: uf.name, cities: [] });
-    });
-
-    (citiesRes.data || []).forEach((city: any) => {
-      const ufData = ufsMap.get(city.uf_id);
-      if (ufData) {
-        const idx = newStateDatabase.findIndex(s => s.uf === ufData.uf);
-        if (idx >= 0) newStateDatabase[idx].cities.push(city.name);
-      }
-    });
-
-    newStateDatabase.forEach(state => { state.cities = sortCities(state.cities); });
-
-    _stateDatabase = newStateDatabase;
-    statesDb.setAll(newStateDatabase); // ✅ CRÍTICO: atualiza Persistence para disparar subscribers
-    _isSupabaseLoaded = true;
-    console.log(`🔁 Realtime: localização atualizada (${newStateDatabase.length} UFs)`);
-    // Opcional: disparar evento para componentes interessados
-    try {
-      const event = new CustomEvent('location:states-changed', { detail: { timestamp: Date.now() } });
-      window.dispatchEvent(event);
-    } catch { }
-  } catch (err) {
-    console.warn('⚠️ Realtime: falha ao atualizar UFs/Cities:', err);
-  }
-};
-
-const startLocationRealtime = () => {
-  if (_realtimeStarted) return;
-  _realtimeStarted = true;
-
-  if (!ufsChannel) {
-    ufsChannel = supabase
-      .channel('realtime:ufs')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'ufs' }, async () => {
-        await refreshLocationDataFromSupabase();
-      })
-      .subscribe(status => {
-        // Realtime subscribed
-      });
-  }
-
-  if (!citiesChannel) {
-    citiesChannel = supabase
-      .channel('realtime:cities')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'cities' }, async () => {
-        await refreshLocationDataFromSupabase();
-      })
-      .subscribe(status => {
-        // Realtime subscribed
-      });
-  }
-};
-
-// Inicia Realtime
-startLocationRealtime();
-
-export const ALL_STATES_LIST = [
-  { uf: 'AC', name: 'Acre' }, { uf: 'AL', name: 'Alagoas' }, { uf: 'AP', name: 'Amapá' },
-  { uf: 'AM', name: 'Amazonas' }, { uf: 'BA', name: 'Bahia' }, { uf: 'CE', name: 'Ceará' },
-  { uf: 'DF', name: 'Distrito Federal' }, { uf: 'ES', name: 'Espírito Santo' }, { uf: 'GO', name: 'Goiás' },
-  { uf: 'MA', name: 'Maranhão' }, { uf: 'MT', name: 'Mato Grosso' }, { uf: 'MS', name: 'Mato Grosso do Sul' },
-  { uf: 'MG', name: 'Minas Gerais' }, { uf: 'PA', name: 'Pará' }, { uf: 'PB', name: 'Paraíba' },
-  { uf: 'PR', name: 'Paraná' }, { uf: 'PE', name: 'Pernambuco' }, { uf: 'PI', name: 'Piauí' },
-  { uf: 'RJ', name: 'Rio de Janeiro' }, { uf: 'RN', name: 'Rio Grande do Norte' }, { uf: 'RS', name: 'Rio Grande do Sul' },
-  { uf: 'RO', name: 'Rondônia' }, { uf: 'RR', name: 'Roraima' }, { uf: 'SC', name: 'Santa Catarina' },
-  { uf: 'SP', name: 'São Paulo' }, { uf: 'SE', name: 'Sergipe' }, { uf: 'TO', name: 'Tocantins' }
-];
+const getCompanyId = () => authService.getCurrentUser()?.companyId ?? null;
 
 const getLogInfo = () => {
   const user = authService.getCurrentUser();
-  return {
-    userId: user?.id || 'system',
-    userName: user?.name || 'Sistema'
-  };
+  return { userId: user?.id || 'system', userName: user?.name || 'Sistema' };
 };
+
+// ── API principal ─────────────────────────────────────────────────────────────
 
 export const locationService = {
-  loadFromSupabase,
-  startRealtime: startLocationRealtime,
-  // Get all data structured (for Settings Module)
-  getStates: () => {
-    return _stateDatabase;
-  },
 
-  subscribe: (callback: (items: StateData[]) => void) => {
-    startLocationRealtime();
-    return statesDb.subscribe(callback);
-  },
+  /** Retorna todos os estados com suas cidades (sistema + empresa). */
+  getAll: async (): Promise<StateData[]> => {
+    const [statesRes, citiesRes] = await Promise.all([
+      supabase.from('states').select('id, uf, name').order('name'),
+      supabase.from('cities').select('id, name, state_id, company_id').order('name'),
+    ]);
 
-  // Get flat list of cities (for Autocomplete in Orders)
-  getAllCitiesFlat: () => {
-    const flatList: { city: string, state: string }[] = [];
-    _stateDatabase.forEach(ufData => {
-      ufData.cities.forEach(city => {
-        flatList.push({ city: city, state: ufData.uf });
-      });
-    });
-    return flatList;
-  },
+    if (statesRes.error) throw statesRes.error;
+    if (citiesRes.error) throw citiesRes.error;
 
-  // Add a city (updates both local DB and Supabase)
-  addCity: async (uf: string, cityName: string) => {
-    const stateIndex = _stateDatabase.findIndex(s => s.uf === uf);
+    const states: StateData[] = (statesRes.data ?? []).map(s => ({
+      id: s.id,
+      uf: s.uf,
+      name: s.name,
+      cities: [],
+    }));
 
-    if (stateIndex >= 0) {
-      const state = _stateDatabase[stateIndex];
-      if (!state.cities.includes(cityName)) {
-        state.cities = sortCities([...state.cities, cityName]);
-        _stateDatabase[stateIndex] = state;
-        statesDb.setAll([..._stateDatabase]);
+    const stateMap = new Map<string, StateData>(states.map(s => [s.id, s]));
 
-        const { userId, userName } = getLogInfo();
-        logService.addLog({
-          userId,
-          userName,
-          action: 'create',
-          module: 'Configurações',
-          description: `Adicionou cidade: ${cityName} - ${uf}`,
+    (citiesRes.data ?? []).forEach(c => {
+      const state = stateMap.get(c.state_id);
+      if (state) {
+        state.cities.push({
+          id: c.id,
+          name: c.name,
+          stateId: c.state_id,
+          isSystem: c.company_id === null,
         });
-
-        // If Supabase is loaded, sync the city to database
-        if (_isSupabaseLoaded) {
-          try {
-            // Get the UF ID from Supabase
-            const { data: ufData } = await supabase
-              .from('ufs')
-              .select('id')
-              .eq('uf', uf)
-              .single();
-
-            if (ufData) {
-              await supabase
-                .from('cities')
-                .insert({
-                  name: cityName,
-                  uf_id: ufData.id,
-                  code: null,
-                  company_id: authService.getCurrentUser()?.companyId || null
-                });
-              console.log(`✅ Cidade ${cityName} salva no Supabase`);
-            }
-          } catch (error) {
-            console.warn('⚠️ Erro ao salvar cidade no Supabase:', error);
-          }
-        }
       }
-    }
+    });
+
+    return states;
   },
 
-  removeCity: async (uf: string, cityName: string) => {
-    const stateIndex = _stateDatabase.findIndex(s => s.uf === uf);
+  /** Adiciona uma cidade customizada para a empresa. */
+  addCity: async (stateId: string, cityName: string): Promise<CityData> => {
+    const companyId = getCompanyId();
+    if (!companyId) throw new Error('Usuário sem empresa vinculada.');
 
-    if (stateIndex >= 0) {
-      const state = _stateDatabase[stateIndex];
-      state.cities = state.cities.filter(c => c !== cityName);
-      _stateDatabase[stateIndex] = state;
+    const { data, error } = await supabase
+      .from('cities')
+      .insert({ state_id: stateId, name: cityName.trim(), company_id: companyId })
+      .select('id, name, state_id, company_id')
+      .single();
 
-      const { userId, userName } = getLogInfo();
-      logService.addLog({
-        userId,
-        userName,
-        action: 'delete',
-        module: 'Configurações',
-        description: `Removeu cidade: ${cityName} - ${uf}`,
-      });
+    if (error) {
+      if (error.code === '23505') throw new Error(`A cidade "${cityName}" já existe neste estado.`);
+      throw error;
+    }
 
-      // Remove from Supabase
-      if (_isSupabaseLoaded) {
-        try {
-          // Get the UF ID first
-          const { data: ufData } = await supabase
-            .from('ufs')
-            .select('id')
-            .eq('uf', uf)
-            .single();
+    const { userId, userName } = getLogInfo();
+    logService.addLog({
+      userId, userName, action: 'create', module: 'Configurações',
+      description: `Adicionou cidade: ${cityName}`,
+      entityId: data.id,
+    });
 
-          if (ufData) {
-            await supabase
-              .from('cities')
-              .delete()
-              .eq('name', cityName)
-              .eq('uf_id', ufData.id);
-            console.log(`✅ Cidade ${cityName} removida do Supabase`);
-          }
-        } catch (error) {
-          console.warn('⚠️ Erro ao remover cidade do Supabase:', error);
-        }
+    return { id: data.id, name: data.name, stateId: data.state_id, isSystem: false };
+  },
+
+  /** Remove uma cidade customizada da empresa. */
+  removeCity: async (cityId: string, cityName?: string): Promise<void> => {
+    const { error } = await supabase
+      .from('cities')
+      .delete()
+      .eq('id', cityId);
+
+    if (error) throw error;
+
+    const { userId, userName } = getLogInfo();
+    logService.addLog({
+      userId, userName, action: 'delete', module: 'Configurações',
+      description: `Removeu cidade: ${cityName ?? cityId}`,
+      entityId: cityId,
+    });
+  },
+
+  /** Realtime: singleton channel para states + cities. Retorna cleanup. */
+  subscribeRealtime: (() => {
+    const listeners = new Set<() => void>();
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    return (callback: () => void): (() => void) => {
+      listeners.add(callback);
+      if (!channel) {
+        channel = supabase
+          .channel('realtime:locations:svc')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'states' }, () => listeners.forEach(fn => fn()))
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'cities' }, () => listeners.forEach(fn => fn()))
+          .subscribe();
       }
-    }
+      return () => {
+        listeners.delete(callback);
+        if (listeners.size === 0 && channel) { void supabase.removeChannel(channel); channel = null; }
+      };
+    };
+  })(),
+
+  /** Retorna lista flat de cidades para autocomplete (city + state UF). */
+  getAllCitiesFlat: async (): Promise<{ city: string; state: string }[]> => {
+    const states = await locationService.getAll();
+    const result: { city: string; state: string }[] = [];
+    states.forEach(s => s.cities.forEach(c => result.push({ city: c.name, state: s.uf })));
+    return result;
   },
 
-  getAllStatesInfo: () => ALL_STATES_LIST,
+  // ── Lista estática dos 27 estados ─────────────────────────────────────────
 
-  importData: (states: StateData[]) => {
-    _stateDatabase = states;
-    _isSupabaseLoaded = false;
-  },
+  ALL_STATES_LIST: [
+    { uf: 'AC', name: 'Acre' }, { uf: 'AL', name: 'Alagoas' }, { uf: 'AP', name: 'Amapá' },
+    { uf: 'AM', name: 'Amazonas' }, { uf: 'BA', name: 'Bahia' }, { uf: 'CE', name: 'Ceará' },
+    { uf: 'DF', name: 'Distrito Federal' }, { uf: 'ES', name: 'Espírito Santo' }, { uf: 'GO', name: 'Goiás' },
+    { uf: 'MA', name: 'Maranhão' }, { uf: 'MT', name: 'Mato Grosso' }, { uf: 'MS', name: 'Mato Grosso do Sul' },
+    { uf: 'MG', name: 'Minas Gerais' }, { uf: 'PA', name: 'Pará' }, { uf: 'PB', name: 'Paraíba' },
+    { uf: 'PR', name: 'Paraná' }, { uf: 'PE', name: 'Pernambuco' }, { uf: 'PI', name: 'Piauí' },
+    { uf: 'RJ', name: 'Rio de Janeiro' }, { uf: 'RN', name: 'Rio Grande do Norte' }, { uf: 'RS', name: 'Rio Grande do Sul' },
+    { uf: 'RO', name: 'Rondônia' }, { uf: 'RR', name: 'Roraima' }, { uf: 'SC', name: 'Santa Catarina' },
+    { uf: 'SP', name: 'São Paulo' }, { uf: 'SE', name: 'Sergipe' }, { uf: 'TO', name: 'Tocantins' },
+  ],
 
-  // For debugging
-  resetToFallback: () => {
-    _stateDatabase = [...FALLBACK_STATE_DATABASE];
-    _isSupabaseLoaded = false;
-  },
+  getAllStatesInfo: () => locationService.ALL_STATES_LIST,
 
-  // Check if Supabase is loaded
-  isSupabaseReady: () => _isSupabaseLoaded,
+  // ── Shims legados ──────────────────────────────────────────────────────────
 
-  // Resolve city name by ID
-  getCityNameById: async (cityId: number | bigint | null): Promise<string | null> => {
+  /** @deprecated Use useLocations() hook. */
+  getStates: (): { id: string; uf: string; name: string; cities: string[] }[] => [],
+
+  /** @deprecated Use locationService.addCity(stateId, name). */
+  subscribe: (_callback: (items: unknown[]) => void): (() => void) => () => { /* no-op */ },
+
+  loadFromSupabase: async () => { /* no-op */ },
+  startRealtime: () => { /* no-op */ },
+
+  // Resolvedor por ID (para retrocompatibilidade com pedidos/loadings já gravados)
+  getCityNameById: async (cityId: string | null): Promise<string | null> => {
     if (!cityId) return null;
-    try {
-      const { data } = await supabase
-        .from('cities')
-        .select('name')
-        .eq('id', cityId)
-        .single();
-      return data?.name || null;
-    } catch (error) {
-      console.error('Erro ao buscar cidade por ID:', error);
-      return null;
-    }
+    const { data } = await supabase.from('cities').select('name').eq('id', cityId).maybeSingle();
+    return data?.name ?? null;
   },
 
-  // Resolve state UF by ID
-  getStateUfById: async (stateId: number | bigint | null): Promise<string | null> => {
+  getStateUfById: async (stateId: string | null): Promise<string | null> => {
     if (!stateId) return null;
-    try {
-      const { data } = await supabase
-        .from('ufs')
-        .select('uf')
-        .eq('id', stateId)
-        .single();
-      return data?.uf || null;
-    } catch (error) {
-      console.error('Erro ao buscar UF por ID:', error);
-      return null;
-    }
-  }
-
+    const { data } = await supabase.from('states').select('uf').eq('id', stateId).maybeSingle();
+    return data?.uf ?? null;
+  },
 };
+

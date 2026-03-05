@@ -33,7 +33,7 @@ const HistoryGroupedList: React.FC<Props> = ({ records, groupBy }) => {
       grouped[key].total += isCredit ? settledVal : -settledVal;
     });
 
-    return Object.values(grouped).sort((a, b) => b.total - a.total); 
+    return Object.values(grouped).sort((a, b) => b.total - a.total);
   }, [records, groupBy]);
 
   return (
@@ -42,22 +42,21 @@ const HistoryGroupedList: React.FC<Props> = ({ records, groupBy }) => {
         <div key={group.title} className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
           <div className="bg-slate-50 px-5 py-3 border-b border-slate-100 flex justify-between items-center">
             <h3 className="font-bold text-slate-800 capitalize flex items-center gap-2">
-              {groupBy === 'month' ? <Calendar size={18} className="text-slate-400"/> : <DollarSign size={18} className="text-slate-400"/>}
+              {groupBy === 'month' ? <Calendar size={18} className="text-slate-400" /> : <DollarSign size={18} className="text-slate-400" />}
               {group.title}
             </h3>
             <div className={`text-sm font-bold ${group.total >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
               Saldo Líquido: {currency(group.total)}
             </div>
           </div>
-          
+
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm text-slate-600">
               <thead className="bg-white text-xs uppercase text-slate-400 font-medium">
                 <tr>
                   <th className="px-5 py-2">Data</th>
                   <th className="px-5 py-2">Descrição</th>
-                  <th className="px-5 py-2 text-right">Valor Original</th>
-                  <th className="px-5 py-2 text-right">Valor Liquidado</th>
+                  <th className="px-5 py-2 text-right">Valor Movimentado</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
@@ -71,12 +70,11 @@ const HistoryGroupedList: React.FC<Props> = ({ records, groupBy }) => {
                       <td className="px-5 py-2">{date(record.issueDate)}</td>
                       <td className="px-5 py-2">
                         <div className="flex items-center gap-2">
-                            <span className="font-medium text-slate-700">{record.description}</span>
-                            {isAdjustment && <span className="bg-amber-100 text-amber-700 text-[8px] font-black px-1.5 py-0.5 rounded uppercase flex items-center gap-0.5"><MinusCircle size={8}/> Abatimento</span>}
+                          <span className="font-medium text-slate-700">{record.description}</span>
+                          {isAdjustment && <span className="bg-amber-100 text-amber-700 text-[8px] font-black px-1.5 py-0.5 rounded uppercase flex items-center gap-0.5"><MinusCircle size={8} /> Abatimento</span>}
                         </div>
                         {groupBy === 'month' && <span className="block text-xs text-slate-400">{record.entityName}</span>}
                       </td>
-                      <td className="px-5 py-2 text-right text-slate-400">{currency(record.originalValue)}</td>
                       <td className={`px-5 py-2 text-right font-bold flex items-center justify-end gap-1 ${isCredit ? 'text-emerald-700' : 'text-rose-700'}`}>
                         {isCredit ? <ArrowUpRight size={12} /> : <ArrowDownLeft size={12} />}
                         {currency(settledValue)}

@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Calendar, Truck } from 'lucide-react';
-import { loadingService } from '../../../../services/loadingService';
+import { financialIntegrationService } from '../../../../services/financialIntegrationService';
 
 interface Props {
   filters: any;
@@ -9,9 +9,8 @@ interface Props {
 }
 
 const Filters: React.FC<Props> = ({ filters, onChange }) => {
-  // Obtém lista única de transportadoras dos carregamentos
-  const loadings = loadingService.getAll();
-  const carriers = Array.from(new Set(loadings.map(l => l.carrierName))).sort();
+  const freightPayables = financialIntegrationService.getPayables().filter((record) => record.subType === 'freight');
+  const carriers = Array.from(new Set(freightPayables.map((record) => record.entityName).filter(Boolean))).sort();
 
   return (
     <div className="space-y-5 animate-in slide-in-from-left-2">

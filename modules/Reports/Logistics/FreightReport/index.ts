@@ -1,7 +1,7 @@
 
 import { Truck } from 'lucide-react';
 import { ReportModule } from '../../types';
-import { loadingService } from '../../../../services/loadingService';
+import { financialIntegrationService } from '../../../../services/financialIntegrationService';
 import Template from './Template';
 import PdfDocument from './PdfDocument';
 import Filters from './Filters';
@@ -22,17 +22,18 @@ const freightReport: ReportModule = {
   },
   FilterComponent: Filters,
   fetchData: ({ startDate, endDate, carrierName }) => {
-    const fmt = (v: number) => new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(v);
-    const fmtInt = (v: number) => new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 }).format(v);
-    const all = loadingService.getAll();
-    const records = all.filter(l => {
+    const records = financialIntegrationService
+      .getPayables()
+      .filter((r) => r.subType === 'freight')
+      .filter((r) => {
+      const dateRef = r.issueDate || r.dueDate;
       if (startDate && endDate) {
-        const d = new Date(l.date).getTime();
+        const d = new Date(dateRef).getTime();
         const start = new Date(startDate).getTime();
         const end = new Date(endDate).getTime();
         if (d < start || d > end) return false;
       }
-      if (carrierName && l.carrierName !== carrierName) return false;
+      if (carrierName && r.entityName !== carrierName) return false;
       return true;
     });
 
@@ -52,25 +53,26 @@ const freightReport: ReportModule = {
         { header: 'Base Cálculo', accessor: 'weightBase', align: 'center' },
         { header: 'Valor Frete', accessor: 'value', format: 'currency', align: 'right' }
       ],
-      rows: records.map(l => {
-        const usaDestino = l.unloadWeightKg && l.unloadWeightKg > 0;
+      rows: records.map(r => {
+        const weightKg = r.weightKg || 0;
+        const freightPerTon = weightKg > 0 ? r.originalValue / (weightKg / 1000) : 0;
         return {
-          date: l.date,
-          carrier: l.carrierName,
-          driver: l.driverName,
-          origin: l.supplierName,
-          destination: l.customerName,
-          freightPerTon: l.freightPricePerTon || 0,
-          weightOrigin: l.weightKg,
-          weightDest: l.unloadWeightKg || 0,
-          weightBase: usaDestino ? 'Destino' : 'Origem',
-          value: l.totalFreightValue
+          date: r.issueDate || r.dueDate,
+          carrier: r.entityName,
+          driver: r.driverName || '-',
+          origin: '-',
+          destination: '-',
+          freightPerTon,
+          weightOrigin: weightKg,
+          weightDest: 0,
+          weightBase: 'Origem',
+          value: r.originalValue
         };
       }),
       summary: [
-        { label: 'Total Fretes (R$)', value: records.reduce((a,b) => a + b.totalFreightValue, 0), format: 'currency' },
-        { label: 'Total Volume Origem (Ton)', value: records.reduce((a,b) => a + b.weightKg, 0) / 1000, format: 'number' },
-        { label: 'Total Quebra (Kg)', value: records.reduce((a,b) => a + (b.breakageKg || 0), 0), format: 'number' }
+        { label: 'Total Fretes (R$)', value: records.reduce((a,b) => a + b.originalValue, 0), format: 'currency' },
+        { label: 'Total Volume Origem (Ton)', value: records.reduce((a,b) => a + (b.weightKg || 0), 0) / 1000, format: 'number' },
+        { label: 'Total Quebra (Kg)', value: 0, format: 'number' }
       ]
     };
   },

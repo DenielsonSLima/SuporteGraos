@@ -1,7 +1,10 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, Save, Calendar, DollarSign, Wallet, FileText, Tag, CheckSquare, Square, ArrowDown, TrendingUp } from 'lucide-react';
-import { financialService, ExpenseCategory, BankAccountWithBalance } from '../../../../../services/financialService';
+import type { ExpenseCategory } from '../../../../../services/expenseCategoryService';
+import type { Account } from '../../../../../services/accountsService';
+import { useAccounts } from '../../../../../hooks/useAccounts';
+import { useExpenseCategories } from '../../../../../hooks/useExpenseCategories';
 import { getLocalDateString } from '../../../../../utils/dateUtils';
 import { useToast } from '../../../../../contexts/ToastContext';
 
@@ -13,8 +16,13 @@ interface Props {
 
 const ExpenseFormModal: React.FC<Props> = ({ isOpen, onClose, onSave }) => {
   const { addToast } = useToast();
-  const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
-  const [bankAccounts, setBankAccounts] = useState<BankAccountWithBalance[]>([]);
+  const { data: expenseCategories = [] } = useExpenseCategories();
+
+  const { data: allAccounts = [] } = useAccounts();
+  const bankAccounts = useMemo(() =>
+    allAccounts.filter((a: Account) => a.is_active !== false).sort((a: Account, b: Account) => a.account_name.localeCompare(b.account_name)),
+    [allAccounts]
+  );
   
   // Estados de Seleção em Cascata
   const [selectedType, setSelectedType] = useState<'variable' | null>('variable');
@@ -39,38 +47,8 @@ const ExpenseFormModal: React.FC<Props> = ({ isOpen, onClose, onSave }) => {
         deductFromPartner: true
       });
       setSelectedType('variable'); 
-      
-      try {
-        const sortedAccounts = financialService.getBankAccountsWithBalances()
-          .filter(acc => acc.active !== false)
-          .sort((a, b) => a.bankName.localeCompare(b.bankName));
-        setBankAccounts(sortedAccounts);
-        
-        const categories = financialService.getExpenseCategories();
-        setExpenseCategories(categories || []);
-      } catch (err) {
-        console.error('Erro ao carregar dados do modal de despesa:', err);
-        addToast('error', 'Erro ao Carregar', 'Não foi possível carregar categorias e contas.');
-      }
     }
   }, [isOpen]);
-
-  // Listener para atualizar saldos em real-time quando transações mudam
-  useEffect(() => {
-    const handleTransactionChange = () => {
-      try {
-        const sortedAccounts = financialService.getBankAccountsWithBalances()
-          .filter(acc => acc.active !== false)
-          .sort((a, b) => a.bankName.localeCompare(b.bankName));
-        setBankAccounts(sortedAccounts);
-      } catch (err) {
-        console.error('Erro ao atualizar saldos:', err);
-      }
-    };
-
-    window.addEventListener('financial:transaction-changed', handleTransactionChange);
-    return () => window.removeEventListener('financial:transaction-changed', handleTransactionChange);
-  }, []);
 
   const filteredSubtypes = useMemo(() => {
     if (!selectedType) return [];
@@ -85,7 +63,7 @@ const ExpenseFormModal: React.FC<Props> = ({ isOpen, onClose, onSave }) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(normalized);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.value || !formData.accountId || !formData.expenseSubtypeName) {
         addToast('warning', 'Campos Obrigatórios', 'Preencha valor, conta e tipo de despesa.');
@@ -100,11 +78,12 @@ const ExpenseFormModal: React.FC<Props> = ({ isOpen, onClose, onSave }) => {
       date: formData.date,
       value: parseFloat(formData.value),
       accountId: formData.accountId,
-      accountName: account ? `${account.bankName} - ${account.owner}` : 'Caixa Central',
+      accountName: account ? account.account_name : 'Caixa Central',
       notes: finalNotes,
       deductFromPartner: formData.deductFromPartner,
       type: 'expense'
     });
+
     onClose();
   };
 
@@ -176,7 +155,7 @@ const ExpenseFormModal: React.FC<Props> = ({ isOpen, onClose, onSave }) => {
                 <option value="">Selecione o Banco...</option>
                 {bankAccounts.map(acc => (
                   <option key={acc.id} value={acc.id}>
-                    {acc.bankName} - {acc.owner} (Saldo: {formatBRL(acc.currentBalance)})
+                    {acc.account_name} (Saldo: {formatBRL(acc.balance)})
                   </option>
                 ))}
             </select>

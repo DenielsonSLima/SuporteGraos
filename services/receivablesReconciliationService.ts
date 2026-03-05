@@ -1,6 +1,7 @@
 import { receivablesService, Receivable } from './financial/receivablesService';
 import { salesService } from './salesService';
 import { standaloneRecordsService } from './standaloneRecordsService';
+import { isSqlCanonicalOpsEnabled, sqlCanonicalOpsLog } from './sqlCanonicalOps';
 
 let hasRun = false;
 let hasRunFromOrders = false;
@@ -25,6 +26,11 @@ const makeTxKey = (tx: { date?: string; value?: number; discountValue?: number; 
 };
 
 export const reconcileReceivablesFromHistory = async () => {
+  if (isSqlCanonicalOpsEnabled()) {
+    sqlCanonicalOpsLog('reconcileReceivablesFromHistory ignorado: SQL canônico ativo');
+    return;
+  }
+
   if (hasRun) return;
   hasRun = true;
 
@@ -129,6 +135,11 @@ export const reconcileReceivablesFromHistory = async () => {
 };
 
 export const reconcileReceivablesFromOrders = async () => {
+  if (isSqlCanonicalOpsEnabled()) {
+    sqlCanonicalOpsLog('reconcileReceivablesFromOrders ignorado: SQL canônico ativo');
+    return;
+  }
+
   if (hasRunFromOrders) return;
   hasRunFromOrders = true;
 

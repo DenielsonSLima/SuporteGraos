@@ -23,7 +23,7 @@ export class Persistence<T extends { id: string }> {
             this.notify();
           }
         } catch (err) {
-          console.error(`Error handling storage event for ${this.key}`, err);
+          console.warn(`[Persistence] Erro ao sincronizar storage '${this.key}':`, err);
         }
       });
     }
@@ -39,7 +39,7 @@ export class Persistence<T extends { id: string }> {
         this.save();
       }
     } catch (e) {
-      console.error(`Error loading ${this.key}`, e);
+      console.warn(`[Persistence] Falha ao carregar '${this.key}' do localStorage, usando dados em memória:`, e);
       this.inMemoryData = [];
     }
   }
@@ -52,7 +52,7 @@ export class Persistence<T extends { id: string }> {
       }
       this.notify();
     } catch (e) {
-      console.error(`Error saving ${this.key}. LocalStorage might be full.`, e);
+      console.warn(`[Persistence] Falha ao salvar '${this.key}' no localStorage (quota excedida?):`, e);
     }
   }
 

@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, DollarSign, Calendar, Wallet, FileText, CheckCircle2, ArrowDown, MinusCircle, Calculator, TrendingUp } from 'lucide-react';
-import { FinancialRecord, BankAccount } from '../../types';
-import { financialService, BankAccountWithBalance } from '../../../../services/financialService';
+import { FinancialRecord } from '../../types';
+import type { Account } from '../../../../services/accountsService';
+import { useAccounts } from '../../../../hooks/useAccounts';
 import { getLocalDateString } from '../../../../utils/dateUtils';
 import { useToast } from '../../../../contexts/ToastContext';
 
@@ -30,7 +31,12 @@ interface Props {
 
 const FinancialPaymentModal: React.FC<Props> = ({ record, bulkTotal, bulkCount, isOpen, onClose, onConfirm, initialData }) => {
   const { addToast } = useToast();
-  
+
+  // Contas bancárias via TanStack Query (cache + realtime)
+  const { data: rawAccounts = [] } = useAccounts();
+  const bankAccounts = rawAccounts
+    .filter(acc => acc.is_active !== false)
+    .sort((a, b) => a.account_name.localeCompare(b.account_name));
   const [displayAmount, setDisplayAmount] = useState('');
   const [numericAmount, setNumericAmount] = useState(0);
   const [displayDiscount, setDisplayDiscount] = useState('');
@@ -39,9 +45,8 @@ const FinancialPaymentModal: React.FC<Props> = ({ record, bulkTotal, bulkCount, 
   const [date, setDate] = useState(getLocalDateString());
   const [accountId, setAccountId] = useState('');
   const [notes, setNotes] = useState('');
-  const [bankAccounts, setBankAccounts] = useState<BankAccountWithBalance[]>([]);
 
-  const debtTotal = bulkTotal || (record ? (record.originalValue - record.paidValue - (record.discountValue || 0)) : 0);
+  const debtTotal = bulkTotal || (record ? (record.remainingValue || 0) : 0);
   const isReceipt = record?.subType === 'sales_order' || record?.subType === 'receipt' || record?.category === 'Venda de Ativo';
 
   const formatBRL = (val: number) => {
@@ -61,12 +66,6 @@ const FinancialPaymentModal: React.FC<Props> = ({ record, bulkTotal, bulkCount, 
       setDate(initialData?.date?.split('T')[0] || getLocalDateString());
       setNotes(initialData?.notes || '');
       setAccountId(initialData?.accountId || '');
-      
-      // Carrega contas com saldo real
-      setBankAccounts(financialService.getBankAccountsWithBalances()
-        .filter(acc => acc.active !== false)
-        .sort((a, b) => a.bankName.localeCompare(b.bankName))
-      );
     }
   }, [isOpen, debtTotal, initialData]);
 
@@ -97,7 +96,7 @@ const FinancialPaymentModal: React.FC<Props> = ({ record, bulkTotal, bulkCount, 
       amount: numericAmount,
       discount: numericDiscount,
       accountId: accountId || 'discount_virtual',
-      accountName: selectedAccount?.bankName || 'ABATIMENTO',
+      accountName: selectedAccount?.account_name || 'ABATIMENTO',
       notes,
       isAsset: false,
       assetName: '',
@@ -158,7 +157,7 @@ const FinancialPaymentModal: React.FC<Props> = ({ record, bulkTotal, bulkCount, 
                 <option value="">Selecione o Banco...</option>
                 {bankAccounts.map(acc => (
                   <option key={acc.id} value={acc.id}>
-                    {acc.bankName} - {acc.owner} (Saldo: {formatBRL(acc.currentBalance)})
+                    {acc.account_name} (Saldo: {formatBRL(acc.balance)})
                   </option>
                 ))}
             </select>

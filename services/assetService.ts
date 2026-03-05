@@ -3,6 +3,7 @@ import { Persistence } from './persistence';
 import { logService } from './logService';
 import { authService } from './authService';
 import { supabase } from './supabase';
+import { isSqlCanonicalOpsEnabled, sqlCanonicalOpsLog } from './sqlCanonicalOps';
 
 const INITIAL_ASSETS: Asset[] = [];
 const db = new Persistence<Asset>('company_assets', INITIAL_ASSETS);
@@ -78,9 +79,14 @@ const mapAssetFromDb = (row: any): Asset => {
 
 const loadFromSupabase = async () => {
   if (isLoaded) return;
+
   try {
     const user = authService.getCurrentUser();
     const companyId = user?.companyId;
+
+    if (!companyId) {
+      return;
+    }
 
     const { data, error } = await supabase
       .from('assets')
@@ -92,9 +98,8 @@ const loadFromSupabase = async () => {
     const mapped = (data || []).map(mapAssetFromDb);
     db.setAll(mapped);
     isLoaded = true;
-    console.log('🔄 Patrimônio sincronizando em tempo real...');
   } catch (error) {
-    console.error('❌ Erro ao carregar assets:', error);
+    console.error('[assetService] loadFromSupabase:', error);
   }
 };
 
@@ -120,7 +125,6 @@ const startRealtime = () => {
         db.delete(rec.id);
       }
 
-      console.log(`🔔 Realtime assets: ${payload.eventType}`);
     })
     .subscribe();
 };
@@ -131,18 +135,28 @@ const startRealtime = () => {
 
 const persistUpsert = async (asset: Asset) => {
   try {
-    const payload: any = mapAssetToDb(asset);
+    const user = authService.getCurrentUser();
+    const companyId = user?.companyId;
+
+    if (!companyId) {
+      return;
+    }
+
+    const payload: any = {
+      ...mapAssetToDb(asset),
+      company_id: companyId
+    };
+
     const isValidUuid = (v?: string) => !!v && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
     if (!isValidUuid(payload.id)) delete payload.id;
 
     const { error } = await supabase.from('assets').upsert(payload).select();
     if (error) {
-      console.error('Erro ao salvar asset no Supabase', error);
       return;
     }
     await loadFromSupabase();
   } catch (err) {
-    console.error('Erro inesperado ao salvar asset no Supabase', err);
+    console.error('[assetService] persistUpsert:', err);
   }
 };
 
@@ -151,7 +165,14 @@ const persistDelete = async (id: string) => {
     const { error } = await supabase.from('assets').delete().eq('id', id);
     if (error) console.error('Erro ao excluir asset no Supabase', error);
   } catch (err) {
-    console.error('Erro inesperado ao excluir asset no Supabase', err);
+    console.error('[assetService] persistDelete:', err);
+  }
+};
+
+const stopRealtime = () => {
+  if (realtimeChannel) {
+    supabase.removeChannel(realtimeChannel);
+    realtimeChannel = null;
   }
 };
 
@@ -170,6 +191,7 @@ export const assetService = {
 
   subscribe: (callback: (items: Asset[]) => void) => db.subscribe(callback),
   startRealtime,
+  stopRealtime,
 
   add: (asset: Asset) => {
     db.add(asset);
@@ -234,7 +256,7 @@ export const assetService = {
         const { error } = await supabase.from('assets').upsert(payload);
         if (error) console.error('Erro ao importar assets no Supabase', error);
       } catch (err) {
-        console.error('Erro inesperado ao importar assets no Supabase', err);
+        console.error('[assetService] importData:', err);
       }
     })();
   },
