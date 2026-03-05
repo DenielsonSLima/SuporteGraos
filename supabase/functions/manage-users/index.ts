@@ -68,8 +68,8 @@ serve(async (req: Request) => {
   }
 
   // 2. Env vars
-  const SUPABASE_URL     = Deno.env.get('SUPABASE_URL')!;
-  const ANON_KEY         = Deno.env.get('SUPABASE_ANON_KEY')!;
+  const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+  const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
   const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
   if (!SUPABASE_URL || !ANON_KEY || !SERVICE_ROLE_KEY) {
@@ -112,9 +112,9 @@ serve(async (req: Request) => {
     return fail('Usuário inativo', 403);
   }
 
-  const companyId  = profile.company_id as string;
+  const companyId = profile.company_id as string;
   const callerRole = (profile.role as string ?? '').toLowerCase();
-  const isAdmin    = ['admin', 'administrator', 'administrador'].includes(callerRole);
+  const isAdmin = ['admin', 'administrator', 'administrador'].includes(callerRole);
 
   if (!companyId) {
     return fail('Usuário sem empresa vinculada', 403);
@@ -140,10 +140,9 @@ serve(async (req: Request) => {
         return fail('Campos obrigatórios: firstName, lastName, email');
       }
 
-      // Gerar senha aleatória forte ou usar a fornecida
+      // Gerar senha temporária simples (6 dígitos) ou usar a fornecida
       const finalPassword: string = generatePassword
-        ? Math.random().toString(36).slice(2, 10) +
-          Math.random().toString(36).slice(2, 6).toUpperCase() + '1!'
+        ? Math.floor(100000 + Math.random() * 900000).toString()
         : (password as string | undefined) ?? '';
 
       if (!finalPassword) {
@@ -154,19 +153,20 @@ serve(async (req: Request) => {
 
       // a) Criar no Supabase Auth
       const { data: authData, error: authErr } = await adminClient.auth.admin.createUser({
-        email:         (email as string).toLowerCase().trim(),
-        password:      finalPassword,
+        email: (email as string).toLowerCase().trim(),
+        password: finalPassword,
         email_confirm: true,
         user_metadata: {
-          first_name:     firstName,
-          last_name:      lastName,
-          cpf:            cpf ?? '',
-          phone:          phone ?? '',
-          role:           roleNorm,
-          company_id:     companyId,
-          permissions:    permissions ?? [],
-          active:         active !== false,
+          first_name: firstName,
+          last_name: lastName,
+          cpf: cpf ?? '',
+          phone: phone ?? '',
+          role: roleNorm,
+          company_id: companyId,
+          permissions: permissions ?? [],
+          active: active !== false,
           allow_recovery: allowRecovery !== false,
+          must_change_password: true,
         },
       });
 
@@ -180,16 +180,16 @@ serve(async (req: Request) => {
 
       // b) Inserir em app_users
       const { error: insertErr } = await adminClient.from('app_users').insert({
-        auth_user_id:   authData.user.id,
-        company_id:     companyId,
-        first_name:     firstName,
-        last_name:      lastName,
-        cpf:            cpf ?? null,
-        email:          (email as string).toLowerCase().trim(),
-        phone:          phone ?? null,
-        role:           roleNorm,
-        active:         active !== false,
-        permissions:    permissions ?? [],
+        auth_user_id: authData.user.id,
+        company_id: companyId,
+        first_name: firstName,
+        last_name: lastName,
+        cpf: cpf ?? null,
+        email: (email as string).toLowerCase().trim(),
+        phone: phone ?? null,
+        role: roleNorm,
+        active: active !== false,
+        permissions: permissions ?? [],
         allow_recovery: allowRecovery !== false,
       });
 
@@ -200,8 +200,8 @@ serve(async (req: Request) => {
       }
 
       return respond({
-        success:           true,
-        userId:            authData.user.id,
+        success: true,
+        userId: authData.user.id,
         generatedPassword: generatePassword ? finalPassword : undefined,
       });
     }
@@ -216,13 +216,13 @@ serve(async (req: Request) => {
 
       // Atualizar Auth metadata
       const metaUpdate: Record<string, unknown> = {};
-      if (firstName     !== undefined) metaUpdate.first_name = firstName;
-      if (lastName      !== undefined) metaUpdate.last_name = lastName;
-      if (cpf           !== undefined) metaUpdate.cpf = cpf;
-      if (phone         !== undefined) metaUpdate.phone = phone;
-      if (roleNorm      !== undefined) metaUpdate.role = roleNorm;
-      if (permissions   !== undefined) metaUpdate.permissions = permissions;
-      if (active        !== undefined) metaUpdate.active = active;
+      if (firstName !== undefined) metaUpdate.first_name = firstName;
+      if (lastName !== undefined) metaUpdate.last_name = lastName;
+      if (cpf !== undefined) metaUpdate.cpf = cpf;
+      if (phone !== undefined) metaUpdate.phone = phone;
+      if (roleNorm !== undefined) metaUpdate.role = roleNorm;
+      if (permissions !== undefined) metaUpdate.permissions = permissions;
+      if (active !== undefined) metaUpdate.active = active;
       if (allowRecovery !== undefined) metaUpdate.allow_recovery = allowRecovery;
 
       const { error: authErr } = await adminClient.auth.admin.updateUserById(userId, {
@@ -232,13 +232,13 @@ serve(async (req: Request) => {
 
       // Atualizar app_users
       const updates: Record<string, unknown> = {};
-      if (firstName     !== undefined) updates.first_name = firstName;
-      if (lastName      !== undefined) updates.last_name = lastName;
-      if (cpf           !== undefined) updates.cpf = cpf;
-      if (phone         !== undefined) updates.phone = phone;
-      if (roleNorm      !== undefined) updates.role = roleNorm;
-      if (permissions   !== undefined) updates.permissions = permissions;
-      if (active        !== undefined) updates.active = active;
+      if (firstName !== undefined) updates.first_name = firstName;
+      if (lastName !== undefined) updates.last_name = lastName;
+      if (cpf !== undefined) updates.cpf = cpf;
+      if (phone !== undefined) updates.phone = phone;
+      if (roleNorm !== undefined) updates.role = roleNorm;
+      if (permissions !== undefined) updates.permissions = permissions;
+      if (active !== undefined) updates.active = active;
       if (allowRecovery !== undefined) updates.allow_recovery = allowRecovery;
 
       const { error: updateErr } = await adminClient

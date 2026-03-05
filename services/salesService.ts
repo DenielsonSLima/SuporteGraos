@@ -577,14 +577,14 @@ export const salesService = {
     const updated = isSqlCanonicalOpsEnabled()
       ? { ...order, transactions: newTxs }
       : {
-          ...order,
-          transactions: newTxs,
-          paidValue: newTxs
-            .filter(t => t.type === 'receipt')
-            .reduce((acc, t) => acc + t.value + (t.discountValue || 0), 0)
-        };
+        ...order,
+        transactions: newTxs,
+        paidValue: newTxs
+          .filter(t => t.type === 'receipt')
+          .reduce((acc, t) => acc + t.value + (t.discountValue || 0), 0)
+      };
     db.update(updated);
-    void persistUpsert(updated);
+    await persistUpsert(updated);
     // ❌ REMOVIDO: void financialSyncService.syncSalesOrder(orderId);
     // Sync agora é feito apenas via financialActionService.processRecord()
     const { userId, userName } = getLogInfo();
@@ -592,7 +592,7 @@ export const salesService = {
     invalidateDashboardCache();
   },
 
-  deleteTransaction: (orderId: string, txId: string) => {
+  deleteTransaction: async (orderId: string, txId: string) => {
     const order = db.getById(orderId);
     if (!order) return;
 
@@ -606,14 +606,14 @@ export const salesService = {
     const updated = isSqlCanonicalOpsEnabled()
       ? { ...order, transactions: newTxs }
       : {
-          ...order,
-          transactions: newTxs,
-          paidValue: newTxs
-            .filter(t => t.type === 'receipt')
-            .reduce((acc, t) => acc + t.value + (t.discountValue || 0), 0)
-        };
+        ...order,
+        transactions: newTxs,
+        paidValue: newTxs
+          .filter(t => t.type === 'receipt')
+          .reduce((acc, t) => acc + t.value + (t.discountValue || 0), 0)
+      };
     db.update(updated);
-    void persistUpsert(updated);
+    await persistUpsert(updated);
     // ❌ REMOVIDO: void financialSyncService.syncSalesOrder(orderId);
     // Sync agora é feito apenas via financialActionService.processRecord()
     const { userId, userName } = getLogInfo();

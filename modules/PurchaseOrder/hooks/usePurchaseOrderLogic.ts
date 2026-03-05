@@ -101,7 +101,7 @@ export const usePurchaseOrderLogic = (initialOrder: PurchaseOrder, onFinalizeCal
         const updatedTxs = [tx, ...(currentOrder.transactions || [])];
         const newPaidValue = (currentOrder.paidValue || 0) + txValue + txDiscount;
         const updated = { ...currentOrder, transactions: updatedTxs, paidValue: newPaidValue, discountValue: (currentOrder.discountValue || 0) + txDiscount };
-        purchaseService.update(updated);
+        await purchaseService.update(updated);
         setCurrentOrder(updated);
 
         SettingsCache.refreshBalances();
@@ -118,7 +118,7 @@ export const usePurchaseOrderLogic = (initialOrder: PurchaseOrder, onFinalizeCal
         addToast('error', `Erro ao confirmar pagamento: ${err?.message || 'Erro desconhecido'}`);
       }
     },
-    handleRegisterAdvance: (data: any) => {
+    handleRegisterAdvance: async (data: any) => {
       const tx: OrderTransaction = {
         id: Math.random().toString(36).substr(2, 9),
         type: 'advance',
@@ -129,7 +129,7 @@ export const usePurchaseOrderLogic = (initialOrder: PurchaseOrder, onFinalizeCal
         notes: data.description || 'Adiantamento'
       };
       const updated = { ...currentOrder, transactions: [tx, ...(currentOrder.transactions || [])], paidValue: (currentOrder.paidValue || 0) + data.value };
-      purchaseService.update(updated);
+      await purchaseService.update(updated);
 
       financialActionService.addAdminExpense({
         id: `adv-po-${tx.id}`,
@@ -152,7 +152,7 @@ export const usePurchaseOrderLogic = (initialOrder: PurchaseOrder, onFinalizeCal
     handleAddExpense: async (data: any) => {
       const tx = { id: Math.random().toString(36).substr(2, 9), type: 'expense' as const, ...data };
       // 1. Atualiza transação do pedido
-      purchaseService.update({ ...currentOrder, transactions: [tx, ...(currentOrder.transactions || [])] });
+      await purchaseService.update({ ...currentOrder, transactions: [tx, ...(currentOrder.transactions || [])] });
 
       // 2. Cria movimentação financeira real (pagamento) (Legado)
       await financialActionService.processRecord(
@@ -180,7 +180,7 @@ export const usePurchaseOrderLogic = (initialOrder: PurchaseOrder, onFinalizeCal
     handleAddCommission: async (data: any) => {
       const tx = { id: Math.random().toString(36).substr(2, 9), type: 'commission' as const, ...data };
       const updated = { ...currentOrder, transactions: [tx, ...(currentOrder.transactions || [])] };
-      purchaseService.update(updated);
+      await purchaseService.update(updated);
 
       if (data.partnerId && data.value && data.value > 0) {
         const generateUUID = () => {
@@ -214,20 +214,20 @@ export const usePurchaseOrderLogic = (initialOrder: PurchaseOrder, onFinalizeCal
       refreshLoadings();
     },
     // Added handleSaveNote for persistent order observations
-    handleSaveNote: (note: any) => {
+    handleSaveNote: async (note: any) => {
       const newNote = { ...note, id: Math.random().toString(36).substr(2, 9) };
       const updated = { ...currentOrder, notesList: [newNote, ...(currentOrder.notesList || [])] };
-      purchaseService.update(updated);
+      await purchaseService.update(updated);
       refreshLoadings();
     },
-    handleUpdateTx: (tx: OrderTransaction) => {
-      purchaseService.updateTransaction(currentOrder.id, tx);
+    handleUpdateTx: async (tx: OrderTransaction) => {
+      await purchaseService.updateTransaction(currentOrder.id, tx);
       SettingsCache.refreshBalances();
       ledgerService.onTransactionChange('update', tx);
       refreshLoadings();
     },
     handleDeleteTx: async (id: string) => {
-      purchaseService.deleteTransaction(currentOrder.id, id);
+      await purchaseService.deleteTransaction(currentOrder.id, id);
       // Exclui também o registro financeiro correspondente (Legado)
       financialActionService.deleteStandaloneRecord('hist-' + id);
       await financialActionService.syncDeleteFromOrigin(id);
@@ -244,8 +244,8 @@ export const usePurchaseOrderLogic = (initialOrder: PurchaseOrder, onFinalizeCal
       await loadingService.delete(loadingId);
       refreshLoadings();
     },
-    confirmFinalize: () => {
-      purchaseService.update({ ...currentOrder, status: 'completed' });
+    confirmFinalize: async () => {
+      await purchaseService.update({ ...currentOrder, status: 'completed' });
       setIsFinalizePromptOpen(false);
       refreshLoadings();
       onFinalizeCallback();

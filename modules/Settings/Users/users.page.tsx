@@ -184,20 +184,7 @@ const UsersSettings: React.FC<Props> = ({ onBack }) => {
       return;
     }
 
-    // Validar senha apenas se for modo manual
-    if (!editingId && passwordMode === 'manual') {
-      if (password !== confirmPassword) {
-        addToast('error', 'Senhas não conferem', 'As senhas digitadas não são iguais.');
-        return;
-      }
 
-      // Validar força da senha
-      if (!passwordValidation.isValid) {
-        const errorMsg = passwordValidation.errors.join('. ');
-        addToast('error', 'Senha fraca', errorMsg);
-        return;
-      }
-    }
 
     try {
       if (editingId) {
@@ -211,10 +198,10 @@ const UsersSettings: React.FC<Props> = ({ onBack }) => {
           ...formData,
           id: Math.random().toString(36).substr(2, 9),
           email: normalizedEmail,
-          password: passwordMode === 'manual' ? password : ''
+          password: ''
         } as UserData;
 
-        const result = await addUser.mutateAsync({ user: newUser, generatePassword: passwordMode === 'auto' });
+        const result = await addUser.mutateAsync({ user: newUser, generatePassword: true });
 
         // Se gerou senha automática, mostrar modal
         if (result.generatedPassword) {
@@ -226,7 +213,7 @@ const UsersSettings: React.FC<Props> = ({ onBack }) => {
         }
       }
       setViewMode('list');
-      addToast('success', 'Usuário Salvo', passwordMode === 'auto' ? 'Usuário criado com senha automática gerada.' : 'Usuário criado com sucesso.');
+      addToast('success', 'Usuário Salvo', 'Usuário salvo com sucesso.');
     } catch (error: any) {
       addToast('error', 'Erro ao salvar', error.message);
     }

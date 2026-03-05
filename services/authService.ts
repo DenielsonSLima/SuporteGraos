@@ -109,7 +109,8 @@ export const authService = {
         role: roleValue,
         companyId: companyId,
         token: authData.session.access_token,
-        avatar: `https://ui-avatars.com/api/?name=${firstName}+${lastName}&background=0D8ABC&color=fff`
+        avatar: `https://ui-avatars.com/api/?name=${firstName}+${lastName}&background=0D8ABC&color=fff`,
+        mustChangePassword: metadata.must_change_password === true
       };
 
 
@@ -131,7 +132,7 @@ export const authService = {
       void auditService.createSession().then(session => {
         currentSessionId = session.id;
         sessionStorage.setItem(SESSION_ID_KEY, session.id);
-      }).catch(() => {});
+      }).catch(() => { });
 
       const elapsedMs = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - loginStart;
 
@@ -274,8 +275,16 @@ export const authService = {
         role: roleValue,
         companyId: companyId,
         token: session.access_token,
-        avatar: `https://ui-avatars.com/api/?name=${firstName}+${lastName}&background=0D8ABC&color=fff`
+        avatar: `https://ui-avatars.com/api/?name=${firstName}+${lastName}&background=0D8ABC&color=fff`,
+        mustChangePassword: metadata.must_change_password === true
       };
+
+      if (userSession.mustChangePassword) {
+        // Impede que um usuário com senha temporária pule a tela de troca de senha no refresh
+        await supabase.auth.signOut();
+        sessionStorage.removeItem(STORAGE_KEY);
+        return null;
+      }
 
       sessionStorage.setItem(STORAGE_KEY, JSON.stringify(userSession));
       const storedSessionId = sessionStorage.getItem(SESSION_ID_KEY);

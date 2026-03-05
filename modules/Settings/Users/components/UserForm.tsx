@@ -157,43 +157,21 @@ const UserForm: React.FC<UserFormProps> = ({
 
             {/* MODO DE SENHA (apenas ao criar) */}
             {!editingId && (
-              <div className="mb-6 p-4 bg-indigo-50 rounded-xl border border-indigo-100">
-                <p className="text-xs font-bold text-slate-700 uppercase mb-3">Definição de Senha</p>
-                <div className="space-y-2">
-                  <label className="flex items-center gap-3 p-3 bg-white rounded-lg border-2 cursor-pointer transition-all hover:border-indigo-300 {passwordMode === 'auto' ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200'}">
-                    <input
-                      type="radio"
-                      name="passwordMode"
-                      value="auto"
-                      checked={passwordMode === 'auto'}
-                      onChange={() => setPasswordMode('auto')}
-                      className="w-4 h-4 text-indigo-600"
-                    />
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold text-slate-700">Gerar Automaticamente</p>
-                      <p className="text-xs text-slate-500">Sistema cria senha forte aleatória</p>
-                    </div>
-                  </label>
-
-                  <label className="flex items-center gap-3 p-3 bg-white rounded-lg border-2 cursor-pointer transition-all hover:border-indigo-300 {passwordMode === 'manual' ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200'}">
-                    <input
-                      type="radio"
-                      name="passwordMode"
-                      value="manual"
-                      checked={passwordMode === 'manual'}
-                      onChange={() => setPasswordMode('manual')}
-                      className="w-4 h-4 text-indigo-600"
-                    />
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold text-slate-700">Definir Manualmente</p>
-                      <p className="text-xs text-slate-500">Criar senha personalizada agora</p>
-                    </div>
-                  </label>
+              <div className="mb-6 p-4 bg-indigo-50 rounded-xl border border-indigo-100 flex items-start gap-3">
+                <div className="p-2 bg-indigo-100 rounded-full text-indigo-600">
+                  <Lock size={18} />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-slate-700 uppercase">Senha Temporária</p>
+                  <p className="text-[10px] text-slate-500 mt-1 leading-relaxed">
+                    O sistema gerará uma senha temporária simples de 6 dígitos que será exibida após salvar.
+                    O usuário deverá cadastrar uma senha definitiva no primeiro acesso.
+                  </p>
                 </div>
               </div>
             )}
 
-            {((passwordMode === 'manual' && !editingId) || (editingId && showPasswordFields)) && (
+            {editingId && showPasswordFields && (
               <div className="space-y-5 animate-in fade-in slide-in-from-top-2 bg-slate-50 p-4 rounded-xl border border-slate-200">
                 <div>
                   <label className="mb-1 block text-xs font-bold text-slate-500 uppercase">Nova Senha</label>

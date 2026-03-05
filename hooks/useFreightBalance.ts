@@ -1,4 +1,4 @@
-/**
+so/**
  * useFreightBalance.ts
  *
  * Hook TanStack Query para buscar o saldo canônico de frete de um carregamento.

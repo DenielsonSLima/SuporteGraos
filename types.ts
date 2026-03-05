@@ -33,6 +33,7 @@ export interface User {
   companyId?: string; // ID da empresa vinculada
   avatar?: string;
   token?: string;
+  mustChangePassword?: boolean;
 }
 
 export interface ApiResponse<T> {

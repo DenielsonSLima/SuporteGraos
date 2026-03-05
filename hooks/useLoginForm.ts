@@ -20,6 +20,7 @@ export function useLoginForm(onLoginSuccess: (user: User) => void) {
     if (typeof window === 'undefined') return false;
     return localStorage.getItem('login_remember') === 'true';
   });
+  const [requirePasswordChange, setRequirePasswordChange] = useState<User | null>(null);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,6 +31,12 @@ export function useLoginForm(onLoginSuccess: (user: User) => void) {
 
     try {
       const user = await authService.login(email, password);
+
+      if (user.mustChangePassword) {
+        setRequirePasswordChange(user);
+        setIsLoading(false);
+        return;
+      }
 
       // Inicializar serviços que dependem de autenticação
       loginScreenService.startRealtime();
@@ -62,6 +69,7 @@ export function useLoginForm(onLoginSuccess: (user: User) => void) {
     isLoading,
     error, setError,
     rememberMe, setRememberMe,
+    requirePasswordChange, setRequirePasswordChange,
     handleSubmit,
   };
 }

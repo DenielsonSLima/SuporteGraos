@@ -30,9 +30,9 @@ export function useSalesTransactionActions(orderId: string) {
 
   /** Exclui uma transação e seu registro financeiro correspondente */
   const deleteTransaction = async (txId: string) => {
-    salesService.deleteTransaction(orderId, txId);
+    await salesService.deleteTransaction(orderId, txId);
     try {
-      financialActionService.deleteStandaloneRecord('hist-' + txId);
+      await financialActionService.deleteStandaloneRecord('hist-' + txId);
     } catch (err) {
       console.error('[useSalesTransactionActions] Falha ao excluir registro financeiro:', err);
     }
