@@ -178,8 +178,8 @@ serve(async (req: Request) => {
         );
       }
 
-      // b) Inserir em app_users
-      const { error: insertErr } = await adminClient.from('app_users').insert({
+      // b) Inserir em app_users (com upsert para não conflitar com o Trigger nativo)
+      const { error: insertErr } = await adminClient.from('app_users').upsert({
         auth_user_id: authData.user.id,
         company_id: companyId,
         first_name: firstName,
@@ -191,7 +191,8 @@ serve(async (req: Request) => {
         active: active !== false,
         permissions: permissions ?? [],
         allow_recovery: allowRecovery !== false,
-      });
+        must_change_password: true, // Mantendo sincronizado
+      }, { onConflict: 'auth_user_id' });
 
       if (insertErr) {
         // Rollback
