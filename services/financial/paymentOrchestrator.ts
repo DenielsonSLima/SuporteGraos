@@ -30,6 +30,7 @@ export { handlePurchaseOrderPayment } from './handlers/purchaseOrderHandler';
 export { handleSalesOrderReceipt } from './handlers/salesOrderHandler';
 export { handleCommissionPayment } from './handlers/commissionHandler';
 export { handleStandalonePayment } from './handlers/standaloneHandler';
+export { handleShareholderPayment } from './handlers/shareholderHandler';
 export { cleanupFinancialRecords } from './handlers/cleanupHandler';
 export { removeFinancialTransaction } from './handlers/transactionCleanupHandler';
 
@@ -40,6 +41,7 @@ import { handlePurchaseOrderPayment } from './handlers/purchaseOrderHandler';
 import { handleSalesOrderReceipt } from './handlers/salesOrderHandler';
 import { handleCommissionPayment } from './handlers/commissionHandler';
 import { handleStandalonePayment } from './handlers/standaloneHandler';
+import { handleShareholderPayment } from './handlers/shareholderHandler';
 import { cleanupFinancialRecords } from './handlers/cleanupHandler';
 import { removeFinancialTransaction } from './handlers/transactionCleanupHandler';
 
@@ -53,6 +55,7 @@ export const paymentOrchestrator = {
   handleSalesOrderReceipt,
   handleCommissionPayment,
   handleStandalonePayment,
+  handleShareholderPayment,
   cleanupFinancialRecords,
   removeFinancialTransaction,
   resolveAccountId,

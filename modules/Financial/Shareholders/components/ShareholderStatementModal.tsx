@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { X, Calendar, ArrowUpCircle, ArrowDownCircle, Printer } from 'lucide-react';
 import type { Shareholder } from '../../../../services/shareholderService';
 import ShareholderPdfModal from './ShareholderPdfModal';
+import ModalPortal from '../../../../components/ui/ModalPortal';
 
 interface Props {
   shareholder: Shareholder | null;
@@ -20,8 +21,9 @@ const ShareholderStatementModal: React.FC<Props> = ({ shareholder, isOpen, onClo
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
-        <div className="w-full max-w-3xl bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
+      <ModalPortal>
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="w-full max-w-3xl bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
           
           {/* Header */}
           <div className="bg-slate-50 px-6 py-4 border-b border-slate-200 flex justify-between items-center">
@@ -97,8 +99,9 @@ const ShareholderStatementModal: React.FC<Props> = ({ shareholder, isOpen, onClo
 
         </div>
       </div>
+    </ModalPortal>
 
-      {/* PDF Modal Layer */}
+    {/* PDF Modal Layer */}
       <ShareholderPdfModal 
         isOpen={isPdfOpen} 
         onClose={() => setIsPdfOpen(false)}

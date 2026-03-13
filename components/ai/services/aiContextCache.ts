@@ -1,3 +1,5 @@
+
+// aiContextCache.ts - ASYNC (Foundation V3)
 import { aiContextService } from './aiContextService';
 
 interface CacheEntry {
@@ -9,7 +11,7 @@ class AIContextCache {
   private cache: Map<string, CacheEntry> = new Map();
   private readonly TTL = 30000; // 30 segundos
 
-  getSystemContext(userName: string): string {
+  async getSystemContext(userName: string): Promise<string> {
     const cacheKey = `context_${userName}`;
     const now = Date.now();
 
@@ -22,13 +24,18 @@ class AIContextCache {
     }
 
     // Cache miss ou expirado
-    const context = aiContextService.getSystemContext(userName);
-    this.cache.set(cacheKey, {
-      data: context,
-      timestamp: now
-    });
-
-    return context;
+    try {
+      // ✅ Chamada agora é async
+      const context = await aiContextService.getSystemContext(userName);
+      this.cache.set(cacheKey, {
+        data: context || '',
+        timestamp: now
+      });
+      return context || '';
+    } catch (err) {
+      console.error('[AI Cache] Erro ao carregar contexto:', err);
+      return '';
+    }
   }
 
   invalidate(userName: string): void {

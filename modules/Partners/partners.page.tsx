@@ -20,6 +20,8 @@ import { usePartners, useCreatePartner, useUpdatePartner, useDeletePartner } fro
 import { useToast } from '../../contexts/ToastContext';
 import { SkeletonCards } from '../../components/ui/SkeletonCards';
 import { usePartnersModule } from './hooks/usePartnersModule';
+import { authService } from '../../services/authService';
+import { partnersService } from './partners.service';
 
 const PartnersPage: React.FC = () => {
   const { addToast } = useToast();
@@ -138,32 +140,41 @@ const PartnersPage: React.FC = () => {
   };
 
   /**
-   * handleSave: salva parceiro + endereço.
-   * SKILL §6.2: Toast de sucesso SOMENTE após conclusão da operação completa.
-   * TODO (SKILL §3.5): Idealmente, parceiro + endereço deveriam ser salvos
-   * em uma RPC atômica no banco (BEGIN...COMMIT). Atualmente, falha no
-   * endereço pode deixar parceiro criado sem endereço.
+   * handleSave: salva parceiro + endereço + categorias de forma atômica via RPC.
+   * SKILL §3.5: Operação completa em uma única transação no banco.
+   * SKILL §6.2: Toast de sucesso após conclusão da operação atômica.
    */
-  const handleSave = async (data: SavePartnerData) => {
+  const handleSave = async (saveData: SavePartnerData) => {
     try {
-      const { address, ...partnerData } = data;
-      let savedPartner;
+      const companyId = data?.data?.[0]?.companyId || (await authService.getCurrentUser())?.companyId;
+      if (!companyId) throw new Error('Company ID não encontrado');
 
-      if (editingPartner) {
-        savedPartner = await updatePartnerMutation.mutateAsync({ id: editingPartner.id, partner: partnerData });
-      } else {
-        savedPartner = await createPartnerMutation.mutateAsync(partnerData);
-      }
+      const { address, ...partnerData } = saveData;
 
-      if (savedPartner && address) {
-        await savePartnerAddress(savedPartner.id, address);
+      // Chama a RPC atômica centralizada
+      await partnersService.savePartnerComplete({
+        partnerId: editingPartner?.id || null,
+        companyId,
+        partnerData,
+        addressData: address || null,
+        categories: partnerData.categories || []
+      });
+
+      // Invalida as queries do TanStack Query
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore
+      const queryClient = await import('../../hooks/queryKeys').then(m => (window as any).queryClient);
+      if (queryClient) {
+        queryClient.invalidateQueries({ queryKey: ['partners'] });
+        queryClient.invalidateQueries({ queryKey: ['addresses'] });
       }
 
       addToast('success', editingPartner ? 'Dados Atualizados' : 'Parceiro Cadastrado');
+      setBalancesTick(prev => prev + 1);
       setViewMode('list');
     } catch (error) {
-      console.error('Erro ao salvar parceiro/endereço:', error);
-      addToast('error', 'Erro no Cadastro', 'Não foi possível salvar todos os dados do parceiro.');
+      console.error('Erro ao salvar parceiro via RPC:', error);
+      addToast('error', 'Erro no Cadastro', 'Não foi possível salvar os dados do parceiro.');
     }
   };
 

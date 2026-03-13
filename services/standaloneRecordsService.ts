@@ -9,11 +9,12 @@
 
 import { supabase } from './supabase';
 import { Persistence } from './persistence';
-import { FinancialRecord } from '../modules/Financial/types';
+import { FinancialRecord, FinancialStatus } from '../modules/Financial/types';
+import { StandaloneRecord as StandaloneRecordDB } from '../types/database';
 import { invalidateFinancialCache } from './financialCache';
 import { invalidateDashboardCache } from './dashboardCache';
+import { RealtimeChannel } from '@supabase/supabase-js';
 import { logService } from './logService';
-import { authService } from './authService';
 
 // Módulo de mapeamento extraído
 import { fromSupabase, toSupabase, STANDALONE_SELECT_FIELDS } from './standalone/standaloneMapper';
@@ -25,7 +26,7 @@ export { fromSupabase, toSupabase, STANDALONE_SELECT_FIELDS };
 const db = new Persistence<FinancialRecord>('admin_expenses', [], { useStorage: false });
 
 let isInitialized = false;
-let realtimeSubscription: any = null;
+let realtimeSubscription: RealtimeChannel | null = null;
 
 export interface StandaloneRecordsPageOptions {
   limit: number;
@@ -37,6 +38,7 @@ export interface StandaloneRecordsPageOptions {
 const fetchPage = async (options: StandaloneRecordsPageOptions): Promise<FinancialRecord[]> => {
   try {
     const { limit, beforeDate, startDate, endDate } = options;
+    const { authService } = await import('./authService');
     const user = authService.getCurrentUser();
     const companyId = user?.companyId;
 
@@ -68,6 +70,7 @@ const fetchPage = async (options: StandaloneRecordsPageOptions): Promise<Financi
  */
 const loadFromSupabase = async (): Promise<void> => {
   try {
+    const { authService } = await import('./authService');
     const user = authService.getCurrentUser();
     const companyId = user?.companyId;
 
@@ -120,7 +123,7 @@ const setupRealtimeSubscription = (): void => {
           if (existing) db.update(record);
           else db.add(record);
         } else if (payload.eventType === 'DELETE' && payload.old) {
-          db.delete((payload.old as any).id);
+          db.delete((payload.old as StandaloneRecordDB).id);
         }
 
         // Invalidar caches
@@ -166,6 +169,7 @@ export const standaloneRecordsService = {
    */
   add: async (record: FinancialRecord): Promise<void> => {
     try {
+      const { authService } = await import('./authService');
       const user = authService.getCurrentUser();
       const supabaseRecord = toSupabase(record);
 
@@ -232,6 +236,8 @@ export const standaloneRecordsService = {
    */
   update: async (record: FinancialRecord): Promise<void> => {
     try {
+      const { authService } = await import('./authService');
+      const user = authService.getCurrentUser();
       const supabaseRecord = toSupabase(record);
 
       const { error } = await supabase
@@ -259,7 +265,6 @@ export const standaloneRecordsService = {
       invalidateDashboardCache();
 
       // Log
-      const user = authService.getCurrentUser();
       logService.addLog({
         userId: user?.id || 'system',
         userName: user?.name || 'Sistema',
@@ -304,6 +309,7 @@ export const standaloneRecordsService = {
       invalidateDashboardCache();
 
       // Log
+      const { authService } = await import('./authService');
       const user = authService.getCurrentUser();
       logService.addLog({
         userId: user?.id || 'system',
@@ -326,6 +332,8 @@ export const standaloneRecordsService = {
     try {
       if (!records || records.length === 0) return;
 
+      const { authService } = await import('./authService');
+      const user = authService.getCurrentUser();
       const supabaseRecords = records.map(toSupabase);
 
       const { error } = await supabase
@@ -342,7 +350,6 @@ export const standaloneRecordsService = {
       invalidateDashboardCache();
 
       // Log
-      const user = authService.getCurrentUser();
       logService.addLog({
         userId: user?.id || 'system',
         userName: user?.name || 'Sistema',
@@ -392,6 +399,3 @@ export const standaloneRecordsService = {
     }
   }
 };
-
-// ❌ NÃO inicializar automaticamente - aguardar autenticação via supabaseInitService
-// void standaloneRecordsService.initialize();

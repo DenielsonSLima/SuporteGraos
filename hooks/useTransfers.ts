@@ -60,6 +60,7 @@ export function useCreateTransfer() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: QUERY_KEYS.TRANSFERS });
       void qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS });
+      void qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_TRANSACTIONS });
     },
   });
 }
@@ -78,6 +79,7 @@ export function useUpdateTransfer() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: QUERY_KEYS.TRANSFERS });
       void qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS });
+      void qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_TRANSACTIONS });
     },
   });
 }
@@ -89,6 +91,7 @@ export function useDeleteTransfer() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: QUERY_KEYS.TRANSFERS });
       void qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS });
+      void qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_TRANSACTIONS });
     },
   });
 }

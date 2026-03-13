@@ -29,7 +29,7 @@ export function useLoans() {
 
 export function useCreateLoan() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: (params: {
       lenderId?: string;
@@ -39,6 +39,9 @@ export function useCreateLoan() {
       endDate?: string;
       numInstallments?: number;
       description?: string;
+      accountId?: string;
+      accountName?: string;
+      type?: 'taken' | 'granted';
     }) => loansService.create(params),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOANS });
@@ -49,9 +52,9 @@ export function useCreateLoan() {
 
 export function useUpdateLoan() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: ({ id, updates }: { id: string; updates: Partial<Omit<Loan, 'id' | 'company_id' | 'created_at' | 'updated_at'>> }) => 
+    mutationFn: ({ id, updates }: { id: string; updates: Partial<Omit<Loan, 'id' | 'company_id' | 'created_at' | 'updated_at'>> }) =>
       loansService.update(id, updates),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOANS });
@@ -62,7 +65,7 @@ export function useUpdateLoan() {
 
 export function useDeleteLoan() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: (loanId: string) => loansService.delete(loanId),
     onSuccess: () => {

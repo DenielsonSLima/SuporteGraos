@@ -3,6 +3,7 @@ import { payablesService, Payable } from '../payablesService';
 import { generateTxId, registerFinancialRecords } from './orchestratorHelpers';
 import type { PaymentData, PaymentResult } from './orchestratorTypes';
 import { isSqlCanonicalOpsEnabled, sqlCanonicalOpsLog } from '../../sqlCanonicalOps';
+import { OrderTransaction } from '../../../modules/PurchaseOrder/types';
 
 /**
  * Handler para pagamento de Frete (Logística).
@@ -94,14 +95,20 @@ export const handleFreightPayment = async (
       const { loadingService } = await import('../../loadingService');
       const loading = loadingService.getAll().find(l => l.id === loadingId);
       if (loading) {
-        const commonTx = {
-          id: txId, date: data.date, value: transactionValue, discountValue,
-          accountId: data.accountId, accountName: data.accountName, notes: data.notes, type: 'payment'
+        const commonTx: OrderTransaction = {
+          id: txId,
+          date: data.date,
+          value: transactionValue,
+          discountValue,
+          accountId: data.accountId,
+          accountName: data.accountName,
+          notes: data.notes,
+          type: 'payment'
         };
         loadingService.update({
           ...loading,
           freightPaid: Number(((loading.freightPaid || 0) + transactionValue).toFixed(2)),
-          transactions: [commonTx as any, ...(loading.transactions || [])]
+          transactions: [commonTx, ...(loading.transactions || [])]
         });
       }
     }

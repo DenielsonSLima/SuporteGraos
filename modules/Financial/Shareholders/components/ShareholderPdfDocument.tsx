@@ -238,7 +238,7 @@ const ShareholderPdfDocument: React.FC<Props> = ({ shareholder }) => {
         </View>
 
         <View style={styles.footer}>
-          <Text style={styles.footerText}>Sistema ERP Suporte Grãos • Documento gerado em {new Date().toLocaleString('pt-BR')}</Text>
+          <Text style={styles.footerText}>{company.nomeFantasia || 'ERP'} • Documento gerado em {new Date().toLocaleString('pt-BR')}</Text>
           <Text style={styles.footerText} render={({ pageNumber, totalPages }) => `Página ${pageNumber} de ${totalPages}`} fixed />
         </View>
       </Page>

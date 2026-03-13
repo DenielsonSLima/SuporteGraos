@@ -2,6 +2,8 @@
 import { generateTxId, registerFinancialRecords } from './orchestratorHelpers';
 import type { PaymentData, PaymentResult } from './orchestratorTypes';
 import { isSqlCanonicalOpsEnabled, sqlCanonicalOpsLog } from '../../sqlCanonicalOps';
+import { FinancialRecord, FinancialStatus } from '../../../modules/Financial/types';
+import { StandaloneRecord as StandaloneRecordDB } from '../../../types/database';
 
 /**
  * Handler para Despesas Administrativas e Avulsas.
@@ -10,8 +12,8 @@ import { isSqlCanonicalOpsEnabled, sqlCanonicalOpsLog } from '../../sqlCanonical
 export const handleStandalonePayment = async (
   recordId: string,
   data: PaymentData,
-  standalone: any,
-  serviceToUpdate: any
+  standalone: FinancialRecord | null,
+  serviceToUpdate: any // Interface polimórfica (standaloneRecordsService | creditService | etc)
 ): Promise<PaymentResult> => {
   const canonicalOpsEnabled = isSqlCanonicalOpsEnabled();
   const txId = generateTxId();
@@ -27,7 +29,7 @@ export const handleStandalonePayment = async (
       paidValue: currentPaid + transactionValue,
       discountValue: currentDisc + discountValue,
       settlementDate: data.date,
-      status: ((currentPaid + transactionValue + currentDisc + discountValue) >= standalone.originalValue - 0.01 ? 'paid' : 'partial'),
+      status: ((currentPaid + transactionValue + currentDisc + discountValue) >= standalone.originalValue - 0.01 ? 'paid' : 'partial') as FinancialStatus,
       bankAccount: data.accountName,
       notes: data.notes
     };

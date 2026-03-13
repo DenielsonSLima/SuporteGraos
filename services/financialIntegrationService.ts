@@ -132,19 +132,23 @@ export const financialIntegrationService = {
 
     // Por enquanto, manteremos a lógica híbrida para não quebrar a UI síncrona:
     const records: FinancialRecord[] = [];
-    payablesService.getAll().forEach(p => records.push(mapPayableToFinancialRecord(p)));
-    financialActionService.getStandaloneRecords().forEach(r => {
-      if (['admin', 'commission', 'loan_taken', 'shareholder'].includes(r.subType || '')) records.push(r);
+    (payablesService?.getAll?.() || []).forEach(p => {
+      if (p) records.push(mapPayableToFinancialRecord(p));
     });
-    return records.sort((a, b) => (a.dueDate ?? '').localeCompare(b.dueDate ?? ''));
+    (financialActionService?.getStandaloneRecords?.() || []).forEach(r => {
+      if (r && ['admin', 'commission', 'loan_taken', 'shareholder'].includes(r.subType || '')) records.push(r);
+    });
+    return records.sort((a, b) => (a?.dueDate ?? '').localeCompare(b?.dueDate ?? ''));
   },
 
   getReceivables: (): FinancialRecord[] => {
     const records: FinancialRecord[] = [];
-    receivablesService.getAll().forEach(r => records.push(mapReceivableToFinancialRecord(r)));
-    financialActionService.getStandaloneRecords().forEach(r => {
-      if (['receipt', 'loan_granted'].includes(r.subType || '')) records.push(r);
+    (receivablesService?.getAll?.() || []).forEach(r => {
+      if (r) records.push(mapReceivableToFinancialRecord(r));
     });
-    return records.sort((a, b) => (a.dueDate ?? '').localeCompare(b.dueDate ?? ''));
+    (financialActionService?.getStandaloneRecords?.() || []).forEach(r => {
+      if (r && ['receipt', 'loan_granted'].includes(r.subType || '')) records.push(r);
+    });
+    return records.sort((a, b) => (a?.dueDate ?? '').localeCompare(b?.dueDate ?? ''));
   }
 };

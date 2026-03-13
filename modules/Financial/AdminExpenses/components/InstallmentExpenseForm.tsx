@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, Save, Calendar, DollarSign, FileText, Tag, User, Layers, Calculator, Clock, Wallet, CheckCircle2, Anchor, TrendingUp, Briefcase, ChevronDown } from 'lucide-react';
+import ModalPortal from '../../../../components/ui/ModalPortal';
 import type { ExpenseCategory } from '../../../../services/expenseCategoryService';
 import type { Account } from '../../../../services/accountsService';
 import { useAccounts } from '../../../../hooks/useAccounts';
@@ -89,7 +90,7 @@ const InstallmentExpenseForm: React.FC<Props> = ({ isOpen, onClose, onSave, onUp
   const filteredSubtypes = useMemo(() => {
     if (!selectedType) return [];
     const categoryGroup = categories.find(c => c.type === selectedType);
-    return categoryGroup ? categoryGroup.subtypes : [];
+    return categoryGroup ? [...categoryGroup.subtypes].sort((a, b) => a.name.localeCompare(b.name)) : [];
   }, [selectedType, categories]);
 
   if (!isOpen) return null;
@@ -124,7 +125,7 @@ const InstallmentExpenseForm: React.FC<Props> = ({ isOpen, onClose, onSave, onUp
         paidValue: isPaidNow ? value : (initialData.paidValue || 0),
         status: isPaidNow ? 'paid' : 'pending',
         subType: 'admin',
-        bankAccount: isPaidNow ? (selectedAccount?.account_name || initialData.bankAccount) : undefined,
+        bankAccount: isPaidNow ? (accountId || initialData.bankAccount) : undefined,
         notes
       };
 
@@ -146,7 +147,7 @@ const InstallmentExpenseForm: React.FC<Props> = ({ isOpen, onClose, onSave, onUp
         paidValue: isPaidNow ? value : 0,
         status: isPaidNow ? 'paid' : 'pending',
         subType: 'admin',
-        bankAccount: isPaidNow ? selectedAccount?.account_name : undefined,
+        bankAccount: isPaidNow ? accountId : undefined,
         notes: isPaidNow ? `[BAIXA IMEDIATA] ${notes}` : notes
       });
     } else {
@@ -181,8 +182,8 @@ const InstallmentExpenseForm: React.FC<Props> = ({ isOpen, onClose, onSave, onUp
   const inputClass = 'block w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 focus:border-slate-800 focus:outline-none transition-all placeholder:text-slate-300 font-bold shadow-sm';
   const labelClass = 'block mb-2 text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1';
 
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
+  const modalContent = (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
       <div className="w-full max-w-lg bg-white rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 flex flex-col max-h-[95vh]">
         
         <div className="bg-slate-950 px-8 py-6 flex justify-between items-center text-white shrink-0">
@@ -355,6 +356,12 @@ const InstallmentExpenseForm: React.FC<Props> = ({ isOpen, onClose, onSave, onUp
         </div>
       </div>
     </div>
+  );
+
+  return (
+    <ModalPortal>
+      {modalContent}
+    </ModalPortal>
   );
 };
 

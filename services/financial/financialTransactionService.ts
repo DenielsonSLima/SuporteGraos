@@ -1,8 +1,6 @@
-
 import { supabase } from '../supabase';
-import { FinancialTransaction } from '../../modules/Financial/types';
-import { authService } from '../authService';
-import { logService } from '../logService';
+import { FinancialTransaction as FinancialTransactionUI } from '../../modules/Financial/types';
+import { FinancialTransaction as FinancialTransactionDB } from '../../types/database';
 import { getTodayBR } from '../../utils/dateUtils';
 
 export interface TransactionLinkParams {
@@ -15,8 +13,8 @@ export interface TransactionLinkParams {
 }
 
 export const financialTransactionService = {
-    async createReversal(row: any) {
-        if (!row?.id || !row?.company_id || !row?.bank_account_id || !row?.amount) {
+    async createReversal(row: FinancialTransactionDB) {
+        if (!row?.id || !row?.company_id || !row?.account_id || !row?.amount) {
             return;
         }
 
@@ -40,19 +38,19 @@ export const financialTransactionService = {
         const rawType = String(row.type || '').toUpperCase();
         const reversalType = rawType === 'IN' ? 'OUT' : 'IN';
 
-        const user = authService.getCurrentUser();
+        const authModule = await import('../authService');
+        const user = authModule.authService.getCurrentUser();
         const { error } = await supabase
             .from('financial_transactions')
             .insert({
-                date: getTodayBR(),
+                transaction_date: getTodayBR(),
                 description: `Estorno automático [REV_OF:${row.id}] ${description}`,
                 amount: Number(row.amount),
                 type: reversalType,
-                bank_account_id: row.bank_account_id,
-                payable_id: null,
-                receivable_id: null,
+                account_id: row.account_id,
                 company_id: row.company_id,
-                user_id: user?.id || row.user_id || null
+                entry_id: row.entry_id, // ✅ CRITICAL: Link to parent entry for trigger update
+                created_by: user?.id || row.created_by || null
             });
 
         if (error) {
@@ -64,8 +62,9 @@ export const financialTransactionService = {
      * Registers a new financial transaction (payment, receipt, etc)
      * Now supports optional link data for the new financial_links table.
      */
-    async add(transaction: Omit<FinancialTransaction, 'id'>, linkData?: TransactionLinkParams) {
-        const user = authService.getCurrentUser();
+    async add(transaction: Omit<FinancialTransactionUI, 'id'>, linkData?: TransactionLinkParams) {
+        const authModule = await import('../authService');
+        const user = authModule.authService.getCurrentUser();
         const companyId = transaction.companyId || user?.companyId;
 
         if (!companyId) {
@@ -85,16 +84,13 @@ export const financialTransactionService = {
             const { data: tx, error: txError } = await supabase
                 .from('financial_transactions')
                 .insert({
-                    date: transaction.date || getTodayBR(),
+                    transaction_date: transaction.date || getTodayBR(),
                     description: transaction.description,
                     amount: transaction.amount,
                     type: normalizedType,
-                    bank_account_id: transaction.bankAccountId,
-                    // Legacy fields (kept for compatibility during migration, but we should phase them out)
-                    payable_id: linkData?.purchaseOrderId || (transaction.financialRecordId && transaction.type === 'payment' ? transaction.financialRecordId : null),
-                    receivable_id: linkData?.salesOrderId || (transaction.financialRecordId && transaction.type === 'receipt' ? transaction.financialRecordId : null),
+                    account_id: transaction.bankAccountId,
                     company_id: companyId,
-                    user_id: user?.id
+                    created_by: user?.id
                 })
                 .select()
                 .single();
@@ -119,7 +115,8 @@ export const financialTransactionService = {
                 }
             }
 
-            logService.addLog({
+            const logModule = await import('../logService');
+            logModule.logService.addLog({
                 userId: user?.id || 'system',
                 userName: user?.name || 'Sistema',
                 action: 'create',
@@ -128,7 +125,7 @@ export const financialTransactionService = {
                 entityId: tx.id
             });
 
-            return tx as FinancialTransaction;
+            return tx as unknown as FinancialTransactionUI;
         } catch (error) {
             throw error;
         }
@@ -177,17 +174,44 @@ export const financialTransactionService = {
         await this.createReversal(data);
     },
 
-    async deleteByRecordId(recordId: string, type: 'payable' | 'receivable') {
-        const field = type === 'payable' ? 'payable_id' : 'receivable_id';
-        const { data, error } = await supabase
-            .from('financial_transactions')
-            .select('*')
-            .eq(field, recordId);
+    async deleteByRecordId(recordId: string, type: 'payable' | 'receivable'): Promise<boolean> {
+        try {
+            const field = type === 'payable' ? 'payable_id' : 'receivable_id';
+            const { data, error } = await supabase
+                .from('financial_transactions')
+                .select('*')
+                .eq(field, recordId);
 
-        if (error) throw error;
+            if (error) throw error;
 
-        for (const row of data || []) {
-            await this.createReversal(row);
+            for (const row of data || []) {
+                await this.createReversal(row);
+            }
+            return true;
+        } catch (err) {
+            console.error('Error in deleteByRecordId:', err);
+            return false;
+        }
+    },
+
+    async deleteByEntryId(entryId: string): Promise<boolean> {
+        try {
+            const { data, error } = await supabase
+                .from('financial_transactions')
+                .select('*')
+                .eq('entry_id', entryId);
+
+            if (error) {
+                throw error;
+            }
+
+            for (const row of data || []) {
+                await this.createReversal(row);
+            }
+            return true;
+        } catch (err) {
+            console.error('Error in deleteByEntryId:', err);
+            return false;
         }
     },
 
@@ -212,7 +236,8 @@ export const financialTransactionService = {
      * Caixa/Início sem depender de execução manual de SQL.
      */
     async normalizeLegacyTransferTypesAndRecalculate() {
-        const user = authService.getCurrentUser();
+        const authModule = await import('../authService');
+        const user = authModule.authService.getCurrentUser();
         const companyId = user?.companyId;
         if (!companyId) return { normalized: 0, balancesUpdated: 0 };
 
@@ -240,7 +265,7 @@ export const financialTransactionService = {
             const toIn: string[] = [];
             const toOut: string[] = [];
 
-            (txRows || []).forEach((row: any) => {
+            (txRows || []).forEach((row) => {
                 const normalized = normalizeType(row.type);
                 if (!normalized) return;
                 if (normalized !== row.type) {
@@ -272,7 +297,7 @@ export const financialTransactionService = {
             );
 
             if (!recalcError && recalcResult) {
-                balancesUpdated = (recalcResult as any)?.updated ?? 0;
+                balancesUpdated = (recalcResult as { updated: number })?.updated ?? 0;
             }
 
             if (typeof window !== 'undefined' && balancesUpdated > 0) {
@@ -283,5 +308,39 @@ export const financialTransactionService = {
         } catch {
             return { normalized: normalizedCount, balancesUpdated };
         }
-    }
+    },
+
+    // REALTIME — singleton channel (evita canais duplicados)
+    subscribeRealtime: (() => {
+        const listeners = new Set<() => void>();
+        let channel: ReturnType<typeof supabase.channel> | null = null;
+        return (onAnyChange: () => void): (() => void) => {
+            listeners.add(onAnyChange);
+            if (!channel) {
+                channel = supabase
+                    .channel('realtime:financial_transactions')
+                    .on(
+                        'postgres_changes',
+                        { event: '*', schema: 'public', table: 'financial_transactions' },
+                        (payload) => {
+                            void import('../authService').then(m => {
+                                const companyId = m.authService.getCurrentUser()?.companyId;
+                                const changedCompanyId = payload?.new?.company_id ?? payload?.old?.company_id;
+                                if (!companyId || !changedCompanyId || changedCompanyId === companyId) {
+                                    listeners.forEach(fn => fn());
+                                }
+                            });
+                        },
+                    )
+                    .subscribe();
+            }
+            return () => {
+                listeners.delete(onAnyChange);
+                if (listeners.size === 0 && channel) {
+                    supabase.removeChannel(channel);
+                    channel = null;
+                }
+            };
+        };
+    })(),
 };

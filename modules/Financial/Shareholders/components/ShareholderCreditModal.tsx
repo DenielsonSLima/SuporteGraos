@@ -6,6 +6,7 @@ import { useAccounts } from '../../../../hooks/useAccounts';
 import { getLocalDateString } from '../../../../utils/dateUtils';
 import type { Shareholder } from '../../../../services/shareholderService';
 import { useToast } from '../../../../contexts/ToastContext';
+import ModalPortal from '../../../../components/ui/ModalPortal';
 
 interface Props {
   isOpen: boolean;
@@ -82,8 +83,9 @@ const ShareholderCreditModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, s
   const labelClass = 'block text-[10px] font-black text-slate-400 uppercase mb-1.5 tracking-widest ml-1';
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
-      <div className="w-full max-w-md bg-white rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 border border-white/20">
+    <ModalPortal>
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
+        <div className="w-full max-w-md bg-white rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 border border-white/20">
         <div className="bg-indigo-600 px-8 py-6 flex justify-between items-center text-white">
           <h3 className="font-black text-xl flex items-center gap-2 uppercase italic tracking-tighter"><TrendingUp size={24} />{initialData ? 'Editar Crédito' : 'Lançar Novo Crédito'}</h3>
           <button onClick={onClose} className="hover:bg-white/20 p-2 rounded-full transition-colors"><X size={28} /></button>
@@ -118,8 +120,9 @@ const ShareholderCreditModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, s
             </button>
           </div>
         </form>
+        </div>
       </div>
-    </div>
+    </ModalPortal>
   );
 };
 

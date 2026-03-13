@@ -72,7 +72,7 @@ const DashboardChart: React.FC<Props> = React.memo(({ data }) => {
               axisLine={false}
               tickLine={false}
               tick={{ fill: '#94a3b8', fontSize: 10 }}
-              tickFormatter={(val) => `R$${val / 1000}k`}
+              tickFormatter={(val) => `R$${(val || 0) / 1000}k`}
             />
 
             {/* Eixo Direito: Preços Unitários (Linhas) */}

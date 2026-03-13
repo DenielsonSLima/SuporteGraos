@@ -13,7 +13,7 @@
 
 import { Loading } from '../modules/Loadings/types';
 import { logService } from './logService';
-import { authService } from './authService';
+
 import { Persistence } from './persistence';
 import { supabase } from './supabase';
 import { supabaseWithRetry } from '../utils/fetchWithRetry';
@@ -38,7 +38,8 @@ let realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
 let isLoaded = false;
 let toastCallback: ((type: 'success' | 'error' | 'info', title: string, message?: string) => void) | null = null;
 
-const getLogInfo = () => {
+const getLogInfo = async () => {
+  const { authService } = await import('./authService');
   const user = authService.getCurrentUser();
   return { userId: user?.id || 'system', userName: user?.name || 'Sistema' };
 };
@@ -53,10 +54,14 @@ const notifyFinancialRefresh = () => {
   window.dispatchEvent(new Event('data:updated'));
 };
 
-const getCurrentCompanyId = () => authService.getCurrentUser()?.companyId || undefined;
+const getCurrentCompanyId = async () => {
+  const { authService } = await import('./authService');
+  return authService.getCurrentUser()?.companyId || undefined;
+};
 
-const resolveCompanyId = (fallbackCompanyId?: string) => {
-  return getCurrentCompanyId() || fallbackCompanyId;
+
+const resolveCompanyId = async (fallbackCompanyId?: string) => {
+  return (await getCurrentCompanyId()) || fallbackCompanyId;
 };
 
 /**
@@ -68,7 +73,8 @@ const findFinancialEntry = async (
   origin: string,
   originId: string
 ): Promise<string | null> => {
-  const companyId = resolveCompanyId();
+  const companyId = await resolveCompanyId();
+
 
   let query = supabase
     .from('financial_entries')
@@ -101,8 +107,10 @@ const upsertFinancialPayableEntry = async (params: {
   dueDate?: string;
   partnerId?: string;
   companyId?: string;
+  description?: string;
 }) => {
-  const companyId = resolveCompanyId(params.companyId);
+  const companyId = await resolveCompanyId(params.companyId);
+
   if (!companyId || !params.originId) return;
 
   const safeAmount = Number(params.amount) || 0;
@@ -114,6 +122,7 @@ const upsertFinancialPayableEntry = async (params: {
     total_amount: safeAmount,
     due_date: params.dueDate || getTodayBR(),
     created_date: getTodayBR(),
+    description: params.description || null
   };
   if (params.partnerId) payload.partner_id = params.partnerId;
 
@@ -123,6 +132,7 @@ const upsertFinancialPayableEntry = async (params: {
     const { error } = await supabase.from('financial_entries').update({
       total_amount: safeAmount,
       due_date: params.dueDate || getTodayBR(),
+      description: params.description || null,
       ...(params.partnerId ? { partner_id: params.partnerId } : {})
     }).eq('id', existingId);
     if (error) console.warn('[loadingService] update financial_entry error:', error.message);
@@ -134,14 +144,18 @@ const upsertFinancialPayableEntry = async (params: {
 };
 
 const syncFinancialEntriesFromLoading = async (loading: Loading, isDelete = false) => {
-  const companyId = resolveCompanyId(loading.companyId);
+  const companyId = await resolveCompanyId(loading.companyId);
+
 
   const freightAmount = isDelete ? 0 : (Number(loading.totalFreightValue) || 0);
   if (loading.id) {
     // ✅ Guard: não criar financial_entry com frete zerado (evita registros órfãos)
-    if (freightAmount <= 0 && !isDelete) {
-      // Se for delete, precisamos zerar; senão, simplesmente não cria
-      console.info('[loadingService] Frete zerado — pulando criação de financial_entry para', loading.id);
+    // ✅ SKIL §13.2: Evitar duplicidade se o modo canônico já processou via RPC
+    if (isSqlCanonicalOpsEnabled()) {
+      console.info('[loadingService] SQL canônico ativo — pulando sync manual de financial_entries para frete', loading.id);
+    } else if (freightAmount <= 0.009 && !isDelete) {
+      // Se for delete, precisamos zerar; senão, simplesmente não cria se for muito perto de zero
+      console.info('[loadingService] Frete zerado ou irrelevante — pulando criação de financial_entry para', loading.id);
     } else {
       await upsertFinancialPayableEntry({
         origin: 'freight',
@@ -149,27 +163,35 @@ const syncFinancialEntriesFromLoading = async (loading: Loading, isDelete = fals
         amount: freightAmount,
         dueDate: loading.date,
         partnerId: loading.carrierId || undefined,
-        companyId
+        companyId,
+        description: `Frete do carregamento - Placa ${loading.vehiclePlate || 'N/A'}`
       });
     }
   }
 
   if (loading.purchaseOrderId) {
-    const order = purchaseService.getById(loading.purchaseOrderId);
-    const relatedLoadings = loadingService
-      .getByPurchaseOrder(loading.purchaseOrderId)
-      .filter(l => l.status !== 'canceled');
-    const purchaseAmount = relatedLoadings.reduce((sum, l) => sum + (Number(l.totalPurchaseValue) || 0), 0);
-    const dueDate = relatedLoadings[0]?.date || loading.date || getTodayBR();
+    if (isSqlCanonicalOpsEnabled()) {
+      console.info('[loadingService] SQL canônico ativo — pulando sync manual de financial_entries para pedido', loading.purchaseOrderId);
+    } else {
+      const order = purchaseService.getById(loading.purchaseOrderId);
+      const relatedLoadings = loadingService
+        .getByPurchaseOrder(loading.purchaseOrderId)
+        .filter(l => l.status !== 'canceled');
+      const purchaseAmount = relatedLoadings.reduce((sum, l) => sum + (Number(l.totalPurchaseValue) || 0), 0);
+      const dueDate = relatedLoadings[0]?.date || loading.date || getTodayBR();
 
-    await upsertFinancialPayableEntry({
-      origin: 'purchase_order',
-      originId: loading.purchaseOrderId,
-      amount: purchaseAmount,
-      dueDate,
-      partnerId: order?.partnerId || undefined,
-      companyId
-    });
+      const description = `Compra de Grãos - Pedido ${order?.number || loading.purchaseOrderId}`;
+
+      await upsertFinancialPayableEntry({
+        origin: 'purchase_order',
+        originId: loading.purchaseOrderId,
+        amount: purchaseAmount,
+        dueDate,
+        partnerId: order?.partnerId || undefined,
+        companyId,
+        description
+      });
+    }
   }
 
   notifyFinancialRefresh();
@@ -222,9 +244,9 @@ const mapLoadingFromOpsRow = (row: any): Loading => {
     freightPaid: Number(payload?.freightPaid ?? payload?.freight_paid ?? 0),
     extraExpenses: payload?.extraExpenses || [],
     transactions: payload?.transactions || [],
-    salesOrderId: payload?.salesOrderId ?? salesOrder?.legacy_id ?? row?.sales_order_id ?? '',
-    salesOrderNumber: payload?.salesOrderNumber ?? salesOrder?.number ?? '',
-    customerName: payload?.customerName ?? salesOrder?.customer_name ?? '',
+    salesOrderId: row?.sales_order_id || payload?.salesOrderId || salesOrder?.legacy_id || '',
+    salesOrderNumber: payload?.salesOrderNumber || salesOrder?.number || '',
+    customerName: payload?.customerName || salesOrder?.customer_name || '',
     salesPrice: Number(payload?.salesPrice ?? payload?.sales_price ?? 0),
     totalSalesValue: Number(row?.total_sales_value ?? payload?.totalSalesValue ?? 0),
     status: (row?.status ?? payload?.status ?? 'in_transit') as any,
@@ -241,12 +263,14 @@ const mapLoadingFromOpsRow = (row: any): Loading => {
 // ============================================================================
 
 const loadFromSupabase = async () => {
-  if (isLoaded) return;
+  if (isLoaded) return db.getAll();
   try {
     // Schema real: ops_loadings tem FK para ops_purchase_orders mas NÃO para ops_sales_orders.
     // Tabela logistics_loadings NÃO existe.
     // Sempre usar ops_loadings com JOIN apenas para purchase_order.
+    const { authService } = await import('./authService');
     const user = authService.getCurrentUser();
+
     let query = supabase
       .from('ops_loadings')
       .select(`
@@ -275,10 +299,12 @@ const loadFromSupabase = async () => {
   }
 };
 
-const startRealtime = () => {
+const startRealtime = async () => {
   if (realtimeChannel) return;
 
+  const { authService } = await import('./authService');
   const companyId = authService.getCurrentUser()?.companyId;
+
   const tableName = 'ops_loadings';
 
   realtimeChannel = supabase
@@ -341,7 +367,8 @@ const persistLoading = async (loading: Loading): Promise<boolean> => {
 
   // 2. Fallback: INSERT/UPSERT direto em ops_loadings
   try {
-    const companyId = resolveCompanyId(loading.companyId);
+    const companyId = await resolveCompanyId(loading.companyId);
+
     const row: Record<string, any> = {
       company_id: companyId,
       legacy_id: loading.id,
@@ -476,12 +503,11 @@ export const loadingService = {
     // ✅ Só cria financial_entry via TS se a RPC não conseguiu (ela já faz via SQL)
     if (!canonicalAuthoritative) {
       await syncFinancialEntriesFromLoading(loading, false);
-    }
 
-    // ✅ SQL-first: com canônico ativo e RPC aplicada, o financeiro é reconstruído no banco
-    if (!canonicalAuthoritative) {
+      // ✅ Backup Sync para legado (caso o modo canônico não esteja processando tudo)
       await createFreightPayable(loading);
-      if (loading.totalFreightValue && loading.totalFreightValue > 0 && loading.carrierId) {
+
+      if (loading.totalFreightValue && loading.totalFreightValue > 0.01 && loading.carrierId) {
         showToast('success', `💰 Frete ${loading.carrierName} criado no financeiro`);
       }
 
@@ -518,7 +544,8 @@ export const loadingService = {
       }
     }
 
-    const { userId, userName } = getLogInfo();
+    const { userId, userName } = await getLogInfo();
+
     invalidateDashboardCache();
     logService.addLog({
       userId,
@@ -545,7 +572,7 @@ export const loadingService = {
     });
   },
 
-  update: (updatedLoading: Loading) => {
+  update: async (updatedLoading: Loading) => {
     const oldLoading = db.getById(updatedLoading.id);
     if (!updatedLoading.extraExpenses) updatedLoading.extraExpenses = [];
     if (!updatedLoading.transactions) updatedLoading.transactions = [];
@@ -578,7 +605,8 @@ export const loadingService = {
       }
     });
 
-    const { userId, userName } = getLogInfo();
+    const { userId, userName } = await getLogInfo();
+
     let description = `Atualizou dados do carregamento ${updatedLoading.vehiclePlate}`;
     if (oldLoading) {
       if (updatedLoading.status === 'redirected' && oldLoading.status !== 'redirected') {
@@ -726,7 +754,8 @@ export const loadingService = {
       });
     }
 
-    const { userId, userName } = getLogInfo();
+    const { userId, userName } = await getLogInfo();
+
     logService.addLog({
       userId,
       userName,

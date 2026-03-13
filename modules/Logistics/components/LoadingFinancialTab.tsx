@@ -88,8 +88,8 @@ const LoadingFinancialTab: React.FC<Props> = ({ loading, onUpdate }) => {
           </div>
           <div className="p-6">
             <div className="space-y-2">
-              {loading.transactions && loading.transactions.length > 0 ? (
-                loading.transactions.map(t => (
+              {totals.transactions && totals.transactions.length > 0 ? (
+                totals.transactions.map(t => (
                   <div key={t.id} className="flex justify-between items-center text-xs p-2 border-b gap-2">
                     <span>{new Date(t.date).toLocaleDateString()} - {t.accountName}</span>
                     <div className="flex items-center gap-2">

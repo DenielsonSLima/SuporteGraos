@@ -23,60 +23,66 @@ export const handleSalesOrderReceipt = async (
   let orderId = '';
   let customerName = data.entityName || 'Cliente';
 
-  // Extrair orderId de prefixo legado (chamado de dentro do Ped. Venda)
-  const resolvedRecordId = recordId.startsWith('so-') ? recordId.replace('so-', '') : recordId;
+  // 1. Resolver UUID real se recordId for o 'number' ou tiver prefixo
+  const isValidUuid = (v: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
+  let resolvedRecordId = recordId.startsWith('so-') ? recordId.replace('so-', '') : recordId;
 
-  if (canonicalOpsEnabled) {
-    // SQL-FIRST: Tentativa 1 — resolvedRecordId é o financial_entries.id
-    const { data: directEntry } = await supabase
-      .from('financial_entries')
-      .select('id, origin_id, origin_type, partner_id')
-      .eq('id', resolvedRecordId)
+  if (!isValidUuid(resolvedRecordId)) {
+    const { data: order } = await supabase
+      .from('ops_sales_orders')
+      .select('id')
+      .eq('number', resolvedRecordId)
       .maybeSingle();
 
-    if (directEntry) {
-      entryId = directEntry.id;
-      orderId = directEntry.origin_id || '';
+    if (order?.id) {
+      resolvedRecordId = order.id;
+    }
+  }
+
+  if (canonicalOpsEnabled) {
+    // RESOLUÇÃO OTIMIZADA: Busca entry e info do parceiro em paralelo ou no mesmo query via VIEW
+    // Tentamos encontrar a entry pelo ID direto (UUID) ou pelo origin_id
+    const { data: entries } = await supabase
+      .from('financial_entries')
+      .select(`
+        id, 
+        origin_id, 
+        partner_id,
+        vw_receivables_enriched!inner(partner_name, sales_order_number)
+      `)
+      .or(`id.eq.${resolvedRecordId},origin_id.eq.${resolvedRecordId}`)
+      .eq('origin_type', 'sales_order')
+      .limit(1);
+
+    const entry = entries?.[0];
+
+    if (entry) {
+      entryId = entry.id;
+      orderId = entry.origin_id || resolvedRecordId;
+      customerName = (entry.vw_receivables_enriched as any)?.partner_name || customerName;
     } else {
-      // Tentativa 2: resolvedRecordId é o origin_id (order UUID)
-      const { data: byOrigin } = await supabase
-        .from('financial_entries')
-        .select('id, origin_id, origin_type, partner_id')
-        .eq('origin_id', resolvedRecordId)
-        .eq('origin_type', 'sales_order')
-        .maybeSingle();
+      // Tentativa 3: Se não encontrou, chamar rebuild RPC para criar a entry on-the-fly
+      if (resolvedRecordId) {
+        const { data: rebuildResult, error: rebuildErr } = await supabase.rpc(
+          'rpc_ops_sales_rebuild_financial_v1',
+          { p_origin_id: resolvedRecordId }
+        );
+        if (rebuildResult && !rebuildErr) {
+          entryId = rebuildResult;
+          orderId = resolvedRecordId;
 
-      if (byOrigin) {
-        entryId = byOrigin.id;
-        orderId = byOrigin.origin_id || resolvedRecordId;
-      }
-    }
-
-    // Tentativa 3: Se não encontrou, chamar rebuild RPC para criar a entry on-the-fly
-    if (!entryId && resolvedRecordId) {
-      const { data: rebuildResult, error: rebuildErr } = await supabase.rpc(
-        'rpc_ops_sales_rebuild_financial_v1',
-        { p_origin_id: resolvedRecordId }
-      );
-      if (rebuildResult && !rebuildErr) {
-        entryId = rebuildResult;
-        orderId = resolvedRecordId;
-      }
-    }
-
-    // Buscar nome do cliente via VIEW
-    if (entryId) {
-      const { data: viewInfo } = await supabase
-        .from('vw_receivables_enriched')
-        .select('partner_name, sales_order_number')
-        .eq('id', entryId)
-        .maybeSingle();
-      if (viewInfo) {
-        customerName = viewInfo.partner_name || customerName;
+          // Buscar nome do cliente após rebuild (raro)
+          const { data: viewInfo } = await supabase
+            .from('vw_receivables_enriched')
+            .select('partner_name')
+            .eq('id', entryId)
+            .maybeSingle();
+          if (viewInfo) customerName = viewInfo.partner_name || customerName;
+        }
       }
     }
   } else {
-    // MODO LEGADO
+    // MODO LEGADO (mantido para compatibilidade se canônico estiver off)
     await receivablesService.loadFromSupabase();
 
     const orderIdFromPrefix = recordId.startsWith('so-') ? resolvedRecordId : '';
@@ -100,18 +106,8 @@ export const handleSalesOrderReceipt = async (
     entryId = receivable?.id || recordId;
   }
 
-  // Contar parcelas anteriores via financial_transactions
-  let installmentSuffix = '';
-  if (entryId) {
-    const { data: prevTxs } = await supabase
-      .from('financial_transactions')
-      .select('id')
-      .eq('entry_id', entryId);
-    const count = prevTxs?.length || 0;
-    if (count > 0) installmentSuffix = ` - ${count + 1}ª Parcela`;
-  }
-
-  const description = `Recebimento Venda: ${customerName}${installmentSuffix}`;
+  // Omitimos o sufixo de parcela para evitar query extra — a descrição base já é clara
+  const description = `Recebimento Venda: ${customerName}`;
 
   // ✅ SINGLE LEDGER FIRST: RPC executa ANTES do registerFinancialRecords
   if (entryId && data.accountId) {

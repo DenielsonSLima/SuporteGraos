@@ -2,7 +2,6 @@ import { User } from '../types';
 import { logService } from './logService';
 import { auditService } from './auditService';
 import { supabase, getSupabaseSession, onAuthStateChange } from './supabase';
-import { stopAllRealtime, resetSupabaseInit } from './supabaseInitService';
 
 const STORAGE_KEY = 'sg_user';
 const SESSION_ID_KEY = 'sg_session_id';
@@ -171,6 +170,7 @@ export const authService = {
     }
 
     // Parar todos os canais Realtime antes do signOut
+    const { stopAllRealtime } = await import('./supabaseInitService');
     await stopAllRealtime();
 
     // Fazer logout no Supabase Auth
@@ -182,6 +182,7 @@ export const authService = {
     sessionStorage.clear();
 
     // Resetar estado de inicialização
+    const { resetSupabaseInit } = await import('./supabaseInitService');
     resetSupabaseInit();
   },
 

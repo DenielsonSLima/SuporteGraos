@@ -14,6 +14,7 @@ import { Loading } from '../../Loadings/types';
 import { useLoadingFinancialOperations } from '../../Loadings/hooks/useLoadingFinancialOperations';
 import { computeFreightSummary } from '../../Loadings/calculations';
 import { useFreightBalance } from '../../../hooks/useFreightBalance';
+import { useFreightTransactions } from '../../../hooks/useFreightTransactions';
 
 interface UseLoadingFinancialTabParams {
   loading: Loading;
@@ -33,6 +34,9 @@ export function useLoadingFinancialTab({ loading, onUpdate, addToast }: UseLoadi
   // ✅ SKIL §5.4: balance canônico vem de financial_entries (DB), não de cálculo frontend
   const { data: dbBalance } = useFreightBalance(loading.id);
 
+  // ✅ SKIL §5.4: Histórico canônico vem de financial_transactions (DB)
+  const { data: dbTransactions } = useFreightTransactions(loading.id);
+
   // ─── Totais via função pura + override do banco ───────────────────────
   const totals = useMemo(() => {
     const summary = computeFreightSummary(loading);
@@ -43,8 +47,18 @@ export function useLoadingFinancialTab({ loading, onUpdate, addToast }: UseLoadi
       totalDisc: dbBalance?.discountAmount ?? summary.totalDiscount,
       netFreightTotal: summary.netFreightTotal,
       balance: dbBalance?.balance ?? summary.balance,
+      // Map transactions to match the component's expected format if needed
+      // but FinancialTransaction is already close to what's used.
+      transactions: dbTransactions?.map(t => ({
+        id: t.id,
+        date: t.transaction_date,
+        value: t.amount,
+        accountName: (t as any).account_name,
+        notes: t.description,
+        discountValue: 0,
+      })) || loading.transactions || []
     };
-  }, [loading, dbBalance]);
+  }, [loading, dbBalance, dbTransactions]);
 
   // ─── Handlers com gerenciamento de estado de UI ───────────────────────
   const handleConfirmPayment = async (data: any) => {

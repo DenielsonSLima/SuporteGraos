@@ -8,6 +8,7 @@ import type { Account } from '../../../../services/accountsService';
 import { useAccounts } from '../../../../hooks/useAccounts';
 import { useExpenseCategories } from '../../../../hooks/useExpenseCategories';
 import { useToast } from '../../../../contexts/ToastContext';
+import ModalPortal from '../../../../components/ui/ModalPortal';
 
 interface Props {
   isOpen: boolean;
@@ -120,137 +121,110 @@ const TransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, type, titl
   const labelClass = 'block text-[10px] font-black text-slate-500 uppercase mb-1.5 tracking-widest ml-1';
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 p-4 animate-in fade-in">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 border border-slate-100 max-h-[90vh] flex flex-col">
-        <div className={`${getColor()} px-6 py-5 flex justify-between items-center text-white shrink-0`}>
-          <h3 className="font-black uppercase tracking-tighter italic text-lg">{title}</h3>
-          <button onClick={onClose} className="hover:bg-white/20 p-1 rounded-full transition-colors"><X size={20} /></button>
-        </div>
-        
-        <div className="overflow-y-auto p-8 flex-1">
-          <form id="tx-form" onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className={labelClass}>Data</label>
-                  <div className="relative">
-                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                      <input type="date" required value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} className={`${inputClass} pl-10`} />
-                  </div>
-                </div>
-                <div>
-                  <label className={labelClass}>Valor em Dinheiro</label>
-                  <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
-                      <input 
-                        type="number" step="0.01" 
-                        value={formData.amount} 
-                        onChange={e => setFormData({...formData, amount: e.target.value})} 
-                        className={`${inputClass} pl-8 text-lg`} 
-                        placeholder="0,00" 
-                      />
-                  </div>
-                </div>
+    <ModalPortal>
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-md p-4 animate-in fade-in">
+        <div className="w-full max-w-md bg-white rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 border border-white/20 max-h-[90vh] flex flex-col">
+          <div className={`${getColor()} px-8 py-6 flex justify-between items-center text-white shrink-0`}>
+            <div>
+              <h3 className="font-black text-xl flex items-center gap-2 uppercase italic tracking-tighter">
+                <AlertTriangle size={24} />
+                {title}
+              </h3>
+              <p className="text-[10px] font-black opacity-80 uppercase tracking-widest mt-0.5">Gestão Financeira do Lote</p>
             </div>
+            <button onClick={onClose} className="hover:bg-white/20 p-2 rounded-full transition-colors"><X size={28} /></button>
+          </div>
 
-            {/* SEÇÃO DE DESCONTO (APENAS SE NÃO FOR DESPESA GENÉRICA, OU SE FOR COMISSÃO) */}
-            {(type === 'commission' || type === 'payment' || type === 'receipt') && (
-               <div className="bg-amber-50 p-4 rounded-xl border border-amber-100">
-                  <div className="flex items-center justify-between mb-2">
-                     <label className="text-[10px] font-black text-amber-700 uppercase tracking-widest flex items-center gap-1">
-                        <MinusCircle size={12} /> Desconto / Abatimento?
-                     </label>
-                  </div>
+          <div className="overflow-y-auto p-8 flex-1 space-y-6">
+            <form id="tx-form" onSubmit={handleSubmit} className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className={labelClass}>Data da Operação</label>
+                  <input type="date" required value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} className={inputClass} />
+                </div>
+                <div>
+                  <label className={labelClass}>Valor em Dinheiro (R$)</label>
                   <div className="relative">
-                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-500 font-bold">R$</span>
-                     <input 
-                        type="number" step="0.01"
-                        value={formData.discount}
-                        onChange={e => setFormData({...formData, discount: e.target.value})}
-                        className="w-full border-2 border-amber-200 rounded-lg bg-white px-4 py-2 pl-9 text-amber-800 font-bold focus:border-amber-500 outline-none text-sm"
-                        placeholder="0,00 (Opcional)"
-                     />
-                  </div>
-                  <p className="text-[9px] text-amber-600 mt-1 font-medium leading-tight">Valor que será deduzido do saldo sem saída de caixa.</p>
-               </div>
-            )}
-
-            {/* SELETOR DE CONTA - SÓ SE TIVER DINHEIRO */}
-            {isCashMovement ? (
-                <div className="animate-in fade-in slide-in-from-top-2">
-                  <label className={labelClass}>Conta de Pagamento (Obrigatório)</label>
-                  <div className="relative">
-                      <Wallet className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-                      <select required value={formData.accountId} onChange={e => setFormData({...formData, accountId: e.target.value})} className={`${inputClass} pl-10 appearance-none pr-10`}>
-                          <option value="">Selecione o Banco...</option>
-                          {bankAccounts.map(acc => <option key={acc.id} value={acc.id}>{acc.account_name}</option>)}
-                      </select>
-                      <ArrowDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" size={16} />
+                    <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                    <input type="number" step="0.01" value={formData.amount} onChange={e => setFormData({ ...formData, amount: e.target.value })} className={`${inputClass} pl-10 text-lg border-blue-50 focus:border-blue-500`} placeholder="0,00" />
                   </div>
                 </div>
-            ) : (
-                 (valDiscount > 0) && (
-                    <div className="p-3 bg-slate-100 rounded-xl text-center text-xs text-slate-500 font-medium border border-slate-200 italic animate-in fade-in">
-                        Nenhuma movimentação bancária necessária para abatimentos puros.
-                    </div>
-                 )
-            )}
+              </div>
 
-            {/* CAMPOS ESPECÍFICOS DE DESPESA */}
-            {type === 'expense' && (
-              <div className="animate-in slide-in-from-top-2">
-                  <label className={labelClass}>Tipo de Despesa</label>
-                  <select 
-                      required 
-                      value={formData.expenseSubtypeId} 
-                      onChange={e => setFormData({...formData, expenseSubtypeId: e.target.value})} 
-                      className={`${inputClass} appearance-none pr-10 mb-4`}
-                  >
+              {(type === 'commission' || type === 'payment' || type === 'receipt') && (
+                <div className="bg-amber-50/50 p-6 rounded-[2rem] border border-amber-100">
+                  <label className={labelClass}><MinusCircle size={12} className="inline mr-1" /> Desconto / Abatimento?</label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-amber-500 font-bold">R$</span>
+                    <input type="number" step="0.01" value={formData.discount} onChange={e => setFormData({ ...formData, discount: e.target.value })} className={`${inputClass} pl-12 border-amber-50 text-amber-800 focus:border-amber-500`} placeholder="0,00" />
+                  </div>
+                </div>
+              )}
+
+              {isCashMovement ? (
+                <div className="animate-in fade-in slide-in-from-top-2">
+                  <label className={labelClass}>Conta de Movimentação (Obrigatório)</label>
+                  <div className="relative">
+                    <Wallet className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                    <select required value={formData.accountId} onChange={e => setFormData({ ...formData, accountId: e.target.value })} className={`${inputClass} pl-12 appearance-none`}>
+                      <option value="">Selecione o Banco...</option>
+                      {bankAccounts.map(acc => <option key={acc.id} value={acc.id}>{acc.account_name}</option>)}
+                    </select>
+                    <ArrowDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+                  </div>
+                </div>
+              ) : (valDiscount > 0 && (
+                <div className="p-4 bg-slate-50 rounded-2xl text-center text-[10px] text-slate-500 font-black uppercase tracking-widest italic border border-slate-100">Baixa via desconto operacional.</div>
+              ))}
+
+              {type === 'expense' && (
+                <div className="animate-in slide-in-from-top-2">
+                  <label className={labelClass}>Categoria da Despesa</label>
+                  <div className="relative">
+                    <Tags className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                    <select required value={formData.expenseSubtypeId} onChange={e => setFormData({ ...formData, expenseSubtypeId: e.target.value })} className={`${inputClass} pl-12 appearance-none`}>
                       <option value="">Selecione...</option>
                       {expenseCategories.map(cat => (
-                          <optgroup key={cat.id} label={cat.name}>
-                              {cat.subtypes.map(sub => <option key={sub.id} value={sub.id}>{sub.name}</option>)}
-                          </optgroup>
+                        <optgroup key={cat.id} label={cat.name}>
+                          {cat.subtypes.map(sub => <option key={sub.id} value={sub.id}>{sub.name}</option>)}
+                        </optgroup>
                       ))}
-                  </select>
-              </div>
-            )}
-
-            {(type === 'expense' || type === 'commission') && (
-                <div className={`p-4 rounded-xl border ${type === 'commission' ? 'bg-violet-50 border-violet-200' : 'bg-amber-50 border-amber-200'}`}>
-                    <label className="flex items-center gap-3 cursor-pointer select-none">
-                        <button type="button" onClick={() => setFormData({...formData, deductFromPartner: !formData.deductFromPartner})} className={`p-1 rounded-lg transition-colors ${formData.deductFromPartner ? (type === 'commission' ? 'text-violet-600' : 'text-amber-600') : 'text-slate-300'}`}>
-                            {formData.deductFromPartner ? <CheckSquare size={24} /> : <Square size={24} />}
-                        </button>
-                        <div>
-                            <p className={`text-xs font-black uppercase ${type === 'commission' ? 'text-violet-900' : 'text-amber-900'}`}>
-                                {type === 'commission' ? 'Debitar Comissão do Produtor?' : 'Debitar do Saldo do Produtor?'}
-                            </p>
-                            <p className={`text-[10px] font-bold leading-tight ${type === 'commission' ? 'text-violet-700' : 'text-amber-700'}`}>
-                                {formData.deductFromPartner 
-                                  ? "SIM - Desconta do saldo a pagar ao fornecedor."
-                                  : "NÃO - A empresa assume este custo."}
-                            </p>
-                        </div>
-                    </label>
+                    </select>
+                  </div>
                 </div>
-            )}
+              )}
 
-            <div>
-              <label className={labelClass}>Anotações</label>
-              <div className="relative">
-                  <FileText className="absolute left-3 top-3 text-slate-300" size={18} />
-                  <textarea rows={2} value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} className={`${inputClass} pl-10 text-[11px] font-bold h-20 resize-none`} placeholder="Detalhes adicionais..." />
+              {(type === 'expense' || type === 'commission') && (
+                <div className={`p-6 rounded-[2rem] border-2 transition-all cursor-pointer ${formData.deductFromPartner ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-100'}`} onClick={() => setFormData({ ...formData, deductFromPartner: !formData.deductFromPartner })}>
+                  <div className="flex items-center gap-4">
+                    <div className={`w-6 h-6 rounded-lg border flex items-center justify-center transition-all ${formData.deductFromPartner ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg' : 'border-slate-300 bg-white'}`}>
+                      {formData.deductFromPartner && <CheckSquare size={14} />}
+                    </div>
+                    <div>
+                      <p className="text-xs font-black text-slate-700 uppercase tracking-tight">{type === 'commission' ? 'Debitar Comissão do Produtor?' : 'Debitar do Saldo do Produtor?'}</p>
+                      <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{formData.deductFromPartner ? "Saldo devedor será deduzido." : "Empresa assume este custo."}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className={labelClass}>Observações / Memo</label>
+                <div className="relative">
+                  <FileText className="absolute left-4 top-3 text-slate-300" size={18} />
+                  <textarea rows={2} value={formData.notes} onChange={e => setFormData({ ...formData, notes: e.target.value })} className={`${inputClass} pl-12 text-xs font-medium py-3`} placeholder="Detalhes..." />
+                </div>
               </div>
-            </div>
-          </form>
-        </div>
+            </form>
+          </div>
 
-        <div className="p-6 border-t border-slate-100 flex justify-end gap-3 bg-white shrink-0">
-            <button type="button" onClick={onClose} className="px-6 py-3 border-2 border-slate-100 rounded-xl text-slate-400 font-black uppercase text-[10px] hover:bg-slate-50">Cancelar</button>
-            <button type="submit" form="tx-form" className={`px-8 py-3 rounded-xl text-white font-black uppercase text-[10px] tracking-widest shadow-xl active:scale-95 transition-all ${getColor()}`}>Confirmar Lançamento</button>
+          <div className="p-8 border-t border-slate-100 flex justify-end gap-3 bg-white shrink-0">
+            <button type="button" onClick={onClose} className="px-8 py-4 rounded-2xl border border-slate-100 text-slate-500 font-black uppercase text-xs tracking-widest hover:bg-slate-50 transition-all">Cancelar</button>
+            <button type="submit" form="tx-form" className={`px-10 py-4 rounded-2xl text-white font-black uppercase text-xs tracking-widest shadow-xl transition-all active:scale-95 ${getColor()}`}>Confirmar Lançamento</button>
+          </div>
         </div>
       </div>
-    </div>
+    </ModalPortal>
   );
 };
 

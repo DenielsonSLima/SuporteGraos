@@ -11,14 +11,17 @@ import { Loading } from '../../Loadings/types';
  * Calcula stats financeiros de um pedido de venda.
  * SKILL: lógica financeira não deve residir em componentes visuais.
  */
-export function useSalesOrderStats(order: SalesOrder, loadings: Loading[]) {
+export function useSalesOrderStats(order: SalesOrder, loadings: Loading[], transactions: any[] = []) {
   return useMemo(() => {
     const active = loadings.filter(l => l.status !== 'canceled');
     const totalDeliveredVal = active.filter(l => (l.unloadWeightKg || 0) > 0).reduce((acc, l) => acc + (l.totalSalesValue || 0), 0);
     const totalTransitVal = active.filter(l => !(l.unloadWeightKg || 0)).reduce((acc, l) => acc + (l.weightSc * (l.salesPrice || order.unitPrice || 0)), 0);
-    const totalReceived = (order.transactions || []).reduce((acc, t) => acc + t.value + (t.discountValue || 0), 0);
+
+    // Confia no total recebido vindo do SQL (v2)
+    const totalReceived = order.paidValue || 0;
+
     return { totalDeliveredVal, totalTransitVal, totalReceived, balance: Math.max(0, totalDeliveredVal - totalReceived) };
-  }, [loadings, order]);
+  }, [loadings, order, transactions]);
 }
 
 /**
@@ -39,6 +42,7 @@ export function useSalesOrderDetailsOperations() {
   const refreshData = () => {
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS });
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOADINGS });
+    queryClient.invalidateQueries({ queryKey: ['sales_order_transactions'] });
   };
 
   const confirmReceipt = async (orderId: string, data: any) => {

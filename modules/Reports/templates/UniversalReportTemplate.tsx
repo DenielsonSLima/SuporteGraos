@@ -1,19 +1,19 @@
 
 import React from 'react';
 import { GeneratedReportData } from '../types';
-import { settingsService } from '../../../services/settingsService';
 import { Sprout } from 'lucide-react';
 import { formatDateBR, getTodayBR } from '../../../utils/dateUtils';
+import { useSettings } from '../../../hooks/useSettings';
 
 interface Props {
   data: GeneratedReportData;
 }
 
 const UniversalReportTemplate: React.FC<Props> = ({ data }) => {
-  const company = settingsService.getCompanyData();
-  const watermark = settingsService.getWatermark();
+  const { company, watermark } = useSettings();
 
   const formatCNPJ = (cnpj: string) => {
+    if (!cnpj) return '';
     const digits = cnpj.replace(/\D/g, '');
     return digits.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
   };
@@ -36,7 +36,7 @@ const UniversalReportTemplate: React.FC<Props> = ({ data }) => {
             src={watermark.imageUrl}
             alt="Marca D'água"
             className="max-w-[60%] max-h-[60%] object-contain"
-            style={{ opacity: watermark.opacity / 100 }}
+            style={{ opacity: (watermark.opacity || 5) / 100 }}
           />
         ) : (
           <Sprout size={220} className="text-slate-100 opacity-15" />
@@ -56,7 +56,7 @@ const UniversalReportTemplate: React.FC<Props> = ({ data }) => {
               )}
             </div>
             <div className="flex-1">
-              <h1 className="text-xs font-black uppercase tracking-tight text-slate-950 leading-tight">{company.razaoSocial}</h1>
+              <h1 className="text-xs font-black uppercase tracking-tight text-slate-950 leading-tight">{company.razaoSocial || 'Relatório Gerencial'}</h1>
               <p className="text-[8px] text-slate-700 font-bold uppercase mt-0.5">CNPJ: {formatCNPJ(company.cnpj)}</p>
               <p className="text-[8px] text-slate-600 font-medium mt-0.5">{company.endereco}{company.numero ? `, ${company.numero}` : ''}</p>
               <p className="text-[8px] text-slate-600 font-medium">{company.cidade}/{company.uf}{company.cep ? ` - CEP ${company.cep}` : ''}</p>
@@ -123,8 +123,8 @@ const UniversalReportTemplate: React.FC<Props> = ({ data }) => {
         )}
 
         <div className="mt-auto border-t border-slate-200 pt-2 flex justify-between items-center text-[7px] font-black text-slate-400 uppercase tracking-widest">
-          <span>Relatório Automatizado • ERP Suporte Grãos</span>
-          <span>{company.nomeFantasia} • {formatDateBR(getTodayBR())}</span>
+          <span>Relatório Automatizado • {company.nomeFantasia || 'ERP'}</span>
+          <span>{company.razaoSocial || 'Gestão de Inteligência'} • {formatDateBR(getTodayBR())}</span>
         </div>
       </div>
     </div>

@@ -1,12 +1,12 @@
 
 import React from 'react';
-import { 
-  TrendingUp, 
-  TrendingDown, 
-  Scale, 
-  ShoppingCart, 
-  Truck, 
-  DollarSign, 
+import {
+  TrendingUp,
+  TrendingDown,
+  Scale,
+  ShoppingCart,
+  Truck,
+  DollarSign,
   Package,
   Activity
 } from 'lucide-react';
@@ -25,8 +25,13 @@ interface KPIProps {
 }
 
 const OperationalSummary: React.FC<KPIProps> = ({ data }) => {
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
-  const number = (val: number) => new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 }).format(val);
+  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { 
+    style: 'currency', 
+    currency: 'BRL',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(Math.abs(val || 0) < 0.005 ? 0 : (val || 0));
+  const number = (val: number) => new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 }).format(val || 0);
 
   const KpiCard = ({ label, value, subValue, icon: Icon, color, trend }: any) => (
     <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between h-full hover:shadow-md transition-shadow">
@@ -54,10 +59,10 @@ const OperationalSummary: React.FC<KPIProps> = ({ data }) => {
         <Activity size={20} className="text-slate-500" />
         Indicadores Operacionais (30 Dias)
       </h3>
-      
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        
-        <KpiCard 
+
+        <KpiCard
           label="Volume Movimentado"
           value={`${number(data.volumeSc)} SC`}
           subValue={`${number(data.volumeTon)} Toneladas`}
@@ -65,7 +70,7 @@ const OperationalSummary: React.FC<KPIProps> = ({ data }) => {
           color="bg-blue-500"
         />
 
-        <KpiCard 
+        <KpiCard
           label="Pedidos Recentes"
           value={data.ordersLast30Days}
           subValue="Compras e Vendas"
@@ -73,7 +78,7 @@ const OperationalSummary: React.FC<KPIProps> = ({ data }) => {
           color="bg-indigo-500"
         />
 
-        <KpiCard 
+        <KpiCard
           label="Custo Médio / SC"
           value={currency(data.avgCostPerSc)}
           subValue="Inclui Frete e Despesas"
@@ -81,7 +86,7 @@ const OperationalSummary: React.FC<KPIProps> = ({ data }) => {
           color="bg-rose-500"
         />
 
-        <KpiCard 
+        <KpiCard
           label="Lucro Estimado / SC"
           value={currency(data.avgProfitPerSc)}
           subValue="Margem Bruta Média"
@@ -89,7 +94,7 @@ const OperationalSummary: React.FC<KPIProps> = ({ data }) => {
           color={data.avgProfitPerSc >= 0 ? "bg-emerald-500" : "bg-red-500"}
         />
 
-        <KpiCard 
+        <KpiCard
           label="Preço Médio Compra"
           value={currency(data.avgPurchasePrice)}
           subValue="Por Saca"
@@ -97,7 +102,7 @@ const OperationalSummary: React.FC<KPIProps> = ({ data }) => {
           color="bg-slate-600"
         />
 
-        <KpiCard 
+        <KpiCard
           label="Preço Médio Venda"
           value={currency(data.avgSalesPrice)}
           subValue="Por Saca"
@@ -105,7 +110,7 @@ const OperationalSummary: React.FC<KPIProps> = ({ data }) => {
           color="bg-emerald-600"
         />
 
-        <KpiCard 
+        <KpiCard
           label="Média Frete (Ton)"
           value={currency(data.avgFreightPriceTon)}
           subValue="Custo Logístico"

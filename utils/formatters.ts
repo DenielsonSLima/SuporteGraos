@@ -15,12 +15,12 @@ export const moneyFormatter = new Intl.NumberFormat('pt-BR', {
   maximumFractionDigits: 2
 });
 
-// Formatador de moeda sem centavos (inteiro)
+// Formatador de moeda sem centavos (inteiro) -> ATUALIZADO para 2 casas a pedido do usuário
 export const currencyFormatter = new Intl.NumberFormat('pt-BR', {
   style: 'currency',
   currency: 'BRL',
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 0
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2
 });
 
 // Formatador de números decimais (4 casas)
@@ -53,7 +53,7 @@ export const formatMoney = (value: number | null | undefined): string => {
 };
 
 export const formatCurrency = (value: number | null | undefined): string => {
-  if (value === null || value === undefined) return 'R$ 0';
+  if (value === null || value === undefined) return 'R$ 0,00';
   const cleanValue = Math.abs(value) < 0.01 ? 0 : value;
   return currencyFormatter.format(cleanValue);
 };

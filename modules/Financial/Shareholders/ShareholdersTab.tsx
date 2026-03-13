@@ -16,11 +16,11 @@ const ShareholdersTab: React.FC = () => {
   const { addToast } = useToast();
   const { data: shareholders = [] } = useShareholders();
   const addTransaction = useShareholderTransaction();
-  
+
   // Navigation State
   const [viewMode, setViewMode] = useState<'list' | 'details'>('list');
   const [selectedShareholder, setSelectedShareholder] = useState<Shareholder | null>(null);
-  
+
   // Modals State
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
   const [isCreditModalOpen, setIsCreditModalOpen] = useState(false);
@@ -46,23 +46,28 @@ const ShareholdersTab: React.FC = () => {
     setIsWithdrawModalOpen(true);
   };
 
-  const handleConfirmWithdraw = (data: PaymentData) => {
+  const handleConfirmWithdraw = async (data: PaymentData) => {
     if (!selectedShareholder) return;
 
-    addTransaction.mutate({
-      shareholderId: selectedShareholder.id,
-      transaction: {
-        date: data.date,
-        type: 'debit',
-        value: data.amount,
-        description: data.notes || 'Pagamento / Retirada de Saldo',
-        accountId: data.accountName
-      }
-    });
+    try {
+      await addTransaction.mutateAsync({
+        shareholderId: selectedShareholder.id,
+        transaction: {
+          date: data.date,
+          type: 'debit',
+          value: data.amount,
+          description: data.notes || 'Pagamento / Retirada de Saldo',
+          accountId: data.accountId
+        }
+      });
 
-    setIsWithdrawModalOpen(false);
-    refreshData();
-    addToast('success', 'Pagamento Registrado');
+      setIsWithdrawModalOpen(false);
+      refreshData();
+      addToast('success', 'Pagamento Registrado');
+    } catch (err: any) {
+      console.error('[ShareholdersTab] Erro ao registrar pagamento:', err);
+      addToast('error', 'Erro ao Registrar Pagamento', err?.message || 'Tente novamente.');
+    }
   };
 
   // 2. Credit (Add Credit - Pro Labore/Profit)
@@ -75,22 +80,26 @@ const ShareholdersTab: React.FC = () => {
     setIsCreditModalOpen(true);
   };
 
-  const handleConfirmCredit = (data: { shareholderId: string; date: string; value: number; description: string; payImmediately?: boolean; accountId?: string; accountName?: string }) => {
-    // Agora o data contém o shareholderId corretamente independente de vir do botão global ou do card
-    addTransaction.mutate({
+  const handleConfirmCredit = async (data: { shareholderId: string; date: string; value: number; description: string; payImmediately?: boolean; accountId?: string; accountName?: string }) => {
+    try {
+      await addTransaction.mutateAsync({
         shareholderId: data.shareholderId,
         transaction: {
-            date: data.date,
-            type: 'credit',
-            value: data.value,
-            description: data.description,
-            accountId: data.payImmediately && data.accountId ? data.accountId : undefined
+          date: data.date,
+          type: 'credit',
+          value: data.value,
+          description: data.description,
+          accountId: data.payImmediately && data.accountId ? data.accountId : undefined
         }
-    });
+      });
 
-    setIsCreditModalOpen(false);
-    refreshData();
-    addToast('success', 'Crédito Lançado', data.payImmediately ? 'Valor lançado e baixado do caixa.' : 'Saldo pendente atualizado.');
+      setIsCreditModalOpen(false);
+      refreshData();
+      addToast('success', 'Crédito Lançado', data.payImmediately ? 'Valor lançado e baixado do caixa.' : 'Saldo pendente atualizado.');
+    } catch (err: any) {
+      console.error('[ShareholdersTab] Erro ao lançar crédito:', err);
+      addToast('error', 'Erro ao Lançar Crédito', err?.message || 'Tente novamente.');
+    }
   };
 
   // 3. Recurrence
@@ -107,20 +116,26 @@ const ShareholdersTab: React.FC = () => {
   };
 
   // 4. Bulk / Individual Process
-  const handleProcessIndividualTransaction = (type: 'credit' | 'payment', data: { shareholderId: string, date: string, value: number, description: string, accountId?: string, accountName?: string }) => {
-    addTransaction.mutate({
+  const handleProcessIndividualTransaction = async (type: 'credit' | 'payment', data: { shareholderId: string, date: string, value: number, description: string, accountId?: string, accountName?: string }) => {
+    try {
+      await addTransaction.mutateAsync({
         shareholderId: data.shareholderId,
         transaction: {
-            date: data.date,
-            type: 'credit',
-            value: data.value,
-            description: data.description,
-            accountId: type === 'payment' && data.accountId ? data.accountId : undefined
+          date: data.date,
+          type: type === 'payment' ? 'debit' : 'credit',
+          value: data.value,
+          description: data.description,
+          accountId: type === 'payment' && data.accountId ? data.accountId : undefined
         }
-    });
+      });
 
-    refreshData();
-    addToast('success', type === 'payment' ? 'Pagamento Realizado' : 'Crédito Lançado', `Valor: ${currency(data.value)}`);
+      refreshData();
+      addToast('success', type === 'payment' ? 'Pagamento Realizado' : 'Crédito Lançado', `Valor: ${currency(data.value)}`);
+    } catch (err: any) {
+      console.error('[ShareholdersTab] Erro ao processar transação:', err);
+      addToast('error', 'Erro na Transação', err?.message || 'Verifique o console para detalhes.');
+      throw err; // Re-throw para que o BulkCreditModal saiba que falhou
+    }
   };
 
   // Navigation Logic
@@ -138,22 +153,22 @@ const ShareholdersTab: React.FC = () => {
   if (viewMode === 'details' && selectedShareholder) {
     return (
       <>
-        <ShareholderDetails 
+        <ShareholderDetails
           shareholder={selectedShareholder}
           onBack={handleBackToList}
           onGeneratePdf={() => setIsPdfOpen(true)}
           onWithdraw={() => openWithdrawModal(selectedShareholder)}
           onAddCredit={() => openCreditModal(selectedShareholder)}
         />
-        
-        <ShareholderPdfModal 
-          isOpen={isPdfOpen} 
+
+        <ShareholderPdfModal
+          isOpen={isPdfOpen}
           onClose={() => setIsPdfOpen(false)}
           shareholder={selectedShareholder}
         />
 
         {isWithdrawModalOpen && selectedShareholder && (
-          <FinancialPaymentModal 
+          <FinancialPaymentModal
             isOpen={isWithdrawModalOpen}
             onClose={() => setIsWithdrawModalOpen(false)}
             onConfirm={handleConfirmWithdraw}
@@ -164,16 +179,16 @@ const ShareholdersTab: React.FC = () => {
               category: 'Retirada de Sócios',
               dueDate: new Date().toISOString().split('T')[0],
               issueDate: new Date().toISOString().split('T')[0],
-              originalValue: selectedShareholder.financial.currentBalance > 0 ? selectedShareholder.financial.currentBalance : 0, 
+              originalValue: selectedShareholder.financial.currentBalance > 0 ? selectedShareholder.financial.currentBalance : 0,
               paidValue: 0,
               status: 'pending',
-              subType: 'shareholder' 
+              subType: 'shareholder'
             }}
           />
         )}
 
         {isCreditModalOpen && (
-          <ShareholderCreditModal 
+          <ShareholderCreditModal
             isOpen={isCreditModalOpen}
             onClose={() => setIsCreditModalOpen(false)}
             onConfirm={handleConfirmCredit}
@@ -188,7 +203,7 @@ const ShareholdersTab: React.FC = () => {
   // --- RENDER LIST VIEW ---
   return (
     <div className="space-y-6 animate-in fade-in">
-      
+
       {/* Top Banner & Actions */}
       <div className="flex flex-col xl:flex-row justify-between items-center bg-white border border-slate-200 p-5 rounded-2xl gap-6 shadow-sm">
         <div className="flex items-center gap-4 w-full xl:w-auto">
@@ -200,21 +215,21 @@ const ShareholdersTab: React.FC = () => {
             <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-0.5">Gestão de saldos acumulados e retiradas</p>
           </div>
         </div>
-        
+
         <div className="flex gap-3 w-full xl:w-auto">
-             <button 
-                onClick={() => setIsBulkModalOpen(true)}
-                className="flex-1 xl:flex-none flex items-center justify-center gap-2 bg-slate-100 text-slate-700 hover:bg-slate-200 px-5 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-colors"
-             >
-                <Layers size={16} /> Painel de Lançamentos
-             </button>
-             <button 
-                onClick={() => openCreditModal()} 
-                className="flex-1 xl:flex-none flex items-center justify-center gap-2 bg-indigo-600 text-white hover:bg-indigo-700 px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all active:scale-95 shadow-lg shadow-indigo-200"
-                disabled={shareholders.length === 0}
-             >
-                <PlusCircle size={16} /> Novo Crédito
-             </button>
+          <button
+            onClick={() => setIsBulkModalOpen(true)}
+            className="flex-1 xl:flex-none flex items-center justify-center gap-2 bg-slate-100 text-slate-700 hover:bg-slate-200 px-5 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-colors"
+          >
+            <Layers size={16} /> Painel de Lançamentos
+          </button>
+          <button
+            onClick={() => openCreditModal()}
+            className="flex-1 xl:flex-none flex items-center justify-center gap-2 bg-indigo-600 text-white hover:bg-indigo-700 px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all active:scale-95 shadow-lg shadow-indigo-200"
+            disabled={shareholders.length === 0}
+          >
+            <PlusCircle size={16} /> Novo Crédito
+          </button>
         </div>
       </div>
 
@@ -228,8 +243,8 @@ const ShareholdersTab: React.FC = () => {
           </div>
         ) : (
           shareholders.map(shareholder => (
-            <ShareholderCard 
-              key={shareholder.id} 
+            <ShareholderCard
+              key={shareholder.id}
               shareholder={shareholder}
               onWithdraw={() => openWithdrawModal(shareholder)}
               onViewHistory={handleOpenDetails}
@@ -240,9 +255,9 @@ const ShareholdersTab: React.FC = () => {
       </div>
 
       {/* MODALS GLOBAIS */}
-      
+
       {isWithdrawModalOpen && selectedShareholder && (
-        <FinancialPaymentModal 
+        <FinancialPaymentModal
           isOpen={isWithdrawModalOpen}
           onClose={() => setIsWithdrawModalOpen(false)}
           onConfirm={handleConfirmWithdraw}
@@ -253,25 +268,25 @@ const ShareholdersTab: React.FC = () => {
             category: 'Retirada de Sócios',
             dueDate: new Date().toISOString().split('T')[0],
             issueDate: new Date().toISOString().split('T')[0],
-            originalValue: selectedShareholder.financial.currentBalance > 0 ? selectedShareholder.financial.currentBalance : 0, 
+            originalValue: selectedShareholder.financial.currentBalance > 0 ? selectedShareholder.financial.currentBalance : 0,
             paidValue: 0,
             status: 'pending',
-            subType: 'shareholder' 
+            subType: 'shareholder'
           }}
         />
       )}
 
       {isRecurringModalOpen && selectedShareholder && (
-        <ShareholderRecurringModal 
-            isOpen={isRecurringModalOpen}
-            onClose={() => setIsRecurringModalOpen(false)}
-            onConfirm={handleConfirmRecurring}
-            shareholder={selectedShareholder}
+        <ShareholderRecurringModal
+          isOpen={isRecurringModalOpen}
+          onClose={() => setIsRecurringModalOpen(false)}
+          onConfirm={handleConfirmRecurring}
+          shareholder={selectedShareholder}
         />
       )}
 
       {isCreditModalOpen && (
-        <ShareholderCreditModal 
+        <ShareholderCreditModal
           isOpen={isCreditModalOpen}
           onClose={() => setIsCreditModalOpen(false)}
           onConfirm={handleConfirmCredit}
@@ -280,7 +295,7 @@ const ShareholdersTab: React.FC = () => {
         />
       )}
 
-      <ShareholderBulkCreditModal 
+      <ShareholderBulkCreditModal
         isOpen={isBulkModalOpen}
         onClose={() => setIsBulkModalOpen(false)}
         shareholders={shareholders}

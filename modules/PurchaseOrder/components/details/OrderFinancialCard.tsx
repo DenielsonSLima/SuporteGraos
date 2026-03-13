@@ -5,6 +5,7 @@ import { OrderTransaction } from '../../types';
 import { formatDateBR } from '../../../../utils/dateUtils';
 import TransactionManagementModal from '../../../Financial/components/modals/TransactionManagementModal';
 import { purchaseService } from '../../../../services/purchaseService';
+import { useAccounts } from '../../../../hooks/useAccounts';
 
 interface Props {
   orderId: string;
@@ -18,12 +19,13 @@ interface Props {
 
 const OrderFinancialCard: React.FC<Props> = ({ orderId, transactions, totalOrderValue, onAddPayment, onAddAdvance, onRefresh, onDeleteTx }) => {
   const [selectedTx, setSelectedTx] = useState<OrderTransaction | null>(null);
-  
+  const { data: accounts = [] } = useAccounts();
+
   const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
   const date = (val: string) => formatDateBR(val);
 
   const financialTransactions = transactions.filter(t => t.type === 'payment' || t.type === 'advance' || t.type === 'receipt');
-  
+
   const totalSettled = financialTransactions.reduce((acc, t) => acc + (t.value || 0) + (t.discountValue || 0), 0);
   const progress = totalOrderValue > 0 ? Math.min((totalSettled / totalOrderValue) * 100, 100) : 0;
 
@@ -36,16 +38,16 @@ const OrderFinancialCard: React.FC<Props> = ({ orderId, transactions, totalOrder
         </div>
         <div className="flex gap-2">
           {/* Botão de Adiantamento Distinto */}
-          <button 
-            onClick={onAddAdvance} 
+          <button
+            onClick={onAddAdvance}
             className="text-[10px] bg-amber-100 border border-amber-200 text-amber-800 hover:bg-amber-200 px-3 py-1.5 rounded-lg font-black uppercase transition-colors flex items-center gap-1 shadow-sm"
           >
             <CreditCard size={14} />
             Adiantamento
           </button>
-          
-          <button 
-            onClick={onAddPayment} 
+
+          <button
+            onClick={onAddPayment}
             className="text-[10px] bg-emerald-600 text-white hover:bg-emerald-700 px-3 py-1.5 rounded-lg font-black uppercase transition-colors flex items-center gap-1 shadow-md active:scale-95"
           >
             <Plus size={14} />
@@ -74,6 +76,11 @@ const OrderFinancialCard: React.FC<Props> = ({ orderId, transactions, totalOrder
               const isPureAdjustment = (t.value === 0 && (t.discountValue || 0) > 0);
               const isAdvance = t.type === 'advance';
 
+              const account = accounts.find(a => a.id === t.accountId);
+              const accountLabel = account
+                ? `${account.account_name}${account.owner ? ` - ${account.owner}` : ''}`
+                : t.accountName || 'Caixa';
+
               return (
                 <div key={t.id} className={`flex flex-col p-3 rounded-xl border transition-all group relative ${isAdvance ? 'bg-amber-50 border-amber-100' : 'bg-slate-50 border-slate-200 hover:bg-white'}`}>
                   <div className="flex justify-between items-start mb-2">
@@ -89,19 +96,19 @@ const OrderFinancialCard: React.FC<Props> = ({ orderId, transactions, totalOrder
                       </div>
                     </div>
                     <div className="text-right">
-                        <span className={`font-black text-sm ${isAdvance ? 'text-amber-700' : 'text-slate-900'}`}>{currency(txSettledValue)}</span>
-                        {isPureAdjustment && <p className="text-[8px] font-bold text-slate-500 uppercase tracking-tighter">Sem Caixa</p>}
+                      <span className={`font-black text-sm ${isAdvance ? 'text-amber-700' : 'text-slate-900'}`}>{currency(txSettledValue)}</span>
+                      {isPureAdjustment && <p className="text-[8px] font-bold text-slate-500 uppercase tracking-tighter">Sem Caixa</p>}
                     </div>
                   </div>
 
                   <div className="flex items-center gap-1.5 bg-white/60 border border-slate-200/50 px-2 py-1 rounded-lg w-fit shadow-sm">
                     <Landmark size={12} className="text-slate-400" />
-                    <span className="text-[9px] font-black text-indigo-700 uppercase tracking-tighter">{t.accountName}</span>
+                    <span className="text-[9px] font-black text-indigo-700 uppercase tracking-tighter line-clamp-1">{accountLabel}</span>
                   </div>
 
                   <div className="absolute right-2 bottom-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                      <button onClick={() => setSelectedTx(t)} className="p-1.5 bg-white border border-slate-200 rounded-lg text-slate-400 hover:text-blue-600 transition-all shadow-sm"><Pencil size={12}/></button>
-                      <button onClick={() => onDeleteTx(t.id)} className="p-1.5 bg-white border border-slate-200 rounded-lg text-slate-400 hover:text-rose-600 transition-all shadow-sm"><Trash2 size={12}/></button>
+                    <button onClick={() => setSelectedTx(t)} className="p-1.5 bg-white border border-slate-200 rounded-lg text-slate-400 hover:text-blue-600 transition-all shadow-sm"><Pencil size={12} /></button>
+                    <button onClick={() => onDeleteTx(t.id)} className="p-1.5 bg-white border border-slate-200 rounded-lg text-slate-400 hover:text-rose-600 transition-all shadow-sm"><Trash2 size={12} /></button>
                   </div>
                 </div>
               );
@@ -111,10 +118,10 @@ const OrderFinancialCard: React.FC<Props> = ({ orderId, transactions, totalOrder
       </div>
 
       {selectedTx && (
-        <TransactionManagementModal 
-            isOpen={!!selectedTx} onClose={() => setSelectedTx(null)} 
-            transaction={selectedTx} onUpdate={(tx) => { purchaseService.updateTransaction(orderId, tx); onRefresh(); setSelectedTx(null); }} 
-            onDelete={(id) => { onDeleteTx(id); setSelectedTx(null); }}
+        <TransactionManagementModal
+          isOpen={!!selectedTx} onClose={() => setSelectedTx(null)}
+          transaction={selectedTx} onUpdate={(tx) => { purchaseService.updateTransaction(orderId, tx); onRefresh(); setSelectedTx(null); }}
+          onDelete={(id) => { onDeleteTx(id); setSelectedTx(null); }}
         />
       )}
     </div>

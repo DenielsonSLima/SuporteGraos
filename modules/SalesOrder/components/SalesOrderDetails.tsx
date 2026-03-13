@@ -18,6 +18,7 @@ import { ModuleId } from '../../../types';
 import { useSalesOrders } from '../../../hooks/useSalesOrders';
 import { useLoadingsBySalesOrder } from '../../../hooks/useLoadings';
 import { useSalesOrderDetailsOperations, useSalesOrderStats, useCrossModuleNavigation } from '../hooks/useSalesOrderDetailsOperations';
+import { useSalesOrderTransactions } from '../hooks/useSalesOrderTransactions';
 
 interface Props {
   order: SalesOrder;
@@ -35,9 +36,14 @@ const SalesOrderDetails: React.FC<Props> = ({ order, onBack, onEdit, onDelete, o
   // Live data via TanStack Query (cache + realtime automático)
   // currentOrder sempre reflete o estado mais recente do banco; order prop é apenas o fallback inicial
   const { data: allOrders = [] } = useSalesOrders();
-  const currentOrder: SalesOrder = allOrders.find(o => o.id === order.id) ?? order;
+  const currentOrder: SalesOrder = allOrders.find(o =>
+    o.id === order.id ||
+    (o.legacy_id && o.legacy_id === order.id) ||
+    o.number === order.id ||
+    o.number === order.number
+  ) ?? order;
 
-  const { data: loadings = [] } = useLoadingsBySalesOrder(order.id);
+  const { data: loadings = [] } = useLoadingsBySalesOrder(currentOrder.id || order.id);
 
   const [isPayModalOpen, setIsPayModalOpen] = useState(false);
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
@@ -46,11 +52,14 @@ const SalesOrderDetails: React.FC<Props> = ({ order, onBack, onEdit, onDelete, o
   const [selectedLoading, setSelectedLoading] = useState<Loading | null>(null);
   const [isFinalizePromptOpen, setIsFinalizePromptOpen] = useState(false);
 
+  // Busca as transações financeiras reais do banco (recebimentos)
+  const { data: realTransactions = [] } = useSalesOrderTransactions(currentOrder.id);
+
   // Não é mais necessário useEffect para carregar dados:
   // useSalesOrders() + useLoadingsBySalesOrder() gerenciam isso com cache + realtime.
 
   // Stats delegados ao hook (SKILL: lógica financeira fora de componentes visuais)
-  const stats = useSalesOrderStats(currentOrder, loadings);
+  const stats = useSalesOrderStats(currentOrder, loadings, realTransactions);
 
   const handleConfirmReceipt = async (data: any) => {
     await confirmReceipt(currentOrder.id, data);
@@ -121,7 +130,7 @@ const SalesOrderDetails: React.FC<Props> = ({ order, onBack, onEdit, onDelete, o
       <SalesLoadingsTable loadings={loadings} onNavigateToPurchase={(id) => navigateTo(ModuleId.PURCHASE_ORDER, id)} onViewLoading={setSelectedLoading} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
-        <SalesFinancialCard orderId={currentOrder.id} transactions={currentOrder.transactions || []} totalOrderValue={stats.totalDeliveredVal} onAddReceipt={() => setIsPayModalOpen(true)} onRefresh={refreshData} />
+        <SalesFinancialCard orderId={currentOrder.id} transactions={realTransactions} totalOrderValue={stats.totalDeliveredVal} onAddReceipt={() => setIsPayModalOpen(true)} onRefresh={refreshData} />
         <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
           <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest mb-6 border-b border-slate-50 pb-2">Anotações da Venda</h3>
           <button onClick={() => setIsNoteModalOpen(true)} className="w-full py-3 border-2 border-dashed border-slate-200 rounded-xl text-[10px] font-black uppercase text-slate-400 hover:border-blue-300 hover:text-blue-600 transition-all">+ Nova Observação</button>

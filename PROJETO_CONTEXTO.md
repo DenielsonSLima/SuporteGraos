@@ -1,0 +1,37 @@
+# Suporte Grãos ERP — Contexto do Sistema
+
+## O que é este projeto
+Sistema de Gestão Empresarial (ERP) especializado para trading e corretagem de grãos (milho, soja, arroz), focado no gerenciamento de contratos de compra/venda e logística de transporte.
+
+## Stack tecnológica
+- **Frontend**: React (Vite) + TypeScript
+- **Backend / DB**: Supabase (PostgreSQL + RLS + Edge Functions)
+- **Estilização**: Tailwind CSS (conforme skills, embora o sistema use muito Vanilla CSS e componentes personalizados)
+- **Hospedagem**: Vercel
+
+## Arquitetura e estrutura de pastas
+- `modules/`: Componentes e lógica agrupados por domínio de negócio (Financeiro, Logística, Pedidos, etc.)
+- `services/`: Camada de comunicação com o Supabase e lógica de negócio centralizada.
+- `hooks/`: Custom hooks para gestão de estado e chamadas de dados.
+- `supabase/`: Migrações e definições do banco de dados.
+
+## Padrões e convenções adotadas
+- **Componentização**: Uso extensivo de modais e componentes UI personalizados com foco em estética premium.
+- **Segurança**: RLS (Row Level Security) habilitado no Supabase.
+- **Financeiro**: Lógica crítica sendo movida para RPCs no banco de dados para garantir atomicidade.
+- **Nomenclatura**: PascalCase para componentes, camelCase para funções e arquivos de lógica.
+- **Modais (Portal)**: TODOS os modais devem utilizar o componente `ModalPortal` (`components/ui/ModalPortal.tsx`) para renderizar no root do documento. Isso evita que o modal fique preso em contextos de empilhamento (ex: `transition` no `<main>`) e garante que ele cubra o cabeçalho e bloqueie interações externas.
+
+## Decisões técnicas importantes
+- **Paginação Manual no PDF**: Implementada para contornar limitações do Puppeteer com quebras de página em tabelas complexas.
+- **Integração com API Brasil**: Uso do endpoint de decodificador para obter dados completos de veículos (incluindo transmissão).
+
+## Contexto de negócio
+Sistema utilizado por traders de grãos para gerenciar o fluxo desde o contrato de compra com o produtor até a entrega ao comprador, controlando fretes, comissões e saldos bancários.
+
+## Erros comuns — não repita
+- **UUID vs Name**: Não enviar o nome da conta bancária para o backend em campos que esperam UUID (ex: `account_id` em lançamentos financeiros).
+- **Category vs Subcategory ID**: A tabela `admin_expenses` referencia `expense_categories` (pai), mas o formulário usa `expense_subcategories` (filho). Sempre mapear para o ID do pai ao salvar no banco.
+- **RPC condicional sem financial_entry**: A `rpc_create_admin_expense` criava `financial_entries` apenas quando `payee_id IS NOT NULL`. Despesas diretas (sem parceiro) ficavam sem entry, quebrando a baixa. Corrigido para SEMPRE criar a entry.
+- **remainingValue no adapter**: O `FinancialPaymentModal` usa `record.remainingValue` para calcular o saldo devedor. Se o adapter (`toFinancialRecord`) não popular esse campo, o modal exibe R$ 0,00. Sempre incluir `remainingValue` ao construir `FinancialRecord`.
+- **Modal sem Portal**: Modais renderizados dentro do `<main>` não cobrem o cabeçalho e permitem cliques na busca global devido ao contexto de empilhamento do CSS. **Sempre** use `ModalPortal`.

@@ -71,7 +71,7 @@ export function useEntryTransactions(entryId: string | null) {
 // Hook: Transações de um período
 export function useTransactionsByDateRange(startDate: string, endDate: string) {
   const key = QUERY_KEYS.TRANSACTIONS_DATE_RANGE('all', startDate, endDate);
-  useTransactionsRealtimeInvalidation(key);
+  useTransactionsRealtimeInvalidation(['financial_transactions']);
 
   return useQuery({
     queryKey: key,
@@ -84,8 +84,8 @@ export function useTransactionsByDateRange(startDate: string, endDate: string) {
 
 // Hook: Totais (inflow/outflow/net) de um período — RPC server-side, zero cálculo frontend
 export function useTransactionTotals(startDate: string, endDate: string) {
-  const key = ['transaction_totals', startDate, endDate] as const;
-  useTransactionsRealtimeInvalidation(key);
+  const key = QUERY_KEYS.TRANSACTION_TOTALS(startDate, endDate);
+  useTransactionsRealtimeInvalidation(['financial_transactions']);
 
   return useQuery({
     queryKey: key,

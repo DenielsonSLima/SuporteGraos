@@ -72,11 +72,11 @@ export const financialService = {
    * Foundation V2: Agora extrai do LedgerService, que usa triggers no Supabase.
    */
   getBankAccountsWithBalances: (): BankAccountWithBalance[] => {
-    const accounts = ledgerService.getAll();
+    const accounts = ledgerService?.getAll?.() || [];
 
-    return accounts.map((acc: any) => ({
+    return (accounts || []).map((acc: any) => ({
       ...acc,
-      currentBalance: acc.currentBalance || 0
+      currentBalance: acc?.currentBalance || 0
     }));
   }
 };

@@ -20,7 +20,7 @@ import { Partner } from '../../Partners/types';
 import { AdvanceTransaction } from './types';
 import AdvanceForm from './components/AdvanceForm';
 import AdvanceListPdfModal from './components/AdvanceListPdfModal';
-import TransactionModal from '../../PurchaseOrder/components/modals/TransactionModal';
+import SettleAdvanceModal from './components/SettleAdvanceModal';
 import { useToast } from '../../../contexts/ToastContext';
 import { useAdvancesOperations } from './hooks/useAdvancesOperations';
 
@@ -112,7 +112,7 @@ const AdvancesTab: React.FC = () => {
               }`}
           >
             <ArrowDownLeft size={16} />
-            Recebidos Ativos
+            Dinheiro Entrando
           </button>
           <button
             onClick={() => setActiveSubTab('given')}
@@ -120,7 +120,7 @@ const AdvancesTab: React.FC = () => {
               }`}
           >
             <ArrowUpRight size={16} />
-            Concedidos Ativos
+            Dinheiro Saindo
           </button>
           <button
             onClick={() => setActiveSubTab('history')}
@@ -242,7 +242,9 @@ const AdvancesTab: React.FC = () => {
 
               <div className="pt-5 border-t border-slate-100 flex justify-between items-center">
                 <div>
-                  <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-1">Valor do Adiantamento</p>
+                  <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-1">
+                    {tx.type === 'given' ? 'Valor que eu Paguei' : 'Valor que eu Recebi'}
+                  </p>
                   <p className={`text-2xl font-black tracking-tighter ${tx.type === 'taken' ? 'text-amber-600' : 'text-indigo-600'}`}>
                     {currency(tx.value)}
                   </p>
@@ -271,12 +273,11 @@ const AdvancesTab: React.FC = () => {
       />
 
       {txToSettle && (
-        <TransactionModal
+        <SettleAdvanceModal
           isOpen={isSettleModalOpen}
           onClose={() => setIsSettleModalOpen(false)}
           onSave={onConfirmSettle}
-          type="receipt"
-          title={`Baixar Saldo - ${txToSettle.partnerName}`}
+          advance={txToSettle}
         />
       )}
 

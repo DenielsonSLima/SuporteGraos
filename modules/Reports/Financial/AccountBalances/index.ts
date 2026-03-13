@@ -1,7 +1,8 @@
 
 import { Wallet } from 'lucide-react';
 import { ReportModule } from '../../types';
-import { financialService } from '../../../../services/financialService';
+import { accountsService } from '../../../../services/accountsService';
+import { initialBalanceService } from '../../../../services/initialBalanceService';
 import { financialTransactionsService } from '../../../../services/financialTransactionsService';
 import Template from './Template';
 import PdfDocument from './PdfDocument';
@@ -21,10 +22,10 @@ const accountBalancesMonthlyReport: ReportModule = {
   },
   FilterComponent: Filters,
   fetchData: async ({ year }) => {
-    const selectedYear = parseInt(year);
-    const accounts = financialService.getBankAccounts();
-    const initialBalances = financialService.getInitialBalances();
+    const accounts = await accountsService.getAll();
+    const initialBalances = await initialBalanceService.getAll();
 
+    const selectedYear = parseInt(year);
     const transactionsByAccountEntries = await Promise.all(
       accounts.map(async (account) => {
         const transactions = await financialTransactionsService.getByAccount(account.id);
@@ -71,7 +72,7 @@ const accountBalancesMonthlyReport: ReportModule = {
       columns: [
         { header: 'Mês Referência', accessor: 'month' },
         ...accounts.map(acc => ({ 
-            header: acc.bankName, 
+            header: acc.account_name, 
             accessor: `balance_${acc.id}`, 
             format: 'currency' as const, 
             align: 'right' as const 

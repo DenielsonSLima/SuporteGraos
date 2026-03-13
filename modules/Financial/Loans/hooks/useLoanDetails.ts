@@ -5,6 +5,7 @@
 // ============================================================================
 
 import { useState, useMemo, useCallback } from 'react';
+import { supabase } from '../../../../services/supabase';
 import { loansService } from '../../../../services/loansService';
 import { financialActionService } from '../../../../services/financialActionService';
 import { standaloneRecordsService } from '../../../../services/standaloneRecordsService';
@@ -23,14 +24,86 @@ export function useLoanDetails({ loan, onUpdate, onBack, addToast }: UseLoanDeta
   const [deletingTxRecord, setDeletingTxRecord] = useState<any | null>(null);
 
   // ─── Extrato financeiro ─────────────────────────────────
+  // ─── Extrato financeiro (Legado + Canônico) ─────────────────
+  const [canonicalTransactions, setCanonicalTransactions] = useState<any[]>([]);
+
+  // Busca transações canônicas via Supabase
+  const fetchCanonical = useCallback(async () => {
+    try {
+      // Primeiro buscamos os IDs das entries vinculadas ao empréstimo
+      const { data: entries } = await supabase
+        .from('financial_entries')
+        .select('id')
+        .eq('origin_id', loan.id)
+        .eq('origin_type', 'loan');
+
+      if (!entries || entries.length === 0) {
+        setCanonicalTransactions([]);
+        return;
+      }
+
+      const entryIds = entries.map(e => e.id);
+
+      // 2. BUSCA COMPLEMENTAR: Buscar transações pela descrição (para pegar as que não estão vinculadas via entry_id)
+      const { data: keywordData } = await supabase
+        .from('financial_transactions')
+        .select(`
+          id,
+          transaction_date,
+          description,
+          amount,
+          account_id,
+          type
+        `)
+        .ilike('description', `%${loan.id}%`);
+
+      // 3. BUSCA CANÔNICA: transações das entries
+      const { data: entryData } = await supabase
+        .from('financial_transactions')
+        .select(`
+          id,
+          transaction_date,
+          description,
+          amount,
+          account_id,
+          type
+        `)
+        .in('entry_id', entryIds);
+
+      // Unificar sem duplicados (por ID)
+      const allData = [...(entryData || []), ...(keywordData || [])];
+      const uniqueData = Array.from(new Map(allData.map(item => [item.id, item])).values());
+
+      setCanonicalTransactions(uniqueData.map(t => ({
+        id: t.id,
+        issueDate: t.transaction_date,
+        description: t.description,
+        paidValue: Number(t.amount),
+        bankAccount: t.account_id,
+        subType: t.type === 'credit' ? 'receipt' : 'admin'
+      })));
+    } catch (err) {
+      console.error('[useLoanDetails] Failed to fetch canonical tx:', err);
+    }
+  }, [loan.id]);
+
+  useMemo(() => {
+    fetchCanonical();
+  }, [fetchCanonical, txVersion]);
+
   const financialHistory = useMemo(() => {
-    return (financialActionService.getStandaloneRecords() as any[])
+    // 1. RegistrosLegado (admin_expenses)
+    const legacy = (financialActionService.getStandaloneRecords() as any[])
       .filter((r: any) => {
-        return r.id?.startsWith(loan.id) && ['receipt', 'admin'].includes(r.subType || '') && r.paidValue > 0;
-      })
+        return r.id?.startsWith(loan.id) &&
+          ['receipt', 'admin', 'loan_taken', 'loan_granted'].includes(r.subType || '') &&
+          (r.paidValue > 0 || r.originalValue > 0);
+      });
+
+    // 2. Unificar e ordenar
+    return [...legacy, ...canonicalTransactions]
       .sort((a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loan.id, txVersion]);
+  }, [loan.id, txVersion, canonicalTransactions]);
 
   // ─── Helpers de tipo ────────────────────────────────────
   const getTxTypeFromRecord = useCallback((subType?: string): 'increase' | 'decrease' => {
@@ -48,21 +121,39 @@ export function useLoanDetails({ loan, onUpdate, onBack, addToast }: UseLoanDeta
     try {
       // SALVAR ou ATUALIZAR registro auxiliar (movimentação)
       if (tx.id) {
-        const subType = resolveSubTypeFromTx(tx.type);
-        await standaloneRecordsService.update({
-          id: tx.id,
-          description: tx.description || (tx.type === 'increase' ? 'Reforço de Empréstimo' : 'Pagamento de Empréstimo'),
-          entityName: loan.entityName,
-          category: 'Empréstimos',
-          dueDate: tx.date,
-          issueDate: tx.date,
-          originalValue: tx.value,
-          paidValue: tx.value,
-          discountValue: 0,
-          status: 'paid',
-          subType: subType as any,
-          bankAccount: tx.accountId
-        });
+        const isUuid = tx.id.length > 20; // Check if it's a real UUID (canonical) or our legacy prefixed ID
+
+        if (isUuid) {
+          // UPDATE na tabela canônica
+          const { error: updateError } = await supabase
+            .from('financial_transactions')
+            .update({
+              description: tx.description,
+              amount: tx.value,
+              transaction_date: tx.date,
+              account_id: tx.accountId
+            })
+            .eq('id', tx.id);
+
+          if (updateError) throw updateError;
+        } else {
+          // UPDATE na tabela legado/auxiliar
+          const subType = resolveSubTypeFromTx(tx.type);
+          await standaloneRecordsService.update({
+            id: tx.id,
+            description: tx.description || (tx.type === 'increase' ? 'Reforço de Empréstimo' : 'Pagamento de Empréstimo'),
+            entityName: loan.entityName,
+            category: 'Empréstimos',
+            dueDate: tx.date,
+            issueDate: tx.date,
+            originalValue: tx.value,
+            paidValue: tx.value,
+            discountValue: 0,
+            status: 'paid',
+            subType: subType as any,
+            bankAccount: tx.accountId
+          });
+        }
       } else if (tx.accountId) {
         const subType = resolveSubTypeFromTx(tx.type);
         const txId = crypto.randomUUID().slice(0, 9);

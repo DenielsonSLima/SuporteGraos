@@ -7,10 +7,10 @@
 // ============================================================================
 
 import { supabase } from './supabase';
-import { authService } from './authService';
+
 
 export type FinancialEntryType = 'payable' | 'receivable';
-export type OriginType = 
+export type OriginType =
   | 'purchase_order'
   | 'sales_order'
   | 'commission'
@@ -18,9 +18,10 @@ export type OriginType =
   | 'loan'
   | 'advance'
   | 'transfer'
+  | 'credit'
   | 'freight';
 
-export type EntryStatus = 'open' | 'partially_paid' | 'paid' | 'overdue' | 'cancelled';
+export type EntryStatus = 'open' | 'partially_paid' | 'paid' | 'overdue' | 'cancelled' | 'reversed';
 
 export interface FinancialEntry {
   id: string;
@@ -32,6 +33,8 @@ export interface FinancialEntry {
   total_amount: number;
   paid_amount: number;
   remaining_amount: number;
+  deductions_amount?: number;
+  net_amount?: number;
   status: EntryStatus;
   created_date: string;
   due_date?: string;
@@ -86,6 +89,8 @@ function mapRow(row: any): FinancialEntry {
     total_amount: parseFloat(row.total_amount ?? '0'),
     paid_amount: parseFloat(row.paid_amount ?? '0'),
     remaining_amount: parseFloat(row.remaining_amount ?? '0'),
+    deductions_amount: parseFloat(row.deductions_amount ?? '0'),
+    net_amount: parseFloat(row.net_amount ?? '0'),
     status: row.status,
     created_date: row.created_date,
     due_date: row.due_date,
@@ -225,6 +230,18 @@ export const financialEntriesService = {
     return data ? mapRow(data) : null;
   },
 
+  // LEITURA — Busca por origem (ex: despesa, pedido)
+  getByOrigin: async (originType: OriginType, originId: string): Promise<FinancialEntry[]> => {
+    const { data, error } = await supabase
+      .from('financial_entries')
+      .select('*')
+      .eq('origin_type', originType)
+      .eq('origin_id', originId);
+
+    if (error) throw new Error(`Erro ao buscar entries por origem: ${error.message}`);
+    return (data ?? []).map(mapRow);
+  },
+
   // LEITURA — Totais por tipo (SQL aggregate via RPC, zero reduce no browser)
   getTotalsByType: async (
     type: FinancialEntryType,
@@ -298,10 +315,12 @@ export const financialEntriesService = {
     let channel: ReturnType<typeof supabase.channel> | null = null;
     const listeners = new Set<(entryType: string | undefined) => void>();
 
-    const ensureChannel = () => {
-      if (channel) return;
+    const ensureChannel = async () => {
 
-      const companyId = authService.getCurrentUser()?.companyId;
+      const { authService } = await import('./authService');
+      const user = authService.getCurrentUser();
+      const companyId = user?.companyId;
+
 
       channel = supabase
         .channel('realtime:financial_entries')

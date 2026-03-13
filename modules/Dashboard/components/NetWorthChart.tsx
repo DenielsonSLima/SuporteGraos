@@ -12,13 +12,15 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { TrendingUp, TrendingDown } from 'lucide-react';
-import { formatCurrency } from '../../../utils/formatters';
+import { formatMoney } from '../../../utils/formatters';
 
 interface NetWorthData {
   name: string;
   netWorth: number;
-  assets: number;
-  liabilities: number;
+  recebido: number;
+  aReceber: number;
+  pago: number;
+  aPagar: number;
   monthlyChange: number;
 }
 
@@ -50,14 +52,13 @@ const NetWorthChart: React.FC<Props> = React.memo(({ data, growthPercent }) => {
 
       const labels: typeof midLabels = [];
       for (let i = 1; i < coords.length; i++) {
-        const change = data[i]?.monthlyChange;
-        if (!change || change === 0) continue;
+        const change = data[i]?.monthlyChange || 0;
 
         labels.push({
           x: (coords[i - 1].x + coords[i].x) / 2,
           y: Math.min(coords[i - 1].y, coords[i].y) - 18,
           label: `${change > 0 ? '+' : ''}${change.toFixed(1)}%`,
-          positive: change > 0,
+          positive: change >= 0,
         });
       }
       setMidLabels(labels);
@@ -74,24 +75,40 @@ const NetWorthChart: React.FC<Props> = React.memo(({ data, growthPercent }) => {
         <div className="bg-white p-4 rounded-xl border-2 border-slate-200 shadow-xl">
           <p className="font-bold text-slate-700 mb-2">{d.name}</p>
           <div className="space-y-1 text-sm">
-            <p className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-emerald-500"></span>
-              <span className="text-slate-600">Ativos:</span>
-              <span className="font-bold text-emerald-700">{formatCurrency(d.assets)}</span>
-            </p>
-            <p className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-rose-500"></span>
-              <span className="text-slate-600">Passivos:</span>
-              <span className="font-bold text-rose-700">{formatCurrency(d.liabilities)}</span>
-            </p>
-            <p className="flex items-center gap-2 pt-2 border-t border-slate-200">
+            <div className="flex gap-4 mb-2 pb-2 border-b border-slate-200">
+              <div className="flex-1">
+                <p className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full bg-emerald-600"></span>
+                  <span className="text-slate-600 text-xs">Recebido:</span>
+                  <span className="font-bold text-emerald-800 text-xs">{formatMoney(d.recebido)}</span>
+                </p>
+                <p className="flex items-center gap-2 mt-1">
+                  <span className="w-3 h-3 rounded-full bg-emerald-300"></span>
+                  <span className="text-slate-600 text-xs">A Receber:</span>
+                  <span className="font-bold text-emerald-600 text-xs">{formatMoney(d.aReceber)}</span>
+                </p>
+              </div>
+              <div className="flex-1">
+                <p className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full bg-rose-600"></span>
+                  <span className="text-slate-600 text-xs">Pago:</span>
+                  <span className="font-bold text-rose-800 text-xs">{formatMoney(d.pago)}</span>
+                </p>
+                <p className="flex items-center gap-2 mt-1">
+                  <span className="w-3 h-3 rounded-full bg-rose-300"></span>
+                  <span className="text-slate-600 text-xs">A Pagar:</span>
+                  <span className="font-bold text-rose-600 text-xs">{formatMoney(d.aPagar)}</span>
+                </p>
+              </div>
+            </div>
+            <p className="flex items-center gap-2 pt-1 border-slate-200">
               <span className="w-3 h-3 rounded-full bg-purple-500"></span>
-              <span className="text-slate-600">Patrimônio:</span>
-              <span className="font-bold text-purple-700">{formatCurrency(d.netWorth)}</span>
+              <span className="text-slate-600">Patrimônio Líquido:</span>
+              <span className="font-bold text-purple-700">{formatMoney(d.netWorth)}</span>
             </p>
             {d.monthlyChange !== 0 && (
-              <p className={`text-xs font-bold pt-1 ${d.monthlyChange > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                {d.monthlyChange > 0 ? '+' : ''}{d.monthlyChange.toFixed(1)}% vs mês anterior
+              <p className={`text-xs font-bold pt-1 ${(d.monthlyChange || 0) > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                {(d.monthlyChange || 0) > 0 ? '+' : ''}${(d.monthlyChange || 0).toFixed(1)}% vs mês anterior
               </p>
             )}
           </div>
@@ -111,13 +128,13 @@ const NetWorthChart: React.FC<Props> = React.memo(({ data, growthPercent }) => {
             <TrendingUp size={20} className="text-purple-500" />
             Evolução Patrimonial (Últimos 6 Meses)
           </h3>
-          <p className="text-xs text-slate-500 mt-1">Ativos - Passivos = Patrimônio Líquido</p>
+          <p className="text-xs text-slate-500 mt-1">Geração de Patrimônio, Contas a Receber e a Pagar</p>
         </div>
 
         {/* Badge de Crescimento */}
         <div className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm ${isPositiveGrowth
-            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-            : 'bg-red-50 text-red-700 border border-red-200'
+          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+          : 'bg-red-50 text-red-700 border border-red-200'
           }`}>
           {isPositiveGrowth ? (
             <TrendingUp size={18} />
@@ -125,7 +142,7 @@ const NetWorthChart: React.FC<Props> = React.memo(({ data, growthPercent }) => {
             <TrendingDown size={18} />
           )}
           <span>
-            {isPositiveGrowth ? '+' : ''}{growthPercent.toFixed(1)}%
+            {isPositiveGrowth ? '+' : ''}{(growthPercent || 0).toFixed(1)}%
           </span>
           <span className="text-xs font-medium opacity-70">no período</span>
         </div>
@@ -145,6 +162,7 @@ const NetWorthChart: React.FC<Props> = React.memo(({ data, growthPercent }) => {
             />
 
             <YAxis
+              yAxisId="left"
               axisLine={false}
               tickLine={false}
               tick={{ fill: '#94a3b8', fontSize: 10 }}
@@ -153,6 +171,7 @@ const NetWorthChart: React.FC<Props> = React.memo(({ data, growthPercent }) => {
 
             <Tooltip
               content={<CustomTooltip />}
+              wrapperStyle={{ zIndex: 50 }}
             />
 
             <Legend
@@ -160,12 +179,17 @@ const NetWorthChart: React.FC<Props> = React.memo(({ data, growthPercent }) => {
               iconType="circle"
             />
 
-            {/* Barras: Ativos e Passivos */}
-            <Bar dataKey="assets" name="Ativos" fill="#10b981" radius={[4, 4, 0, 0]} barSize={30} />
-            <Bar dataKey="liabilities" name="Passivos" fill="#f43f5e" radius={[4, 4, 0, 0]} barSize={30} />
+            {/* Barras: Entrada Empilhada (a) */}
+            <Bar yAxisId="left" stackId="a" dataKey="recebido" name="Recebido no Mês" fill="#059669" barSize={20} />
+            <Bar yAxisId="left" stackId="a" dataKey="aReceber" name="A Receber (Fim do Mês)" fill="#6ee7b7" radius={[4, 4, 0, 0]} barSize={20} />
+            
+            {/* Barras: Saída Empilhada (b) */}
+            <Bar yAxisId="left" stackId="b" dataKey="pago" name="Pago no Mês" fill="#e11d48" barSize={20} />
+            <Bar yAxisId="left" stackId="b" dataKey="aPagar" name="A Pagar (Fim do Mês)" fill="#fda4af" radius={[4, 4, 0, 0]} barSize={20} />
 
-            {/* Linha: Patrimônio Líquido */}
+            {/* Linha: Net Worth */}
             <Line
+              yAxisId="left"
               type="monotone"
               dataKey="netWorth"
               name="Patrimônio Líquido"
@@ -186,14 +210,14 @@ const NetWorthChart: React.FC<Props> = React.memo(({ data, growthPercent }) => {
               top: ml.y,
               transform: 'translate(-50%, -50%)',
               pointerEvents: 'none',
+              zIndex: 10,
             }}
           >
             <span
-              className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold border ${
-                ml.positive
+              className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold border ${ml.positive
                   ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                   : 'bg-red-50 text-red-700 border-red-200'
-              }`}
+                }`}
             >
               {ml.label}
             </span>

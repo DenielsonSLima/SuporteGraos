@@ -8,7 +8,12 @@ interface Props {
   orders: PurchaseOrder[];
 }
 
-const formatCurrency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
+const formatCurrency = (val: number) => new Intl.NumberFormat('pt-BR', { 
+  style: 'currency', 
+  currency: 'BRL',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2
+}).format(Math.abs(val) < 0.005 ? 0 : val);
 
 const KPIs: React.FC<Props> = ({ orders }) => {
   

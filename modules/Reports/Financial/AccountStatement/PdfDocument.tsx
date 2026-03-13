@@ -6,8 +6,10 @@ import { PdfWatermark } from '../../../../components/pdf/PdfWatermark';
 import { PdfFooter } from '../../../../components/pdf/PdfFooter';
 import { PdfTable } from '../../../../components/pdf/PdfTable';
 import { GeneratedReportData } from '../../types';
+import { settingsService } from '../../../../services/settingsService';
 
 const PdfDocument: React.FC<{ data: GeneratedReportData }> = ({ data }) => {
+  const company = settingsService.getCompanyData();
   const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(!val || Math.abs(val) < 0.005 ? 0 : val);
   const date = (val: string) => new Date(val).toLocaleDateString('pt-BR');
 
@@ -18,37 +20,37 @@ const PdfDocument: React.FC<{ data: GeneratedReportData }> = ({ data }) => {
 
   const columns = [
     { header: 'Data', accessor: 'date', width: '10%', render: (row: any) => date(row.date) },
-    { 
-      header: 'Histórico / Descrição', 
-      accessor: 'description', 
+    {
+      header: 'Histórico / Descrição',
+      accessor: 'description',
       width: '35%',
       render: (row: any) => `${row.description}\n${row.entity}`
     },
     { header: 'Natureza', accessor: 'category', width: '15%' },
-    { 
-      header: 'Entrada (+)', 
-      accessor: 'credit', 
-      width: '13%', 
+    {
+      header: 'Entrada (+)',
+      accessor: 'credit',
+      width: '13%',
       align: 'right' as const,
       render: (row: any) => row.credit ? currency(row.credit) : '',
       style: () => ({ color: '#059669' })
     },
-    { 
-      header: 'Saída (-)', 
-      accessor: 'debit', 
-      width: '13%', 
+    {
+      header: 'Saída (-)',
+      accessor: 'debit',
+      width: '13%',
       align: 'right' as const,
       render: (row: any) => row.debit ? currency(row.debit) : '',
       style: () => ({ color: '#dc2626' })
     },
-    { 
-      header: 'Saldo Acum.', 
-      accessor: 'balanceAfter', 
-      width: '14%', 
+    {
+      header: 'Saldo Acum.',
+      accessor: 'balanceAfter',
+      width: '14%',
       align: 'right' as const,
       render: (row: any) => currency(row.balanceAfter),
-      style: (row: any) => ({ 
-        fontWeight: 'bold', 
+      style: (row: any) => ({
+        fontWeight: 'bold',
         color: row.balanceAfter >= 0 ? '#1e293b' : '#dc2626',
         backgroundColor: '#f8fafc'
       })
@@ -60,12 +62,12 @@ const PdfDocument: React.FC<{ data: GeneratedReportData }> = ({ data }) => {
       <Page size="A4" style={pdfStyles.page}>
         <PdfWatermark />
         <PdfHeader title={data.title} subtitle={data.subtitle} />
-        
+
         {/* Box de Saldo Anterior */}
-        <View style={{ 
-          backgroundColor: '#1e293b', 
-          padding: 12, 
-          borderRadius: 8, 
+        <View style={{
+          backgroundColor: '#1e293b',
+          padding: 12,
+          borderRadius: 8,
           marginBottom: 12,
           flexDirection: 'row',
           justifyContent: 'space-between',
@@ -107,22 +109,22 @@ const PdfDocument: React.FC<{ data: GeneratedReportData }> = ({ data }) => {
               </Text>
             </View>
           ) : (
-            <PdfTable 
-              columns={columns} 
-              data={data.rows} 
-              alternateRows 
+            <PdfTable
+              columns={columns}
+              data={data.rows}
+              alternateRows
             />
           )}
         </View>
 
         {/* Saldo Final em Destaque */}
-        <View style={{ 
-          marginTop: 20, 
-          alignItems: 'flex-end' 
+        <View style={{
+          marginTop: 20,
+          alignItems: 'flex-end'
         }}>
-          <View style={{ 
-            backgroundColor: '#1e293b', 
-            padding: 16, 
+          <View style={{
+            backgroundColor: '#1e293b',
+            padding: 16,
             borderRadius: 12,
             minWidth: 200,
             borderBottomWidth: 4,
@@ -131,20 +133,20 @@ const PdfDocument: React.FC<{ data: GeneratedReportData }> = ({ data }) => {
             <Text style={{ fontSize: 8, color: '#94a3b8', textTransform: 'uppercase', fontWeight: 'bold' }}>
               Saldo Final em Conta
             </Text>
-            <Text style={{ 
-              fontSize: 18, 
-              color: finalBalance >= 0 ? '#ffffff' : '#f87171', 
-              fontWeight: 'bold', 
-              marginTop: 4 
+            <Text style={{
+              fontSize: 18,
+              color: finalBalance >= 0 ? '#ffffff' : '#f87171',
+              fontWeight: 'bold',
+              marginTop: 4
             }}>
               {currency(finalBalance)}
             </Text>
             <Text style={{ fontSize: 6, color: '#64748b', textTransform: 'uppercase', marginTop: 4 }}>
-              Conciliado via Sistema Suporte Grãos
+              Conciliado via {company.nomeFantasia || 'ERP'}
             </Text>
           </View>
         </View>
-        
+
         <PdfFooter />
       </Page>
     </Document>

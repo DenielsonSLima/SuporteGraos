@@ -340,7 +340,7 @@ const PdfDocument: React.FC<Props> = ({ order, loadings, variant, company, water
 
             <View style={stylesInternal.footer}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Text style={[stylesInternal.footerText, stylesInternal.footerAccent]}>ERP Suporte Graos Intelligence v1.8</Text>
+                <Text style={[stylesInternal.footerText, stylesInternal.footerAccent]}>{company.nomeFantasia || 'ERP'} Intelligence</Text>
                 <Text style={[stylesInternal.footerText, { marginLeft: 6 }]}>| Relatorio emitido por: {order.consultantName || '-'}</Text>
               </View>
               <Text style={stylesInternal.footerText}>
@@ -563,7 +563,7 @@ const PdfDocument: React.FC<Props> = ({ order, loadings, variant, company, water
 
           <View style={styles.footer}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={[styles.footerText, styles.footerAccent]}>Suporte Graos Intelligence v1.8</Text>
+              <Text style={[styles.footerText, styles.footerAccent]}>{company.nomeFantasia || 'ERP'} Intelligence</Text>
               <Text style={[styles.footerText, { marginLeft: 6 }]}>| Este extrato e um comprovante oficial</Text>
             </View>
             <Text style={styles.footerText}>

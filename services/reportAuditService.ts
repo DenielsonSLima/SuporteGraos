@@ -5,6 +5,7 @@ import { Persistence } from './persistence';
 
 export interface ReportAccessLog {
   id: string;
+  companyId: string;
   userId: string;
   reportId: string;
   reportTitle: string;
@@ -24,6 +25,7 @@ let _realtimeStarted = false;
 
 const mapReportLogFromDb = (record: any): ReportAccessLog => ({
   id: record.id,
+  companyId: record.company_id,
   userId: record.user_id,
   reportId: record.report_id,
   reportTitle: record.report_title,
@@ -35,6 +37,7 @@ const mapReportLogFromDb = (record: any): ReportAccessLog => ({
 
 const mapReportLogToDb = (log: ReportAccessLog) => ({
   id: log.id,
+  company_id: log.companyId,
   user_id: log.userId,
   report_id: log.reportId,
   report_title: log.reportTitle,
@@ -129,6 +132,7 @@ export const reportAuditService = {
     
     const log: ReportAccessLog = {
       id: crypto.randomUUID(),
+      companyId: user?.companyId || '',
       userId: user?.id || 'system',
       reportId,
       reportTitle,
@@ -151,6 +155,7 @@ export const reportAuditService = {
     
     const log: ReportAccessLog = {
       id: crypto.randomUUID(),
+      companyId: user?.companyId || '',
       userId: user?.id || 'system',
       reportId,
       reportTitle,

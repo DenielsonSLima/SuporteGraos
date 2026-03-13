@@ -275,6 +275,9 @@ const ReportScreen: React.FC<Props> = ({ reportModule, reportId, onBack }) => {
           isOpen={isHtmlPdfOpen}
           onClose={() => setIsHtmlPdfOpen(false)}
           reportId={reportId}
+          initialFilters={filters}
+          initialStartDate={filters.startDate}
+          initialEndDate={filters.endDate}
         />
       )}
 

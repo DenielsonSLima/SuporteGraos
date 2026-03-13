@@ -198,7 +198,7 @@ const PartnerDossierTemplate: React.FC<Props> = ({ data }) => {
 
         <div className="mt-10 pt-4 border-t border-slate-100 flex justify-between items-center text-[7px] font-black text-slate-400 uppercase tracking-widest">
           <div className="flex gap-4">
-            <span className="flex items-center gap-1"><Sprout size={10} className="text-emerald-500" /> Suporte Grãos Intelligence</span>
+            <span className="flex items-center gap-1"><Sprout size={10} className="text-emerald-500" /> {company.nomeFantasia || 'ERP'} Intelligence</span>
             <span>Documento de Conferência Interna</span>
           </div>
           <span>Página 1 de 1</span>

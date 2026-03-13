@@ -16,21 +16,37 @@ import { useEffect } from 'react';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { QUERY_KEYS, STALE_TIMES } from './queryKeys';
 import { financialEntriesService } from '../services/financialEntriesService';
+import { financialTransactionService } from '../services/financial/financialTransactionService';
+import { accountsService } from '../services/accountsService';
+import { assetService } from '../services/assetService';
 import { cashierService } from '../modules/Cashier/services/cashierService';
 
 /**
  * Relatório do mês atual — dados vêm do SQL (RPC).
- * Invalida automaticamente quando entries financeiras mudam.
- * (entries são o melhor proxy — toda operação gera/atualiza uma entry)
+ * Invalida automaticamente quando houver mudança em:
+ * 1. Entries (obrigações)
+ * 2. Transactions (movimentações/caixa)
+ * 3. Accounts (saldos/transferências)
  */
 export function useCashierCurrentMonth() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    const unsub = financialEntriesService.subscribeRealtime(() => {
+    const invalidate = () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT });
-    });
-    return unsub;
+    };
+
+    const unsubEntries = financialEntriesService.subscribeRealtime(invalidate);
+    const unsubTx = financialTransactionService.subscribeRealtime(invalidate);
+    const unsubAccounts = accountsService.subscribeRealtime(invalidate);
+    const unsubAssets = assetService.subscribeRealtime(invalidate);
+
+    return () => {
+      unsubEntries();
+      unsubTx();
+      unsubAccounts();
+      unsubAssets();
+    };
   }, [queryClient]);
 
   return useQuery({

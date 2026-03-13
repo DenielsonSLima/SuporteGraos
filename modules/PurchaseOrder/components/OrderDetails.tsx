@@ -11,20 +11,20 @@ import PurchaseOrderHeader from './details/PurchaseOrderHeader';
 import PurchaseOperationalKPIs from './details/PurchaseOperationalKPIs';
 import PurchaseProfitabilityKPIs from './details/PurchaseProfitabilityKPIs';
 import OrderFinancialCard from './details/OrderFinancialCard';
-import OrderExpensesCard from './details/Expenses/OrderExpensesCard'; 
-import OrderBrokerCard from './details/OrderBrokerCard'; 
+import OrderExpensesCard from './details/Expenses/OrderExpensesCard';
+import OrderBrokerCard from './details/OrderBrokerCard';
 import OrderObservationsCard from './details/OrderObservationsCard';
 import OrderProductCard from './details/OrderProductCard';
 import PurchaseLoadingsTable from './details/PurchaseLoadingsTable';
 
 // MODALS
-import PurchasePaymentModal from './modals/PurchasePaymentModal'; 
+import PurchasePaymentModal from './modals/PurchasePaymentModal';
 import PurchaseAdvanceModal from './modals/PurchaseAdvanceModal'; // NOVO IMPORT
-import TransactionModal from './modals/TransactionModal'; 
+import TransactionModal from './modals/TransactionModal';
 import TransactionManagementModal from '../../Financial/components/modals/TransactionManagementModal';
 import ActionConfirmationModal from '../../../components/ui/ActionConfirmationModal';
 import NoteModal from './modals/NoteModal';
-import PdfPreviewModal, { PdfVariant } from './modals/PdfPreviewModal'; 
+import PdfPreviewModal, { PdfVariant } from './modals/PdfPreviewModal';
 import ExpenseFormModal from './details/Expenses/ExpenseFormModal';
 import LoadingForm from '../../Loadings/components/LoadingForm';
 import LoadingManagement from '../../Loadings/components/LoadingManagement';
@@ -40,25 +40,26 @@ interface Props {
 
 const OrderDetails: React.FC<Props> = ({ order, onBack, onEdit, onDelete, onFinalize }) => {
   // Lógica extraída para o hook
-  const { 
-    currentOrder, 
-    loadings, 
-    stats, 
-    isFinalizePromptOpen, 
+  const {
+    currentOrder,
+    loadings,
+    stats,
+    mergedTransactions,
+    isFinalizePromptOpen,
     setIsFinalizePromptOpen,
-    actions 
+    actions
   } = usePurchaseOrderLogic(order, onFinalize);
 
   // Estados de UI (Modais)
   const [isPayModalOpen, setIsPayModalOpen] = useState(false);
   const [isAdvanceModalOpen, setIsAdvanceModalOpen] = useState(false); // NOVO STATE
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
-  const [isBrokerModalOpen, setIsBrokerModalOpen] = useState(false); 
+  const [isBrokerModalOpen, setIsBrokerModalOpen] = useState(false);
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [isPdfOpen, setIsPdfOpen] = useState(false);
   const [pdfVariant, setPdfVariant] = useState<PdfVariant>('producer');
   const [showLoadingForm, setShowLoadingForm] = useState(false);
-  
+
   // Seleções
   const [selectedTx, setSelectedTx] = useState<OrderTransaction | null>(null);
   const [selectedLoading, setSelectedLoading] = useState<Loading | null>(null);
@@ -126,9 +127,9 @@ const OrderDetails: React.FC<Props> = ({ order, onBack, onEdit, onDelete, onFina
           <button onClick={() => { setPdfVariant('internal'); setIsPdfOpen(true); }} className="px-4 py-2.5 rounded-xl border border-slate-900 bg-slate-900 text-[10px] font-black uppercase text-white hover:bg-slate-800 transition-all flex items-center gap-2 shadow-lg">
             <ShieldCheck size={16} /> PDF Completo (Gerencial)
           </button>
-          
+
           <div className="w-px h-10 bg-slate-200 mx-1"></div>
-          
+
           {currentOrder.status !== 'completed' && (
             <button onClick={onFinalize} className="px-4 py-2.5 rounded-xl bg-emerald-600 text-xs font-black uppercase text-white hover:bg-emerald-700 shadow-lg">Finalizar</button>
           )}
@@ -139,7 +140,7 @@ const OrderDetails: React.FC<Props> = ({ order, onBack, onEdit, onDelete, onFina
 
       <PurchaseOrderHeader order={currentOrder} />
 
-      <PurchaseOperationalKPIs 
+      <PurchaseOperationalKPIs
         totalLoaded={stats.totalPurchaseVal}
         totalSettled={stats.totalSettled}
         totalPending={stats.balancePartner}
@@ -147,91 +148,91 @@ const OrderDetails: React.FC<Props> = ({ order, onBack, onEdit, onDelete, onFina
         advanceBalance={stats.advanceBalance} // PASSA O SALDO DE ADIANTAMENTO
       />
 
-      <PurchaseProfitabilityKPIs 
+      <PurchaseProfitabilityKPIs
         totalPurchase={stats.totalPurchaseVal}
         totalFreight={stats.totalFreightVal}
         totalSales={stats.totalSalesVal}
         avgSalesPrice={stats.avgSalesPrice}
-        transactions={currentOrder.transactions || []} 
+        transactions={mergedTransactions}
       />
 
-      <OrderProductCard 
-          productName={currentOrder.items[0]?.productName || 'Grão'}
-          totalKg={stats.totalKg}
-          totalSc={stats.totalSc}
-          avgPurchasePrice={stats.avgPurchasePrice}
-          totalPurchaseValue={stats.totalPurchaseVal}
+      <OrderProductCard
+        productName={currentOrder.items[0]?.productName || 'Grão'}
+        totalKg={stats.totalKg}
+        totalSc={stats.totalSc}
+        avgPurchasePrice={stats.avgPurchasePrice}
+        totalPurchaseValue={stats.totalPurchaseVal}
       />
 
       <div className="mb-10">
-        <PurchaseLoadingsTable 
-            loadings={loadings} 
-            onViewLoading={setSelectedLoading} 
-            onAddNew={() => setShowLoadingForm(true)} 
-            onDeleteLoading={setPendingDeleteLoadingId} 
+        <PurchaseLoadingsTable
+          loadings={loadings}
+          onViewLoading={setSelectedLoading}
+          onAddNew={() => setShowLoadingForm(true)}
+          onDeleteLoading={setPendingDeleteLoadingId}
         />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          <OrderFinancialCard 
-              orderId={currentOrder.id}
-              transactions={currentOrder.transactions || []} 
-              totalOrderValue={stats.totalPurchaseVal} 
-              onAddPayment={() => setIsPayModalOpen(true)} 
-              onAddAdvance={() => setIsAdvanceModalOpen(true)} // ABRE MODAL DE ADIANTAMENTO
-              onRefresh={() => actions.refreshLoadings()}
-              onDeleteTx={setPendingDeleteTxId}
-          />
-          <OrderExpensesCard 
-            transactions={currentOrder.transactions || []}
-            onAddExpense={() => setIsExpenseModalOpen(true)}
-            onEditTx={setSelectedTx}
-            onDeleteTx={setPendingDeleteTxId}
-          />
+        <OrderFinancialCard
+          orderId={currentOrder.id}
+          transactions={mergedTransactions}
+          totalOrderValue={stats.totalPurchaseVal}
+          onAddPayment={() => setIsPayModalOpen(true)}
+          onAddAdvance={() => setIsAdvanceModalOpen(true)} // ABRE MODAL DE ADIANTAMENTO
+          onRefresh={() => actions.refreshLoadings()}
+          onDeleteTx={setPendingDeleteTxId}
+        />
+        <OrderExpensesCard
+          transactions={mergedTransactions}
+          onAddExpense={() => setIsExpenseModalOpen(true)}
+          onEditTx={setSelectedTx}
+          onDeleteTx={setPendingDeleteTxId}
+        />
       </div>
 
       <div className="mb-8">
-         <OrderObservationsCard notes={currentOrder.notesList || []} onAddNote={() => setIsNoteModalOpen(true)} />
+        <OrderObservationsCard notes={currentOrder.notesList || []} onAddNote={() => setIsNoteModalOpen(true)} />
       </div>
 
       {currentOrder.hasBroker && (
         <div className="mb-8">
-            <OrderBrokerCard 
-                brokerName={currentOrder.brokerName || 'Não Informado'}
-                commissionPerSc={currentOrder.brokerCommissionPerSc || 0}
-                totalDue={stats.totalCommissionDue}
-                transactions={currentOrder.transactions || []}
-                onAddPayment={() => setIsBrokerModalOpen(true)}
-                onEditTx={setSelectedTx}
-                onDeleteTx={setPendingDeleteTxId}
-            />
+          <OrderBrokerCard
+            brokerName={currentOrder.brokerName || 'Não Informado'}
+            commissionPerSc={currentOrder.brokerCommissionPerSc || 0}
+            totalDue={stats.totalCommissionDue}
+            transactions={mergedTransactions}
+            onAddPayment={() => setIsBrokerModalOpen(true)}
+            onEditTx={setSelectedTx}
+            onDeleteTx={setPendingDeleteTxId}
+          />
         </div>
       )}
 
       {/* --- MODALS --- */}
-      
-      <PurchasePaymentModal 
-        isOpen={isPayModalOpen} 
-        onClose={() => setIsPayModalOpen(false)} 
-        onConfirm={onPaymentConfirm} 
+
+      <PurchasePaymentModal
+        isOpen={isPayModalOpen}
+        onClose={() => setIsPayModalOpen(false)}
+        onConfirm={onPaymentConfirm}
         totalPending={stats.balancePartner}
         recordDescription={`Produtor ${currentOrder.partnerName}`}
       />
 
-      <PurchaseAdvanceModal 
+      <PurchaseAdvanceModal
         isOpen={isAdvanceModalOpen}
         onClose={() => setIsAdvanceModalOpen(false)}
         onConfirm={onAdvanceConfirm}
         partnerName={currentOrder.partnerName}
       />
 
-      <ExpenseFormModal 
+      <ExpenseFormModal
         isOpen={isExpenseModalOpen}
         onClose={() => setIsExpenseModalOpen(false)}
         onSave={onExpenseSave}
       />
-      
-      <TransactionModal 
+
+      <TransactionModal
         isOpen={isBrokerModalOpen}
         onClose={() => setIsBrokerModalOpen(false)}
         onSave={onCommissionSave}
@@ -240,41 +241,41 @@ const OrderDetails: React.FC<Props> = ({ order, onBack, onEdit, onDelete, onFina
       />
 
       {selectedTx && (
-        <TransactionManagementModal 
-            isOpen={!!selectedTx} 
-            onClose={() => setSelectedTx(null)} 
-            transaction={selectedTx} 
-            onUpdate={onTxUpdate} 
-            onDelete={setPendingDeleteTxId} 
-            title={selectedTx.type === 'expense' ? "Editar Despesa Extra" : (selectedTx.type === 'commission' ? "Editar Comissão" : (selectedTx.type === 'advance' ? "Editar Adiantamento" : "Editar Pagamento"))} 
+        <TransactionManagementModal
+          isOpen={!!selectedTx}
+          onClose={() => setSelectedTx(null)}
+          transaction={selectedTx}
+          onUpdate={onTxUpdate}
+          onDelete={setPendingDeleteTxId}
+          title={selectedTx.type === 'expense' ? "Editar Despesa Extra" : (selectedTx.type === 'commission' ? "Editar Comissão" : (selectedTx.type === 'advance' ? "Editar Adiantamento" : "Editar Pagamento"))}
         />
       )}
 
-      <ActionConfirmationModal 
-          isOpen={!!pendingDeleteTxId} 
-          onClose={() => setPendingDeleteTxId(null)} 
-          onConfirm={() => { if(pendingDeleteTxId) actions.handleDeleteTx(pendingDeleteTxId); setPendingDeleteTxId(null); }} 
-          title="Estornar Lançamento?" 
-          description="O valor sairá do histórico e o saldo voltará a constar como aberto." 
-          type="danger" 
+      <ActionConfirmationModal
+        isOpen={!!pendingDeleteTxId}
+        onClose={() => setPendingDeleteTxId(null)}
+        onConfirm={() => { if (pendingDeleteTxId) actions.handleDeleteTx(pendingDeleteTxId); setPendingDeleteTxId(null); }}
+        title="Estornar Lançamento?"
+        description="O valor sairá do histórico e o saldo voltará a constar como aberto."
+        type="danger"
       />
 
-      <ActionConfirmationModal 
-          isOpen={!!pendingDeleteLoadingId} 
-          onClose={() => setPendingDeleteLoadingId(null)} 
-            onConfirm={() => { if(pendingDeleteLoadingId) { actions.handleDeleteLoading(pendingDeleteLoadingId); } setPendingDeleteLoadingId(null); }} 
-          title="Excluir Romaneio?" 
-          description="⚠️ AVISO: O frete será DELETADO do Financeiro também! Esta ação é permanente." 
-          type="danger" 
+      <ActionConfirmationModal
+        isOpen={!!pendingDeleteLoadingId}
+        onClose={() => setPendingDeleteLoadingId(null)}
+        onConfirm={() => { if (pendingDeleteLoadingId) { actions.handleDeleteLoading(pendingDeleteLoadingId); } setPendingDeleteLoadingId(null); }}
+        title="Excluir Romaneio?"
+        description="⚠️ AVISO: O frete será DELETADO do Financeiro também! Esta ação é permanente."
+        type="danger"
       />
-      
-      <ActionConfirmationModal 
-        isOpen={isFinalizePromptOpen} 
-        onClose={() => setIsFinalizePromptOpen(false)} 
-        onConfirm={actions.confirmFinalize} 
-        title="Saldo Quitado!" 
-        description="O pagamento zerou o saldo devedor deste pedido. Deseja marcar como FINALIZADO?" 
-        type="success" 
+
+      <ActionConfirmationModal
+        isOpen={isFinalizePromptOpen}
+        onClose={() => setIsFinalizePromptOpen(false)}
+        onConfirm={actions.confirmFinalize}
+        title="Saldo Quitado!"
+        description="O pagamento zerou o saldo devedor deste pedido. Deseja marcar como FINALIZADO?"
+        type="success"
         confirmLabel="Sim, Finalizar Pedido"
         cancelLabel="Manter Aberto"
       />

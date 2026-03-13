@@ -79,12 +79,12 @@ export function useLoadingFinancialOperations({ loading, onUpdate }: UseLoadingF
       extraExpenses: [...(loading.extraExpenses || []), expense]
     });
 
-    // 2. Registra no histórico financeiro geral
+    // 2. Registra no histórico financeiro geral (vincunlado ao frete)
     financialActionService.processRecord(
-      `expense-${loading.id}-${expense.id}`,
+      `fr-${loading.id}`,
       {
         amount: expenseData.value,
-        discount: expenseData.discount || 0,
+        discount: expenseData.discountValue || 0,
         date: expenseData.date,
         accountId: expenseData.accountId,
         accountName: expenseData.accountName,
@@ -108,15 +108,15 @@ export function useLoadingFinancialOperations({ loading, onUpdate }: UseLoadingF
     const updatedTransactions = (currentLoading.transactions || []).map((t: any) =>
       t.id === editPayment.id
         ? {
-            ...t,
-            date: data.date,
-            value: amount,
-            discountValue: discount,
-            accountId: data.accountId,
-            accountName: data.accountName,
-            notes: data.notes,
-            type: t.type || 'payment'
-          }
+          ...t,
+          date: data.date,
+          value: amount,
+          discountValue: discount,
+          accountId: data.accountId,
+          accountName: data.accountName,
+          notes: data.notes,
+          type: t.type || 'payment'
+        }
         : t
     );
 

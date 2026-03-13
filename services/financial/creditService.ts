@@ -1,15 +1,14 @@
 import { Persistence } from '../persistence';
 import { supabase } from '../supabase';
-import { invalidateDashboardCache } from '../dashboardCache';
-import { invalidateFinancialCache } from '../financialCache';
 import { logService } from '../logService';
 import { auditService } from '../auditService';
 import { authService } from '../authService';
 import { FinancialRecord } from '../../modules/Financial/types';
 import { shouldSkipLegacyTableOps } from '../realtimeTableAvailability';
-import { sqlCanonicalOpsLog } from '../sqlCanonicalOps';
+import { isSqlCanonicalOpsEnabled, sqlCanonicalOpsLog } from '../sqlCanonicalOps';
 import { creditMathService } from './credits/creditMathService';
 import { creditReportsService } from './credits/creditReportsService';
+import { financialTransactionService } from './financialTransactionService';
 
 // Tipos de créditos
 export type CreditType = 'credit_income' | 'investment';
@@ -30,6 +29,24 @@ let isLoaded = false;
 // ============================================================================
 
 const startRealtime = () => {
+  const canonicalMode = isSqlCanonicalOpsEnabled();
+
+  if (canonicalMode) {
+    if (realtimeChannel) return;
+    realtimeChannel = supabase
+      .channel('realtime:financial_entries_credits')
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'financial_entries', filter: 'origin_type=eq.credit'
+      }, () => {
+        isLoaded = false;
+        void loadFromSupabase();
+        invalidateFinancialCache();
+        invalidateDashboardCache();
+      })
+      .subscribe();
+    return;
+  }
+
   if (shouldSkipLegacyTableOps('credits')) {
     sqlCanonicalOpsLog('creditService.startRealtime ignorado: tabela credits indisponível no modo canônico');
     return;
@@ -129,6 +146,29 @@ const toSupabase = (record: FinancialRecord) => {
   return result;
 };
 
+/**
+ * Converte FinancialEntry para FinancialRecord
+ */
+const fromFinancialEntry = (row: any): FinancialRecord => {
+  return {
+    id: row.id,
+    description: row.description || 'Lançamento Financeiro',
+    entityName: 'Crédito',
+    category: 'income',
+    dueDate: row.due_date,
+    issueDate: row.created_date || row.due_date || new Date().toISOString(),
+    settlementDate: row.paid_date,
+    originalValue: parseFloat(row.total_amount) || 0,
+    paidValue: parseFloat(row.paid_amount || 0) || 0,
+    remainingValue: parseFloat(row.remaining_amount || 0) || 0,
+    discountValue: parseFloat(row.deductions_amount || 0) || 0,
+    status: row.status,
+    subType: 'credit_income', 
+    bankAccount: row.bank_account_id || '',
+    notes: row.notes || '',
+  };
+};
+
 // ============================================================================
 // FUNCIONALIDADES PRINCIPAIS
 // ============================================================================
@@ -137,6 +177,30 @@ const toSupabase = (record: FinancialRecord) => {
  * Carrega créditos do Supabase e armazena em cache
  */
 export const loadFromSupabase = async (): Promise<FinancialRecord[]> => {
+  const canonicalMode = isSqlCanonicalOpsEnabled();
+
+  if (canonicalMode) {
+    try {
+      const { data, error } = await supabase
+        .from('financial_entries')
+        .select('*')
+        .eq('origin_type', 'credit')
+        .neq('status', 'cancelled')
+        .order('created_date', { ascending: false });
+
+      if (error) {
+        return [];
+      }
+
+      const records = (data || []).map(fromFinancialEntry);
+      db.setAll(records);
+      isLoaded = true;
+      return records;
+    } catch (err) {
+      return [];
+    }
+  }
+
   if (shouldSkipLegacyTableOps('credits')) {
     sqlCanonicalOpsLog('creditService.loadFromSupabase ignorado: tabela credits indisponível no modo canônico');
     db.setAll([]);
@@ -172,6 +236,49 @@ export const loadFromSupabase = async (): Promise<FinancialRecord[]> => {
  * Cria um novo crédito
  */
 export const create = async (credit: FinancialRecord): Promise<Credit | null> => {
+  const canonicalMode = isSqlCanonicalOpsEnabled();
+
+  if (canonicalMode) {
+    try {
+      const user = authService.getCurrentUser();
+      const companyId = user?.companyId;
+      if (!companyId) return null;
+
+      const insertPayload = {
+          id: credit.id,
+          company_id: companyId,
+          type: 'receivable',
+          origin_type: 'credit',
+          origin_id: credit.id,
+          description: credit.description,
+          total_amount: credit.originalValue,
+          paid_amount: credit.paidValue || 0,
+          due_date: credit.dueDate,
+          status: credit.status || 'open',
+          created_date: credit.issueDate || new Date().toISOString().split('T')[0],
+        };
+
+      const { data, error } = await supabase
+        .from('financial_entries')
+        .insert(insertPayload)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('[creditService.create] Supabase error:', error.message, error.details, error.hint);
+        return null;
+      }
+
+      const mapped = fromFinancialEntry(data);
+      db.add(mapped);
+      
+      invalidateFinancialCache();
+      return mapped as Credit;
+    } catch (err) {
+      return null;
+    }
+  }
+
   if (shouldSkipLegacyTableOps('credits')) {
     sqlCanonicalOpsLog('creditService.create ignorado: tabela credits indisponível no modo canônico');
     return null;
@@ -245,6 +352,39 @@ export const create = async (credit: FinancialRecord): Promise<Credit | null> =>
  * Atualiza um crédito existente
  */
 export const update = async (id: string, updates: Partial<FinancialRecord>): Promise<Credit | null> => {
+  const canonicalMode = isSqlCanonicalOpsEnabled();
+
+  if (canonicalMode) {
+    try {
+      const { data, error } = await supabase
+        .from('financial_entries')
+        .update({
+          description: updates.description,
+          total_amount: updates.originalValue,
+          due_date: updates.dueDate,
+          status: updates.status,
+          paid_amount: updates.paidValue,
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('[creditService.update] Supabase error:', error.message, error.details, error.hint);
+        return null;
+      }
+
+      const mapped = fromFinancialEntry(data);
+      const records = db.getAll();
+      db.setAll(records.map(r => r.id === id ? mapped : r));
+      
+      invalidateFinancialCache();
+      return mapped as Credit;
+    } catch (err) {
+      return null;
+    }
+  }
+
   if (shouldSkipLegacyTableOps('credits')) {
     sqlCanonicalOpsLog('creditService.update ignorado: tabela credits indisponível no modo canônico');
     return null;
@@ -305,6 +445,35 @@ export const update = async (id: string, updates: Partial<FinancialRecord>): Pro
  * Remove um crédito
  */
 export const remove = async (id: string): Promise<boolean> => {
+  const canonicalMode = isSqlCanonicalOpsEnabled();
+
+  if (canonicalMode) {
+    try {
+      // No modo canônico, preferimos marcar como cancelado em vez de deletar
+      const { error } = await supabase
+        .from('financial_entries')
+        .update({ status: 'cancelled' })
+        .eq('id', id);
+
+      if (error) return false;
+
+      // Criar estorno da transação financeira para abater o saldo da conta
+      const reversalSuccess = await financialTransactionService.deleteByEntryId(id);
+
+      if (!reversalSuccess) {
+        // Se falhar o estorno, não removemos do cache local para manter consistência
+        return false;
+      }
+
+      const records = db.getAll();
+      db.setAll(records.filter(r => r.id !== id));
+      invalidateFinancialCache();
+      return true;
+    } catch (err) {
+      return false;
+    }
+  }
+
   if (shouldSkipLegacyTableOps('credits')) {
     sqlCanonicalOpsLog('creditService.remove ignorado: tabela credits indisponível no modo canônico');
     return false;
@@ -320,10 +489,21 @@ export const remove = async (id: string): Promise<boolean> => {
       return false;
     }
 
+    // O fallback para legado também deve tentar estornar, se aplicável
+    const legacyReversalSuccess = await financialTransactionService.deleteByEntryId(id);
+    
+    if (!legacyReversalSuccess) {
+        // Se falhar o estorno, não removemos do cache local para manter consistência
+        return false;
+    }
+
     const records = db.getAll();
     db.setAll(records.filter(r => r.id !== id));
 
-    const { userId, userName } = getLogInfo();
+    const {
+      userId,
+      userName
+    } = getLogInfo();
     logService.addLog({
       userId,
       userName,
@@ -358,6 +538,31 @@ export const remove = async (id: string): Promise<boolean> => {
  * Inscreve-se para atualizações em tempo real
  */
 export const subscribe = (callback: (credits: FinancialRecord[]) => void): (() => void) => {
+  const canonicalMode = isSqlCanonicalOpsEnabled();
+
+  if (canonicalMode) {
+    const channel = supabase
+      .channel('financial_entries_credits_sub')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'financial_entries',
+          filter: 'origin_type=eq.credit'
+        },
+        async () => {
+          const records = await loadFromSupabase();
+          callback(records);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }
+
   if (shouldSkipLegacyTableOps('credits')) {
     return () => {};
   }
@@ -406,7 +611,7 @@ export const calculateTotalValue = (
  */
 export const getCredits = (): FinancialRecord[] => {
   const all = db.getAll() || [];
-  return all.filter(c => ['credit_income', 'investment'].includes(c.subType || ''));
+  return all.filter(c => ['credit_income', 'investment'].includes(c.subType || '') && c.status !== 'cancelled');
 };
 
 /**
@@ -441,6 +646,15 @@ export const getOtherMonthsCredits = (): FinancialRecord[] => {
 export const getSummary = () => {
   const credits = getCredits();
   return creditReportsService.getSummary(credits);
+};
+
+// Invalidation helpers to avoid circular dependencies
+const invalidateFinancialCache = () => {
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event('financial:updated'));
+};
+
+const invalidateDashboardCache = () => {
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event('dashboard:updated'));
 };
 
 export default {

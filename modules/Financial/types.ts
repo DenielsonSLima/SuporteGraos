@@ -1,5 +1,5 @@
 
-export type FinancialStatus = 'pending' | 'paid' | 'overdue' | 'partial';
+export type FinancialStatus = 'pending' | 'paid' | 'overdue' | 'partial' | 'cancelled' | 'reversed';
 
 export interface FinancialRecord {
   id: string;
@@ -31,6 +31,8 @@ export interface FinancialRecord {
   orderNumber?: string; // número do pedido vinculado (ex: PV-2026-389)
   companyId?: string;
   remainingValue?: number;
+  deductionsAmount?: number;
+  netAmount?: number;
 }
 
 export interface LoanTransaction {

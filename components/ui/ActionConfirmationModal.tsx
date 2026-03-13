@@ -15,6 +15,8 @@ interface Props {
   type?: 'danger' | 'success' | 'warning';
 }
 
+import ModalPortal from './ModalPortal';
+
 const ActionConfirmationModal: React.FC<Props> = ({
   isOpen,
   onClose,
@@ -43,40 +45,42 @@ const ActionConfirmationModal: React.FC<Props> = ({
   const colors = getColors();
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 p-4 animate-in fade-in">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-6 transform transition-all scale-100 border border-slate-100">
-        <div className="flex flex-col items-center text-center">
-          
-          <div className={`h-16 w-16 rounded-full flex items-center justify-center mb-4 ${colors.bg} ${colors.icon}`}>
-            {type === 'success' ? <CheckCircle size={32} /> : <AlertTriangle size={32} />}
-          </div>
-          
-          <h3 className="text-xl font-bold text-slate-900 mb-2">{title}</h3>
-          
-          <div className="text-sm text-slate-500 mb-8 leading-relaxed">
-            {content}
-          </div>
-          
-          <div className="flex gap-3 w-full">
-            {/* Renderiza o botão cancelar apenas se houver texto definido */}
-            {cancelLabel && (
+    <ModalPortal>
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 p-4 animate-in fade-in">
+        <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-6 transform transition-all scale-100 border border-slate-100">
+          <div className="flex flex-col items-center text-center">
+            
+            <div className={`h-16 w-16 rounded-full flex items-center justify-center mb-4 ${colors.bg} ${colors.icon}`}>
+              {type === 'success' ? <CheckCircle size={32} /> : <AlertTriangle size={32} />}
+            </div>
+            
+            <h3 className="text-xl font-bold text-slate-900 mb-2">{title}</h3>
+            
+            <div className="text-sm text-slate-500 mb-8 leading-relaxed">
+              {content}
+            </div>
+            
+            <div className="flex gap-3 w-full">
+              {/* Renderiza o botão cancelar apenas se houver texto definido */}
+              {cancelLabel && (
+                <button 
+                  onClick={handleClose}
+                  className="flex-1 px-4 py-3 bg-white border border-slate-300 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition-colors"
+                >
+                  {cancelLabel}
+                </button>
+              )}
               <button 
-                onClick={handleClose}
-                className="flex-1 px-4 py-3 bg-white border border-slate-300 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition-colors"
+                onClick={async () => { await onConfirm(); handleClose(); }}
+                className={`flex-1 px-4 py-3 text-white font-bold rounded-xl shadow-md transition-colors flex items-center justify-center gap-2 ${colors.btn}`}
               >
-                {cancelLabel}
+                {confirmLabel}
               </button>
-            )}
-            <button 
-              onClick={async () => { await onConfirm(); handleClose(); }}
-              className={`flex-1 px-4 py-3 text-white font-bold rounded-xl shadow-md transition-colors flex items-center justify-center gap-2 ${colors.btn}`}
-            >
-              {confirmLabel}
-            </button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </ModalPortal>
   );
 };
 

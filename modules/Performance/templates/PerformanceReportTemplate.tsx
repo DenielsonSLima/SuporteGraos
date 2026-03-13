@@ -1,7 +1,6 @@
 
 import React from 'react';
 import { PerformanceReport } from '../types';
-import { settingsService } from '../../../services/settingsService';
 import { formatMoney } from '../../../utils/formatters';
 import FinancialKPIs from '../components/FinancialKPIs';
 import OperationalStats from '../components/OperationalStats';
@@ -11,7 +10,8 @@ import PriceTrendChart from '../components/PriceTrendChart';
 import CostTrendChart from '../components/CostTrendChart';
 import HarvestBreakdown from '../components/HarvestBreakdown';
 import ExpenseStructure from '../components/ExpenseStructure';
-import { Sprout, BarChart3, Activity, Table } from 'lucide-react';
+import { Sprout, BarChart3, Table } from 'lucide-react';
+import { useSettings } from '../../../hooks/useSettings';
 
 interface Props {
   data: PerformanceReport;
@@ -19,19 +19,19 @@ interface Props {
 }
 
 const PerformanceReportTemplate: React.FC<Props> = ({ data, periodLabel }) => {
-  const company = settingsService.getCompanyData();
-  const watermark = settingsService.getWatermark();
+  const { company, watermark } = useSettings();
 
   return (
     <div id="performance-pdf-content" className="relative w-full bg-white text-slate-950 p-10 font-sans min-h-[210mm] flex flex-col box-border overflow-hidden">
-      
+
       {/* MARCA D'ÁGUA TÉCNICA */}
       <div className="absolute inset-0 z-0 flex items-center justify-center pointer-events-none overflow-hidden">
         {watermark.imageUrl ? (
-          <img 
-            src={watermark.imageUrl} 
-            alt="BG" 
-            className="w-[60%] object-contain opacity-[0.04]"
+          <img
+            src={watermark.imageUrl}
+            alt="BG"
+            className="w-[60%] object-contain"
+            style={{ opacity: (watermark.opacity || 4) / 100 }}
           />
         ) : (
           <Sprout size={400} className="text-slate-100 opacity-10" />
@@ -39,19 +39,19 @@ const PerformanceReportTemplate: React.FC<Props> = ({ data, periodLabel }) => {
       </div>
 
       <div className="relative z-10 flex-1 flex flex-col space-y-6">
-        
+
         {/* CABEÇALHO */}
         <div className="flex justify-between items-start border-b-2 border-slate-900 pb-4 mb-2">
           <div className="flex gap-4 items-center">
             <div className="h-12 flex items-center shrink-0">
-               {company.logoUrl ? (
-                 <img src={company.logoUrl} className="max-h-full w-auto object-contain" alt="Logo" />
-               ) : (
-                 <Sprout size={32} className="text-slate-300" />
-               )}
+              {company.logoUrl ? (
+                <img src={company.logoUrl} className="max-h-full w-auto object-contain" alt="Logo" />
+              ) : (
+                <Sprout size={32} className="text-slate-300" />
+              )}
             </div>
             <div>
-              <h1 className="text-lg font-black uppercase text-slate-900 leading-none">{company.razaoSocial}</h1>
+              <h1 className="text-lg font-black uppercase text-slate-900 leading-none">{company.razaoSocial || 'Relatório de Performance'}</h1>
               <div className="text-slate-600 text-[8px] mt-1.5 space-y-0.5 font-bold uppercase">
                 <p>CNPJ: {company.cnpj} | {company.cidade}/{company.uf} • {company.telefone}</p>
               </div>
@@ -60,48 +60,48 @@ const PerformanceReportTemplate: React.FC<Props> = ({ data, periodLabel }) => {
           <div className="text-right">
             <h2 className="text-xl font-black text-slate-900 uppercase italic tracking-tighter leading-none">Relatório de Performance Analítica</h2>
             <div className="flex items-center gap-2 justify-end mt-1.5">
-                <span className="text-[9px] font-black text-blue-700 uppercase tracking-widest bg-blue-50 px-2 py-0.5 rounded">DRE Gerencial</span>
-                <span className="text-[8px] text-slate-500 font-bold uppercase tracking-widest">Período: {periodLabel}</span>
+              <span className="text-[9px] font-black text-blue-700 uppercase tracking-widest bg-blue-50 px-2 py-0.5 rounded">DRE Gerencial</span>
+              <span className="text-[8px] text-slate-500 font-bold uppercase tracking-widest">Período: {periodLabel}</span>
             </div>
           </div>
         </div>
 
         {/* SEÇÃO 1: KPIs FINANCEIROS E OPERACIONAIS INTEGRADOS */}
         <div className="break-inside-avoid">
-           <FinancialKPIs 
-              revenue={data.totalRevenue} 
-              debits={data.totalDebits} 
-              balance={data.balance} 
-           />
+          <FinancialKPIs
+            revenue={data.totalRevenue}
+            debits={data.totalDebits}
+            balance={data.balance}
+          />
         </div>
 
         <div className="break-inside-avoid">
-           <OperationalStats data={data} />
+          <OperationalStats data={data} />
         </div>
 
         {/* SEÇÃO 2: GRÁFICOS LADO A LADO - FILEIRA 1 */}
         <div className="grid grid-cols-2 gap-6 break-inside-avoid">
-            <div className="border border-slate-200 rounded-2xl p-4 bg-white shadow-sm">
-                <QuantityChart data={data.monthlyHistory} />
-            </div>
-            <div className="border border-slate-200 rounded-2xl p-4 bg-white shadow-sm">
-                <PriceTrendChart data={data.priceTrendHistory} />
-            </div>
+          <div className="border border-slate-200 rounded-2xl p-4 bg-white shadow-sm">
+            <QuantityChart data={data.monthlyHistory} />
+          </div>
+          <div className="border border-slate-200 rounded-2xl p-4 bg-white shadow-sm">
+            <PriceTrendChart data={data.priceTrendHistory} />
+          </div>
         </div>
 
         {/* SEÇÃO 3: GRÁFICOS UNITÁRIOS E DRE - FILEIRA 2 */}
         <div className="grid grid-cols-2 gap-6 break-inside-avoid">
-            <div className="border border-slate-200 rounded-2xl p-4 bg-white shadow-sm">
-                <CostTrendChart data={data.monthlyHistory} />
-            </div>
-            <div className="border border-slate-200 rounded-2xl p-4 bg-white shadow-sm">
-                <EvolutionChart data={data.monthlyHistory} />
-            </div>
+          <div className="border border-slate-200 rounded-2xl p-4 bg-white shadow-sm">
+            <CostTrendChart data={data.monthlyHistory} />
+          </div>
+          <div className="border border-slate-200 rounded-2xl p-4 bg-white shadow-sm">
+            <EvolutionChart data={data.monthlyHistory} />
+          </div>
         </div>
 
         {/* SEÇÃO 4: PERFORMANCE GEOGRÁFICA / SAFRA (WIDE) */}
         <div className="break-inside-avoid">
-            <HarvestBreakdown harvests={data.harvests} />
+          <HarvestBreakdown harvests={data.harvests} />
         </div>
 
         {/* SEÇÃO 5: TABELA MENSAL */}
@@ -145,8 +145,8 @@ const PerformanceReportTemplate: React.FC<Props> = ({ data, periodLabel }) => {
 
         {/* RODAPÉ TÉCNICO */}
         <div className="mt-auto pt-4 border-t border-slate-200 flex justify-between items-center text-[7px] font-black text-slate-400 uppercase tracking-widest">
-           <span>ERP Suporte Grãos • Exportação Oficial de Inteligência de Mercado</span>
-           <span>Autenticado em {new Date().toLocaleString('pt-BR')}</span>
+          <span>{company.nomeFantasia || 'ERP'} • Exportação Oficial de Inteligência de Mercado</span>
+          <span>Autenticado em {new Date().toLocaleString('pt-BR')}</span>
         </div>
       </div>
     </div>

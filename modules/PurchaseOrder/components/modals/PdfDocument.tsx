@@ -2,20 +2,21 @@ import React, { useMemo } from 'react';
 import { Document, Page, View, Text, Image } from '@react-pdf/renderer';
 import { PurchaseOrder } from '../../types';
 import { Loading } from '../../../Loadings/types';
-import { settingsService } from '../../../../services/settingsService';
 import { PdfVariant } from './PdfPreviewModal';
 import { stylesProducer } from './PdfProducerStyles';
 import { stylesInternal } from './PdfInternalStyles';
+
+import { CompanyData, WatermarkSettings } from '../../../../services/settingsService';
 
 interface Props {
   order: PurchaseOrder;
   loadings: Loading[];
   variant: PdfVariant;
+  company: CompanyData;
+  watermark: WatermarkSettings;
 }
 
-const PdfDocument: React.FC<Props> = ({ order, loadings, variant }) => {
-  const company = settingsService.getCompanyData();
-  const watermark = settingsService.getWatermark();
+const PdfDocument: React.FC<Props> = ({ order, loadings, variant, company, watermark }) => {
 
   const currency = (val: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(!val || Math.abs(val) < 0.005 ? 0 : val);
@@ -198,7 +199,7 @@ const PdfDocument: React.FC<Props> = ({ order, loadings, variant }) => {
               <Text style={[stylesInternal.tableCell, { color: '#94a3b8', marginRight: 8 }]}>
                 Custo medio compra: {currency(statsInternal.totalGrainCost / (statsInternal.totalWeightScOrig || 1))}
               </Text>
-              <Text style={[stylesInternal.tableCell, { color: '#94a3b8' }]}> 
+              <Text style={[stylesInternal.tableCell, { color: '#94a3b8' }]}>
                 Frete medio (T): {currency(statsInternal.totalFreightCost / ((statsInternal.totalWeightKgOrig || 1) / 1000))}
               </Text>
             </View>
@@ -350,7 +351,7 @@ const PdfDocument: React.FC<Props> = ({ order, loadings, variant }) => {
 
             <View style={stylesInternal.footer}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Text style={[stylesInternal.footerText, stylesInternal.footerAccent]}>ERP Suporte Graos Intelligence v1.8</Text>
+                <Text style={[stylesInternal.footerText, stylesInternal.footerAccent]}>{company.nomeFantasia || 'ERP'} Intelligence</Text>
                 <Text style={[stylesInternal.footerText, { marginLeft: 6 }]}>| Relatorio emitido por: {order.consultantName || '-'}</Text>
               </View>
               <Text style={stylesInternal.footerText}>
@@ -583,7 +584,7 @@ const PdfDocument: React.FC<Props> = ({ order, loadings, variant }) => {
 
           <View style={stylesProducer.footer}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={[stylesProducer.footerText, stylesProducer.footerAccent]}>ERP Suporte Graos v1.8</Text>
+              <Text style={[stylesProducer.footerText, stylesProducer.footerAccent]}>{company.nomeFantasia || 'ERP'} System</Text>
               <Text style={[stylesProducer.footerText, { marginLeft: 6 }]}>| Documento Auditado Eletronicamente</Text>
             </View>
             <Text style={stylesProducer.footerText}>

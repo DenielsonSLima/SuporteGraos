@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { authService } from './authService';
+
 import { waitForInit } from './supabaseInitService';
 import { Persistence } from './persistence';
 import { isSqlCanonicalOpsEnabled, sqlCanonicalOpsLog } from './sqlCanonicalOps';
@@ -578,7 +578,8 @@ export const auditService = {
       ipAddress: clientInfo.ipAddress,
       userAgent: clientInfo.userAgent,
       metadata: options?.metadata,
-      companyId: authService.getCurrentUser()?.companyId,
+      companyId: (await import('./authService')).authService.getCurrentUser()?.companyId,
+
       createdAt: new Date().toISOString()
     };
 
@@ -613,7 +614,8 @@ export const auditService = {
       browserInfo: clientInfo.browserInfo,
       deviceInfo: clientInfo.deviceInfo,
       status: 'active',
-      companyId: authService.getCurrentUser()?.companyId,
+      companyId: (await import('./authService')).authService.getCurrentUser()?.companyId,
+
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -654,15 +656,17 @@ export const auditService = {
     const login: LoginHistory = {
       id: crypto.randomUUID(),
       userEmail,
-      userName: authService.getCurrentUser()?.name || 'Desconhecido',
-      userId: authService.getCurrentUser()?.id,
+      userName: (await import('./authService')).authService.getCurrentUser()?.name || 'Desconhecido',
+      userId: (await import('./authService')).authService.getCurrentUser()?.id,
+
       loginType: success ? 'success' : 'failed',
       failureReason,
       ipAddress: clientInfo.ipAddress,
       userAgent: clientInfo.userAgent,
       browserInfo: clientInfo.browserInfo,
       deviceInfo: clientInfo.deviceInfo,
-      companyId: authService.getCurrentUser()?.companyId,
+      companyId: (await import('./authService')).authService.getCurrentUser()?.companyId,
+
       createdAt: new Date().toISOString()
     };
 

@@ -10,6 +10,7 @@ import { supabase } from './supabase';
 export interface Loan {
   id: string;
   company_id: string;
+  type: 'taken' | 'granted';
   lender_id?: string;
   principal_amount: number;
   interest_rate?: number;
@@ -39,6 +40,7 @@ function mapLoan(row: any): Loan {
   return {
     id: row.id,
     company_id: row.company_id,
+    type: row.type || 'taken',
     lender_id: row.lender_id,
     principal_amount: parseFloat(row.principal_amount ?? '0'),
     interest_rate: row.interest_rate ? parseFloat(row.interest_rate) : undefined,
@@ -69,12 +71,43 @@ function mapInstallment(row: any): LoanInstallment {
 
 export const loansService = {
   getAll: async (): Promise<Loan[]> => {
-    const { data, error } = await supabase
+    // 1. Busca todos os empréstimos (simples e seguro)
+    const { data: loans, error: loansError } = await supabase
       .from('loans')
       .select('*')
       .order('start_date', { ascending: false });
-    if (error) throw new Error(`Erro ao buscar empréstimos: ${error.message}`);
-    return (data ?? []).map(mapLoan);
+
+    if (loansError) throw new Error(`Erro ao buscar empréstimos: ${loansError.message}`);
+    if (!loans || loans.length === 0) return [];
+
+    // 2. Tenta buscar o account_id vinculado via transações para cada empréstimo
+    // Para performance, buscamos apenas os IDs necessários
+    const { data: entries, error: entriesError } = await supabase
+      .from('financial_entries')
+      .select(`
+        origin_id,
+        financial_transactions!entry_id (
+          account_id
+        )
+      `)
+      .in('origin_id', loans.map(l => l.id))
+      .eq('origin_type', 'loan');
+
+    if (entriesError) {
+      console.warn('[loansService] Erro ao buscar contas vinculadas:', entriesError.message);
+    }
+
+    // 3. Mapeia e mescla
+    return loans.map(row => {
+      const loan = mapLoan(row);
+      const entry = entries?.find(e => e.origin_id === row.id);
+      const accountId = entry?.financial_transactions?.[0]?.account_id;
+
+      return {
+        ...loan,
+        account_id: accountId
+      } as any;
+    });
   },
 
   getInstallments: async (loanId: string): Promise<LoanInstallment[]> => {
@@ -87,7 +120,7 @@ export const loansService = {
     return (data ?? []).map(mapInstallment);
   },
 
-  // Operação atômica via RPC
+  // Operação atômica via RPC (Canonical Mode)
   create: async (params: {
     lenderId?: string;
     principalAmount: number;
@@ -96,8 +129,13 @@ export const loansService = {
     endDate?: string;
     numInstallments?: number;
     description?: string;
+    accountId?: string;
+    accountName?: string;
+    type?: 'taken' | 'granted';
   }): Promise<string> => {
     const { data, error } = await supabase.rpc('rpc_create_loan', {
+      p_type: params.type || 'taken',
+      p_account_id: params.accountId || null,
       p_lender_id: params.lenderId || null,
       p_principal_amount: params.principalAmount,
       p_interest_rate: params.interestRate || 0,
@@ -106,6 +144,7 @@ export const loansService = {
       p_num_installments: params.numInstallments || 1,
       p_description: params.description || null,
     });
+
     if (error) throw new Error(error.message);
     return data as string;
   },
@@ -133,7 +172,7 @@ export const loansService = {
       .from('loan_installments')
       .update({ status: 'cancelled' })
       .eq('loan_id', loanId);
-    
+
     // Cancela o empréstimo
     const { error } = await supabase
       .from('loans')

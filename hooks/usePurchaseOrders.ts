@@ -32,6 +32,21 @@ function ensurePurchaseChannel() {
       { event: '*', schema: 'public', table: tableName },
       () => _purchaseListeners.forEach(cb => cb()),
     )
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'financial_entries',
+        filter: 'origin_type=eq.purchase_order'
+      },
+      () => _purchaseListeners.forEach(cb => cb()),
+    )
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'financial_transactions' },
+      () => _purchaseListeners.forEach(cb => cb()),
+    )
     .subscribe();
 }
 

@@ -9,7 +9,6 @@ import { supabase } from '../../services/supabase';
 
 /**
  * Verifica duplicidade de documento no servidor (SKILL §3.6: validação no banco).
- * Substitui a abordagem anterior de buscar 1000 registros no client-side.
  */
 async function checkDocumentExists(
   document: string,
@@ -32,7 +31,41 @@ async function checkDocumentExists(
   return { exists: true, name: data[0].name };
 }
 
+/**
+ * Busca saldos consolidados via RPC atômica (SKILL §13).
+ */
+async function getPartnerBalances(companyId: string) {
+  const { data, error } = await supabase.rpc('get_partner_balances', {
+    p_company_id: companyId
+  });
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Salva parceiro completo (Dados + Endereço + Categorias) via RPC atômica (SKILL §3.5).
+ */
+async function savePartnerComplete(payload: {
+  partnerId: string | null;
+  companyId: string;
+  partnerData: any;
+  addressData: any;
+  categories: string[];
+}) {
+  const { data, error } = await supabase.rpc('save_partner_complete', {
+    p_partner_id: payload.partnerId,
+    p_company_id: payload.companyId,
+    p_partner_data: payload.partnerData,
+    p_address_data: payload.addressData,
+    p_categories: payload.categories
+  });
+  if (error) throw error;
+  return data;
+}
+
 export const partnersService = {
   ...parceirosService,
   checkDocumentExists,
+  getPartnerBalances,
+  savePartnerComplete,
 };

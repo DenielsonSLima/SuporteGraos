@@ -9,8 +9,10 @@
  * SKIL: TSX não importa services diretamente.
  */
 
-import { adminExpensesService } from '../../../../services/adminExpensesService';
 import { supabase } from '../../../../services/supabase';
+import { adminExpensesService } from '../../../../services/adminExpensesService';
+import { financialTransactionsService } from '../../../../services/financialTransactionsService';
+import { useToast } from '../../../../contexts/ToastContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { QUERY_KEYS } from '../../../../hooks/queryKeys';
 
@@ -41,8 +43,9 @@ export function useAdminExpenseOperations() {
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS });
   };
 
-  const createExpense = async (params: CreateExpenseParams) => {
-    await adminExpensesService.create(params);
+  const createExpense = async (params: CreateExpenseParams): Promise<string> => {
+    const id = await adminExpensesService.create(params);
+    return id;
   };
 
   /**
@@ -71,15 +74,27 @@ export function useAdminExpenseOperations() {
       if (discountErr) throw new Error(`Erro ao aplicar desconto: ${discountErr.message}`);
     }
 
-    // 3. Registrar pagamento via RPC
+    // 3. Registrar pagamento via RPC (se entry existe) ou Direto (se não existe)
     if (params.amount > 0) {
-      const { error: payErr } = await supabase.rpc('pay_financial_entry', {
-        p_entry_id: entry.id,
-        p_account_id: params.accountId,
-        p_amount: params.amount,
-        p_description: params.description || 'Pagamento de despesa administrativa',
-      });
-      if (payErr) throw new Error(`Erro ao registrar pagamento: ${payErr.message}`);
+      if (entry) {
+        const { error: payErr } = await supabase.rpc('pay_financial_entry', {
+          p_entry_id: entry.id,
+          p_account_id: params.accountId,
+          p_amount: params.amount,
+          p_description: params.description || 'Pagamento de despesa administrativa',
+        });
+        if (payErr) throw new Error(`Erro ao registrar pagamento: ${payErr.message}`);
+      } else {
+        // Fallback: Pagamento direto via Transaction Service
+        await financialTransactionsService.add({
+          account_id: params.accountId,
+          type: 'debit',
+          amount: params.amount,
+          transaction_date: new Date().toISOString().split('T')[0],
+          description: params.description || 'Pagamento direto de despesa administrativa',
+          entry_id: undefined
+        });
+      }
     }
 
     // 4. Atualizar status no admin_expenses também
@@ -93,9 +108,41 @@ export function useAdminExpenseOperations() {
       .eq('id', params.entryOriginId);
   };
 
+  const deleteExpense = async (id: string) => {
+    await adminExpensesService.delete(id);
+  };
+
+  const updateExpense = async (id: string, params: Partial<CreateExpenseParams>) => {
+    await adminExpensesService.update(id, {
+      description: params.description,
+      amount: params.amount,
+      expenseDate: params.expenseDate,
+      due_date: params.dueDate,
+      payeeName: params.payeeName,
+      categoryId: params.categoryId
+    });
+  };
+
+  /**
+   * Reverte (exclui) um pagamento de despesa administrativa.
+   * A RPC deleta a transação e os triggers cuidam de:
+   *   - Devolver saldo na conta bancária
+   *   - Recalcular paid_amount na financial_entry
+   *   - Atualizar status do admin_expense
+   */
+  const reversePayment = async (transactionId: string) => {
+    const { error } = await supabase.rpc('rpc_reverse_admin_expense_payment', {
+      p_transaction_id: transactionId,
+    });
+    if (error) throw new Error(`Erro ao reverter pagamento: ${error.message}`);
+  };
+
   return {
     createExpense,
     payExpense,
+    deleteExpense,
+    updateExpense,
+    reversePayment,
     refreshData,
   };
 }

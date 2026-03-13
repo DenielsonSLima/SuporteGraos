@@ -275,84 +275,84 @@ export const initializeSupabaseData = async (): Promise<InitStats> => {
           supabase.from('partners').select('*').order('name')
         ]);
 
-      // Processar UFs
-      if (ufsResult.status === 'fulfilled' && !ufsResult.value.error) {
-        stats.data.ufs = ufsResult.value.data || [];
-      } else {
-        stats.errors.push('UFs: ' + (ufsResult.status === 'rejected' ? ufsResult.reason : (ufsResult.value as any).error?.message));
-      }
+        // Processar UFs
+        if (ufsResult.status === 'fulfilled' && !ufsResult.value.error) {
+          stats.data.ufs = ufsResult.value.data || [];
+        } else {
+          stats.errors.push('UFs: ' + (ufsResult.status === 'rejected' ? ufsResult.reason : (ufsResult.value as any).error?.message));
+        }
 
-      // Processar Cities
-      if (citiesResult.status === 'fulfilled' && !citiesResult.value.error) {
-        stats.data.cities = citiesResult.value.data || [];
-        stats.tablesLoaded++;
+        // Processar Cities
+        if (citiesResult.status === 'fulfilled' && !citiesResult.value.error) {
+          stats.data.cities = citiesResult.value.data || [];
+          stats.tablesLoaded++;
 
-      } else {
-        stats.errors.push('Cities: ' + (citiesResult.status === 'rejected' ? citiesResult.reason : (citiesResult.value as any).error?.message));
-      }
+        } else {
+          stats.errors.push('Cities: ' + (citiesResult.status === 'rejected' ? citiesResult.reason : (citiesResult.value as any).error?.message));
+        }
 
-      // Processar Partner Types
-      if (partnerTypesResult.status === 'fulfilled' && !partnerTypesResult.value.error) {
-        stats.data.partnerTypes = partnerTypesResult.value.data || [];
-        stats.tablesLoaded++;
+        // Processar Partner Types
+        if (partnerTypesResult.status === 'fulfilled' && !partnerTypesResult.value.error) {
+          stats.data.partnerTypes = partnerTypesResult.value.data || [];
+          stats.tablesLoaded++;
 
-      } else {
-        stats.errors.push('PartnerTypes: ' + (partnerTypesResult.status === 'rejected' ? partnerTypesResult.reason : (partnerTypesResult.value as any).error?.message));
-      }
+        } else {
+          stats.errors.push('PartnerTypes: ' + (partnerTypesResult.status === 'rejected' ? partnerTypesResult.reason : (partnerTypesResult.value as any).error?.message));
+        }
 
-      // Processar Product Types
-      if (productTypesResult.status === 'fulfilled' && !productTypesResult.value.error) {
-        stats.data.productTypes = productTypesResult.value.data || [];
-        stats.tablesLoaded++;
+        // Processar Product Types
+        if (productTypesResult.status === 'fulfilled' && !productTypesResult.value.error) {
+          stats.data.productTypes = productTypesResult.value.data || [];
+          stats.tablesLoaded++;
 
-      } else {
-        stats.errors.push('ProductTypes: ' + (productTypesResult.status === 'rejected' ? productTypesResult.reason : (productTypesResult.value as any).error?.message));
-      }
+        } else {
+          stats.errors.push('ProductTypes: ' + (productTypesResult.status === 'rejected' ? productTypesResult.reason : (productTypesResult.value as any).error?.message));
+        }
 
-      // Processar Bank Accounts
-      if (bankAccountsResult.status === 'fulfilled' && !bankAccountsResult.value.error) {
-        stats.data.bankAccounts = bankAccountsResult.value.data || [];
-        stats.tablesLoaded++;
+        // Processar Bank Accounts
+        if (bankAccountsResult.status === 'fulfilled' && !bankAccountsResult.value.error) {
+          stats.data.bankAccounts = bankAccountsResult.value.data || [];
+          stats.tablesLoaded++;
 
-      } else {
-        stats.errors.push('BankAccounts: ' + (bankAccountsResult.status === 'rejected' ? bankAccountsResult.reason : (bankAccountsResult.value as any).error?.message));
-      }
+        } else {
+          stats.errors.push('BankAccounts: ' + (bankAccountsResult.status === 'rejected' ? bankAccountsResult.reason : (bankAccountsResult.value as any).error?.message));
+        }
 
-      // Processar Initial Balances
-      if (initialBalancesResult.status === 'fulfilled' && !initialBalancesResult.value.error) {
-        stats.data.initialBalances = initialBalancesResult.value.data || [];
-        stats.tablesLoaded++;
+        // Processar Initial Balances
+        if (initialBalancesResult.status === 'fulfilled' && !initialBalancesResult.value.error) {
+          stats.data.initialBalances = initialBalancesResult.value.data || [];
+          stats.tablesLoaded++;
 
-      } else {
-        stats.errors.push('InitialBalances: ' + (initialBalancesResult.status === 'rejected' ? initialBalancesResult.reason : (initialBalancesResult.value as any).error?.message));
-      }
+        } else {
+          stats.errors.push('InitialBalances: ' + (initialBalancesResult.status === 'rejected' ? initialBalancesResult.reason : (initialBalancesResult.value as any).error?.message));
+        }
 
-      // Processar Expense Types
-      if (expenseTypesResult.status === 'fulfilled' && !expenseTypesResult.value.error) {
-        stats.data.expenseTypes = expenseTypesResult.value.data || [];
-        stats.tablesLoaded++;
+        // Processar Expense Types
+        if (expenseTypesResult.status === 'fulfilled' && !expenseTypesResult.value.error) {
+          stats.data.expenseTypes = expenseTypesResult.value.data || [];
+          stats.tablesLoaded++;
 
-      } else {
-        stats.errors.push('ExpenseTypes: ' + (expenseTypesResult.status === 'rejected' ? expenseTypesResult.reason : (expenseTypesResult.value as any).error?.message));
-      }
+        } else {
+          stats.errors.push('ExpenseTypes: ' + (expenseTypesResult.status === 'rejected' ? expenseTypesResult.reason : (expenseTypesResult.value as any).error?.message));
+        }
 
-      // Processar Expense Categories
-      if (expenseCategoriesResult.status === 'fulfilled' && !expenseCategoriesResult.value.error) {
-        stats.data.expenseCategories = expenseCategoriesResult.value.data || [];
-        stats.tablesLoaded++;
+        // Processar Expense Categories
+        if (expenseCategoriesResult.status === 'fulfilled' && !expenseCategoriesResult.value.error) {
+          stats.data.expenseCategories = expenseCategoriesResult.value.data || [];
+          stats.tablesLoaded++;
 
-      } else {
-        stats.errors.push('ExpenseCategories: ' + (expenseCategoriesResult.status === 'rejected' ? expenseCategoriesResult.reason : (expenseCategoriesResult.value as any).error?.message));
-      }
+        } else {
+          stats.errors.push('ExpenseCategories: ' + (expenseCategoriesResult.status === 'rejected' ? expenseCategoriesResult.reason : (expenseCategoriesResult.value as any).error?.message));
+        }
 
-      // Processar Shareholders
-      if (shareholdersResult.status === 'fulfilled' && !shareholdersResult.value.error) {
-        stats.data.shareholders = shareholdersResult.value.data || [];
-        stats.tablesLoaded++;
+        // Processar Shareholders
+        if (shareholdersResult.status === 'fulfilled' && !shareholdersResult.value.error) {
+          stats.data.shareholders = shareholdersResult.value.data || [];
+          stats.tablesLoaded++;
 
-      } else {
-        stats.errors.push('Shareholders: ' + (shareholdersResult.status === 'rejected' ? shareholdersResult.reason : (shareholdersResult.value as any).error?.message));
-      }
+        } else {
+          stats.errors.push('Shareholders: ' + (shareholdersResult.status === 'rejected' ? shareholdersResult.reason : (shareholdersResult.value as any).error?.message));
+        }
 
         // Processar Shareholder Transactions
         if (shareholderTransactionsResult.status === 'fulfilled' && !shareholderTransactionsResult.value.error) {
@@ -420,6 +420,21 @@ export const initializeSupabaseData = async (): Promise<InitStats> => {
     // ✅ INICIAR REALTIME SUBSCRIPTIONS (dados já foram carregados acima)
     if (stats.tablesLoaded > 0) {
       if (canonicalOpsEnabled) {
+        // No modo canônico, carregamos também os serviços de configurações e carga (essenciais para UI/PDFs)
+        const [settingsModule, loadingModule] = await Promise.all([
+          import('./settingsService'),
+          import('./loadingService')
+        ]);
+
+        await Promise.allSettled([
+          settingsModule.settingsService.loadFromSupabase(),
+          loadingModule.loadingService.loadFromSupabase()
+        ]);
+
+        // Ativar realtime para garantir atualizações dinâmicas na UI
+        settingsModule.settingsService.startRealtime();
+        loadingModule.loadingService.startRealtime();
+
         _initCriticalCompleted = true;
         _initFullCompleted = true;
         emitInitEvent('supabase:init:critical', { diagnostics: _initDiagnostics });
@@ -427,300 +442,300 @@ export const initializeSupabaseData = async (): Promise<InitStats> => {
         emitInitEvent('supabase:init:full', { diagnostics: _initDiagnostics });
         emitInitEvent('data:updated');
       } else {
-      try {
-        // Importar services dinamicamente em PARALELO para máxima performance
-        const [
-          transporterModule,
-          vehicleModule,
-          driverModule,
-          shareholderModule,
-          partnerAddressModule,
-          partnerModule,
-          salesModule,
-          assetModule,
-          loadingModule,
-          advancesModule,
-          receivablesModule,
-          payablesModule,
-          transfersModule,
-          loansModule,
-          financialHistoryModule,
-          purchaseModule,
-          standaloneModule,
-          auditModule,
-          logModule,
-          settingsModule,
-          bankAccountModule,
-          expenseCategoryModule,
-          initialBalanceModule,
-          classificationModule,
-          locationModule,
-          reconciliationModule,
-          payablesReconciliationModule,
-          creditModule,
-          loginScreenModule,
-          reportAuditModule,
-          // loanServiceModule removido — consolidado no loansService canônico
-          ledgerModule,
-          financialTransactionModule,
-        ] = await Promise.all([
-          import('./transporterService'),
-          import('./vehicleService'),
-          import('./driverService'),
-          import('./shareholderService'),
-          import('./partnerAddress/index'),
-          import('./partnerService'),
-          import('./salesService'),
-          import('./assetService'),
-          import('./loadingService'),
-          import('./financial/advancesService'),
-          import('./financial/receivablesService'),
-          import('./financial/payablesService'),
-          import('./financial/transfersService'),
-          import('./financial/loansService'),
-          import('./financial/financialHistoryService'),
-          import('./purchaseService'),
-          import('./standaloneRecordsService'),
-          import('./auditService'),
-          import('./logService'),
-          import('./settingsService'),
-          import('./bankAccountService'),
-          import('./expenseCategoryService'),
-          import('./initialBalanceService'),
-          import('./classificationService'),
-          import('./locationService'),
-          import('./receivablesReconciliationService'),
-          import('./payablesReconciliationService'),
-          import('./financial/creditService'),
-          import('./loginScreenService'),
-          import('./reportAuditService'),
-          // import('./loanService'), — removido: consolidado no loansService canônico
-          import('./ledgerService'),
-          import('./financial/financialTransactionService'),
-        ]);
+        try {
+          // Importar services dinamicamente em PARALELO para máxima performance
+          const [
+            transporterModule,
+            vehicleModule,
+            driverModule,
+            shareholderModule,
+            partnerAddressModule,
+            partnerModule,
+            salesModule,
+            assetModule,
+            loadingModule,
+            advancesModule,
+            receivablesModule,
+            payablesModule,
+            transfersModule,
+            loansModule,
+            financialHistoryModule,
+            purchaseModule,
+            standaloneModule,
+            auditModule,
+            logModule,
+            settingsModule,
+            bankAccountModule,
+            expenseCategoryModule,
+            initialBalanceModule,
+            classificationModule,
+            locationModule,
+            reconciliationModule,
+            payablesReconciliationModule,
+            creditModule,
+            loginScreenModule,
+            reportAuditModule,
+            // loanServiceModule removido — consolidado no loansService canônico
+            ledgerModule,
+            financialTransactionModule,
+          ] = await Promise.all([
+            import('./transporterService'),
+            import('./vehicleService'),
+            import('./driverService'),
+            import('./shareholderService'),
+            import('./partnerAddress/index'),
+            import('./partnerService'),
+            import('./salesService'),
+            import('./assetService'),
+            import('./loadingService'),
+            import('./financial/advancesService'),
+            import('./financial/receivablesService'),
+            import('./financial/payablesService'),
+            import('./financial/transfersService'),
+            import('./financial/loansService'),
+            import('./financial/financialHistoryService'),
+            import('./purchaseService'),
+            import('./standaloneRecordsService'),
+            import('./auditService'),
+            import('./logService'),
+            import('./settingsService'),
+            import('./bankAccountService'),
+            import('./expenseCategoryService'),
+            import('./initialBalanceService'),
+            import('./classificationService'),
+            import('./locationService'),
+            import('./receivablesReconciliationService'),
+            import('./payablesReconciliationService'),
+            import('./financial/creditService'),
+            import('./loginScreenService'),
+            import('./reportAuditService'),
+            // import('./loanService'), — removido: consolidado no loansService canônico
+            import('./ledgerService'),
+            import('./financial/financialTransactionService'),
+          ]);
 
-        // 📥 CARREGAR DADOS DE CADA SERVICE (em paralelo) - critico primeiro
-        const criticalStartTime = performance.now();
+          // 📥 CARREGAR DADOS DE CADA SERVICE (em paralelo) - critico primeiro
+          const criticalStartTime = performance.now();
 
-        const withTimeout = async <T,>(promise: Promise<T>, serviceName: string, timeoutMs: number): Promise<T | null> => {
-          const start = performance.now();
-          let status: ServiceLoadStatus = 'ok';
-          let errorMessage: string | undefined;
-          let timedOut = false;
-          let timeoutId: ReturnType<typeof setTimeout> | null = null;
+          const withTimeout = async <T,>(promise: Promise<T>, serviceName: string, timeoutMs: number): Promise<T | null> => {
+            const start = performance.now();
+            let status: ServiceLoadStatus = 'ok';
+            let errorMessage: string | undefined;
+            let timedOut = false;
+            let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
-          try {
-            const timeoutPromise = new Promise<null>((resolve) => {
-              timeoutId = setTimeout(() => {
-                timedOut = true;
-                resolve(null);
-              }, timeoutMs);
-            });
+            try {
+              const timeoutPromise = new Promise<null>((resolve) => {
+                timeoutId = setTimeout(() => {
+                  timedOut = true;
+                  resolve(null);
+                }, timeoutMs);
+              });
 
-            const result = await Promise.race([
-              promise.then((value) => value),
-              timeoutPromise
-            ]);
+              const result = await Promise.race([
+                promise.then((value) => value),
+                timeoutPromise
+              ]);
 
-            if (timedOut) {
-              status = 'timeout';
-              return null;
-            }
-
-            return result as T;
-          } catch (error: any) {
-            status = 'error';
-            errorMessage = error?.message || String(error);
-            return null;
-          } finally {
-            if (timeoutId) clearTimeout(timeoutId);
-            recordServiceMetric({
-              name: serviceName,
-              durationMs: Math.round(performance.now() - start),
-              status,
-              error: errorMessage
-            });
-          }
-        };
-
-        // normalizeLegacy roda em background — NÃO bloqueia critical path
-        if (typeof financialTransactionModule.financialTransactionService?.normalizeLegacyTransferTypesAndRecalculate === 'function') {
-          void withTimeout(
-            financialTransactionModule.financialTransactionService.normalizeLegacyTransferTypesAndRecalculate(),
-            'financialTransactionService.normalizeLegacyTransferTypesAndRecalculate',
-            CRITICAL_TIMEOUT_MS
-          );
-        }
-
-        const criticalPromises: Promise<any>[] = [];
-
-        if (typeof partnerModule.partnerService?.loadFromSupabase === 'function') {
-          criticalPromises.push(withTimeout(partnerModule.partnerService.loadFromSupabase(), 'partnerService', CRITICAL_TIMEOUT_MS));
-        }
-        if (typeof purchaseModule.purchaseService?.loadFromSupabase === 'function') {
-          criticalPromises.push(withTimeout(purchaseModule.purchaseService.loadFromSupabase(), 'purchaseService', CRITICAL_TIMEOUT_MS));
-        }
-        if (typeof salesModule.salesService?.loadFromSupabase === 'function') {
-          criticalPromises.push(withTimeout(salesModule.salesService.loadFromSupabase(), 'salesService', CRITICAL_TIMEOUT_MS));
-        }
-        if (typeof loadingModule.loadingService?.loadFromSupabase === 'function') {
-          criticalPromises.push(withTimeout(loadingModule.loadingService.loadFromSupabase(), 'loadingService', CRITICAL_TIMEOUT_MS));
-        }
-        if (typeof payablesModule.payablesService?.loadFromSupabase === 'function') {
-          criticalPromises.push(withTimeout(payablesModule.payablesService.loadFromSupabase(), 'payablesService', CRITICAL_TIMEOUT_MS));
-        }
-        if (typeof receivablesModule.receivablesService?.loadFromSupabase === 'function') {
-          criticalPromises.push(withTimeout(receivablesModule.receivablesService.loadFromSupabase(), 'receivablesService', CRITICAL_TIMEOUT_MS));
-        }
-        if (typeof transfersModule.transfersService?.loadFromSupabase === 'function') {
-          criticalPromises.push(withTimeout(transfersModule.transfersService.loadFromSupabase(), 'transfersService', CRITICAL_TIMEOUT_MS));
-        }
-        if (typeof standaloneModule.standaloneRecordsService?.initialize === 'function') {
-          criticalPromises.push(withTimeout(standaloneModule.standaloneRecordsService.initialize(), 'standaloneRecordsService', CRITICAL_TIMEOUT_MS));
-        }
-        if (typeof ledgerModule.ledgerService?.recalculateBalances === 'function') {
-          criticalPromises.push(withTimeout(ledgerModule.ledgerService.recalculateBalances(), 'ledgerService', CRITICAL_TIMEOUT_MS));
-        }
-
-        await Promise.allSettled(criticalPromises);
-        if (_initDiagnostics) {
-          _initDiagnostics.criticalMs = Math.round(performance.now() - criticalStartTime);
-        }
-
-        _initCriticalCompleted = true;
-
-        if (!isSqlCanonicalOpsEnabled()) {
-          // Reconcilia recebimentos e pagamentos antigos automaticamente (sem bloquear a UI)
-          // Delay de 1.5s para garantir que todos os serviços estejam carregados
-          setTimeout(() => {
-            void reconciliationModule.reconcileReceivablesFromHistory();
-            void payablesReconciliationModule.reconcilePayablesFromHistory();
-            // Reconciliar diretamente dos pedidos após 500ms extra
-            setTimeout(() => {
-              void payablesReconciliationModule.reconcilePayablesFromOrders();
-              void payablesReconciliationModule.reconcilePayablesFromFreights();
-              void reconciliationModule.reconcileReceivablesFromOrders();
-            }, 500);
-          }, 1500);
-        }
-        emitInitEvent('supabase:init:critical', { diagnostics: _initDiagnostics });
-        emitInitEvent('supabase:init:complete', { diagnostics: _initDiagnostics });
-        emitInitEvent('data:updated');
-        if (shouldLogDiagnostics()) {
-        }
-
-        // Carregar services nao criticos em background
-        const runBackgroundLoad = async () => {
-          try {
-            const backgroundStartTime = performance.now();
-            const backgroundPromises: Promise<any>[] = [];
-
-            if (typeof transporterModule.transporterService?.loadFromSupabase === 'function') {
-              backgroundPromises.push(withTimeout(transporterModule.transporterService.loadFromSupabase(), 'transporterService', BACKGROUND_TIMEOUT_MS));
-            }
-            if (typeof vehicleModule.vehicleService?.loadFromSupabase === 'function') {
-              backgroundPromises.push(withTimeout(vehicleModule.vehicleService.loadFromSupabase(), 'vehicleService', BACKGROUND_TIMEOUT_MS));
-            }
-            if (typeof driverModule.driverService?.loadFromSupabase === 'function') {
-              backgroundPromises.push(withTimeout(driverModule.driverService.loadFromSupabase(), 'driverService', BACKGROUND_TIMEOUT_MS));
-            }
-            if (typeof shareholderModule.shareholderService?.loadFromSupabase === 'function') {
-              backgroundPromises.push(withTimeout(shareholderModule.shareholderService.loadFromSupabase(), 'shareholderService', BACKGROUND_TIMEOUT_MS));
-            }
-            if (typeof partnerAddressModule.partnerAddressService?.loadFromSupabase === 'function') {
-              backgroundPromises.push(withTimeout(partnerAddressModule.partnerAddressService.loadFromSupabase(), 'partnerAddressService', BACKGROUND_TIMEOUT_MS));
-            }
-            if (typeof assetModule.assetService?.loadFromSupabase === 'function') {
-              backgroundPromises.push(withTimeout(assetModule.assetService.loadFromSupabase(), 'assetService', BACKGROUND_TIMEOUT_MS));
-            }
-            if (typeof advancesModule.advancesService?.loadFromSupabase === 'function') {
-              backgroundPromises.push(withTimeout(advancesModule.advancesService.loadFromSupabase(), 'advancesService', BACKGROUND_TIMEOUT_MS));
-            }
-            if (typeof loansModule.loansService?.loadFromSupabase === 'function') {
-              backgroundPromises.push(withTimeout(loansModule.loansService.loadFromSupabase(), 'loansService', BACKGROUND_TIMEOUT_MS));
-            }
-            if (typeof financialHistoryModule.financialHistoryService?.loadFromSupabase === 'function') {
-              backgroundPromises.push(withTimeout(financialHistoryModule.financialHistoryService.loadFromSupabase(), 'financialHistoryService', BACKGROUND_TIMEOUT_MS));
-            }
-            if (typeof settingsModule.settingsService?.loadFromSupabase === 'function') {
-              backgroundPromises.push(withTimeout(settingsModule.settingsService.loadFromSupabase(), 'settingsService', BACKGROUND_TIMEOUT_MS));
-            }
-            if (typeof bankAccountModule.bankAccountService?.loadFromSupabase === 'function') {
-              backgroundPromises.push(withTimeout(bankAccountModule.bankAccountService.loadFromSupabase(), 'bankAccountService', BACKGROUND_TIMEOUT_MS));
-            }
-            if (typeof initialBalanceModule.initialBalanceService?.loadFromSupabase === 'function') {
-              backgroundPromises.push(withTimeout(initialBalanceModule.initialBalanceService.loadFromSupabase(), 'initialBalanceService', BACKGROUND_TIMEOUT_MS));
-            }
-            if (typeof expenseCategoryModule.expenseCategoryService?.loadFromSupabase === 'function') {
-              backgroundPromises.push(withTimeout(expenseCategoryModule.expenseCategoryService.loadFromSupabase(), 'expenseCategoryService', BACKGROUND_TIMEOUT_MS));
-            }
-            if (typeof classificationModule.classificationService?.loadFromSupabase === 'function') {
-              backgroundPromises.push(withTimeout(classificationModule.classificationService.loadFromSupabase(), 'classificationService', BACKGROUND_TIMEOUT_MS));
-            }
-            if (typeof locationModule.locationService?.loadFromSupabase === 'function') {
-              backgroundPromises.push(withTimeout(locationModule.locationService.loadFromSupabase(), 'locationService', BACKGROUND_TIMEOUT_MS));
-            }
-
-            await Promise.allSettled(backgroundPromises);
-            if (_initDiagnostics) {
-              _initDiagnostics.backgroundMs = Math.round(performance.now() - backgroundStartTime);
-            }
-
-            // 🔄 Iniciar subscriptions em tempo real
-            const startServiceRealtime = (moduleRef: any, serviceKey?: string) => {
-              const target = serviceKey ? moduleRef?.[serviceKey] : moduleRef;
-              if (typeof target?.startRealtime === 'function') {
-                target.startRealtime();
+              if (timedOut) {
+                status = 'timeout';
+                return null;
               }
-            };
 
-            startServiceRealtime(transporterModule, 'transporterService');
-            startServiceRealtime(vehicleModule, 'vehicleService');
-            startServiceRealtime(driverModule, 'driverService');
-            startServiceRealtime(shareholderModule, 'shareholderService');
-            startServiceRealtime(partnerAddressModule, 'partnerAddressService');
-            startServiceRealtime(partnerModule, 'partnerService');
-            startServiceRealtime(salesModule, 'salesService');
-            startServiceRealtime(assetModule, 'assetService');
-            startServiceRealtime(loadingModule, 'loadingService');
-            startServiceRealtime(advancesModule, 'advancesService');
-            startServiceRealtime(receivablesModule, 'receivablesService');
-            startServiceRealtime(payablesModule, 'payablesService');
-            startServiceRealtime(transfersModule, 'transfersService');
-            startServiceRealtime(loansModule, 'loansService');
-            startServiceRealtime(financialHistoryModule, 'financialHistoryService');
-            startServiceRealtime(purchaseModule, 'purchaseService');
-            if (typeof auditModule.auditService?.startRealtime === 'function') auditModule.auditService.startRealtime();
-            if (typeof logModule.logService?.startRealtime === 'function') logModule.logService.startRealtime();
-            if (typeof settingsModule.settingsService?.startRealtime === 'function') settingsModule.settingsService.startRealtime();
-            if (typeof bankAccountModule.bankAccountService?.startRealtime === 'function') bankAccountModule.bankAccountService.startRealtime();
-            if (typeof ledgerModule.ledgerService?.startRealtime === 'function') ledgerModule.ledgerService.startRealtime();
-            if (typeof initialBalanceModule.initialBalanceService?.startRealtime === 'function') initialBalanceModule.initialBalanceService.startRealtime();
-            if (typeof locationModule.locationService?.startRealtime === 'function') locationModule.locationService.startRealtime();
-
-            // Novos serviços com realtime
-            startServiceRealtime(expenseCategoryModule, 'expenseCategoryService');
-            startServiceRealtime(classificationModule, 'classificationService');
-            if (typeof creditModule.default?.startRealtime === 'function') creditModule.default.startRealtime();
-            if (typeof loginScreenModule.loginScreenService?.startRealtime === 'function') loginScreenModule.loginScreenService.startRealtime();
-            if (typeof reportAuditModule.reportAuditService?.startRealtime === 'function') reportAuditModule.reportAuditService.startRealtime();
-            // loanServiceModule.loanService.startRealtime() removido — consolidado no loansService canônico
-
-
-            _initFullCompleted = true;
-            emitInitEvent('supabase:init:full', { diagnostics: _initDiagnostics });
-            emitInitEvent('data:updated');
-            if (shouldLogDiagnostics()) {
+              return result as T;
+            } catch (error: any) {
+              status = 'error';
+              errorMessage = error?.message || String(error);
+              return null;
+            } finally {
+              if (timeoutId) clearTimeout(timeoutId);
+              recordServiceMetric({
+                name: serviceName,
+                durationMs: Math.round(performance.now() - start),
+                status,
+                error: errorMessage
+              });
             }
-          } catch (error) {
-            console.error('[supabaseInitService] runBackgroundLoad:', error);
-          }
-        };
+          };
 
-        void runBackgroundLoad();
-      } catch (realtimeError) {
-        console.warn('[supabaseInitService] realtime setup:', realtimeError);
-      }
+          // normalizeLegacy roda em background — NÃO bloqueia critical path
+          if (typeof financialTransactionModule.financialTransactionService?.normalizeLegacyTransferTypesAndRecalculate === 'function') {
+            void withTimeout(
+              financialTransactionModule.financialTransactionService.normalizeLegacyTransferTypesAndRecalculate(),
+              'financialTransactionService.normalizeLegacyTransferTypesAndRecalculate',
+              CRITICAL_TIMEOUT_MS
+            );
+          }
+
+          const criticalPromises: Promise<any>[] = [];
+
+          if (typeof partnerModule.partnerService?.loadFromSupabase === 'function') {
+            criticalPromises.push(withTimeout(partnerModule.partnerService.loadFromSupabase(), 'partnerService', CRITICAL_TIMEOUT_MS));
+          }
+          if (typeof purchaseModule.purchaseService?.loadFromSupabase === 'function') {
+            criticalPromises.push(withTimeout(purchaseModule.purchaseService.loadFromSupabase(), 'purchaseService', CRITICAL_TIMEOUT_MS));
+          }
+          if (typeof salesModule.salesService?.loadFromSupabase === 'function') {
+            criticalPromises.push(withTimeout(salesModule.salesService.loadFromSupabase(), 'salesService', CRITICAL_TIMEOUT_MS));
+          }
+          if (typeof loadingModule.loadingService?.loadFromSupabase === 'function') {
+            criticalPromises.push(withTimeout(loadingModule.loadingService.loadFromSupabase(), 'loadingService', CRITICAL_TIMEOUT_MS));
+          }
+          if (typeof payablesModule.payablesService?.loadFromSupabase === 'function') {
+            criticalPromises.push(withTimeout(payablesModule.payablesService.loadFromSupabase(), 'payablesService', CRITICAL_TIMEOUT_MS));
+          }
+          if (typeof receivablesModule.receivablesService?.loadFromSupabase === 'function') {
+            criticalPromises.push(withTimeout(receivablesModule.receivablesService.loadFromSupabase(), 'receivablesService', CRITICAL_TIMEOUT_MS));
+          }
+          if (typeof transfersModule.transfersService?.loadFromSupabase === 'function') {
+            criticalPromises.push(withTimeout(transfersModule.transfersService.loadFromSupabase(), 'transfersService', CRITICAL_TIMEOUT_MS));
+          }
+          if (typeof standaloneModule.standaloneRecordsService?.initialize === 'function') {
+            criticalPromises.push(withTimeout(standaloneModule.standaloneRecordsService.initialize(), 'standaloneRecordsService', CRITICAL_TIMEOUT_MS));
+          }
+          if (typeof ledgerModule.ledgerService?.recalculateBalances === 'function') {
+            criticalPromises.push(withTimeout(ledgerModule.ledgerService.recalculateBalances(), 'ledgerService', CRITICAL_TIMEOUT_MS));
+          }
+
+          await Promise.allSettled(criticalPromises);
+          if (_initDiagnostics) {
+            _initDiagnostics.criticalMs = Math.round(performance.now() - criticalStartTime);
+          }
+
+          _initCriticalCompleted = true;
+
+          if (!isSqlCanonicalOpsEnabled()) {
+            // Reconcilia recebimentos e pagamentos antigos automaticamente (sem bloquear a UI)
+            // Delay de 1.5s para garantir que todos os serviços estejam carregados
+            setTimeout(() => {
+              void reconciliationModule.reconcileReceivablesFromHistory();
+              void payablesReconciliationModule.reconcilePayablesFromHistory();
+              // Reconciliar diretamente dos pedidos após 500ms extra
+              setTimeout(() => {
+                void payablesReconciliationModule.reconcilePayablesFromOrders();
+                void payablesReconciliationModule.reconcilePayablesFromFreights();
+                void reconciliationModule.reconcileReceivablesFromOrders();
+              }, 500);
+            }, 1500);
+          }
+          emitInitEvent('supabase:init:critical', { diagnostics: _initDiagnostics });
+          emitInitEvent('supabase:init:complete', { diagnostics: _initDiagnostics });
+          emitInitEvent('data:updated');
+          if (shouldLogDiagnostics()) {
+          }
+
+          // Carregar services nao criticos em background
+          const runBackgroundLoad = async () => {
+            try {
+              const backgroundStartTime = performance.now();
+              const backgroundPromises: Promise<any>[] = [];
+
+              if (typeof transporterModule.transporterService?.loadFromSupabase === 'function') {
+                backgroundPromises.push(withTimeout(transporterModule.transporterService.loadFromSupabase(), 'transporterService', BACKGROUND_TIMEOUT_MS));
+              }
+              if (typeof vehicleModule.vehicleService?.loadFromSupabase === 'function') {
+                backgroundPromises.push(withTimeout(vehicleModule.vehicleService.loadFromSupabase(), 'vehicleService', BACKGROUND_TIMEOUT_MS));
+              }
+              if (typeof driverModule.driverService?.loadFromSupabase === 'function') {
+                backgroundPromises.push(withTimeout(driverModule.driverService.loadFromSupabase(), 'driverService', BACKGROUND_TIMEOUT_MS));
+              }
+              if (typeof shareholderModule.shareholderService?.loadFromSupabase === 'function') {
+                backgroundPromises.push(withTimeout(shareholderModule.shareholderService.loadFromSupabase(), 'shareholderService', BACKGROUND_TIMEOUT_MS));
+              }
+              if (typeof partnerAddressModule.partnerAddressService?.loadFromSupabase === 'function') {
+                backgroundPromises.push(withTimeout(partnerAddressModule.partnerAddressService.loadFromSupabase(), 'partnerAddressService', BACKGROUND_TIMEOUT_MS));
+              }
+              if (typeof assetModule.assetService?.loadFromSupabase === 'function') {
+                backgroundPromises.push(withTimeout(assetModule.assetService.loadFromSupabase(), 'assetService', BACKGROUND_TIMEOUT_MS));
+              }
+              if (typeof advancesModule.advancesService?.loadFromSupabase === 'function') {
+                backgroundPromises.push(withTimeout(advancesModule.advancesService.loadFromSupabase(), 'advancesService', BACKGROUND_TIMEOUT_MS));
+              }
+              if (typeof loansModule.loansService?.loadFromSupabase === 'function') {
+                backgroundPromises.push(withTimeout(loansModule.loansService.loadFromSupabase(), 'loansService', BACKGROUND_TIMEOUT_MS));
+              }
+              if (typeof financialHistoryModule.financialHistoryService?.loadFromSupabase === 'function') {
+                backgroundPromises.push(withTimeout(financialHistoryModule.financialHistoryService.loadFromSupabase(), 'financialHistoryService', BACKGROUND_TIMEOUT_MS));
+              }
+              if (typeof settingsModule.settingsService?.loadFromSupabase === 'function') {
+                backgroundPromises.push(withTimeout(settingsModule.settingsService.loadFromSupabase(), 'settingsService', BACKGROUND_TIMEOUT_MS));
+              }
+              if (typeof bankAccountModule.bankAccountService?.loadFromSupabase === 'function') {
+                backgroundPromises.push(withTimeout(bankAccountModule.bankAccountService.loadFromSupabase(), 'bankAccountService', BACKGROUND_TIMEOUT_MS));
+              }
+              if (typeof initialBalanceModule.initialBalanceService?.loadFromSupabase === 'function') {
+                backgroundPromises.push(withTimeout(initialBalanceModule.initialBalanceService.loadFromSupabase(), 'initialBalanceService', BACKGROUND_TIMEOUT_MS));
+              }
+              if (typeof expenseCategoryModule.expenseCategoryService?.loadFromSupabase === 'function') {
+                backgroundPromises.push(withTimeout(expenseCategoryModule.expenseCategoryService.loadFromSupabase(), 'expenseCategoryService', BACKGROUND_TIMEOUT_MS));
+              }
+              if (typeof classificationModule.classificationService?.loadFromSupabase === 'function') {
+                backgroundPromises.push(withTimeout(classificationModule.classificationService.loadFromSupabase(), 'classificationService', BACKGROUND_TIMEOUT_MS));
+              }
+              if (typeof locationModule.locationService?.loadFromSupabase === 'function') {
+                backgroundPromises.push(withTimeout(locationModule.locationService.loadFromSupabase(), 'locationService', BACKGROUND_TIMEOUT_MS));
+              }
+
+              await Promise.allSettled(backgroundPromises);
+              if (_initDiagnostics) {
+                _initDiagnostics.backgroundMs = Math.round(performance.now() - backgroundStartTime);
+              }
+
+              // 🔄 Iniciar subscriptions em tempo real
+              const startServiceRealtime = (moduleRef: any, serviceKey?: string) => {
+                const target = serviceKey ? moduleRef?.[serviceKey] : moduleRef;
+                if (typeof target?.startRealtime === 'function') {
+                  target.startRealtime();
+                }
+              };
+
+              startServiceRealtime(transporterModule, 'transporterService');
+              startServiceRealtime(vehicleModule, 'vehicleService');
+              startServiceRealtime(driverModule, 'driverService');
+              startServiceRealtime(shareholderModule, 'shareholderService');
+              startServiceRealtime(partnerAddressModule, 'partnerAddressService');
+              startServiceRealtime(partnerModule, 'partnerService');
+              startServiceRealtime(salesModule, 'salesService');
+              startServiceRealtime(assetModule, 'assetService');
+              startServiceRealtime(loadingModule, 'loadingService');
+              startServiceRealtime(advancesModule, 'advancesService');
+              startServiceRealtime(receivablesModule, 'receivablesService');
+              startServiceRealtime(payablesModule, 'payablesService');
+              startServiceRealtime(transfersModule, 'transfersService');
+              startServiceRealtime(loansModule, 'loansService');
+              startServiceRealtime(financialHistoryModule, 'financialHistoryService');
+              startServiceRealtime(purchaseModule, 'purchaseService');
+              if (typeof auditModule.auditService?.startRealtime === 'function') auditModule.auditService.startRealtime();
+              if (typeof logModule.logService?.startRealtime === 'function') logModule.logService.startRealtime();
+              if (typeof settingsModule.settingsService?.startRealtime === 'function') settingsModule.settingsService.startRealtime();
+              if (typeof bankAccountModule.bankAccountService?.startRealtime === 'function') bankAccountModule.bankAccountService.startRealtime();
+              if (typeof ledgerModule.ledgerService?.startRealtime === 'function') ledgerModule.ledgerService.startRealtime();
+              if (typeof initialBalanceModule.initialBalanceService?.startRealtime === 'function') initialBalanceModule.initialBalanceService.startRealtime();
+              if (typeof locationModule.locationService?.startRealtime === 'function') locationModule.locationService.startRealtime();
+
+              // Novos serviços com realtime
+              startServiceRealtime(expenseCategoryModule, 'expenseCategoryService');
+              startServiceRealtime(classificationModule, 'classificationService');
+              if (typeof creditModule.default?.startRealtime === 'function') creditModule.default.startRealtime();
+              if (typeof loginScreenModule.loginScreenService?.startRealtime === 'function') loginScreenModule.loginScreenService.startRealtime();
+              if (typeof reportAuditModule.reportAuditService?.startRealtime === 'function') reportAuditModule.reportAuditService.startRealtime();
+              // loanServiceModule.loanService.startRealtime() removido — consolidado no loansService canônico
+
+
+              _initFullCompleted = true;
+              emitInitEvent('supabase:init:full', { diagnostics: _initDiagnostics });
+              emitInitEvent('data:updated');
+              if (shouldLogDiagnostics()) {
+              }
+            } catch (error) {
+              console.error('[supabaseInitService] runBackgroundLoad:', error);
+            }
+          };
+
+          void runBackgroundLoad();
+        } catch (realtimeError) {
+          console.warn('[supabaseInitService] realtime setup:', realtimeError);
+        }
       }
     }
 

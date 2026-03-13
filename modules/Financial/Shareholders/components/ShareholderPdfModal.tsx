@@ -5,6 +5,7 @@ import type { Shareholder } from '../../../../services/shareholderService';
 import { pdf } from '@react-pdf/renderer';
 import { saveAs } from 'file-saver';
 import ShareholderPdfDocument from './ShareholderPdfDocument';
+import ModalPortal from '../../../../components/ui/ModalPortal';
 
 interface Props {
   isOpen: boolean;
@@ -54,8 +55,9 @@ const ShareholderPdfModal: React.FC<Props> = ({ isOpen, onClose, shareholder }) 
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
-      <div className="w-full max-w-4xl bg-slate-200 rounded-xl shadow-2xl overflow-hidden flex flex-col h-[90vh]">
+    <ModalPortal>
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
+        <div className="w-full max-w-4xl bg-slate-200 rounded-xl shadow-2xl overflow-hidden flex flex-col h-[90vh]">
         
         {/* Toolbar */}
         <div className="bg-slate-900 text-white px-4 py-3 flex justify-between items-center shadow-md z-20">
@@ -95,7 +97,8 @@ const ShareholderPdfModal: React.FC<Props> = ({ isOpen, onClose, shareholder }) 
         </div>
 
       </div>
-    </div>
+      </div>
+    </ModalPortal>
   );
 };
 

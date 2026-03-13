@@ -13,6 +13,7 @@ import { authService } from '../../authService';
 import { formatMoney as formatCurrency } from '../../../utils/formatters';
 import { isSqlCanonicalOpsEnabled } from '../../sqlCanonicalOps';
 import type { RegisterFinancialParams } from './orchestratorTypes';
+import { FinancialRecord } from '../../../modules/Financial/types';
 
 // ============================================================================
 // HELPERS BÁSICOS
@@ -87,7 +88,7 @@ export const registerFinancialRecords = async (params: RegisterFinancialParams) 
   // Só executa via financialTransactionService no modo LEGADO.
   let txResult = null;
   const canonicalOps = isSqlCanonicalOpsEnabled();
-  
+
   if (!canonicalOps && amount > 0 && accountId) {
     try {
       const linkParams: TransactionLinkParams = {
@@ -153,7 +154,7 @@ export const registerFinancialRecords = async (params: RegisterFinancialParams) 
       paidValue: amount,
       discountValue: discount,
       status: 'paid',
-      subType: referenceType as any,
+      subType: referenceType as FinancialRecord['subType'],
       bankAccount: isPureAdjustment ? 'ABATIMENTO' : (accountName || accountId || 'N/D'),
       companyId: company,
       notes: `${notes || ''} [ORIGIN:${recordId}] [REF:${txId}]`.trim()

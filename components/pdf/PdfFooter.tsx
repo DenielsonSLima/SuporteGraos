@@ -8,8 +8,8 @@ interface PdfFooterProps {
   pageNumber?: boolean;
 }
 
-export const PdfFooter: React.FC<PdfFooterProps> = ({ 
-  text = 'Sistema ERP Suporte Grãos • Gestão Comercial e Logística',
+export const PdfFooter: React.FC<PdfFooterProps> = ({
+  text,
   pageNumber = true
 }) => {
   const company = settingsService.getCompanyData();
@@ -17,7 +17,7 @@ export const PdfFooter: React.FC<PdfFooterProps> = ({
   return (
     <View style={pdfStyles.footer} fixed>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%' }}>
-        <Text style={pdfStyles.footerText}>{text}</Text>
+        <Text style={pdfStyles.footerText}>{text || `${company.nomeFantasia || 'ERP'} • Inteligência e Gestão`}</Text>
         <Text style={pdfStyles.footerText}>{company.nomeFantasia}</Text>
       </View>
       {pageNumber && (

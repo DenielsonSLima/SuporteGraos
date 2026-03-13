@@ -30,15 +30,7 @@ function ensureAssetChannel() {
 }
 
 function subscribeToAssetRealtime(onInvalidate: () => void): () => void {
-  _assetListeners.add(onInvalidate);
-  ensureAssetChannel();
-  return () => {
-    _assetListeners.delete(onInvalidate);
-    if (_assetListeners.size === 0 && _assetChannel) {
-      supabase.removeChannel(_assetChannel);
-      _assetChannel = null;
-    }
-  };
+  return assetService.subscribeRealtime(onInvalidate);
 }
 
 // ─── Hook principal — leitura ─────────────────────────────────────────────────
@@ -72,11 +64,7 @@ export function useCreateAsset() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (asset: Asset) => {
-      assetService.add(asset);
-      // Retorno síncrono pois o serviço persiste async internamente
-      return Promise.resolve(asset);
-    },
+    mutationFn: (asset: Asset) => assetService.add(asset),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ASSETS });
     },
@@ -87,10 +75,7 @@ export function useUpdateAsset() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (asset: Asset) => {
-      assetService.update(asset);
-      return Promise.resolve(asset);
-    },
+    mutationFn: (asset: Asset) => assetService.update(asset),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ASSETS });
     },
@@ -101,10 +86,7 @@ export function useDeleteAsset() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (assetId: string) => {
-      assetService.delete(assetId);
-      return Promise.resolve(assetId);
-    },
+    mutationFn: (assetId: string) => assetService.delete(assetId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ASSETS });
     },

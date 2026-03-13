@@ -2,6 +2,8 @@
 import React, { useState, useMemo } from 'react';
 import { Plus, Search, Filter, Calendar, Tag, Layers } from 'lucide-react';
 import AdminExpenseGroupedList from './components/AdminExpenseGroupedList';
+import AdminExpenseCardList from './components/AdminExpenseCardList';
+import AdminExpenseQuickView from './components/AdminExpenseQuickView';
 import InstallmentExpenseForm from './components/InstallmentExpenseForm';
 import AdminExpensesKPIs from './components/AdminExpensesKPIs';
 import FinancialPaymentModal, { PaymentData } from '../components/modals/FinancialPaymentModal';
@@ -14,30 +16,51 @@ import { useToast } from '../../../contexts/ToastContext';
 import type { ExpenseCategory } from '../../../services/expenseCategoryService';
 import { useAdminExpenseOperations } from './hooks/useAdminExpenseOperations';
 
-// Lookup: subcategory_id → { name, type }
-function buildCategoryLookup(cats: ExpenseCategory[]): Map<string, { name: string; type: string }> {
-  const map = new Map<string, { name: string; type: string }>();
+// Lookup: subcategory_id → { name, type, parentId }
+function buildCategoryLookup(cats: ExpenseCategory[]): Map<string, { name: string; type: string; parentId: string }> {
+  const map = new Map<string, { name: string; type: string; parentId: string }>();
   cats.forEach(c => {
+    // Adiciona a própria categoria para permitir fallback/legado
+    map.set(c.id, { name: c.name, type: c.type, parentId: c.id });
+    
     (c.subtypes || []).forEach(s => {
-      map.set(s.id, { name: s.name, type: c.type });
+      map.set(s.id, { name: s.name, type: c.type, parentId: c.id });
     });
   });
   return map;
 }
 
 // Adapter: AdminExpense (DB) → FinancialRecord (UI)
-function toFinancialRecord(exp: AdminExpense, catLookup: Map<string, { name: string; type: string }>): FinancialRecord {
+function toFinancialRecord(exp: AdminExpense, catLookup: Map<string, { name: string; type: string; parentId: string }>): FinancialRecord {
   const catInfo = catLookup.get(exp.category_id);
+  
+  // Tenta recuperar o nome da subcategoria da descrição se estiver no formato "Subcategoria: Descrição"
+  let displayCategory = catInfo?.name || '';
+  let displayDescription = exp.description || '';
+  
+  if (displayDescription.includes(': ')) {
+    const parts = displayDescription.split(': ');
+    const subName = parts[0];
+    // Verifica se subName corresponde a algum nome de subcategoria conhecido no lookup
+    const isKnownSub = Array.from(catLookup.values()).some(v => v.name === subName);
+    
+    if (isKnownSub) {
+      displayCategory = subName;
+      displayDescription = parts.slice(1).join(': ');
+    }
+  }
+
   return {
     id: exp.id,
-    description: exp.description,
+    description: displayDescription,
     entityName: exp.payee_name || 'DESPESA DIRETA',
-    category: catInfo?.name || '',
+    category: displayCategory,
     dueDate: exp.due_date || exp.expense_date,
     issueDate: exp.expense_date,
     settlementDate: exp.paid_date,
     originalValue: exp.amount,
     paidValue: exp.status === 'paid' ? exp.amount : 0,
+    remainingValue: exp.status === 'paid' ? 0 : exp.amount,
     status: exp.status === 'open' ? 'pending' : exp.status === 'paid' ? 'paid' : 'pending',
     subType: 'admin',
     notes: '',
@@ -48,7 +71,7 @@ const AdminExpensesTab: React.FC = () => {
   const { addToast } = useToast();
   const { data: adminExpenses = [] } = useAdminExpenses();
   const { data: expenseCategories = [] } = useExpenseCategories();
-  const { createExpense, payExpense, refreshData } = useAdminExpenseOperations();
+  const { createExpense, payExpense, deleteExpense, updateExpense, reversePayment, refreshData } = useAdminExpenseOperations();
 
   const catLookup = useMemo(() => buildCategoryLookup(expenseCategories), [expenseCategories]);
   const records = useMemo(() => adminExpenses.map(e => toFinancialRecord(e, catLookup)), [adminExpenses, catLookup]);
@@ -63,8 +86,9 @@ const AdminExpensesTab: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'open' | 'future' | 'all'>('open');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isPayModalOpen, setIsPayModalOpen] = useState(false);
+  const [isQuickViewOpen, setIsQuickViewOpen] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<FinancialRecord | null>(null);
-  const [deletingRecord, setDeletingRecord] = useState<FinancialRecord | null>(null);
 
   // Filter State
   const [searchTerm, setSearchTerm] = useState('');
@@ -78,15 +102,28 @@ const AdminExpensesTab: React.FC = () => {
       for (const record of newRecords) {
         // Busca o subcategory id pelo nome da categoria
         const subcatEntry = Array.from(catLookup.entries()).find(([, v]) => v.name === record.category);
-        await createExpense({
-          categoryId: subcatEntry?.[0] || undefined,
-          description: record.description,
+        const subcatData = subcatEntry?.[1];
+        
+        // No banco admin_expenses.category_id aponta para a CATEGORIA PAI (expense_categories.id)
+        // Por isso enviamos o parentId do lookup.
+        const expenseId = await createExpense({
+          categoryId: subcatData?.parentId || undefined,
+          description: record.category ? `${record.category}: ${record.description}` : record.description,
           amount: record.originalValue || record.paidValue || 0,
           payeeName: record.entityName,
           accountId: record.status === 'paid' ? record.bankAccount : undefined,
           expenseDate: record.issueDate || record.dueDate,
           dueDate: record.dueDate,
         });
+
+        if (record.status === 'paid' && record.bankAccount) {
+          await payExpense({
+            entryOriginId: expenseId,
+            accountId: record.bankAccount,
+            amount: record.originalValue || record.paidValue || 0,
+            description: `[Baixa Imediata] ${record.description}`
+          });
+        }
       }
       refreshData();
       addToast('success', 'Despesa(s) lançada(s) com sucesso');
@@ -120,18 +157,59 @@ const AdminExpensesTab: React.FC = () => {
     }
   };
 
-  const handleEditRecord = (_record: FinancialRecord) => {
-    addToast('info', 'Edição será implementada na próxima fase');
+  const handleOpenQuickView = (record: FinancialRecord) => {
+    setSelectedRecord(record);
+    setIsQuickViewOpen(true);
+  };
+
+  const handleEditRecord = (record: FinancialRecord) => {
+    setSelectedRecord(record);
+    setIsQuickViewOpen(false);
+    setIsAddModalOpen(true);
   };
 
   const handleDeleteRecord = (record: FinancialRecord) => {
-    setDeletingRecord(record);
+    setSelectedRecord(record);
+    setIsDeleteConfirmOpen(true);
   };
 
   const confirmDeleteRecord = async () => {
-    if (!deletingRecord) return;
-    addToast('info', 'Exclusão não disponível - registros são imutáveis no novo sistema');
-    setDeletingRecord(null);
+    if (!selectedRecord) return;
+    try {
+      await deleteExpense(selectedRecord.id);
+      addToast('success', 'Despesa excluída com sucesso');
+      setIsQuickViewOpen(false);
+      refreshData();
+    } catch (err: any) {
+      addToast('error', 'Erro ao excluir despesa', err.message);
+    } finally {
+      setIsDeleteConfirmOpen(false);
+      setSelectedRecord(null);
+    }
+  };
+
+  const handleUpdateRecord = async (record: FinancialRecord) => {
+    try {
+      // Busca o subcategory id pelo nome da categoria
+      const subcatEntry = Array.from(catLookup.entries()).find(([, v]) => v.name === record.category);
+      const subcatData = subcatEntry?.[1];
+
+      await updateExpense(record.id, {
+        description: record.category ? `${record.category}: ${record.description}` : record.description,
+        amount: record.originalValue,
+        expenseDate: record.issueDate,
+        dueDate: record.dueDate,
+        payeeName: record.entityName,
+        categoryId: subcatData?.parentId
+      });
+
+      refreshData();
+      addToast('success', 'Despesa atualizada com sucesso');
+      setIsAddModalOpen(false);
+      setSelectedRecord(null);
+    } catch (err: any) {
+      addToast('error', 'Erro ao atualizar despesa', err.message);
+    }
   };
 
   // --- FILTERING & KPI CALCULATIONS ---
@@ -311,19 +389,40 @@ const AdminExpensesTab: React.FC = () => {
 
       {/* CONTENT AREA */}
       <div>
-        <AdminExpenseGroupedList
+        <AdminExpenseCardList
           records={filteredRecords}
+          onSelect={handleOpenQuickView}
           onPay={handleOpenPayment}
           onEdit={handleEditRecord}
           onDelete={handleDeleteRecord}
         />
       </div>
 
+      <AdminExpenseQuickView
+        isOpen={isQuickViewOpen}
+        onClose={() => setIsQuickViewOpen(false)}
+        record={selectedRecord}
+        onPay={handleOpenPayment}
+        onEdit={handleEditRecord}
+        onDelete={handleDeleteRecord}
+        onReversePayment={async (txId: string) => {
+          try {
+            await reversePayment(txId);
+            addToast('success', 'Pagamento revertido com sucesso');
+            refreshData();
+          } catch (err: any) {
+            addToast('error', 'Erro ao reverter pagamento', err.message);
+          }
+        }}
+      />
+
       {/* FORM MODAL */}
       <InstallmentExpenseForm
         isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
+        onClose={() => { setIsAddModalOpen(false); setSelectedRecord(null); }}
         onSave={handleAddExpenses}
+        onUpdate={handleUpdateRecord}
+        initialData={selectedRecord}
       />
 
       {/* PAYMENT MODAL */}
@@ -334,18 +433,24 @@ const AdminExpensesTab: React.FC = () => {
         record={selectedRecord}
       />
 
-      <ActionConfirmationModal
-        isOpen={!!deletingRecord}
-        onClose={() => setDeletingRecord(null)}
+      <ActionConfirmationModal 
+        isOpen={isDeleteConfirmOpen}
+        onClose={() => setIsDeleteConfirmOpen(false)}
+        onCancel={() => setIsDeleteConfirmOpen(false)}
         onConfirm={confirmDeleteRecord}
-        title="Excluir Despesa?"
+        title="Excluir Despesa"
         description={
-          deletingRecord?.status === 'paid'
-            ? 'Esta despesa já foi baixada. Ao excluir, o valor será estornado no caixa.'
-            : 'Tem certeza que deseja excluir esta despesa?'
+          <>
+            Tem certeza que deseja excluir a despesa <span className="font-black">"{selectedRecord?.description}"</span>?
+            <br />
+            Esta ação não pode ser desfeita.
+          </>
         }
+        confirmLabel="Sim, Excluir"
+        cancelLabel="Cancelar"
         type="danger"
       />
+
     </div>
   );
 };

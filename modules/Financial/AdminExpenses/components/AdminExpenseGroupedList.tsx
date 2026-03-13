@@ -3,9 +3,11 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { FinancialRecord } from '../../types';
 import { DollarSign, Calendar, MoreHorizontal } from 'lucide-react';
 import { financialService, getCategoryIcon } from '../../../../services/financialService';
+import type { ExpenseCategory } from '../../../../services/expenseCategoryService';
 
 interface Props {
   records: FinancialRecord[];
+  categories: ExpenseCategory[];
   onPay: (record: FinancialRecord) => void;
   onEdit: (record: FinancialRecord) => void;
   onDelete: (record: FinancialRecord) => void;
@@ -26,7 +28,7 @@ interface MonthGroup {
   types: Record<string, TypeGroup>;
 }
 
-const AdminExpenseGroupedList: React.FC<Props> = ({ records, onPay, onEdit, onDelete }) => {
+const AdminExpenseGroupedList: React.FC<Props> = ({ records, categories: expenseDefinitions, onPay, onEdit, onDelete }) => {
   const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
   const date = (val: string) => new Date(val).toLocaleDateString('pt-BR');
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -36,9 +38,6 @@ const AdminExpenseGroupedList: React.FC<Props> = ({ records, onPay, onEdit, onDe
     window.addEventListener('click', handleClickOutside);
     return () => window.removeEventListener('click', handleClickOutside);
   }, []);
-
-  // Fetch categories to map sub-items (like "Aluguel") to Types (like "Fixed")
-  const expenseDefinitions = financialService.getExpenseCategories();
 
   const getExpenseTypeInfo = (categoryName: string) => {
     // 1. Find the main category that contains this subtype
@@ -146,7 +145,7 @@ const AdminExpenseGroupedList: React.FC<Props> = ({ records, onPay, onEdit, onDe
                 {/* Type Header */}
                 <div className={`px-5 py-3 flex items-center justify-between border-b ${getColorForType(typeGroup.typeKey).replace('bg-', 'bg-opacity-50 bg-').replace('text-', 'text-').replace('border-', 'border-')}`}>
                   <div className="flex items-center gap-2">
-                    <Icon size={16} />
+                    {Icon && <Icon size={16} />}
                     <h4 className="font-bold text-sm uppercase tracking-wide">{typeGroup.type}</h4>
                   </div>
                   <span className="font-bold text-sm">{currency(typeGroup.total)}</span>

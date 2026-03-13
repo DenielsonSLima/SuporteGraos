@@ -16,6 +16,9 @@ export const marketService = {
       { label: 'Feijão (Cores)', base: 280.00 },
       { label: 'Boi Gordo (@)', base: 235.00 },
       { label: 'Trigo (PR)', base: 1240.00 },
+      { label: 'Diesel S10', base: 6.05 },
+      { label: 'Gasolina Comum', base: 5.79 },
+      { label: 'Petróleo (Brent)', base: 415.40 },
     ];
 
     // Simula uma variação de mercado para as commodities (entre -1.5% e +1.5%)

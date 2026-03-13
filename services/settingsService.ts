@@ -5,18 +5,18 @@ import { supabase } from './supabase';
 
 export type RotationFrequency = 'daily' | 'weekly' | 'monthly' | 'fixed';
 
-interface LoginScreenSettings {
+export interface LoginScreenSettings {
   images: string[];
   frequency: RotationFrequency;
 }
 
-interface WatermarkSettings {
+export interface WatermarkSettings {
   imageUrl: string | null;
   opacity: number;
   orientation: 'portrait' | 'landscape';
 }
 
-interface CompanyData {
+export interface CompanyData {
   razaoSocial: string;
   nomeFantasia: string;
   cnpj: string;
@@ -68,19 +68,19 @@ const loadCompanyData = (): CompanyData => {
     try { return JSON.parse(stored); } catch { }
   }
   return {
-    razaoSocial: 'Agro Grãos LTDA',
-    nomeFantasia: 'Suporte Grãos',
-    cnpj: '12.345.678/0001-90',
-    ie: '123.456.789',
-    endereco: 'Av. das Indústrias',
-    numero: '1000',
-    bairro: 'Distrito Industrial',
-    cidade: 'Sinop',
-    uf: 'MT',
-    cep: '78550-000',
-    telefone: '(66) 3531-0000',
-    email: 'financeiro@suportegraos.com',
-    site: 'www.suportegraos.com',
+    razaoSocial: '',
+    nomeFantasia: '',
+    cnpj: '',
+    ie: '',
+    endereco: '',
+    numero: '',
+    bairro: '',
+    cidade: '',
+    uf: '',
+    cep: '',
+    telefone: '',
+    email: '',
+    site: '',
     logoUrl: null
   };
 };
@@ -92,7 +92,7 @@ const loadWatermarkSettings = (): WatermarkSettings => {
   }
   return {
     imageUrl: null,
-    opacity: 10,
+    opacity: 15,
     orientation: 'portrait'
   };
 };
@@ -193,8 +193,13 @@ const startWatermarkRealtime = () => {
 };
 
 const fetchCompanyFromSupabase = async (): Promise<boolean> => {
-  const user = authService.getCurrentUser();
-  const companyId = user?.companyId;
+  let user = authService.getCurrentUser();
+  let companyId = user?.companyId;
+
+  if (!companyId) {
+    user = await authService.restoreSession();
+    companyId = user?.companyId;
+  }
 
   if (!companyId) {
     return false;
@@ -224,8 +229,13 @@ const fetchCompanyFromSupabase = async (): Promise<boolean> => {
 };
 
 const fetchWatermarkFromSupabase = async (): Promise<boolean> => {
-  const user = authService.getCurrentUser();
-  const companyId = user?.companyId;
+  let user = authService.getCurrentUser();
+  let companyId = user?.companyId;
+
+  if (!companyId) {
+    user = await authService.restoreSession();
+    companyId = user?.companyId;
+  }
 
   if (!companyId) {
     return false;
@@ -407,10 +417,16 @@ export const settingsService = {
     };
   },
 
-  updateWatermark: async (data: WatermarkSettings) => {
+  updateWatermark: async (data: Omit<WatermarkSettings, 'orientation'> & { orientation?: 'portrait' | 'landscape' }) => {
     try {
       const currentUser = authService.getCurrentUser();
-      _watermarkSettings = { ..._watermarkSettings, ...data };
+      const newData = {
+        imageUrl: data.imageUrl,
+        opacity: data.opacity,
+        orientation: data.orientation || 'portrait'
+      } as WatermarkSettings;
+
+      _watermarkSettings = { ..._watermarkSettings, ...newData };
       localStorage.setItem(WATERMARK_KEY, JSON.stringify(_watermarkSettings));
 
       const { userId, userName } = getLogInfo();
@@ -441,7 +457,6 @@ export const settingsService = {
 
         if (upserted?.id) {
           _watermarkId = upserted.id;
-        } else {
         }
 
         notifyWatermarkListeners();

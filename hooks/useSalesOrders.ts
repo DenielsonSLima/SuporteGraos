@@ -41,6 +41,21 @@ function ensureSalesChannel() {
       { event: '*', schema: 'public', table: 'ops_loadings' },
       () => _salesListeners.forEach(cb => cb()),
     )
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'financial_entries',
+        filter: 'origin_type=eq.sales_order'
+      },
+      () => _salesListeners.forEach(cb => cb()),
+    )
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'financial_transactions' },
+      () => _salesListeners.forEach(cb => cb()),
+    )
     .subscribe();
 }
 

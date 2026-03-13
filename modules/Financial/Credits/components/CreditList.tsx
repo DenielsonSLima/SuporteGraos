@@ -1,25 +1,31 @@
 import React from 'react';
 import { Calendar, Edit2, Trash2 } from 'lucide-react';
 import { FinancialRecord } from '../../types';
-import type { Account } from '../../../../services/accountsService';
 import { useAccounts } from '../../../../hooks/useAccounts';
 
-interface Props {
+interface CreditListProps {
   credits: FinancialRecord[];
   onEdit: (credit: FinancialRecord) => void;
   onDelete: (credit: FinancialRecord) => void;
-  groupBy?: 'none' | 'account_month';
 }
 
-const CreditList: React.FC<Props> = ({ credits, onEdit, onDelete, groupBy = 'none' }) => {
+const formatDate = (dateString?: string) => {
+  if (!dateString) return '---';
+  try {
+    return new Intl.DateTimeFormat('pt-BR').format(new Date(dateString));
+  } catch (e) {
+    return 'Data Inválida';
+  }
+};
+
+const CreditList: React.FC<CreditListProps> = ({ credits, onEdit, onDelete }) => {
   const { data: accounts = [] } = useAccounts();
   const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
-  const dateStr = (val: string) => new Date(val).toLocaleDateString('pt-BR');
 
   const getAccountLabel = (accountId?: string) => {
-    if (!accountId) return 'Conta não informada';
+    if (!accountId) return 'Sem conta';
     const account = accounts.find(a => a.id === accountId);
-    return account ? account.account_name : accountId;
+    return account ? account.account_name : 'Sem conta';
   };
 
   const sortedCredits = [...credits].sort((a, b) =>
@@ -34,14 +40,36 @@ const CreditList: React.FC<Props> = ({ credits, onEdit, onDelete, groupBy = 'non
     );
   }
 
+  const monthLabel = (dateValue: string) => {
+    try {
+      return new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(new Date(dateValue));
+    } catch { return 'Data desconhecida'; }
+  };
+
+  // Group by month
+  const groupedByMonth: Record<string, FinancialRecord[]> = {};
+  sortedCredits.forEach((credit) => {
+    try {
+      const d = new Date(credit.issueDate || credit.dueDate);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (!groupedByMonth[key]) groupedByMonth[key] = [];
+      groupedByMonth[key].push(credit);
+    } catch {
+      if (!groupedByMonth['unknown']) groupedByMonth['unknown'] = [];
+      groupedByMonth['unknown'].push(credit);
+    }
+  });
+
+  const monthKeys = Object.keys(groupedByMonth).sort((a, b) => b.localeCompare(a));
+
   const renderTable = (rows: FinancialRecord[]) => (
     <div className="overflow-x-auto">
       <table className="w-full text-left text-sm text-slate-600">
         <thead className="bg-slate-50 text-xs uppercase text-slate-400 font-medium">
           <tr>
-            <th className="px-5 py-2 w-32">Data</th>
+            <th className="px-5 py-2 w-36">Data</th>
             <th className="px-5 py-2">Descrição</th>
-            <th className="px-5 py-2 w-64">Conta</th>
+            <th className="px-5 py-2 w-52">Conta</th>
             <th className="px-5 py-2 text-right w-36">Valor</th>
             <th className="px-5 py-2 text-center w-32">Ações</th>
           </tr>
@@ -56,16 +84,15 @@ const CreditList: React.FC<Props> = ({ credits, onEdit, onDelete, groupBy = 'non
                 <div className="flex items-center gap-2">
                   <Calendar size={14} className="text-slate-400 group-hover:text-blue-500 transition-colors" />
                   <span className="text-slate-700 font-medium">
-                    {dateStr(credit.issueDate)}
+                    {formatDate(credit.issueDate || credit.dueDate)}
                   </span>
                 </div>
               </td>
               <td className="px-5 py-3">
                 <div className="font-medium text-slate-800">{credit.description || '-'}</div>
-                <div className="text-xs text-slate-500">{credit.entityName || ''}</div>
               </td>
               <td className="px-5 py-3 text-xs">
-                <span className="bg-slate-100 px-2 py-1 rounded text-slate-600">
+                <span className="bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-lg font-bold">
                   {getAccountLabel(credit.bankAccount)}
                 </span>
               </td>
@@ -103,59 +130,20 @@ const CreditList: React.FC<Props> = ({ credits, onEdit, onDelete, groupBy = 'non
     </div>
   );
 
-  if (groupBy === 'account_month') {
-    const groupedByAccount: Record<string, FinancialRecord[]> = {};
-    sortedCredits.forEach((credit) => {
-      const accountLabel = getAccountLabel(credit.bankAccount);
-      if (!groupedByAccount[accountLabel]) groupedByAccount[accountLabel] = [];
-      groupedByAccount[accountLabel].push(credit);
-    });
-
-    const accountLabels = Object.keys(groupedByAccount).sort((a, b) => a.localeCompare(b, 'pt-BR'));
-    const monthLabel = (dateValue: string) => new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(new Date(dateValue));
-
-    return (
-      <div className="space-y-6">
-        {accountLabels.map((accountLabel) => {
-          const creditsByAccount = groupedByAccount[accountLabel];
-          const groupedByMonth: Record<string, FinancialRecord[]> = {};
-          creditsByAccount.forEach((credit) => {
-            const d = new Date(credit.issueDate);
-            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-            if (!groupedByMonth[key]) groupedByMonth[key] = [];
-            groupedByMonth[key].push(credit);
-          });
-
-          const monthKeys = Object.keys(groupedByMonth).sort((a, b) => b.localeCompare(a));
-
-          return (
-            <div key={accountLabel} className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-              <div className="px-5 py-3 border-b border-slate-200 bg-slate-50">
-                <div className="text-sm font-bold text-slate-700">Conta Bancária</div>
-                <div className="text-xs text-slate-500 mt-0.5">{accountLabel}</div>
-              </div>
-              {monthKeys.map((monthKey, index) => {
-                const rows = groupedByMonth[monthKey];
-                const monthHeader = monthLabel(rows[0].issueDate);
-                return (
-                  <div key={monthKey} className={index === 0 ? '' : 'border-t border-slate-200'}>
-                    <div className="px-5 py-2 bg-white text-xs font-bold text-slate-600">
-                      {monthHeader}
-                    </div>
-                    {renderTable(rows)}
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })}
-      </div>
-    );
-  }
-
   return (
-    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-      {renderTable(sortedCredits)}
+    <div className="space-y-6">
+      {monthKeys.map((monthKey) => {
+        const rows = groupedByMonth[monthKey];
+        const header = monthKey === 'unknown' ? 'Data desconhecida' : monthLabel(rows[0].issueDate || rows[0].dueDate);
+        return (
+          <div key={monthKey} className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+            <div className="px-5 py-3 border-b border-slate-200 bg-slate-50">
+              <div className="text-sm font-bold text-slate-700 capitalize">{header}</div>
+            </div>
+            {renderTable(rows)}
+          </div>
+        );
+      })}
     </div>
   );
 };

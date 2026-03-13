@@ -33,7 +33,6 @@ import {
   handleSalesOrderReceipt,
   handleCommissionPayment,
   handleStandalonePayment,
-  PaymentData
 } from './financial/paymentOrchestrator';
 
 // Módulo de transferências (extraído)
@@ -44,7 +43,8 @@ import {
   deleteTransfer,
   importTransfers
 } from './financial/actions/transferActions';
-import type { Shareholder } from './shareholderService';
+import { PaymentResult, PaymentData } from './financial/handlers/orchestratorTypes';
+import type { Shareholder as ShareholderDB } from './shareholderService';
 
 const getLogInfo = () => {
   const user = authService.getCurrentUser();
@@ -55,7 +55,7 @@ const getLogInfo = () => {
  * Mapeia um Shareholder para FinancialRecord (obrigações com sócios).
  * Garante tipo homogêneo no array de getStandaloneRecords().
  */
-function mapShareholderToFinancialRecord(s: Shareholder): FinancialRecord {
+function mapShareholderToFinancialRecord(s: ShareholderDB): FinancialRecord {
   const today = new Date().toISOString().slice(0, 10);
   return {
     id: s.id,
@@ -83,10 +83,10 @@ export const financialActionService = {
   ],
   getTransfers: () => getTransfers(),
 
-  processRecord: async (recordId: string, data: any, subType?: string) => {
+  processRecord: async (recordId: string, data: PaymentData, subType?: string): Promise<PaymentResult> => {
     const { userId, userName } = getLogInfo();
-    const transactionValue = parseFloat(data.amount) || 0;
-    const discountValue = parseFloat(data.discount) || 0;
+    const transactionValue = typeof data.amount === 'string' ? parseFloat(data.amount) || 0 : data.amount;
+    const discountValue = typeof data.discount === 'string' ? parseFloat(data.discount) || 0 : data.discount;
 
     // Resolver nome da conta bancária
     let accountName = data.accountName;
@@ -129,7 +129,7 @@ export const financialActionService = {
     // financial_history + admin_expenses de forma CONSISTENTE
     // =====================================================================
 
-    let result: any = { success: true };
+    let result: PaymentResult = { success: true, txId: '' };
 
     if (subType === 'freight') {
       result = await handleFreightPayment(recordId, paymentData);
@@ -141,15 +141,15 @@ export const financialActionService = {
       result = await handleCommissionPayment(recordId, paymentData);
     } else {
       // Standalone / admin / crédito / sócio / recibo
-      let standalone: any = standaloneRecordsService.getById(recordId);
-      let serviceToUpdate: any = standaloneRecordsService;
+      let standalone: FinancialRecord | ShareholderDB | null | undefined = standaloneRecordsService.getById(recordId);
+      let serviceToUpdate: { getById?: (id: string) => any;[key: string]: any } = standaloneRecordsService;
 
       if (!standalone) {
         standalone = creditService.getCredits().find((c: any) => c.id === recordId);
         if (standalone) serviceToUpdate = creditService;
       }
       if (!standalone) {
-        standalone = shareholderService.getById(recordId);
+        standalone = await shareholderService.getById(recordId);
         if (standalone) serviceToUpdate = shareholderService;
       }
       if (!standalone) {
@@ -157,7 +157,13 @@ export const financialActionService = {
         if (standalone) serviceToUpdate = receiptService;
       }
 
-      result = await handleStandalonePayment(recordId, paymentData, standalone, serviceToUpdate);
+      if (standalone && serviceToUpdate === shareholderService) {
+        // Pró-labore ou Retirada via lista standalone
+        const { handleShareholderPayment } = await import('./financial/paymentOrchestrator');
+        result = await handleShareholderPayment(recordId, paymentData, 'debit');
+      } else {
+        result = await handleStandalonePayment(recordId, paymentData, standalone as FinancialRecord, serviceToUpdate);
+      }
     }
 
     // Log geral de ação

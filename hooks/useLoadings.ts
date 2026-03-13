@@ -41,7 +41,7 @@ export function useLoadings() {
 
   return useQuery({
     queryKey: QUERY_KEYS.LOADINGS,
-    queryFn: () => loadingService.getAll(),
+    queryFn: () => loadingService.loadFromSupabase(),
     staleTime: STALE_TIMES.DYNAMIC,
     placeholderData: keepPreviousData,
   });
@@ -55,7 +55,13 @@ export function useLoadingsByPurchaseOrder(purchaseOrderId: string | undefined) 
 
   return useQuery({
     queryKey: [...QUERY_KEYS.LOADINGS, 'purchase', purchaseOrderId] as const,
-    queryFn: () => loadingService.getByPurchaseOrder(purchaseOrderId!),
+    queryFn: async () => {
+      const all = await loadingService.loadFromSupabase();
+      return all.filter(l =>
+        l.purchaseOrderId === purchaseOrderId ||
+        (l.purchaseOrderNumber && l.purchaseOrderNumber === purchaseOrderId)
+      );
+    },
     enabled: !!purchaseOrderId,
     staleTime: STALE_TIMES.DYNAMIC,
     placeholderData: keepPreviousData,
@@ -70,7 +76,13 @@ export function useLoadingsBySalesOrder(salesOrderId: string | undefined) {
 
   return useQuery({
     queryKey: [...QUERY_KEYS.LOADINGS, 'sales', salesOrderId] as const,
-    queryFn: () => loadingService.getBySalesOrder(salesOrderId!),
+    queryFn: async () => {
+      const all = await loadingService.loadFromSupabase();
+      return all.filter(l =>
+        l.salesOrderId === salesOrderId ||
+        (l.salesOrderNumber && l.salesOrderNumber === salesOrderId)
+      );
+    },
     enabled: !!salesOrderId,
     staleTime: STALE_TIMES.DYNAMIC,
     placeholderData: keepPreviousData,

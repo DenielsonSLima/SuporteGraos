@@ -1,222 +1,303 @@
-import React, { useState, useMemo } from 'react';
-import { Plus, Search, CreditCard, TrendingUp, DollarSign, Trash2, Edit } from 'lucide-react';
-import { creditLinesService } from '../../../services/creditLinesService';
-import type { CreditLine } from '../../../services/creditLinesService';
-import { useCreditLines, useCreditLineTotals } from '../../../hooks/useCreditLines';
-import ActionConfirmationModal from '../../../components/ui/ActionConfirmationModal';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Plus, Search, TrendingUp, Filter, Layers, Calendar, X } from 'lucide-react';
+import { useCredits, useCreateCredit, useUpdateCredit, useDeleteCredit } from '../../../hooks/useCredits';
+import CreditList from './components/CreditList';
+import CreditFormModal from './components/CreditFormModal';
+import ModalPortal from '../../../components/ui/ModalPortal';
 import { useToast } from '../../../contexts/ToastContext';
-import { useQueryClient } from '@tanstack/react-query';
-import { QUERY_KEYS } from '../../../hooks/queryKeys';
+import type { FinancialRecord } from '../../../modules/Financial/types';
 
 const CreditsTab: React.FC = () => {
   const { addToast } = useToast();
-  const queryClient = useQueryClient();
+  
+  // UI Tabs / Filters
+  const [activeSubTab, setActiveSubTab] = useState<'current_month' | 'history'>('current_month');
   const [searchTerm, setSearchTerm] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<CreditLine | null>(null);
+  const [editingCredit, setEditingCredit] = useState<FinancialRecord | null>(null);
+  const [deletingCredit, setDeletingCredit] = useState<FinancialRecord | null>(null);
 
-  // Form state
-  const [formData, setFormData] = useState({
-    name: '',
-    total_limit: '',
-    interest_rate: '',
-    start_date: new Date().toISOString().split('T')[0],
-    end_date: '',
-  });
+  // Pagination
+  const PAGE_SIZE = 100;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
-  // TanStack Query: dados + realtime automático
-  const { data: creditLines = [], isLoading } = useCreditLines();
-  const { data: totalsData } = useCreditLineTotals();
+  // TanStack Query
+  const { data: credits = [], isLoading } = useCredits();
+  const createCreditMutation = useCreateCredit();
+  const updateCreditMutation = useUpdateCredit();
+  const deleteCreditMutation = useDeleteCredit();
+
+  // Mês Atual helpers
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth() + 1;
+  const startOfMonthStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`;
+  const endOfMonthStr = new Date(currentYear, currentMonth, 0).toISOString().split('T')[0];
 
   const filteredCredits = useMemo(() => {
-    if (!searchTerm) return creditLines;
-    const lower = searchTerm.toLowerCase();
-    return creditLines.filter(c =>
-      c.name.toLowerCase().includes(lower)
-    );
-  }, [creditLines, searchTerm]);
+    let result = credits;
 
-  const totals = totalsData ?? { totalLimit: 0, totalUsed: 0, totalAvailable: 0 };
+    if (activeSubTab === 'current_month') {
+      result = result.filter(r => {
+        const d = r.issueDate || r.dueDate || '';
+        return d >= startOfMonthStr && d <= endOfMonthStr;
+      });
+    }
+
+    if (activeSubTab === 'history') {
+      const searchLower = searchTerm.toLowerCase();
+      result = result.filter(r => {
+        const d = r.issueDate || r.dueDate || '';
+        if (startDate && d < startDate) return false;
+        if (endDate && d > endDate) return false;
+        if (searchTerm) {
+          return r.description.toLowerCase().includes(searchLower) || 
+                 (r.entityName && r.entityName.toLowerCase().includes(searchLower));
+        }
+        return true;
+      });
+    }
+
+    return result;
+  }, [credits, activeSubTab, searchTerm, startDate, endDate, startOfMonthStr, endOfMonthStr]);
+
+  const paginatedRecords = useMemo(() => {
+    if (activeSubTab !== 'history') return filteredCredits;
+    return filteredCredits.slice(0, visibleCount);
+  }, [filteredCredits, activeSubTab, visibleCount]);
+
+  const hasMore = activeSubTab === 'history' && filteredCredits.length > visibleCount;
+
+  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [startDate, endDate, searchTerm, activeSubTab]);
+
+  const totalCreditsValue = useMemo(() => {
+    return filteredCredits.reduce((acc, c) => acc + (c.originalValue || 0), 0);
+  }, [filteredCredits]);
 
   const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
 
-  const formatValueInput = (val: string) => {
-    const numbers = val.replace(/\D/g, '');
-    if (!numbers) return '';
-    return (parseInt(numbers, 10) / 100).toFixed(2).replace('.', ',').replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1.');
-  };
-  const parseValue = (val: string) => parseFloat(val.replace(/\./g, '').replace(',', '.')) || 0;
-
-  const handleCreate = async () => {
+  const handleSubmit = async (data: any) => {
     try {
-      await creditLinesService.add({
-        name: formData.name,
-        total_limit: parseValue(formData.total_limit),
-        interest_rate: formData.interest_rate ? parseValue(formData.interest_rate) : undefined,
-        is_active: true,
-        start_date: formData.start_date || undefined,
-        end_date: formData.end_date || undefined,
-      });
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CREDIT_LINES });
-      addToast('success', 'Linha de Crédito criada!');
-      setIsFormOpen(false);
-      setFormData({ name: '', total_limit: '', interest_rate: '', start_date: new Date().toISOString().split('T')[0], end_date: '' });
+      if (editingCredit) {
+        // Update existing credit
+        await updateCreditMutation.mutateAsync({
+          id: editingCredit.id,
+          data: {
+            description: data.description,
+            amount: data.value,
+            date: data.date,
+          },
+        });
+        addToast('success', 'Crédito atualizado com sucesso!');
+        setEditingCredit(null);
+      } else {
+        // Create new credit
+        await createCreditMutation.mutateAsync({
+          description: data.description,
+          amount: data.value,
+          date: data.date,
+          accountId: data.accountId,
+          accountName: data.accountName,
+        });
+        addToast('success', 'Crédito lançado com sucesso!');
+      }
     } catch (err: any) {
-      addToast('error', 'Erro ao criar', err.message);
+      addToast('error', 'Erro ao salvar crédito', err.message);
+    }
+  };
+
+  const handleEdit = (credit: FinancialRecord) => {
+    setEditingCredit(credit);
+    setIsFormOpen(true);
+  };
+
+  const handleDelete = (credit: FinancialRecord) => {
+    setDeletingCredit(credit);
+  };
+
+  const confirmDelete = async () => {
+    if (!deletingCredit) return;
+    try {
+      await deleteCreditMutation.mutateAsync(deletingCredit.id);
+      addToast('success', 'Crédito excluído com sucesso!');
+    } catch (err: any) {
+      addToast('error', 'Erro ao excluir crédito', err.message);
+    } finally {
+      setDeletingCredit(null);
     }
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex-1">
-          <h3 className="text-lg font-bold text-slate-900">Linhas de Crédito</h3>
-          <p className="text-sm text-slate-500">Gerenciamento de limites de crédito</p>
+    <div className="space-y-8 animate-in fade-in duration-500">
+
+      {/* Premium Sub-navigation */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
+        <div className="flex gap-2 p-1.5 bg-slate-100/80 backdrop-blur-md rounded-2xl border border-slate-200/50 shadow-inner w-full sm:w-fit">
+          <button
+            onClick={() => setActiveSubTab('current_month')}
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-3 px-8 py-3.5 text-[10px] font-black uppercase tracking-[0.15em] rounded-xl transition-all duration-300 ${activeSubTab === 'current_month' ? 'bg-white text-emerald-600 shadow-xl shadow-emerald-900/5' : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'}`}
+          >
+            <Filter size={16} /> Mês Atual
+          </button>
+          <button
+            onClick={() => setActiveSubTab('history')}
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-3 px-8 py-3.5 text-[10px] font-black uppercase tracking-[0.15em] rounded-xl transition-all duration-300 ${activeSubTab === 'history' ? 'bg-slate-900 text-white shadow-xl shadow-black/20' : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'}`}
+          >
+            <Layers size={16} /> Histórico Geral
+          </button>
         </div>
+        
         <button
-          onClick={() => setIsFormOpen(true)}
-          className="flex items-center gap-2 bg-slate-900 text-white px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg active:scale-95"
+          onClick={() => { setEditingCredit(null); setIsFormOpen(true); }}
+          className="bg-emerald-600 text-white px-8 py-3.5 rounded-[1.5rem] font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:bg-emerald-700 hover:scale-[1.02] hover:-translate-y-1 transition-all active:scale-95 flex items-center justify-center gap-3"
         >
-          <Plus size={18} />
-          Nova Linha de Crédito
+          <Plus size={18} /> Novo Crédito
         </button>
       </div>
 
-      {/* KPIs */}
+      {/* KPI */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-blue-500">
-          <p className="text-[10px] text-blue-600 uppercase font-black tracking-widest">Limite Total</p>
-          <p className="text-xl font-black text-blue-600 mt-1">{currency(totals.totalLimit)}</p>
-        </div>
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-amber-500">
-          <p className="text-[10px] text-amber-600 uppercase font-black tracking-widest">Utilizado</p>
-          <p className="text-xl font-black text-amber-600 mt-1">{currency(totals.totalUsed)}</p>
-        </div>
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-emerald-500">
-          <p className="text-[10px] text-emerald-600 uppercase font-black tracking-widest">Disponível</p>
-          <p className="text-xl font-black text-emerald-600 mt-1">{currency(totals.totalAvailable)}</p>
+        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-emerald-500 animate-in slide-in-from-left-5">
+          <p className="text-[10px] text-emerald-600 uppercase font-black tracking-widest flex items-center gap-1.5 mb-1"><TrendingUp size={14}/> Entradas Neste Filtro</p>
+          <p className="text-2xl font-black text-emerald-600 tracking-tighter">{currency(totalCreditsValue)}</p>
         </div>
       </div>
 
-      {/* Busca */}
-      <div className="relative flex-1 max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-        <input
-          type="text"
-          placeholder="Buscar linha de crédito..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full pl-10 pr-4 py-2.5 rounded-xl border-2 border-slate-100 bg-slate-50 text-sm focus:bg-white focus:border-slate-800 focus:outline-none transition-all font-medium"
-        />
-      </div>
-
-      {/* Lista */}
-      {filteredCredits.length === 0 ? (
-        <div className="text-center py-20 text-slate-400 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50">
-          <CreditCard size={48} className="mx-auto mb-4 text-slate-300" />
-          <p className="font-bold uppercase tracking-widest">Nenhuma linha de crédito cadastrada</p>
-        </div>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredCredits.map(cl => {
-            const usagePercent = cl.total_limit > 0 ? (cl.used_amount / cl.total_limit) * 100 : 0;
-            return (
-              <div key={cl.id} className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition-all">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
-                    <CreditCard size={22} />
-                  </div>
-                  <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-tighter border ${cl.is_active ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-300'}`}>
-                    {cl.is_active ? 'Ativa' : 'Inativa'}
-                  </span>
-                </div>
-                <h4 className="font-black text-slate-800 text-lg uppercase tracking-tight mb-4">{cl.name}</h4>
-                
-                {/* Progress bar */}
-                <div className="mb-4">
-                  <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
-                    <span>Utilização</span>
-                    <span>{usagePercent.toFixed(0)}%</span>
-                  </div>
-                  <div className="w-full bg-slate-100 rounded-full h-2.5">
-                    <div className={`h-2.5 rounded-full transition-all ${usagePercent > 80 ? 'bg-rose-500' : usagePercent > 50 ? 'bg-amber-500' : 'bg-emerald-500'}`} style={{ width: `${Math.min(usagePercent, 100)}%` }} />
-                  </div>
-                </div>
-
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Limite:</span>
-                    <span className="font-bold text-slate-800">{currency(cl.total_limit)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Utilizado:</span>
-                    <span className="font-bold text-amber-600">{currency(cl.used_amount)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Disponível:</span>
-                    <span className="font-bold text-emerald-600">{currency(cl.available_amount)}</span>
-                  </div>
-                  {cl.interest_rate != null && (
-                    <div className="flex justify-between">
-                      <span className="text-slate-500">Juros:</span>
-                      <span className="font-bold text-slate-800">{cl.interest_rate}% a.m.</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Modal de Formulário Inline */}
-      {isFormOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
-          <div className="w-full max-w-md bg-white rounded-xl shadow-2xl overflow-hidden animate-in zoom-in-95">
-            <div className="bg-slate-900 px-6 py-4 flex justify-between items-center text-white">
-              <h3 className="font-bold text-lg">Nova Linha de Crédito</h3>
-              <button onClick={() => setIsFormOpen(false)} className="hover:bg-white/20 p-2 rounded-full transition-colors">✕</button>
+      {/* Visão Geral Filter & Search (apenas aba 'history') */}
+      {activeSubTab === 'history' && (
+        <div className="bg-white/80 backdrop-blur-xl p-3 rounded-[2.5rem] border border-slate-200/60 shadow-2xl shadow-slate-200/50 animate-in slide-in-from-top-5 duration-500">
+          <div className="flex flex-col lg:flex-row gap-4 items-stretch lg:items-center">
+            <div className="relative flex-1 group">
+              <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-500 transition-colors" size={20} />
+              <input
+                type="text"
+                placeholder="Pesquisar por crédito..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-14 pr-6 py-4 rounded-[1.8rem] border border-slate-100 bg-slate-50 text-sm font-black text-slate-800 placeholder:text-slate-400/80 placeholder:font-bold focus:bg-white focus:border-emerald-400 focus:ring-4 focus:ring-emerald-500/5 outline-none transition-all shadow-inner"
+              />
             </div>
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block mb-1 text-xs font-bold text-slate-500 uppercase">Nome da Linha</label>
-                <input type="text" required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm focus:border-primary-500 focus:outline-none" placeholder="Ex: Crédito Banco do Brasil" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block mb-1 text-xs font-bold text-slate-500 uppercase">Limite (R$)</label>
-                  <input type="text" inputMode="numeric" required value={formData.total_limit}
-                    onChange={e => setFormData({ ...formData, total_limit: formatValueInput(e.target.value) })}
-                    className="w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm focus:border-primary-500 focus:outline-none font-bold" placeholder="0,00" />
-                </div>
-                <div>
-                  <label className="block mb-1 text-xs font-bold text-slate-500 uppercase">Juros (% a.m.)</label>
-                  <input type="text" inputMode="decimal" value={formData.interest_rate}
-                    onChange={e => setFormData({ ...formData, interest_rate: e.target.value })}
-                    className="w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm focus:border-primary-500 focus:outline-none" placeholder="0,00" />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block mb-1 text-xs font-bold text-slate-500 uppercase">Data Início</label>
-                  <input type="date" value={formData.start_date} onChange={e => setFormData({ ...formData, start_date: e.target.value })}
-                    className="w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm focus:border-primary-500 focus:outline-none" />
-                </div>
-                <div>
-                  <label className="block mb-1 text-xs font-bold text-slate-500 uppercase">Data Fim</label>
-                  <input type="date" value={formData.end_date} onChange={e => setFormData({ ...formData, end_date: e.target.value })}
-                    className="w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm focus:border-primary-500 focus:outline-none" />
-                </div>
-              </div>
-              <div className="pt-2 flex justify-end gap-3">
-                <button type="button" onClick={() => setIsFormOpen(false)} className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-medium text-sm">Cancelar</button>
-                <button type="button" onClick={handleCreate} className="px-6 py-2 rounded-lg bg-slate-800 text-white font-bold shadow-sm hover:bg-slate-900 text-sm">Confirmar</button>
+
+            <div className="flex items-center gap-4 bg-slate-50/50 p-2 rounded-[1.8rem] border border-slate-100">
+              <div className="flex items-center gap-3 bg-white px-5 py-3 rounded-2xl border border-slate-200/50 shadow-sm">
+                <Calendar size={18} className="text-slate-400" />
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-32 text-xs border-none focus:ring-0 bg-transparent text-slate-700 font-black p-0 uppercase tracking-tighter"
+                />
+                <span className="text-slate-300 font-black text-[10px] uppercase tracking-widest">Até</span>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-32 text-xs border-none focus:ring-0 bg-transparent text-slate-700 font-black p-0 uppercase tracking-tighter"
+                />
+                {(startDate || endDate) && (
+                  <button
+                    onClick={() => { setStartDate(''); setEndDate(''); }}
+                    className="ml-2 bg-rose-50 hover:bg-rose-500 p-1.5 rounded-xl text-rose-500 hover:text-white transition-all shadow-sm"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
               </div>
             </div>
           </div>
+
+          {(startDate || endDate || searchTerm) && (
+            <div className="px-6 py-2 flex justify-end">
+              <span className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] italic">
+                Exibindo {filteredCredits.length} entrada{filteredCredits.length !== 1 ? 's' : ''} localizada{filteredCredits.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+          )}
         </div>
+      )}
+
+      {/* Lista */}
+      {isLoading ? (
+        <div className="flex items-center justify-center py-20">
+          <div className="w-8 h-8 rounded-full border-4 border-slate-200 border-t-emerald-500 animate-spin" />
+        </div>
+      ) : (
+        <div className="animate-in slide-in-from-bottom-5 duration-700">
+          <CreditList 
+            credits={paginatedRecords} 
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+          />
+        </div>
+      )}
+
+      {/* Paginação Histórico */}
+      {activeSubTab === 'history' && filteredCredits.length > 0 && (
+        <div className="flex flex-col items-center gap-3 py-10">
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">
+            Exibindo {paginatedRecords.length} de {filteredCredits.length} registros
+          </span>
+          {hasMore && (
+            <button
+              onClick={() => setVisibleCount(prev => prev + PAGE_SIZE)}
+              className="px-12 py-4 rounded-[1.5rem] text-[10px] font-black uppercase tracking-[0.2em] border-2 border-slate-200 text-slate-600 hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-all shadow-xl active:scale-95"
+            >
+              Carregar Mais Resultados
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Modal de Formulário (Criar / Editar) */}
+      {isFormOpen && (
+        <CreditFormModal
+          isOpen={isFormOpen}
+          onClose={() => { setIsFormOpen(false); setEditingCredit(null); }}
+          onSubmit={handleSubmit}
+          initialData={editingCredit ? {
+            issueDate: editingCredit.issueDate || editingCredit.dueDate,
+            description: editingCredit.description,
+            originalValue: editingCredit.originalValue,
+            bankAccount: editingCredit.bankAccount,
+          } : undefined}
+        />
+      )}
+
+      {/* Modal de Confirmação de Exclusão */}
+      {deletingCredit && (
+        <ModalPortal>
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in">
+            <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95">
+              <div className="px-8 py-6 bg-red-50 border-b border-red-100">
+                <h3 className="font-black text-lg text-red-700 uppercase tracking-tight">Confirmar Exclusão</h3>
+              </div>
+              <div className="px-8 py-6 space-y-4">
+                <p className="text-slate-700 text-sm">
+                  Tem certeza que deseja excluir o crédito <strong className="text-slate-900">"{deletingCredit.description}"</strong> no valor de{' '}
+                  <strong className="text-red-600">{currency(deletingCredit.originalValue || 0)}</strong>?
+                </p>
+                <p className="text-xs text-slate-500">Esta ação não pode ser desfeita.</p>
+              </div>
+              <div className="flex gap-3 px-8 py-5 bg-slate-50 border-t border-slate-100">
+                <button
+                  onClick={() => setDeletingCredit(null)}
+                  className="flex-1 py-3 px-4 text-slate-700 bg-white border-2 border-slate-200 hover:bg-slate-100 rounded-2xl font-black text-xs uppercase tracking-wider transition-all"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  disabled={deleteCreditMutation.isPending}
+                  className="flex-1 py-3 px-4 text-white bg-red-600 hover:bg-red-700 rounded-2xl font-black text-xs uppercase tracking-wider transition-all disabled:opacity-50"
+                >
+                  {deleteCreditMutation.isPending ? 'Excluindo...' : 'Sim, Excluir'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </ModalPortal>
       )}
     </div>
   );

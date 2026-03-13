@@ -322,7 +322,7 @@ const PerformancePdfDocument: React.FC<Props> = ({ data, periodLabel }) => {
         </View>
 
         <View style={styles.footer}>
-          <Text style={styles.footerText}>ERP Suporte Grãos • Exportação Oficial</Text>
+          <Text style={styles.footerText}>{company.nomeFantasia || 'ERP'} • Exportação Oficial</Text>
           <Text style={styles.footerText} render={({ pageNumber, totalPages }) => `Página ${pageNumber} de ${totalPages}`} fixed />
         </View>
       </Page>

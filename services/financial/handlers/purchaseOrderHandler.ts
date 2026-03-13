@@ -3,6 +3,7 @@ import { payablesService, Payable } from '../payablesService';
 import { generateTxId, registerFinancialRecords } from './orchestratorHelpers';
 import type { PaymentData, PaymentResult } from './orchestratorTypes';
 import { isSqlCanonicalOpsEnabled, sqlCanonicalOpsLog } from '../../sqlCanonicalOps';
+import { PurchaseOrder, OrderTransaction } from '../../../modules/PurchaseOrder/types';
 
 /**
  * Handler para pagamento de Pedido de Compra (Produtor).
@@ -98,7 +99,7 @@ export const handlePurchaseOrderPayment = async (
 
     const isPayableUUID = !recordId.startsWith('po-grain-');
     let payable: Payable | undefined;
-    let order: any;
+    let order: PurchaseOrder | undefined;
 
     if (isPayableUUID) {
       payable = payablesService.getById(recordId);

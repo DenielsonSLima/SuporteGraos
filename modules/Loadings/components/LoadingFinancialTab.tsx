@@ -39,36 +39,36 @@ const LoadingFinancialTab: React.FC<Props> = ({ loading, onUpdate }) => {
   const labelClass = 'block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest';
 
   return (
-    <div className="space-y-6 animate-in fade-in">
+    <div className="space-y-4 animate-in fade-in">
       {/* ─── KPI Cards ──────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm">
           <span className={labelClass}>Valor Bruto Frete</span>
-          <p className="text-xl font-black text-slate-900">{currency(loading.totalFreightValue)}</p>
+          <p className="text-base font-black text-slate-900 tracking-tight">{currency(loading.totalFreightValue)}</p>
         </div>
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+        <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm">
           <span className={labelClass}>Extras / Descontos</span>
           <p className="text-sm font-bold text-slate-700">+{currency(totals.totalAdditions)} | -{currency(totals.totalDeductions)}</p>
         </div>
-        <div className="bg-slate-900 p-5 rounded-2xl text-white">
+        <div className="bg-slate-900 p-3.5 rounded-xl text-white">
           <span className="text-[10px] font-black text-slate-400 uppercase">Líquido a Pagar</span>
-          <p className="text-2xl font-black text-emerald-400">{currency(totals.netFreightTotal)}</p>
+          <p className="text-lg font-black text-emerald-400 tracking-tight">{currency(totals.netFreightTotal)}</p>
         </div>
-        <div className={`p-5 rounded-2xl border-2 ${totals.balance > 0.05 ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'}`}>
+        <div className={`p-3.5 rounded-xl border-2 ${totals.balance > 0.05 ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'}`}>
           <span className={labelClass}>Saldo Pendente</span>
-          <p className="text-2xl font-black">{currency(totals.balance)}</p>
+          <p className="text-lg font-black tracking-tight">{currency(totals.balance)}</p>
         </div>
       </div>
 
       {/* ─── Despesas + Pagamentos ──────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Despesas do Motorista */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="bg-slate-50 px-6 py-4 border-b border-slate-100 flex justify-between items-center">
-            <h3 className="font-black text-xs uppercase flex items-center gap-2"><Receipt size={18} className="text-blue-500" /> Despesas do Motorista</h3>
-            <button onClick={() => setIsExpenseModalOpen(true)} className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase">Lançar Item</button>
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="bg-slate-50 px-4 py-2 border-b border-slate-100 flex justify-between items-center">
+            <h3 className="font-black text-xs uppercase flex items-center gap-2"><Receipt size={16} className="text-blue-500" /> Despesas</h3>
+            <button onClick={() => setIsExpenseModalOpen(true)} className="bg-blue-600 text-white px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-widest">Lançar</button>
           </div>
-          <div className="p-6">
+          <div className="p-3">
             <div className="space-y-2">
               {loading.extraExpenses && loading.extraExpenses.length > 0 ? (
                 loading.extraExpenses.map(e => (
@@ -85,15 +85,15 @@ const LoadingFinancialTab: React.FC<Props> = ({ loading, onUpdate }) => {
         </div>
 
         {/* Pagamentos Efetuados */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="bg-slate-50 px-6 py-4 border-b border-slate-100 flex justify-between items-center">
-            <h3 className="font-black text-xs uppercase flex items-center gap-2"><History size={18} className="text-emerald-500" /> Pagamentos Efetuados</h3>
-            <button onClick={() => setIsPayModalOpen(true)} className="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase">Baixar Frete</button>
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="bg-slate-50 px-4 py-2 border-b border-slate-100 flex justify-between items-center">
+            <h3 className="font-black text-xs uppercase flex items-center gap-2"><History size={16} className="text-emerald-500" /> Pagamentos</h3>
+            <button onClick={() => setIsPayModalOpen(true)} className="bg-emerald-600 text-white px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-widest">Baixar</button>
           </div>
-          <div className="p-6">
+          <div className="p-3">
             <div className="space-y-2">
-              {loading.transactions && loading.transactions.length > 0 ? (
-                loading.transactions.map(t => (
+              {totals.transactions && totals.transactions.length > 0 ? (
+                totals.transactions.map(t => (
                   <div key={t.id} className="flex justify-between items-center text-xs p-2 border-b gap-2">
                     <span>{new Date(t.date).toLocaleDateString()} - {t.accountName}</span>
                     <div className="flex items-center gap-2">
@@ -102,10 +102,10 @@ const LoadingFinancialTab: React.FC<Props> = ({ loading, onUpdate }) => {
                         {t.discountValue! > 0 && <p className="text-[8px] text-amber-600">Abatimento: {currency(t.discountValue!)}</p>}
                       </div>
                       <button title="Editar" onClick={() => handleEditPayment(t)} className="text-blue-500 hover:text-blue-700 p-1 rounded hover:bg-blue-50 transition-colors">
-                        <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536M4 20h4.586a1 1 0 0 0 .707-.293l9.414-9.414a2 2 0 0 0 0-2.828l-3.172-3.172a2 2 0 0 0-2.828 0l-9.414 9.414A1 1 0 0 0 4 20z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                        <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536M4 20h4.586a1 1 0 0 0 .707-.293l9.414-9.414a2 2 0 0 0 0-2.828l-3.172-3.172a2 2 0 0 0-2.828 0l-9.414 9.414A1 1 0 0 0 4 20z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
                       </button>
                       <button title="Excluir" onClick={() => handleDeletePayment(t)} className="text-rose-500 hover:text-rose-700 p-1 rounded hover:bg-rose-50 transition-colors">
-                        <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0 1 16.138 21H7.862a2 2 0 0 1-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M8 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                        <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0 1 16.138 21H7.862a2 2 0 0 1-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M8 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
                       </button>
                     </div>
                   </div>

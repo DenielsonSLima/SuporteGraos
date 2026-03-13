@@ -28,9 +28,10 @@ export interface SalesLoading {
 
 export interface SalesOrder {
   id: string;
+  legacy_id?: string;
   number: string;
   date: string;
-  
+
   // Sales Info
   consultantName: string; // Sócio/Vendedor
   customerId: string;

@@ -33,19 +33,19 @@ export interface CompanyData {
 }
 
 export const DEFAULT_COMPANY_DATA: CompanyData = {
-    razaoSocial: 'Agro Grãos LTDA',
-    nomeFantasia: 'Suporte Grãos',
-    cnpj: '12.345.678/0001-90',
-    ie: '123.456.789',
-    endereco: 'Av. das Indústrias',
-    numero: '1000',
-    bairro: 'Distrito Industrial',
-    cidade: 'Sinop',
-    uf: 'MT',
-    cep: '78550-000',
-    telefone: '(66) 3531-0000',
-    email: 'financeiro@suportegraos.com',
-    site: 'www.suportegraos.com',
+    razaoSocial: '',
+    nomeFantasia: '',
+    cnpj: '',
+    ie: '',
+    endereco: '',
+    numero: '',
+    bairro: '',
+    cidade: '',
+    uf: '',
+    cep: '',
+    telefone: '',
+    email: '',
+    site: '',
     logoUrl: null,
 };
 

@@ -1,108 +1,191 @@
-
 <!DOCTYPE html>
 <html lang="pt-BR">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#10b981" />
-    <title>Suporte Grãos ERP</title>
-    <link rel="icon" type="image/png" href="/logo2.png" />
-    <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png" />
-    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
-    <link rel="mask-icon" href="/icons/safari-pinned-tab.svg" color="#10b981" />
-    <link rel="manifest" href="/site.webmanifest" />
-    <script>
-      (function () {
-        var link = document.querySelector("link[rel='icon']") || document.createElement('link');
-        link.rel = 'icon';
-        link.href = '/logo2.png?v=' + Date.now();
-        if (!link.parentNode) {
-          document.head.appendChild(link);
-        }
-      })();
-    </script>
-    <script>
-      (function () {
-        var assets = [
-          '/logo2.png',
-          '/favicon.ico',
-          '/icons/favicon-16x16.png',
-          '/icons/favicon-32x32.png',
-          '/icons/apple-touch-icon.png',
-          '/icons/safari-pinned-tab.svg',
-          '/site.webmanifest'
-        ];
 
-        assets.forEach(function (url) {
-          fetch(url, { cache: 'no-store' })
-            .then(function (res) {
-              console.log('[icons] fetch', url, res.status, res.headers.get('content-type'));
-            })
-            .catch(function (err) {
-              console.warn('[icons] fetch failed', url, err);
-            });
-        });
-      })();
-    </script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            fontFamily: {
-              sans: ['Inter', 'sans-serif'],
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#10b981" />
+  <title>Suporte Grãos ERP</title>
+  <link rel="icon" type="image/png" href="/logo2.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <link rel="mask-icon" href="/icons/safari-pinned-tab.svg" color="#10b981" />
+  <link rel="manifest" href="/site.webmanifest" />
+  <script>
+    (function () {
+      var link = document.querySelector("link[rel='icon']") || document.createElement('link');
+      link.rel = 'icon';
+      link.href = '/logo2.png?v=' + Date.now();
+      if (!link.parentNode) {
+        document.head.appendChild(link);
+      }
+    })();
+  </script>
+  <script>
+    (function () {
+      var assets = [
+        '/logo2.png',
+        '/favicon.ico',
+        '/icons/favicon-16x16.png',
+        '/icons/favicon-32x32.png',
+        '/icons/apple-touch-icon.png',
+        '/icons/safari-pinned-tab.svg',
+        '/site.webmanifest'
+      ];
+
+      assets.forEach(function (url) {
+        fetch(url, { cache: 'no-store' })
+          .then(function (res) {
+            console.log('[icons] fetch', url, res.status, res.headers.get('content-type'));
+          })
+          .catch(function (err) {
+            console.warn('[icons] fetch failed', url, err);
+          });
+      });
+    })();
+  </script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          },
+          colors: {
+            primary: {
+              50: '#f0f9ff',
+              100: '#e0f2fe',
+              200: '#bae6fd',
+              300: '#7dd3fc',
+              400: '#38bdf8',
+              500: '#0ea5e9',
+              600: '#0284c7',
+              700: '#0369a1',
+              800: '#075985',
+              900: '#0c4a6e',
             },
-            colors: {
-              primary: {
-                50: '#ecfdf5',
-                100: '#d1fae5',
-                200: '#a7f3d0',
-                300: '#6ee7b7',
-                400: '#34d399',
-                500: '#10b981',
-                600: '#059669',
-                700: '#047857',
-                800: '#065f46',
-                900: '#064e3b',
-              },
-              slate: {
-                850: '#1e293b', // Custom dark sidebar
-              }
+            accent: {
+              50: '#faf5ff',
+              100: '#f3e8ff',
+              200: '#e9d5ff',
+              300: '#d8b4fe',
+              400: '#c084fc',
+              500: '#a855f7',
+              600: '#9333ea',
+              700: '#7e22ce',
+              800: '#6b21a8',
+              900: '#581c87',
+            },
+            slate: {
+              850: '#1e293b',
+              950: '#020617',
+            }
+          },
+          backgroundImage: {
+            'glass-gradient': 'linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05))',
+            'primary-gradient': 'linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%)',
+            'surface-gradient': 'linear-gradient(180deg, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0.5) 100%)',
+          },
+          boxShadow: {
+            'premium': '0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.02)',
+            'glass': '0 8px 32px 0 rgba(31, 38, 135, 0.07)',
+          },
+          animation: {
+            'float': 'float 6s ease-in-out infinite',
+            'pulse-subtle': 'pulse-subtle 3s ease-in-out infinite',
+          },
+          keyframes: {
+            float: {
+              '0%, 100%': { transform: 'translateY(0)' },
+              '50%': { transform: 'translateY(-10px)' },
+            },
+            'pulse-subtle': {
+              '0%, 100%': { opacity: '1' },
+              '50%': { opacity: '0.8' },
             }
           }
         }
       }
-    </script>
-    <style>
-      html, body {
-        height: 100%;
-        width: 100%;
-        margin: 0;
-        padding: 0;
-        font-family: 'Inter', sans-serif;
-        background-color: #f8fafc; /* slate-50 - Matches app background to fix black void on resize */
+    }
+  </script>
+  <style>
+    html,
+    body {
+      height: 100%;
+      width: 100%;
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', sans-serif;
+      background-color: #f8fafc;
+      /* slate-50 - Matches app background to fix black void on resize */
+    }
+
+    html {
+      scrollbar-gutter: stable;
+    }
+
+    /* Custom scrollbar for better aesthetics */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #f1f1f1;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+
+    /* Glassmorphism Classes */
+    .glass {
+      background: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+
+    .glass-dark {
+      background: rgba(15, 23, 42, 0.8);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    /* Premium Surface */
+    .surface-premium {
+      background: white;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.04), 0 4px 6px -2px rgba(0, 0, 0, 0.02);
+      border: 1px solid #f1f5f9;
+      border-radius: 1.5rem;
+    }
+
+    /* Animations */
+    @keyframes fadeUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
       }
-      html {
-        scrollbar-gutter: stable;
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
       }
-      /* Custom scrollbar for better aesthetics */
-      ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-      }
-      ::-webkit-scrollbar-track {
-        background: #f1f1f1; 
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #cbd5e1; 
-        border-radius: 4px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #94a3b8; 
-      }
-    </style>
+    }
+
+    .animate-fade-up {
+      animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+  </style>
   <script type="importmap">
 {
   "imports": {
@@ -118,8 +201,10 @@
 }
 </script>
 </head>
-  <body>
-    <div id="root"></div>
+
+<body>
+  <div id="root"></div>
   <script type="module" src="/index.tsx"></script>
 </body>
+
 </html>

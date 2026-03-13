@@ -4,17 +4,14 @@
 // SKILL: TSX NÃO deve importar services diretamente
 // ============================================================================
 //
-// TODO (SKILL §3.6 + §8.4): O cálculo de saldos consolidados (partnerBalances)
-// abaixo viola a regra "Saldo Sagrado" — deveria ser uma VIEW ou RPC no banco
-// (ex: vw_partner_balances ou rpc.get_partner_balances). Manter aqui como
-// solução transitória até a migração para o banco.
+// FIXED (SKILL §3.6 + §8.4): O cálculo de saldos agora é feito via RPC no banco
+// (rpc.get_partner_balances), respeitando a regra "Saldo Sagrado".
 // ============================================================================
 
-import { useMemo, useCallback } from 'react';
-import { parceirosService } from '../../../services/parceirosService';
-import { financialIntegrationService } from '../../../services/financialIntegrationService';
-import { advanceService } from '../../Financial/Advances/services/advanceService';
-import type { Partner, SavePartnerData } from '../partners.types';
+import { useMemo, useCallback, useState, useEffect } from 'react';
+import { partnersService } from '../partners.service';
+import { authService } from '../../../services/authService';
+import type { Partner } from '../partners.types';
 
 interface UsePartnersModuleOptions {
   partners: Partner[];
@@ -22,56 +19,42 @@ interface UsePartnersModuleOptions {
 }
 
 /**
- * Hook para cálculo de saldos consolidados dos parceiros
+ * Hook para buscar saldos consolidados dos parceiros via RPC
  * e operação de salvar endereço.
  */
 export function usePartnersModule({ partners, balancesTick }: UsePartnersModuleOptions) {
-  // ─── Cálculo de saldos consolidados ─────────────────────
-  const partnerBalances = useMemo(() => {
-    try {
-    const payables = financialIntegrationService.getPayables();
-    const receivables = financialIntegrationService.getReceivables();
-    const advances = advanceService.getSummaries();
+  const [partnerBalances, setPartnerBalances] = useState<Record<string, { credit: number; debit: number; net: number }>>({});
 
-    const balanceMap: Record<string, { credit: number; debit: number; net: number }> = {};
+  // ─── Busca de saldos consolidados via RPC ─────────────────
+  useEffect(() => {
+    const fetchBalances = async () => {
+      try {
+        const companyId = authService.getCurrentUser()?.companyId;
+        if (!companyId) return;
 
-    partners.forEach(p => {
-      let credit = 0;
-      let debit = 0;
+        const balances = await partnersService.getPartnerBalances(companyId);
 
-      // 1. Débitos (Pagar)
-      const pPay = payables.filter(r => r.entityName === p.name);
-      debit += pPay.reduce((acc, r) => acc + (r.originalValue - r.paidValue - (r.discountValue || 0)), 0);
+        const balanceMap: Record<string, { credit: number; debit: number; net: number }> = {};
+        balances.forEach((b: any) => {
+          balanceMap[b.partner_id] = {
+            credit: Number(b.total_receivable) + Number(b.total_advances),
+            debit: Number(b.total_payable),
+            net: Number(b.net_balance),
+          };
+        });
 
-      // 2. Créditos (Receber)
-      const pRec = receivables.filter(r => r.entityName === p.name);
-      credit += pRec.reduce((acc, r) => acc + (r.originalValue - r.paidValue - (r.discountValue || 0)), 0);
-
-      // 3. Adiantamentos
-      const pAdv = advances.find(s => s.partnerId === p.id || s.partnerName === p.name);
-      if (pAdv) {
-        if (pAdv.netBalance > 0) credit += pAdv.netBalance;
-        else debit += Math.abs(pAdv.netBalance);
+        setPartnerBalances(balanceMap);
+      } catch (err) {
+        console.error('[usePartnersModule] Erro ao buscar saldos via RPC:', err);
       }
+    };
 
-      balanceMap[p.id] = {
-        credit,
-        debit,
-        net: credit - debit,
-      };
-    });
+    fetchBalances();
+  }, [balancesTick]);
 
-    return balanceMap;
-    } catch (err) {
-      console.error('[usePartnersModule] Erro ao calcular saldos:', err);
-      return {} as Record<string, { credit: number; debit: number; net: number }>;
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [partners, balancesTick]);
-
-  // ─── Salvar endereço do parceiro ────────────────────────
+  // ─── Salvar endereço do parceiro (Atalho legado/simples) ───
   const savePartnerAddress = useCallback(async (partnerId: string, address: any) => {
-    await parceirosService.savePartnerAddress(partnerId, address);
+    await partnersService.savePartnerAddress(partnerId, address);
   }, []);
 
   return {

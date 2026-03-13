@@ -26,7 +26,7 @@ export interface PaymentResult {
 
 export interface CleanupParams {
   entityId: string;
-  entityType: 'loading' | 'purchase_order' | 'sales_order';
+  entityType: 'loading' | 'purchase_order' | 'sales_order' | 'commission' | 'standalone';
   payableIds?: string[];
   receivableIds?: string[];
 }

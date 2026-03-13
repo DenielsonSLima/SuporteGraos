@@ -134,15 +134,15 @@ const LoanPdfDocument: React.FC<Props> = ({ loan, history, accounts = [] }) => {
     <Document>
       <Page size="A4" style={pdfStyles.page}>
         <PdfWatermark />
-        <PdfHeader 
-          title="Extrato de Empréstimo" 
-          subtitle={`${loan.entityName} - Contrato ${loan.type === 'taken' ? 'Tomado' : 'Concedido'}`} 
+        <PdfHeader
+          title="Extrato de Empréstimo"
+          subtitle={`${loan.entityName} - Contrato ${loan.type === 'taken' ? 'Tomado' : 'Concedido'}`}
         />
 
         {/* Contract Details */}
         <View style={styles.contractBox}>
           <Text style={styles.sectionTitle}>Dados do Contrato</Text>
-          
+
           <View style={styles.contractGrid}>
             <View style={styles.contractItem}>
               <Text style={styles.contractLabel}>Valor Original</Text>
@@ -181,7 +181,7 @@ const LoanPdfDocument: React.FC<Props> = ({ loan, history, accounts = [] }) => {
         {/* History Table */}
         <View style={pdfStyles.section}>
           <Text style={styles.sectionTitle}>Extrato de Movimentações</Text>
-          
+
           <View>
             <View style={styles.tableHeader}>
               <Text style={styles.colDate}>Data</Text>
@@ -199,8 +199,8 @@ const LoanPdfDocument: React.FC<Props> = ({ loan, history, accounts = [] }) => {
               </View>
             ) : (
               history.map((item, idx) => (
-                <View 
-                  key={`${idx}`} 
+                <View
+                  key={`${idx}`}
                   style={[styles.tableRow, idx % 2 === 1 ? styles.tableRowAlt : {}]}
                 >
                   <Text style={styles.colDate}>{dateStr(item.issueDate)}</Text>

@@ -41,7 +41,7 @@ const CashierPdfDocument: React.FC<Props> = ({ report, title }) => {
   const emissionDate = report.generatedAt || report.snapshotClosedDate || new Date().toISOString();
   const statusTag = report.isSnapshot ? 'Snapshot Auditável' : report.isClosed ? 'Fechamento Oficial' : 'Execução Dinâmica';
   const documentId = report.id?.toUpperCase() || 'CAIXA-AO-VIVO';
-  const operator = report.snapshotClosedBy || 'Motor ERP Suporte Grãos';
+  const operator = report.snapshotClosedBy || `Motor ERP ${company.nomeFantasia || 'Sistema'}`;
 
   const addressLine = [safeText(company.endereco, ''), safeText(company.numero, '')]
     .filter(Boolean)
@@ -95,7 +95,7 @@ const CashierPdfDocument: React.FC<Props> = ({ report, title }) => {
           <View style={styles.headerLeft}>
             {company.logoUrl && <Image src={company.logoUrl} style={styles.logo} />}
             <View style={styles.companyInfo}>
-              <Text style={styles.companyName}>{safeText(company.razaoSocial, 'Suporte Grãos')}</Text>
+              <Text style={styles.companyName}>{safeText(company.razaoSocial, company.nomeFantasia || 'Sistema')}</Text>
               <Text style={styles.companySubtitle}>Fechamento 360º • Caixa & Liquidez</Text>
               <View style={styles.companyDetails}>
                 <Text>CNPJ: {formatCNPJ(company.cnpj)}</Text>

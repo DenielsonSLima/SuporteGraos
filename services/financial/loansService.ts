@@ -7,6 +7,7 @@ import { logService } from '../logService';
 import { auditService } from '../auditService';
 import { authService } from '../authService';
 import { isSqlCanonicalOpsEnabled, sqlCanonicalOpsLog } from '../sqlCanonicalOps';
+import { StandaloneRecord as StandaloneRecordDB } from '../../types/database';
 
 // Tipos de empréstimos
 export type LoanType = 'loan_taken' | 'loan_granted';
@@ -42,7 +43,7 @@ const getLogInfo = () => {
 /**
  * Converte registro do Supabase (snake_case) para o formato do app (camelCase)
  */
-const fromSupabase = (record: any): FinancialRecord => {
+const fromSupabase = (record: StandaloneRecordDB): FinancialRecord => {
 
   return {
     id: record.id,
@@ -53,20 +54,20 @@ const fromSupabase = (record: any): FinancialRecord => {
     dueDate: record.due_date,
     issueDate: record.issue_date,
     settlementDate: record.settlement_date,
-    originalValue: parseFloat(record.original_value) || 0,
-    paidValue: parseFloat(record.paid_value || 0) || 0,
-    discountValue: parseFloat(record.discount_value || 0) || 0,
-    status: record.status,
-    subType: record.sub_type,
-    bankAccount: record.bank_account,
-    notes: record.notes,
+    originalValue: record.original_value || 0,
+    paidValue: record.paid_value || 0,
+    discountValue: record.discount_value || 0,
+    status: record.status as FinancialRecord['status'],
+    subType: record.sub_type as FinancialRecord['subType'],
+    bankAccount: record.bank_account ?? undefined,
+    notes: record.notes ?? undefined,
   };
 };
 
 /**
  * Converte registro do app para o formato do Supabase
  */
-const toSupabase = (record: FinancialRecord): any => ({
+const toSupabase = (record: FinancialRecord): Partial<StandaloneRecordDB> => ({
   id: record.id,
   description: record.description,
   entity_name: record.entityName,
@@ -118,7 +119,7 @@ const fetchPage = async (options: LoansPageOptions): Promise<FinancialRecord[]> 
     }
 
     let query = supabase
-      .from('standalone_records')
+      .from('admin_expenses')
       .select(LOANS_SELECT_FIELDS)
       .eq('company_id', companyId)
       .in('sub_type', ['loan_taken', 'loan_granted'])
@@ -157,7 +158,7 @@ const loadFromSupabase = async (): Promise<FinancialRecord[]> => {
     }
 
     const { data, error } = await supabase
-      .from('standalone_records')
+      .from('admin_expenses')
       .select('*')
       .eq('company_id', companyId)
       .in('sub_type', ['loan_taken', 'loan_granted'])
@@ -191,13 +192,13 @@ const startRealtime = () => {
   if (realtimeChannel) return;
 
   realtimeChannel = supabase
-    .channel('realtime:standalone_records_loans')
+    .channel('realtime:admin_expenses_loans')
     .on(
       'postgres_changes',
       {
         event: '*',
         schema: 'public',
-        table: 'standalone_records',
+        table: 'admin_expenses',
         filter: `sub_type=in.(loan_taken,loan_granted)`
       },
       (payload) => {
@@ -230,7 +231,7 @@ const persistUpsert = async (item: FinancialRecord) => {
 
 
     const { error } = await supabase
-      .from('standalone_records')
+      .from('admin_expenses')
       .upsert(payload)
       .select();
 
@@ -245,7 +246,7 @@ const persistUpsert = async (item: FinancialRecord) => {
 const persistDelete = async (id: string) => {
   try {
     const { error } = await supabase
-      .from('standalone_records')
+      .from('admin_expenses')
       .delete()
       .eq('id', id);
 

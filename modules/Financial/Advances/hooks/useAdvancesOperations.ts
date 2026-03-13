@@ -65,6 +65,7 @@ export function useAdvancesOperations({ addToast }: UseAdvancesOperationsOptions
         accountId: data.accountId,
         description: `Quitação parcial/total - ${txToSettle.partnerName}`,
         advanceDate: data.date,
+        parentId: txToSettle.id,
       });
 
       refreshData();

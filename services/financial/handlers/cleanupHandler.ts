@@ -28,7 +28,7 @@ export const cleanupFinancialRecords = async (params: CleanupParams) => {
 
   try {
     // 1. Localizar e deletar via Financial Links (Nova Abstração)
-    const links = await financialTransactionService.getLinksByEntity(entityId, entityType as any);
+    const links = await financialTransactionService.getLinksByEntity(entityId, entityType);
     for (const link of links) {
       if (link.transaction_id) {
         await financialTransactionService.delete(link.transaction_id);

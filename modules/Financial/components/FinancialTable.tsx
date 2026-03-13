@@ -116,8 +116,10 @@ const FinancialTable: React.FC<Props> = ({
                 <th className="px-4 py-3 text-right border-r border-slate-800">Valor Movimentado</th>
               ) : (
                 <>
-                  <th className="px-4 py-3 text-right border-r border-slate-800">Valor Total</th>
-                  <th className="px-4 py-3 text-right border-r border-slate-800">Valor Liquidado</th>
+                  <th className="px-4 py-3 text-right border-r border-slate-800">Bruto (A)</th>
+                  <th className="px-4 py-3 text-right border-r border-slate-800">Deduções (B)</th>
+                  <th className="px-4 py-3 text-right border-r border-slate-800">Líquido (A-B)</th>
+                  <th className="px-4 py-3 text-right border-r border-slate-800">Liquidado</th>
                 </>
               )}
               <th className="px-4 py-3 text-center border-r border-slate-800">Fluxo</th>
@@ -188,6 +190,12 @@ const FinancialTable: React.FC<Props> = ({
                     <>
                       <td className="px-4 py-4 text-right font-bold text-slate-500">
                         {currency(record.originalValue)}
+                      </td>
+                      <td className="px-4 py-4 text-right font-bold text-rose-400">
+                        {record.deductionsAmount && record.deductionsAmount > 0 ? currency(record.deductionsAmount) : '-'}
+                      </td>
+                      <td className="px-4 py-4 text-right font-black text-slate-900 border-x border-slate-100 bg-slate-50/30">
+                        {currency(record.netAmount || record.originalValue)}
                       </td>
                       <td className={`px-4 py-4 text-right font-black ${totalSettled > 0 ? 'text-emerald-600' : 'text-slate-300'}`}>
                         <div className="flex flex-col items-end">

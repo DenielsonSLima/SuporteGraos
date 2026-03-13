@@ -12,6 +12,7 @@
 import { supabase } from './supabase';
 import { authService } from './authService';
 import { logService } from './logService';
+import { Anchor, TrendingUp, Briefcase, HelpCircle } from 'lucide-react';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -75,7 +76,14 @@ const sortCategories = (cats: ExpenseCategory[]): ExpenseCategory[] =>
   });
 
 /** Ícone por tipo (mantido por retrocompatibilidade com componentes antigos). */
-export const getCategoryIcon = (_type: string) => null;
+export const getCategoryIcon = (type: string) => {
+  switch (type) {
+    case 'fixed': return Anchor;
+    case 'variable': return TrendingUp;
+    case 'administrative': return Briefcase;
+    default: return HelpCircle;
+  }
+};
 
 
 // ── API principal ─────────────────────────────────────────────────────────────

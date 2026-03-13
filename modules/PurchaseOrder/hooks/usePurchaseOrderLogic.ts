@@ -10,12 +10,15 @@ import { useToast } from '../../../contexts/ToastContext';
 import { SettingsCache } from '../../../services/settingsCache';
 import { ledgerService } from '../../../services/ledgerService';
 import { payablesService } from '../../../services/financial/payablesService';
+import { usePurchaseOrderTransactions } from './usePurchaseOrderTransactions';
 
 export const usePurchaseOrderLogic = (initialOrder: PurchaseOrder, onFinalizeCallback: () => void) => {
   const { addToast } = useToast();
   const [currentOrder, setCurrentOrder] = useState<PurchaseOrder>(initialOrder);
   const [loadings, setLoadings] = useState<Loading[]>([]);
   const [isFinalizePromptOpen, setIsFinalizePromptOpen] = useState(false);
+
+  const { data: liveTransactions = [] } = usePurchaseOrderTransactions(currentOrder.id);
 
   // Function to refresh loadings and order data
   const refreshLoadings = (id?: string) => {
@@ -40,12 +43,68 @@ export const usePurchaseOrderLogic = (initialOrder: PurchaseOrder, onFinalizeCal
 
   const activeLoadings = useMemo(() => loadings.filter(l => l.status !== 'canceled'), [loadings]);
 
+  // Merge transactions from metadata and live financial module
+  const mergedTransactions = useMemo(() => {
+    const txMap = new Map<string, OrderTransaction>();
+
+    // 1. Start with metadata transactions (legacy/manual)
+    (currentOrder.transactions || []).forEach(tx => txMap.set(tx.id, tx));
+
+    // 2. Overwrite/Add with live transactions from financial module (SINGLE SOURCE OF TRUTH)
+    liveTransactions.forEach(tx => {
+      // Se já existe um ID igual, o live é absoluto
+      const existingById = txMap.get(tx.id);
+
+      // Heurística V2: Busca por duplicidade mais permissiva
+      // Motivo: Lançamentos manuais podem ter datas ou notas levemente diferentes dos lançamentos reais do banco
+      let duplicateId: string | null = null;
+      if (!existingById) {
+        const txDate = new Date(tx.date).getTime();
+
+        for (const [id, mTx] of txMap.entries()) {
+          // 1. O ID manual geralmente é menor e não-UUID (random string)
+          const isManualId = id.length < 20 && !id.includes('-');
+          if (!isManualId) continue;
+
+          // 2. Mesma natureza (pagamento/adiantamento) e valor exato
+          const sameValue = Math.abs(mTx.value - tx.value) < 0.01;
+          const sameType = (mTx.type === 'payment' || mTx.type === 'advance') &&
+            (tx.type === 'payment' || tx.type === 'receipt' || tx.type === 'advance');
+
+          if (sameValue && sameType) {
+            // 3. Janela de data de 3 dias (previne erros de fuso ou lançamentos retroativos)
+            const mTxDate = new Date(mTx.date).getTime();
+            const dayInMs = 24 * 60 * 60 * 1000;
+            const withinWindow = Math.abs(mTxDate - txDate) <= (3 * dayInMs);
+
+            if (withinWindow) {
+              duplicateId = id;
+              break;
+            }
+          }
+        }
+      }
+
+      const idToUse = existingById ? tx.id : (duplicateId || tx.id);
+      const existing = txMap.get(idToUse);
+
+      txMap.set(idToUse, {
+        ...tx,
+        id: idToUse,
+        deductFromPartner: existing?.deductFromPartner ?? tx.deductFromPartner,
+        discountValue: Math.max(tx.discountValue || 0, existing?.discountValue || 0)
+      });
+    });
+
+    return Array.from(txMap.values()).sort((a, b) => b.date.localeCompare(a.date));
+  }, [currentOrder.transactions, liveTransactions]);
+
   const stats = useMemo(() => {
     const totalPurchaseVal = activeLoadings.reduce((acc, l) => acc + (l.totalPurchaseValue || 0), 0);
     const totalFreightVal = activeLoadings.reduce((acc, l) => acc + (l.totalFreightValue || 0), 0);
     const totalSalesVal = activeLoadings.reduce((acc, l) => acc + (l.totalSalesValue || 0), 0);
 
-    const txs = currentOrder.transactions || [];
+    const txs = mergedTransactions;
 
     const expensesDeducted = txs
       .filter(t => (t.type === 'expense' || t.type === 'commission') && t.deductFromPartner)
@@ -141,8 +200,7 @@ export const usePurchaseOrderLogic = (initialOrder: PurchaseOrder, onFinalizeCal
         originalValue: data.value,
         paidValue: data.value,
         status: 'paid',
-        subType: 'admin',
-        bankAccount: data.accountName
+        subType: 'admin'
       });
       SettingsCache.refreshBalances();
       ledgerService.onTransactionChange('add', tx);
@@ -252,5 +310,5 @@ export const usePurchaseOrderLogic = (initialOrder: PurchaseOrder, onFinalizeCal
     }
   };
 
-  return { currentOrder, loadings, stats, isFinalizePromptOpen, setIsFinalizePromptOpen, actions };
+  return { currentOrder, loadings, stats, mergedTransactions, isFinalizePromptOpen, setIsFinalizePromptOpen, actions };
 };

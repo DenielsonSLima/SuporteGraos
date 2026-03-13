@@ -9,11 +9,12 @@
 
 import { FinancialRecord } from '../../modules/Financial/types';
 import { authService } from '../authService';
+import { StandaloneRecord as StandaloneRecordDB } from '../../types/database';
 
 /**
  * Converte registro do Supabase (snake_case) para o formato do app (camelCase)
  */
-export const fromSupabase = (record: any): FinancialRecord => ({
+export const fromSupabase = (record: StandaloneRecordDB): FinancialRecord => ({
   id: record.id,
   description: record.description,
   entityName: record.entity_name,
@@ -22,31 +23,31 @@ export const fromSupabase = (record: any): FinancialRecord => ({
   dueDate: record.due_date || record.issue_date || new Date().toISOString().slice(0, 10),
   issueDate: record.issue_date || record.due_date || new Date().toISOString().slice(0, 10),
   settlementDate: record.settlement_date,
-  originalValue: parseFloat(record.original_value),
-  paidValue: parseFloat(record.paid_value || 0),
-  remainingValue: Math.max(0, parseFloat(record.original_value) - parseFloat(record.paid_value || 0) - parseFloat(record.discount_value || 0)),
-  discountValue: parseFloat(record.discount_value || 0),
-  status: record.status,
-  subType: record.sub_type,
-  bankAccount: record.bank_account,
-  notes: record.notes,
+  originalValue: record.original_value,
+  paidValue: record.paid_value || 0,
+  remainingValue: Math.max(0, (record.original_value || 0) - (record.paid_value || 0) - (record.discount_value || 0)),
+  discountValue: record.discount_value || 0,
+  status: record.status as any,
+  subType: record.sub_type as any,
+  bankAccount: record.bank_account || undefined,
+  notes: record.notes || undefined,
   assetId: record.asset_id,
   isAssetReceipt: record.is_asset_receipt,
   assetName: record.asset_name,
-  weightSc: record.weight_sc ? parseFloat(record.weight_sc) : undefined,
-  weightKg: record.weight_kg ? parseFloat(record.weight_kg) : undefined,
-  unitPriceTon: record.unit_price_ton ? parseFloat(record.unit_price_ton) : undefined,
-  unitPriceSc: record.unit_price_sc ? parseFloat(record.unit_price_sc) : undefined,
-  loadCount: record.load_count,
-  totalTon: record.total_ton ? parseFloat(record.total_ton) : undefined,
-  totalSc: record.total_sc ? parseFloat(record.total_sc) : undefined,
+  weightSc: record.weight_sc ?? undefined,
+  weightKg: record.weight_kg ?? undefined,
+  unitPriceTon: record.unit_price_ton ?? undefined,
+  unitPriceSc: record.unit_price_sc ?? undefined,
+  loadCount: record.load_count ?? undefined,
+  totalTon: record.total_ton ?? undefined,
+  totalSc: record.total_sc ?? undefined,
   companyId: record.company_id,
 });
 
 /**
  * Converte registro do app (camelCase) para o formato do Supabase (snake_case)
  */
-export const toSupabase = (record: FinancialRecord): any => ({
+export const toSupabase = (record: FinancialRecord): Partial<StandaloneRecordDB> => ({
   id: record.id,
   description: record.description,
   entity_name: record.entityName,

@@ -1193,46 +1193,43 @@ export type Database = {
       }
       financial_transactions: {
         Row: {
+          account_id: string | null
           amount: number
-          bank_account_id: string | null
-          category_id: string | null
           company_id: string
           created_at: string | null
-          date: string
+          created_by: string | null
           description: string
+          entry_id: string | null
           id: string
-          payable_id: string | null
-          receivable_id: string | null
+          transaction_date: string
+          transfer_id: string | null
           type: string
-          user_id: string | null
         }
         Insert: {
+          account_id?: string | null
           amount: number
-          bank_account_id?: string | null
-          category_id?: string | null
           company_id: string
           created_at?: string | null
-          date: string
+          created_by?: string | null
           description: string
+          entry_id?: string | null
           id?: string
-          payable_id?: string | null
-          receivable_id?: string | null
+          transaction_date: string
+          transfer_id?: string | null
           type: string
-          user_id?: string | null
         }
         Update: {
+          account_id?: string | null
           amount?: number
-          bank_account_id?: string | null
-          category_id?: string | null
           company_id?: string
           created_at?: string | null
-          date?: string
+          created_by?: string | null
           description?: string
+          entry_id?: string | null
           id?: string
-          payable_id?: string | null
-          receivable_id?: string | null
+          transaction_date?: string
+          transfer_id?: string | null
           type?: string
-          user_id?: string | null
         }
         Relationships: [
           {
@@ -3916,12 +3913,12 @@ export type Database = {
           entry_description: string | null
           entry_id: string | null
           entry_status:
-            | Database["public"]["Enums"]["financial_entry_status"]
-            | null
+          | Database["public"]["Enums"]["financial_entry_status"]
+          | null
           entry_type: Database["public"]["Enums"]["financial_entry_type"] | null
           movement_type:
-            | Database["public"]["Enums"]["financial_movement_type"]
-            | null
+          | Database["public"]["Enums"]["financial_movement_type"]
+          | null
           origin_module: string | null
           payment_date: string | null
           total_amount: number | null
@@ -4020,42 +4017,42 @@ export type Database = {
         Returns: Json
       }
       create_user_with_auth:
-        | {
-            Args: {
-              p_active?: boolean
-              p_allow_recovery?: boolean
-              p_cpf: string
-              p_email: string
-              p_first_name: string
-              p_last_name: string
-              p_password: string
-              p_permissions?: Json
-              p_phone: string
-              p_role?: string
-            }
-            Returns: {
-              auth_id: string
-              error: string
-              success: boolean
-              user_id: string
-            }[]
-          }
-        | {
-            Args: {
-              p_active?: boolean
-              p_can_generate_tokens?: boolean
-              p_cpf: string
-              p_email: string
-              p_first_name: string
-              p_generate_password?: boolean
-              p_last_name: string
-              p_password: string
-              p_permissions?: Json
-              p_phone: string
-              p_role?: string
-            }
-            Returns: Json
-          }
+      | {
+        Args: {
+          p_active?: boolean
+          p_allow_recovery?: boolean
+          p_cpf: string
+          p_email: string
+          p_first_name: string
+          p_last_name: string
+          p_password: string
+          p_permissions?: Json
+          p_phone: string
+          p_role?: string
+        }
+        Returns: {
+          auth_id: string
+          error: string
+          success: boolean
+          user_id: string
+        }[]
+      }
+      | {
+        Args: {
+          p_active?: boolean
+          p_can_generate_tokens?: boolean
+          p_cpf: string
+          p_email: string
+          p_first_name: string
+          p_generate_password?: boolean
+          p_last_name: string
+          p_password: string
+          p_permissions?: Json
+          p_phone: string
+          p_role?: string
+        }
+        Returns: Json
+      }
       create_user_with_bcrypt: {
         Args: {
           p_active?: boolean
@@ -4121,21 +4118,21 @@ export type Database = {
     }
     Enums: {
       financial_entry_status:
-        | "pending"
-        | "partially_paid"
-        | "paid"
-        | "cancelled"
+      | "pending"
+      | "partially_paid"
+      | "paid"
+      | "cancelled"
       financial_entry_type:
-        | "payable"
-        | "receivable"
-        | "expense"
-        | "commission"
-        | "advance"
-        | "partner_contribution"
-        | "partner_withdrawal"
-        | "loan_receivable"
-        | "loan_payable"
-        | "internal_credit"
+      | "payable"
+      | "receivable"
+      | "expense"
+      | "commission"
+      | "advance"
+      | "partner_contribution"
+      | "partner_withdrawal"
+      | "loan_receivable"
+      | "loan_payable"
+      | "internal_credit"
       financial_movement_type: "credit" | "debit"
     }
     CompositeTypes: {
@@ -4150,116 +4147,116 @@ type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
-    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-    | { schema: keyof DatabaseWithoutInternals },
+  | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+  | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+  ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+    DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+  : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+    DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
-    ? R
-    : never
+  ? R
+  : never
   : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])
-    ? (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-        Row: infer R
-      }
-      ? R
-      : never
-    : never
+    DefaultSchema["Views"])
+  ? (DefaultSchema["Tables"] &
+    DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+      Row: infer R
+    }
+  ? R
+  : never
+  : never
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
+  | keyof DefaultSchema["Tables"]
+  | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+  ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+  : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Insert: infer I
-    }
-    ? I
-    : never
+    Insert: infer I
+  }
+  ? I
+  : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Insert: infer I
-      }
-      ? I
-      : never
-    : never
+  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+    Insert: infer I
+  }
+  ? I
+  : never
+  : never
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
+  | keyof DefaultSchema["Tables"]
+  | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+  ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+  : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Update: infer U
-    }
-    ? U
-    : never
+    Update: infer U
+  }
+  ? U
+  : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Update: infer U
-      }
-      ? U
-      : never
-    : never
+  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+    Update: infer U
+  }
+  ? U
+  : never
+  : never
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema["Enums"]
-    | { schema: keyof DatabaseWithoutInternals },
+  | keyof DefaultSchema["Enums"]
+  | { schema: keyof DatabaseWithoutInternals },
   EnumName extends DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+  ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+  : never = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-    : never
+  ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+  : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof DatabaseWithoutInternals },
+  | keyof DefaultSchema["CompositeTypes"]
+  | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+  ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+  : never = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-    : never
+  ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+  : never
 
 export const Constants = {
   public: {

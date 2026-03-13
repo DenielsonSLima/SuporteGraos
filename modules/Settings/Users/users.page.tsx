@@ -196,7 +196,6 @@ const UsersSettings: React.FC<Props> = ({ onBack }) => {
       } else {
         const newUser: UserData = {
           ...formData,
-          id: Math.random().toString(36).substr(2, 9),
           email: normalizedEmail,
           password: ''
         } as UserData;

@@ -309,10 +309,10 @@ const AdvanceListPdfDocument: React.FC<Props> = ({ transactions, tab }) => {
   const company = settingsService.getCompanyData();
   const watermark = settingsService.getWatermark();
 
-  const currency = (val: number) => 
+  const currency = (val: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(!val || Math.abs(val) < 0.005 ? 0 : val);
-  
-  const dateStr = (val: string) => 
+
+  const dateStr = (val: string) =>
     new Date(val).toLocaleDateString('pt-BR');
 
   const titles = {
@@ -456,7 +456,7 @@ const AdvanceListPdfDocument: React.FC<Props> = ({ transactions, tab }) => {
 
           {/* Footer */}
           <View style={styles.footer}>
-            <Text>Suporte Grãos ERP - Gestão de Antecipações</Text>
+            <Text>{company.nomeFantasia || 'ERP'} - Gestão de Antecipações</Text>
             <Text>Página 1 de 1</Text>
           </View>
         </View>

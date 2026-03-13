@@ -9,35 +9,53 @@ export const freightExpenseService = {
         const companyId = expense.companyId || user?.companyId;
 
         const { data, error } = await supabase
-            .from('freight_expenses')
+            .from('ops_loading_freight_components')
             .insert({
                 loading_id: expense.loadingId,
-                type: expense.type,
+                component_type: expense.type === 'deduction' ? 'quebra' : 'outros',
                 amount: expense.amount,
                 description: expense.description,
-                is_deduction: expense.isDeduction,
+                deductible: expense.isDeduction,
                 company_id: companyId
             })
             .select()
             .single();
 
         if (error) throw error;
-        return data as FreightExpense;
+
+        // Map back to FreightExpense interface
+        return {
+            id: data.id,
+            loadingId: data.loading_id,
+            type: data.deductible ? 'deduction' : 'addition',
+            amount: Number(data.amount),
+            description: data.description,
+            isDeduction: data.deductible,
+            companyId: data.company_id
+        } as FreightExpense;
     },
 
     async getByLoading(loadingId: string) {
         const { data, error } = await supabase
-            .from('freight_expenses')
+            .from('ops_loading_freight_components')
             .select('*')
             .eq('loading_id', loadingId);
 
         if (error) return [];
-        return data as FreightExpense[];
+        return (data || []).map(d => ({
+            id: d.id,
+            loadingId: d.loading_id,
+            type: d.deductible ? 'deduction' : 'addition',
+            amount: Number(d.amount),
+            description: d.description,
+            isDeduction: d.deductible,
+            companyId: d.company_id
+        })) as FreightExpense[];
     },
 
     async deleteByLoading(loadingId: string) {
         const { error } = await supabase
-            .from('freight_expenses')
+            .from('ops_loading_freight_components')
             .delete()
             .eq('loading_id', loadingId);
 

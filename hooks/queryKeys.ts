@@ -40,7 +40,9 @@ export const QUERY_KEYS = {
   ACCOUNT_TRANSACTIONS: (accountId: string) => ['account_transactions', accountId] as const,
   ENTRY_TRANSACTIONS: (entryId: string) => ['entry_transactions', entryId] as const,
   TRANSACTIONS_DATE_RANGE: (accountId: string, start: string, end: string) =>
-    ['transactions_date_range', accountId, start, end] as const,
+    ['financial_transactions', 'range', accountId, start, end] as const,
+  TRANSACTION_TOTALS: (start: string, end: string) =>
+    ['financial_transactions', 'totals', start, end] as const,
   ACCOUNT_SUMMARY: (accountId: string) => ['account_summary', accountId] as const,
 
   // ─── Financeiro — operações (FASE 1B) ───────────────────
@@ -53,6 +55,7 @@ export const QUERY_KEYS = {
   ADVANCES: ['advances'] as const,
   SHAREHOLDER_OPERATIONS: ['shareholder_operations'] as const,
   STANDALONE_RECORDS: ['standalone_records'] as const,
+  CREDITS: ['credits'] as const,
 
   // ─── Categorias de despesa ──────────────────────────────
   EXPENSE_CATEGORIES: ['expense_categories'] as const,

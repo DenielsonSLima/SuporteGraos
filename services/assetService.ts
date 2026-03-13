@@ -129,6 +129,28 @@ const startRealtime = () => {
     .subscribe();
 };
 
+const subscribeRealtime = (callback: () => void) => {
+  const companyId = authService.getCurrentUser()?.companyId;
+
+  const channel = supabase
+    .channel('realtime:assets:service')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'assets' },
+      (payload: any) => {
+        const changedCompanyId = payload?.new?.company_id ?? payload?.old?.company_id;
+        if (!companyId || !changedCompanyId || changedCompanyId === companyId) {
+          callback();
+        }
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+};
+
 // ============================================================================
 // PERSISTÊNCIA SUPABASE
 // ============================================================================
@@ -139,7 +161,7 @@ const persistUpsert = async (asset: Asset) => {
     const companyId = user?.companyId;
 
     if (!companyId) {
-      return;
+      throw new Error('Empresa não encontrada');
     }
 
     const payload: any = {
@@ -150,22 +172,27 @@ const persistUpsert = async (asset: Asset) => {
     const isValidUuid = (v?: string) => !!v && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
     if (!isValidUuid(payload.id)) delete payload.id;
 
-    const { error } = await supabase.from('assets').upsert(payload).select();
-    if (error) {
-      return;
-    }
-    await loadFromSupabase();
+    const { data, error } = await supabase.from('assets').upsert(payload).select().single();
+    if (error) throw error;
+
+    // Atualiza local após sucesso
+    const updated = mapAssetFromDb(data);
+    db.update(updated);
+
+    return updated;
   } catch (err) {
     console.error('[assetService] persistUpsert:', err);
+    throw err;
   }
 };
 
 const persistDelete = async (id: string) => {
   try {
     const { error } = await supabase.from('assets').delete().eq('id', id);
-    if (error) console.error('Erro ao excluir asset no Supabase', error);
+    if (error) throw error;
   } catch (err) {
     console.error('[assetService] persistDelete:', err);
+    throw err;
   }
 };
 
@@ -190,12 +217,12 @@ export const assetService = {
   getById: (id: string) => db.getById(id),
 
   subscribe: (callback: (items: Asset[]) => void) => db.subscribe(callback),
+  subscribeRealtime,
   startRealtime,
   stopRealtime,
 
-  add: (asset: Asset) => {
-    db.add(asset);
-    void persistUpsert(asset);
+  add: async (asset: Asset) => {
+    const result = await persistUpsert(asset);
 
     const { userId, userName } = getLogInfo();
     logService.addLog({
@@ -206,12 +233,13 @@ export const assetService = {
       description: `Registrou novo ativo: ${asset.name} (${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(asset.acquisitionValue)})`,
       entityId: asset.id
     });
+
+    return result;
   },
 
-  update: (asset: Asset) => {
+  update: async (asset: Asset) => {
     const old = db.getById(asset.id);
-    db.update(asset);
-    void persistUpsert(asset);
+    const result = await persistUpsert(asset);
 
     const { userId, userName } = getLogInfo();
     if (old && old.status !== 'sold' && asset.status === 'sold') {
@@ -227,12 +255,14 @@ export const assetService = {
         entityId: asset.id
       });
     }
+
+    return result;
   },
 
-  delete: (id: string) => {
+  delete: async (id: string) => {
     const asset = db.getById(id);
+    await persistDelete(id);
     db.delete(id);
-    void persistDelete(id);
 
     const { userId, userName } = getLogInfo();
     logService.addLog({

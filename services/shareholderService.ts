@@ -1,6 +1,8 @@
 import { supabase } from './supabase';
 import { Persistence } from './persistence';
 import { invalidateDashboardCache } from './dashboardCache';
+import { Shareholder as ShareholderDB, ShareholderTransaction as ShareholderTransactionDB } from '../types/database';
+import { RealtimeChannel } from '@supabase/supabase-js';
 
 // ─── TIPOS EXPORTADOS ─────────────────────────────────────────────────────────
 
@@ -45,7 +47,7 @@ export interface Shareholder {
 
 // ─── MAPEADORES ───────────────────────────────────────────────────────────────
 
-function mapRow(row: any, transactions: ShareholderTransaction[] = []): Shareholder {
+function mapRow(row: ShareholderDB, transactions: ShareholderTransaction[] = []): Shareholder {
   return {
     id: row.id,
     name: row.name ?? '',
@@ -75,11 +77,11 @@ function mapRow(row: any, transactions: ShareholderTransaction[] = []): Sharehol
   };
 }
 
-function mapTransactionRow(row: any): ShareholderTransaction {
+function mapTransactionRow(row: ShareholderTransactionDB): ShareholderTransaction {
   return {
     id: row.id,
     date: row.date,
-    type: row.type,
+    type: row.type as 'credit' | 'debit',
     value: Number(row.value),
     description: row.description ?? '',
     accountId: row.account_name ?? undefined,
@@ -90,7 +92,7 @@ function mapTransactionRow(row: any): ShareholderTransaction {
 
 const db = new Persistence<Shareholder>('shareholders', [], { useStorage: false });
 let isInitialized = false;
-let realtimeSubscription: any = null;
+let realtimeSubscription: RealtimeChannel | null = null;
 
 // ─── SERVICE ──────────────────────────────────────────────────────────────────
 
@@ -176,9 +178,13 @@ export const shareholderService = {
    * Adiciona um novo sócio.
    */
   add: async (shareholder: Omit<Shareholder, 'id'>): Promise<Shareholder> => {
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    if (!authUser?.id) throw new Error('Não autenticado');
+
     const { data: profile } = await supabase
       .from('app_users')
       .select('company_id')
+      .eq('auth_user_id', authUser.id)
       .single();
 
     if (!profile?.company_id) throw new Error('Usuário sem empresa vinculada');
@@ -267,9 +273,13 @@ export const shareholderService = {
     shareholderId: string,
     tx: Omit<ShareholderTransaction, 'id'>,
   ): Promise<void> => {
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    if (!authUser?.id) throw new Error('Não autenticado');
+
     const { data: profile } = await supabase
       .from('app_users')
       .select('company_id')
+      .eq('auth_user_id', authUser.id)
       .single();
 
     if (!profile?.company_id) throw new Error('Usuário sem empresa vinculada');
@@ -285,6 +295,33 @@ export const shareholderService = {
     });
 
     if (error) throw new Error(`Erro ao registrar transação: ${error.message}`);
+
+    // ✅ NOVO: Sincronizar com o Ledger Bancário se houver conta vinculada
+    if (tx.accountId) {
+      try {
+        const { handleShareholderPayment, resolveAccountLabel } = await import('./financial/paymentOrchestrator');
+
+        // Buscar o nome do sócio para o log (opcional, mas bom pra UX)
+        const shareholder = db.getById(shareholderId);
+
+        await handleShareholderPayment(
+          shareholderId,
+          {
+            date: tx.date,
+            amount: tx.value,
+            discount: 0,
+            accountId: tx.accountId,
+            accountName: resolveAccountLabel(tx.accountId),
+            entityName: shareholder?.name || 'Sócio',
+            notes: tx.description
+          },
+          tx.type // 'credit' ou 'debit'
+        );
+      } catch (syncErr) {
+        console.warn('[shareholderService] Falha ao sincronizar com Ledger Bancário:', syncErr);
+        // Não throw para não travar a transação do sócio
+      }
+    }
 
     // Recalcular saldo e recarregar cache
     await shareholderService._recalcBalance(shareholderId);

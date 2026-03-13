@@ -48,7 +48,8 @@ export const adminExpensesService = {
     const { data, error } = await supabase
       .from('admin_expenses')
       .select('*')
-      .order('expense_date', { ascending: false });
+      .order('expense_date', { ascending: false })
+      .limit(100);
     if (error) throw new Error(`Erro ao buscar despesas: ${error.message}`);
     return (data ?? []).map(mapRow);
   },
@@ -97,6 +98,41 @@ export const adminExpensesService = {
     });
     if (error) throw new Error(error.message);
     return data as string;
+  },
+
+  delete: async (id: string): Promise<void> => {
+    const { error } = await supabase
+      .from('admin_expenses')
+      .delete()
+      .eq('id', id);
+    if (error) {
+      if (error.code === '23503') throw new Error('Esta despesa possui pagamentos vinculados e não pode ser excluída. Cancele os pagamentos primeiro.');
+      throw new Error(`Erro ao excluir despesa: ${error.message}`);
+    }
+  },
+
+  update: async (id: string, params: {
+    description?: string;
+    amount?: number;
+    payeeName?: string;
+    payeeId?: string;
+    categoryId?: string;
+    expenseDate?: string;
+    due_date?: string;
+  }): Promise<void> => {
+    const { error } = await supabase
+      .from('admin_expenses')
+      .update({
+        description: params.description,
+        amount: params.amount,
+        payee_name: params.payeeName,
+        payee_id: params.payeeId,
+        category_id: params.categoryId,
+        expense_date: params.expenseDate,
+        due_date: params.due_date
+      })
+      .eq('id', id);
+    if (error) throw new Error(`Erro ao atualizar despesa: ${error.message}`);
   },
 
   subscribeRealtime: (() => {

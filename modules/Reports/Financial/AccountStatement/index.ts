@@ -1,7 +1,8 @@
 
 import { Landmark } from 'lucide-react';
 import { ReportModule } from '../../types';
-import { financialService } from '../../../../services/financialService';
+import { accountsService } from '../../../../services/accountsService';
+import { initialBalanceService } from '../../../../services/initialBalanceService';
 import { financialTransactionsService } from '../../../../services/financialTransactionsService';
 import Template from './Template';
 import PdfDocument from './PdfDocument';
@@ -27,11 +28,13 @@ const accountStatementReport: ReportModule = {
         return { title: 'Extrato de Conta', subtitle: 'Selecione uma conta nos filtros', columns: [], rows: [] };
     }
 
-    const account = financialService.getBankAccounts().find(a => a.id === accountId);
-    const accountName = account ? `${account.bankName} - ${account.owner || ''}` : 'Conta Desconhecida';
+    const accounts = await accountsService.getAll();
+    const account = accounts.find(a => a.id === accountId);
+    if (!account) return { title: 'Erro', subtitle: 'Conta não encontrada', columns: [], rows: [] };
 
-    // 1. Get Initial Balance for this Account
-    const initialBalanceRecord = financialService.getInitialBalances().find(b => b.accountId === accountId);
+    // 1. Get Initial Balance for this Account from Database
+    const initialBalances = await initialBalanceService.getAll();
+    const initialBalanceRecord = initialBalances.find(b => b.accountId === accountId);
     const startBalanceVal = initialBalanceRecord ? initialBalanceRecord.value : 0;
     const startBalanceDate = initialBalanceRecord ? initialBalanceRecord.date : '2000-01-01';
 
@@ -70,7 +73,7 @@ const accountStatementReport: ReportModule = {
       });
 
     return {
-      title: `Extrato Analítico: ${account?.bankName || 'Conta'}`,
+      title: `Extrato Analítico: ${account?.account_name || 'Conta'}`,
       subtitle: `Movimentação de ${dateStr(startDate)} a ${dateStr(endDate)}`,
       columns: [
         { header: 'Data', accessor: 'date', format: 'date' },

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, Calendar, DollarSign, Clock, RefreshCw, CheckCircle2, Info } from 'lucide-react';
 import type { Shareholder } from '../../../../services/shareholderService';
+import ModalPortal from '../../../../components/ui/ModalPortal';
 
 interface Props {
   isOpen: boolean;
@@ -37,8 +38,9 @@ const ShareholderRecurringModal: React.FC<Props> = ({ isOpen, onClose, onConfirm
   const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
-      <div className="w-full max-w-md bg-white rounded-xl shadow-2xl overflow-hidden animate-in zoom-in-95">
+    <ModalPortal>
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
+        <div className="w-full max-w-md bg-white rounded-xl shadow-2xl overflow-hidden animate-in zoom-in-95">
         
         <div className="bg-indigo-600 px-6 py-4 flex justify-between items-center text-white">
           <div className="flex items-center gap-2">
@@ -120,6 +122,7 @@ const ShareholderRecurringModal: React.FC<Props> = ({ isOpen, onClose, onConfirm
         </form>
       </div>
     </div>
+  </ModalPortal>
   );
 };
 

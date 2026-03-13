@@ -11,12 +11,12 @@ interface PdfHeaderProps {
   additionalInfo?: { label: string; value: string }[];
 }
 
-export const PdfHeader: React.FC<PdfHeaderProps> = ({ 
-  title, 
-  subtitle, 
-  date, 
+export const PdfHeader: React.FC<PdfHeaderProps> = ({
+  title,
+  subtitle,
+  date,
   period,
-  additionalInfo 
+  additionalInfo
 }) => {
   const company = settingsService.getCompanyData();
   const emissionDate = date || new Date().toLocaleString('pt-BR');
@@ -44,13 +44,13 @@ export const PdfHeader: React.FC<PdfHeaderProps> = ({
     <View style={pdfStyles.header}>
       {/* Linha superior: Logo + Dados da Empresa | Título do Relatório */}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-        
+
         {/* Esquerda: Logo + Empresa */}
         <View style={{ flexDirection: 'row', gap: 8, flex: 1 }}>
           {/* Logo */}
-          <View style={{ 
-            width: 52, 
-            height: 52, 
+          <View style={{
+            width: 52,
+            height: 52,
             backgroundColor: '#ffffff',
             borderWidth: 1,
             borderColor: '#e2e8f0',
@@ -68,7 +68,7 @@ export const PdfHeader: React.FC<PdfHeaderProps> = ({
           {/* Dados da Empresa */}
           <View style={{ flex: 1 }}>
             <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#1e293b', textTransform: 'uppercase' }}>
-              {company.razaoSocial}
+              {company.razaoSocial || 'Relatório de Gestão'}
             </Text>
             <View style={{ marginTop: 2, fontSize: 6.5, color: '#475569' }}>
               <Text>CNPJ: {formatCNPJ(company.cnpj)}</Text>
@@ -82,9 +82,9 @@ export const PdfHeader: React.FC<PdfHeaderProps> = ({
 
         {/* Direita: Título do Relatório */}
         <View style={{ textAlign: 'right', marginLeft: 10 }}>
-          <Text style={{ 
-            fontSize: 12, 
-            fontWeight: 'bold', 
+          <Text style={{
+            fontSize: 12,
+            fontWeight: 'bold',
             color: '#1e293b',
             textTransform: 'uppercase',
             fontFamily: 'Helvetica-BoldOblique'
