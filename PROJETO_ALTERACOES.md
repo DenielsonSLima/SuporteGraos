@@ -5,6 +5,22 @@
 
 ---
 
+## 2026-03-13 — UI: Ajuste de Tamanho de Fonte dos KPIs (Dashboard)
+
+**O que foi feito:**
+- Reduzido o tamanho da fonte dos valores nos cards de KPI do módulo Início (Dashboard).
+- `FinancialSummary.tsx`: `text-2xl` → `text-xl`.
+- `OperationalSummary.tsx`: `text-xl` → `text-lg`.
+
+**Por quê:**
+- Prevenir quebra de layout quando os valores atingirem a casa dos milhões (R$ 1.000.000,00+).
+
+**Arquivos afetados:**
+- `modules/Dashboard/components/FinancialSummary.tsx`
+- `modules/Dashboard/components/OperationalSummary.tsx`
+
+---
+
 ## 2026-03-13 — Feature: Adição de Combustíveis e Petróleo ao Mercado ao Vivo
 
 **O que foi feito:**

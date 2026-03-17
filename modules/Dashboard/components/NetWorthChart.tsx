@@ -177,6 +177,7 @@ const NetWorthChart: React.FC<Props> = React.memo(({ data, growthPercent }) => {
             <Legend
               wrapperStyle={{ paddingTop: '20px' }}
               iconType="circle"
+              formatter={(value) => <span className="text-[10px] text-slate-500 font-medium">{value}</span>}
             />
 
             {/* Barras: Entrada Empilhada (a) */}

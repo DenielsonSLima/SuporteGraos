@@ -35,3 +35,7 @@ Sistema utilizado por traders de grãos para gerenciar o fluxo desde o contrato 
 - **RPC condicional sem financial_entry**: A `rpc_create_admin_expense` criava `financial_entries` apenas quando `payee_id IS NOT NULL`. Despesas diretas (sem parceiro) ficavam sem entry, quebrando a baixa. Corrigido para SEMPRE criar a entry.
 - **remainingValue no adapter**: O `FinancialPaymentModal` usa `record.remainingValue` para calcular o saldo devedor. Se o adapter (`toFinancialRecord`) não popular esse campo, o modal exibe R$ 0,00. Sempre incluir `remainingValue` ao construir `FinancialRecord`.
 - **Modal sem Portal**: Modais renderizados dentro do `<main>` não cobrem o cabeçalho e permitem cliques na busca global devido ao contexto de empilhamento do CSS. **Sempre** use `ModalPortal`.
+- **Acesso ao Supabase**: O agente possui acesso direto ao banco de dados Supabase via MCP (`supabase-mcp-server`). SEMPRE utilize as ferramentas do MCP (`execute_sql`, `apply_migration`) para aplicar alterações de banco de dados diretamente, em vez de solicitar que o usuário execute SQL manualmente.
+- **Dependências Circulares**: Para evitar `ReferenceError: Cannot access ... before initialization`, serviços que importam `authService` ou `auditService` devem fazê-lo via **dynamic imports** dentro das funções, especialmente se houver dependências cruzadas.
+- **Status `reversed`**: Implementado suporte a estornos financeiros. Transações de estorno devem referenciar o `entry_id` pai para garantir que o saldo pago seja recalculado corretamente pelos gatilhos do banco.
+

@@ -16,6 +16,7 @@ import { useEffect } from 'react';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { QUERY_KEYS, STALE_TIMES } from './queryKeys';
 import { financialEntriesService } from '../services/financialEntriesService';
+import { supabase } from '../services/supabase';
 import { financialTransactionService } from '../services/financial/financialTransactionService';
 import { accountsService } from '../services/accountsService';
 import { assetService } from '../services/assetService';
@@ -41,11 +42,19 @@ export function useCashierCurrentMonth() {
     const unsubAccounts = accountsService.subscribeRealtime(invalidate);
     const unsubAssets = assetService.subscribeRealtime(invalidate);
 
+    // Invalida também em mudanças de Pedidos e Carregamentos (Realtime UI)
+    const subOrders = supabase.channel('cashier_orders_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ops_purchase_orders' }, invalidate)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ops_sales_orders' }, invalidate)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ops_loadings' }, invalidate)
+      .subscribe();
+
     return () => {
       unsubEntries();
       unsubTx();
       unsubAccounts();
       unsubAssets();
+      supabase.removeChannel(subOrders);
     };
   }, [queryClient]);
 

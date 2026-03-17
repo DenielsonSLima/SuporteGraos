@@ -57,4 +57,30 @@ export interface CashierReport {
   // --- RESUMO ---
   netBalance: number;
   netWorth?: number; // Patrimônio líquido calculado pelo RPC
+
+  // --- NOVOS CAMPOS (Resumo do Mês) ---
+  monthPurchasedTotal: number;
+  monthSoldTotal: number;
+  monthPurchasesPaidTotal: number;
+  monthFreightPaidTotal: number;
+  monthRefusedTotal: number;
+  monthExpensesPaidTotal: number;
+  monthPaidTotal: number;
+  monthDirectDiff: number;
+  monthOperationalSpread: number;
+  creditsReceivedDetails: {
+    sales_order: number;
+    loan: number;
+    others: number;
+  };
+  expenseDistribution: {
+    purchases: number;
+    freight: number;
+    expenses: number;
+    others: number;
+  };
+  revenueDistribution: {
+    opening_receivables: number;
+    future_receivables: number;
+  };
 }

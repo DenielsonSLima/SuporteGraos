@@ -31,7 +31,7 @@ const FinancialSummary: React.FC<Props> = React.memo(({ data }) => {
           </div>
           <div className="flex items-end justify-between">
             <div>
-              <h3 className="text-2xl font-bold text-white mb-1">{formatMoney(data.totalBankBalance)}</h3>
+              <h3 className="text-xl font-bold text-white mb-1">{formatMoney(data.totalBankBalance)}</h3>
               <p className="text-[10px] text-slate-400 uppercase font-black">Disponibilidade Imediata</p>
             </div>
           </div>
@@ -46,7 +46,7 @@ const FinancialSummary: React.FC<Props> = React.memo(({ data }) => {
           </div>
           <span className="text-sm font-bold text-slate-500 uppercase tracking-wide">Contas a Pagar</span>
         </div>
-        <h3 className="text-2xl font-bold text-slate-800 mb-1">{formatMoney(data.totalLiabilities)}</h3>
+        <h3 className="text-xl font-bold text-slate-800 mb-1">{formatMoney(data.totalLiabilities)}</h3>
         <p className="mt-2 text-[10px] text-slate-400 uppercase font-black tracking-widest">Obrigações Operacionais</p>
       </div>
 
@@ -58,7 +58,7 @@ const FinancialSummary: React.FC<Props> = React.memo(({ data }) => {
           </div>
           <span className="text-sm font-bold text-slate-500 uppercase tracking-wide">Contas a Receber</span>
         </div>
-        <h3 className="text-2xl font-bold text-slate-800 mb-1">{formatMoney(data.pendingSalesReceipts)}</h3>
+        <h3 className="text-xl font-bold text-slate-800 mb-1">{formatMoney(data.pendingSalesReceipts)}</h3>
         <p className="mt-2 text-[10px] text-slate-400 uppercase font-black tracking-widest">Vendas Faturadas</p>
       </div>
 
@@ -70,7 +70,7 @@ const FinancialSummary: React.FC<Props> = React.memo(({ data }) => {
           </div>
           <span className="text-sm font-bold text-slate-500 uppercase tracking-wide">Em Trânsito</span>
         </div>
-        <h3 className="text-2xl font-bold text-blue-700 mb-1">{formatMoney(data.merchandiseInTransitValue)}</h3>
+        <h3 className="text-xl font-bold text-blue-700 mb-1">{formatMoney(data.merchandiseInTransitValue)}</h3>
         <p className="mt-2 text-[10px] text-slate-400 uppercase font-black tracking-widest">Valor de Carga na Estrada</p>
       </div>
 
@@ -86,7 +86,7 @@ const FinancialSummary: React.FC<Props> = React.memo(({ data }) => {
           </div>
           <div className="flex items-end justify-between">
             <div>
-              <h3 className="text-2xl font-bold text-white mb-1">{formatMoney(netWorth)}</h3>
+              <h3 className="text-xl font-bold text-white mb-1">{formatMoney(netWorth)}</h3>
               <p className="text-[10px] text-slate-400 uppercase font-black">Ativos - Passivos</p>
             </div>
           </div>

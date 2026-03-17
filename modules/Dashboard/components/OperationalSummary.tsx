@@ -47,7 +47,7 @@ const OperationalSummary: React.FC<KPIProps> = ({ data }) => {
       </div>
       <div>
         <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">{label}</p>
-        <h3 className="text-xl font-bold text-slate-800">{value}</h3>
+        <h3 className="text-lg font-bold text-slate-800">{value}</h3>
         {subValue && <p className="text-xs text-slate-500 mt-1">{subValue}</p>}
       </div>
     </div>

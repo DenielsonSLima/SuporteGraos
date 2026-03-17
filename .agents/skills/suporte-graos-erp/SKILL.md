@@ -14,7 +14,8 @@ description: >
 
 ## 🚀 Proatividade com Ferramentas
 - O agente tem acesso total ao `supabase-mcp-server`.
-- **Proatividade:** O agente deve realizar consultas SQL, listar tabelas e verificar o banco de dados de forma proativa para resolver problemas ou validar implementações, sem necessidade de pedir permissão para cada comando (conforme acordado com o usuário).
+- **PROATIVIDADE OBRIGATÓRIA:** O agente DEVE realizar consultas SQL, aplicar migrações e verificar o banco de dados via MCP de forma proativa. **NÃO SOLICITE** que o usuário execute SQL manualmente. Se houver falha de permissão, o agente deve investigar e resolver autonomamente ou justificar tecnicamente o bloqueio antes de reportar.
+
 
 ## Visão Geral do Sistema
 
@@ -267,6 +268,10 @@ Pode ser quitado por dois caminhos — **nunca deve gerar duplicidade:**
 
 Implementar com `id_referencia` + `tipo_origem = 'frete'` em `contas_pagar`.
 
+### ⚠️ Regra Crítica: Adiantamentos e Baixas
+- **Vínculo Obrigatório**: Todo adiantamento que abate um saldo devedor deve estar vinculado via `parent_id` (enviado como `p_parent_id` na RPC).
+- O não envio do `parent_id` impede o abatimento automático do saldo mostrado no frontend.
+
 > Para detalhes completos do modal, consulte `references/logistica.md`
 
 ---
@@ -305,6 +310,11 @@ Financeiro/
 
 ### Contas a Receber
 **Origem:** Exclusivamente do Pedido de Venda quando peso de descarga é lançado.
+
+**Prevenção de "Ghost Credits":**
+- A view `vw_receivables_enriched` deve filtrar apenas `origin_id = 'sales_order'`.
+- Registros com status `cancelled` ou `reversed` devem ser ocultados.
+- Estornos financeiros devem incluir obrigatoriamente o `entry_id` original para que os gatilhos do banco abatam o saldo corretamente.
 
 ### Adiantamentos
 - Registra valores adiantados a um parceiro (produtor, transportadora) antes do serviço
@@ -406,6 +416,17 @@ Toda alteração nestas operações pode ter efeito cascata:
 ### 6. Adiantamentos Não Abatidos
 **Problema:** Adiantamento registrado mas não deduzido do saldo final  
 **Solução:** `saldo_a_pagar = valor_total - pagamentos_realizados - adiantamentos_vinculados`
+
+## Padrões de Interface (UI) Premium
+
+### 1. ModalPortal
+**REGRA ABSOLUTA:** Todos os modais DEVEM usar o componente `ModalPortal`. Isso garante que o modal seja renderizado no `document.body`, cobrindo o cabeçalho e bloqueando interações globais.
+
+### 2. Quick View (Drawer)
+Para detalhamento de registros (como despesas ou recebíveis), usar o padrão de gaveta lateral (Quick View) em vez de navegar para uma nova tela, mantendo o contexto da lista.
+
+### 3. Prevenção de Dependências Circulares
+Serviços críticos (`financialEntriesService`, `loadingService`, etc.) que dependem de `authService` ou `auditService` devem usar **dynamic imports** (`await import(...)`) para evitar `ReferenceError` na inicialização.
 
 ---
 

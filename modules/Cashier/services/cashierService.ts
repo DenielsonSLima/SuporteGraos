@@ -92,6 +92,19 @@ export const cashierService = {
       shareholderPayables,
       totalLiabilities,
       netBalance,
+      // NOVOS CAMPOS
+      monthPurchasedTotal: Number(sqlData?.monthPurchasedTotal) || 0,
+      monthSoldTotal: Number(sqlData?.monthSoldTotal) || 0,
+      monthPurchasesPaidTotal: Number(sqlData?.monthPurchasesPaidTotal) || 0,
+      monthFreightPaidTotal: Number(sqlData?.monthFreightPaidTotal) || 0,
+      monthRefusedTotal: Number(sqlData?.monthRefusedTotal) || 0,
+      monthExpensesPaidTotal: Number(sqlData?.monthExpensesPaidTotal) || 0,
+      monthPaidTotal: Number(sqlData?.monthPaidTotal) || 0,
+      monthDirectDiff: Number(sqlData?.monthDirectDiff) || 0,
+      monthOperationalSpread: Number(sqlData?.monthOperationalSpread) || 0,
+      creditsReceivedDetails: sqlData?.creditsReceivedDetails || { sales_order: 0, loan: 0, others: 0 },
+      expenseDistribution: sqlData?.expenseDistribution || { purchases: 0, freight: 0, expenses: 0, others: 0 },
+      revenueDistribution: sqlData?.revenueDistribution || { opening_receivables: 0, future_receivables: 0 },
     };
   },
 

@@ -23,6 +23,7 @@ import { CashierReport } from '../types';
 import CashierPdfPreviewModal from './modals/CashierPdfPreviewModal';
 import CashierKPIs from './CashierKPIs';
 import CashierCharts from './CashierCharts';
+import CashierSummaryCards from './CashierSummaryCards';
 
 interface Props {
   report: CashierReport;
@@ -194,6 +195,10 @@ const CashierReportView: React.FC<Props> = ({ report, title }) => {
             <span className="text-xl font-bold text-rose-700">{currency(report.totalLiabilities)}</span>
           </div>
         </div>
+      </div>
+
+      <div className="mt-8">
+        <CashierSummaryCards data={report} />
       </div>
 
       <CashierPdfPreviewModal isOpen={isPdfOpen} onClose={() => setIsPdfOpen(false)} report={report} title={title} />

@@ -12,7 +12,7 @@ export const freightExpenseService = {
             .from('ops_loading_freight_components')
             .insert({
                 loading_id: expense.loadingId,
-                component_type: expense.type === 'deduction' ? 'quebra' : 'outros',
+                component_type: expense.type,
                 amount: expense.amount,
                 description: expense.description,
                 deductible: expense.isDeduction,
@@ -27,7 +27,7 @@ export const freightExpenseService = {
         return {
             id: data.id,
             loadingId: data.loading_id,
-            type: data.deductible ? 'deduction' : 'addition',
+            type: data.component_type,
             amount: Number(data.amount),
             description: data.description,
             isDeduction: data.deductible,
@@ -45,7 +45,7 @@ export const freightExpenseService = {
         return (data || []).map(d => ({
             id: d.id,
             loadingId: d.loading_id,
-            type: d.deductible ? 'deduction' : 'addition',
+            type: d.component_type,
             amount: Number(d.amount),
             description: d.description,
             isDeduction: d.deductible,
