@@ -96,11 +96,15 @@ export const useCreateCredit = () => {
 
       return credit;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CREDITS });
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.TOTAL_BALANCE });
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT });
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_ENTRIES });
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CREDITS }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.TOTAL_BALANCE }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_ENTRIES }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD })
+      ]);
     },
   });
 };
@@ -119,10 +123,13 @@ export const useUpdateCredit = () => {
       if (!result) throw new Error('Falha ao atualizar crédito');
       return result;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CREDITS });
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.TOTAL_BALANCE });
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_ENTRIES });
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CREDITS }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.TOTAL_BALANCE }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_ENTRIES }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD })
+      ]);
     },
   });
 };
@@ -136,11 +143,15 @@ export const useDeleteCredit = () => {
       if (!result) throw new Error('Falha ao excluir crédito');
       return result;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CREDITS });
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.TOTAL_BALANCE });
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT });
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_ENTRIES });
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CREDITS }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.TOTAL_BALANCE }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_ENTRIES }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD })
+      ]);
     },
   });
 };

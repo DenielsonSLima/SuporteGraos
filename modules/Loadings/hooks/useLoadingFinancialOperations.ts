@@ -36,35 +36,32 @@ export function useLoadingFinancialOperations({ loading, onUpdate }: UseLoadingF
   const queryClient = useQueryClient();
 
   /** Invalida todos os caches financeiros relevantes */
-  const invalidateFinancialCaches = () => {
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOADINGS });
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FREIGHTS });
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_TRANSACTIONS });
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS });
+  const invalidateFinancialCaches = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOADINGS }),
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FREIGHTS }),
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_TRANSACTIONS }),
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS })
+    ]);
   };
 
   // ─── Processa pagamento de frete ──────────────────────────────────────
   const processPayment = async (data: PaymentData) => {
     await financialActionService.processRecord(`fr-${loading.id}`, data, 'freight');
 
-    // Recarrega o loading atualizado após processamento centralizado.
-    const updatedLoading = loadingService.getAll().find(l => l.id === loading.id);
+    // Invalidação via mutation hook + TanStack Query AGORA AGUARDADA
+    await invalidateFinancialCaches();
 
-    // Invalidação via mutation hook + TanStack Query
-    updateLoadingMut.mutate(updatedLoading || loading);
-    invalidateFinancialCaches();
-
-    if (updatedLoading) {
-      onUpdate({
-        ...updatedLoading,
-        transactions: [...(updatedLoading.transactions || [])],
-        extraExpenses: [...(updatedLoading.extraExpenses || [])]
-      });
-    }
+    // Notificamos o componente pai do sucesso, permitindo que os hooks reativos (dbBalance/dbTransactions)
+    // façam o trabalho pesado de exibir os dados novos que acabaram de ser persistidos.
+    onUpdate({
+      ...loading,
+      freightPaid: (loading.freightPaid || 0) + data.amount
+    });
   };
 
   // ─── Adiciona despesa do motorista ────────────────────────────────────
-  const addExpense = (expenseData: any) => {
+  const addExpense = async (expenseData: any) => {
     const expense = {
       id: Math.random().toString(36).substr(2, 9),
       description: expenseData.description,
@@ -73,14 +70,8 @@ export function useLoadingFinancialOperations({ loading, onUpdate }: UseLoadingF
       date: expenseData.date
     };
 
-    // 1. Atualiza carregamento local
-    onUpdate({
-      ...loading,
-      extraExpenses: [...(loading.extraExpenses || []), expense]
-    });
-
-    // 2. Registra no histórico financeiro geral (vincunlado ao frete)
-    financialActionService.processRecord(
+    // 1. Registra no histórico financeiro geral (vincunlado ao frete)
+    await financialActionService.processRecord(
       `fr-${loading.id}`,
       {
         amount: expenseData.value,
@@ -93,8 +84,14 @@ export function useLoadingFinancialOperations({ loading, onUpdate }: UseLoadingF
       'freight'
     );
 
-    // 3. Invalida caches via TanStack Query
-    invalidateFinancialCaches();
+    // 2. Invalida caches via TanStack Query (AGUARDADO)
+    await invalidateFinancialCaches();
+
+    // 3. Atualiza carregamento local
+    onUpdate({
+      ...loading,
+      extraExpenses: [...(loading.extraExpenses || []), expense]
+    });
 
     addToast('success', 'Despesa registrada com sucesso!');
   };
@@ -177,16 +174,15 @@ export function useLoadingFinancialOperations({ loading, onUpdate }: UseLoadingF
       });
     }
 
-    // Invalidação via mutation hook + TanStack Query
-    updateLoadingMut.mutate(loadingAtualizado);
-    invalidateFinancialCaches();
+    // Invalidação via mutation hook + TanStack Query (AGUARDADO)
+    await invalidateFinancialCaches();
 
     onUpdate(loadingAtualizado);
   };
 
   // ─── Estorna pagamento (SKIL §3.6: transações imutáveis) ────────────
   // Em vez de excluir, cria transação compensatória preservando auditoria.
-  const deletePayment = (tx: any) => {
+  const deletePayment = async (tx: any) => {
     const reversalId = `rev-${tx.id}-${Date.now()}`;
     const now = new Date().toISOString().split('T')[0];
 
@@ -212,8 +208,9 @@ export function useLoadingFinancialOperations({ loading, onUpdate }: UseLoadingF
     const updatedPaid = Math.max(0, (loading.freightPaid || 0) - (tx.value || 0));
 
     const loadingAtualizado = { ...loading, transactions: updatedTransactions, freightPaid: updatedPaid };
-    updateLoadingMut.mutate(loadingAtualizado);
-    invalidateFinancialCaches();
+    
+    // Invalidação via mutation hook + TanStack Query (AGUARDADO)
+    await invalidateFinancialCaches();
 
     onUpdate(loadingAtualizado);
     addToast('success', 'Estorno registrado com sucesso!');

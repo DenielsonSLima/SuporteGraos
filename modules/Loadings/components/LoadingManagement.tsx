@@ -9,6 +9,7 @@ import {
 import { Loading } from '../types';
 import TransactionModal from '../../PurchaseOrder/components/modals/TransactionModal';
 import LoadingFinancialTab from './LoadingFinancialTab';
+import ModalPortal from '../../../components/ui/ModalPortal';
 import { useToast } from '../../../contexts/ToastContext';
 import { useActiveSales } from '../../../hooks/useActiveSales';
 import { useCarrierPartners } from '../../../hooks/useCarrierPartners';
@@ -159,8 +160,12 @@ const LoadingManagement: React.FC<Props> = ({ loading, onClose, onUpdate, origin
   const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-300">
-      <div className="w-full max-w-4xl bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] border border-slate-200 animate-in zoom-in-95 duration-500">
+    <ModalPortal>
+      <div 
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-300"
+        onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      >
+        <div className="w-full max-w-4xl bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] border border-slate-200 animate-in zoom-in-95 duration-300">
 
         <LoadingHeader
           loading={loading}
@@ -245,6 +250,7 @@ const LoadingManagement: React.FC<Props> = ({ loading, onClose, onUpdate, origin
         title={txType === 'advance' ? 'Lançar Adiantamento Frete' : 'Baixar Saldo de Frete'}
       />
     </div>
+    </ModalPortal>
   );
 };
 

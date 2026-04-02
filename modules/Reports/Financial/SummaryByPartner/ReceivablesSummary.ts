@@ -21,9 +21,9 @@ const receivablesSummaryPartner: ReportModule = {
     partnerId: ''
   },
   FilterComponent: Filters,
-  fetchData: ({ startDate, endDate, partnerId }) => {
+  fetchData: async ({ startDate, endDate, partnerId }) => {
     // 1. Recebíveis de Vendas
-    const receivables = financialIntegrationService.getReceivables()
+    const receivables = (await financialIntegrationService.getReceivables())
       .filter(r => r.status !== 'paid' && r.subType === 'sales_order');
 
     // 2. Adiantamentos Concedidos (Ativos)

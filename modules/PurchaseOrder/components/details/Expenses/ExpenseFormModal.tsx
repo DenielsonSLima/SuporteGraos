@@ -64,8 +64,12 @@ const ExpenseFormModal: React.FC<Props> = ({ isOpen, onClose, onSave }) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(normalized);
   };
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+
     if (!formData.value || !formData.accountId || !formData.expenseSubtypeName) {
         addToast('warning', 'Campos Obrigatórios', 'Preencha valor, conta e tipo de despesa.');
         return;
@@ -75,17 +79,23 @@ const ExpenseFormModal: React.FC<Props> = ({ isOpen, onClose, onSave }) => {
     const categoryGroup = expenseCategories.find(c => c.type === selectedType);
     const finalNotes = formData.notes ? `${categoryGroup?.name} - ${formData.expenseSubtypeName} | ${formData.notes}` : `${categoryGroup?.name} - ${formData.expenseSubtypeName}`;
 
-    onSave({
-      date: formData.date,
-      value: parseFloat(formData.value),
-      accountId: formData.accountId,
-      accountName: account ? account.account_name : 'Caixa Central',
-      notes: finalNotes,
-      deductFromPartner: formData.deductFromPartner,
-      type: 'expense'
-    });
-
-    onClose();
+    setIsSubmitting(true);
+    try {
+      await onSave({
+        date: formData.date,
+        value: parseFloat(formData.value),
+        accountId: formData.accountId,
+        accountName: account ? account.account_name : 'Caixa Central',
+        notes: finalNotes,
+        deductFromPartner: formData.deductFromPartner,
+        type: 'expense'
+      });
+      onClose();
+    } catch (error) {
+      addToast('error', 'Erro ao salvar', 'Ocorreu um erro ao processar a despesa.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const inputClass = 'w-full px-4 py-3 border-2 border-slate-200 bg-white text-slate-950 font-bold rounded-xl focus:border-rose-500 focus:ring-0 outline-none transition-all placeholder:text-slate-300 text-sm';
@@ -178,8 +188,10 @@ const ExpenseFormModal: React.FC<Props> = ({ isOpen, onClose, onSave }) => {
             </div>
 
             <div className="pt-2 flex justify-end gap-3">
-              <button type="button" onClick={onClose} className="px-6 py-3 border-2 border-slate-100 rounded-xl text-slate-400 font-black uppercase text-[10px] hover:bg-slate-50">Cancelar</button>
-              <button type="submit" className="px-8 py-3 rounded-xl text-white bg-rose-600 hover:bg-rose-700 font-black uppercase text-[10px] tracking-widest shadow-xl active:scale-95 transition-all">Confirmar Lançamento</button>
+              <button type="button" onClick={onClose} disabled={isSubmitting} className="px-6 py-3 border-2 border-slate-100 rounded-xl text-slate-400 font-black uppercase text-[10px] hover:bg-slate-50 disabled:opacity-50">Cancelar</button>
+              <button type="submit" disabled={isSubmitting} className="px-8 py-3 rounded-xl text-white bg-rose-600 hover:bg-rose-700 font-black uppercase text-[10px] tracking-widest shadow-xl active:scale-95 transition-all disabled:opacity-50">
+                {isSubmitting ? 'Processando...' : 'Confirmar Lançamento'}
+              </button>
             </div>
           </form>
         </div>

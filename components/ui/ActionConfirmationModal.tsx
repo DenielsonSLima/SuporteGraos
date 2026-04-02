@@ -29,6 +29,7 @@ const ActionConfirmationModal: React.FC<Props> = ({
   cancelLabel = 'Cancelar',
   type = 'danger'
 }) => {
+  const [loading, setLoading] = React.useState(false);
   if (!isOpen) return null;
 
   const handleClose = onClose || onCancel || (() => {});
@@ -71,10 +72,22 @@ const ActionConfirmationModal: React.FC<Props> = ({
                 </button>
               )}
               <button 
-                onClick={async () => { await onConfirm(); handleClose(); }}
-                className={`flex-1 px-4 py-3 text-white font-bold rounded-xl shadow-md transition-colors flex items-center justify-center gap-2 ${colors.btn}`}
+                onClick={async () => { 
+                  if (loading) return;
+                  try {
+                    setLoading(true);
+                    await onConfirm(); 
+                    if (isOpen) handleClose(); 
+                  } catch (err) {
+                    console.error('Erro ao confirmar ação:', err);
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+                disabled={loading}
+                className={`flex-1 px-4 py-3 text-white font-bold rounded-xl shadow-md transition-colors flex items-center justify-center gap-2 ${colors.btn} ${loading ? 'opacity-50 cursor-not-all' : ''}`}
               >
-                {confirmLabel}
+                {loading ? 'Processando...' : confirmLabel}
               </button>
             </div>
           </div>

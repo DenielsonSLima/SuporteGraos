@@ -140,6 +140,7 @@ const LoadingFinancialTab: React.FC<Props> = ({ loading, onUpdate }) => {
           originalValue: totals.netFreightTotal,
           paidValue: totals.totalPaid,
           discountValue: totals.totalDisc,
+          remainingValue: totals.balance,
           status: 'pending',
           subType: 'freight'
         }}

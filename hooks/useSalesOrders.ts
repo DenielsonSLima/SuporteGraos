@@ -89,8 +89,8 @@ export function useSalesOrders() {
     queryKey: QUERY_KEYS.SALES_ORDERS,
     // Delega ao salesService que sabe lidar com modo canônico e enriquecimento
     queryFn: () => salesService.loadFromSupabase(),
-    staleTime: STALE_TIMES.REFERENCE,    // 5 min — dados moderadamente estáticos
-    placeholderData: (prev) => prev,      // Sem piscar ao revalidar
+    staleTime: 1000 * 60 * 5, // ⚡ REALTIME: O canal via useEffect já invalida; não precisa de fetch constante
+    placeholderData: (prev) => prev,      // Mantém dados antigos enquanto revalida
   });
 }
 
@@ -117,7 +117,9 @@ export function useAddSalesOrder() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (sale: SalesOrder) => salesService.add(sale),
-    onSuccess: () => { void qc.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS }); },
+    onSuccess: async () => { 
+      await qc.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS });
+    },
     onError: mutationErrorHandler,
   });
 }
@@ -126,7 +128,9 @@ export function useUpdateSalesOrder() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (sale: SalesOrder) => salesService.update(sale),
-    onSuccess: () => { void qc.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS }); },
+    onSuccess: async () => { 
+      await qc.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS });
+    },
     onError: mutationErrorHandler,
   });
 }
@@ -135,7 +139,9 @@ export function useDeleteSalesOrder() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => salesService.delete(id),
-    onSuccess: () => { void qc.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS }); },
+    onSuccess: async () => { 
+      await qc.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS });
+    },
     onError: mutationErrorHandler,
   });
 }
@@ -145,7 +151,9 @@ export function useUpdateSalesTransaction() {
   return useMutation({
     mutationFn: (params: { orderId: string; transaction: any }) =>
       salesService.updateTransaction(params.orderId, params.transaction),
-    onSuccess: () => { void qc.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS }); },
+    onSuccess: async () => { 
+      await qc.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS });
+    },
     onError: mutationErrorHandler,
   });
 }
@@ -154,9 +162,11 @@ export function useDeleteSalesTransaction() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (params: { orderId: string; txId: string }) => {
-      salesService.deleteTransaction(params.orderId, params.txId);
+      await salesService.deleteTransaction(params.orderId, params.txId);
     },
-    onSuccess: () => { void qc.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS }); },
+    onSuccess: async () => { 
+      await qc.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS });
+    },
     onError: mutationErrorHandler,
   });
 }

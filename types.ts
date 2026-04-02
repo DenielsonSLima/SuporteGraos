@@ -31,6 +31,7 @@ export interface User {
   email: string;
   role: 'admin' | 'user' | 'manager';
   companyId?: string; // ID da empresa vinculada
+  appUserId?: string; // ID na tabela app_users (UUID)
   avatar?: string;
   token?: string;
   mustChangePassword?: boolean;

@@ -5,6 +5,21 @@
 
 ---
 
+## 2026-03-18 — Fix: Gráficos de Barras sumiram do Dashboard
+
+**O que foi feito:**
+- Restaurada a lógica completa da função RPC `rpc_dashboard_data` no Supabase.
+- Re-implementado o cálculo de Histórico Patrimonial (6 meses) e Gráfico de Tendência (3 meses).
+- Preservados os novos campos de breakdown financeiro enquanto a estrutura de histórico foi recuperada.
+
+**Por quê:**
+- A função no banco de dados estava incompleta, retornando apenas dados operacionais e de cards financeiros atuais, omitindo as seções necessárias para renderizar os gráficos no módulo Início.
+
+**Arquivos afetados:**
+- Database: `rpc_dashboard_data` (Stored Procedure)
+
+---
+
 ## 2026-03-13 — UI: Ajuste de Tamanho de Fonte dos KPIs (Dashboard)
 
 **O que foi feito:**
@@ -247,3 +262,43 @@
 - A correção do UUID foi feita garantindo que o `accountId` original do hook de contas seja passado adiante no payload de criação.
 
 ---
+
+## 2026-03-18 — Global System Reset (Financial and Operational Data)
+
+**O que foi feito:**
+- Realizado reset total das tabelas de movimentação financeira e operacional do sistema.
+- Tabelas limpas: `ops_loadings`, `ops_purchase_orders`, `ops_sales_orders`, `financial_transactions`, `financial_entries`, `financial_links`, `transfers`, `initial_balances`, `assets`, `loans`, `advances`, `shareholder_operations`, `shareholder_transactions`.
+- Saldos de contas bancárias (`public.accounts`) e de sócios (`public.shareholders`) resetados para `0.00`.
+- Preservados cadastros de parceiros (`parceiros_parceiros`), empresas e usuários.
+
+**Por quê:**
+- Solicitação do usuário para corrigir instabilidades e "bugs" acumulados através de um ponto de partida limpo (clean slate).
+
+**Arquivos afetados:**
+- Banco de Dados Supabase (via MCP).
+
+---
+- [19/03/2026] Fix: Robustez em recebimentos, estornos de vendas e Quick View no Contas a Receber.
+  - Modificados: `salesOrderHandler.ts`, `SalesOrderDetails.tsx`, `UnifiedReceivableManager.tsx`, `useFinancialRecordDetailsModal.ts`, `salesService.ts`, `cashierReportService.ts`, `financialTransactionService.ts`, `ActionConfirmationModal.tsx`.
+  - [FIX] Resolvido erro 400 no Caixa (join inválido) e 409 no estorno (race condition + loading state).
+
+---
+
+## 2026-03-26/27 — Fix: Sincronização Financeira e Trava de Segurança (Double Submission)
+
+**O que foi feito:**
+- **Deleção Física (v2)**: Substituída a lógica de "Estorno" por **Delete Físico** em `financial_transactions` ao excluir recebimentos de vendas. Isso garante recálculo instantâneo via triggers e UI limpa.
+- **ID Mismatch**: Corrigida a falha de chave estrangeira (`app_users.id` vs Auth UID) que causava erros 409. O serviço agora usa o UUID interno corretamente.
+- **UI Hardening**: Implementado estado `isSubmitting` no `SalesReceiptModal` para desabilitar o botão durante o salvamento, impedindo cliques duplicados.
+- **Async Refresh**: Ajustado o hook `useSalesOrderDetailsOperations` para `await` a invalidação de cache (TanStack Query), garantindo que a lista de recebimentos atualize sem precisar de F5.
+- **Manual Data Repair**: Removidos registros órfãos e duplicados do pedido **PV-2026-620** para restaurar o equilíbrio financeiro.
+
+**Por quê:**
+- O modelo de estorno contábil estava "sujando" a visão do usuário e os gatilhos de soma do banco não refletiam o saldo esperado após reversões falhas. Cliques rápidos geravam duplicidade de lançamentos.
+
+**Arquivos afetados:**
+- `services/financial/financialTransactionService.ts`
+- `modules/SalesOrder/components/modals/SalesReceiptModal.tsx`
+- `modules/SalesOrder/hooks/useSalesOrderDetailsOperations.ts`
+- `services/authService.ts`
+- Database: `financial_transactions`, `financial_links` (limpeza manual).

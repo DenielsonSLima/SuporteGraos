@@ -9,6 +9,7 @@ export interface TransactionLinkParams {
     loadingId?: string;
     commissionId?: string;
     standaloneId?: string;
+    shareholderTxId?: string;
     linkType: 'payment' | 'receipt' | 'deduction' | 'reversal';
 }
 
@@ -36,11 +37,25 @@ export const financialTransactionService = {
         }
 
         const rawType = String(row.type || '').toUpperCase();
-        const reversalType = rawType === 'IN' ? 'OUT' : 'IN';
+        
+        // Normalização robusta: Créditos/Inflows (IN, CREDIT, RECEIPT, etc) -> Reversão de SAÍDA (OUT)
+        // Débitos/Outflows (OUT, DEBIT, PAYMENT, etc) -> Reversão de ENTRADA (IN)
+        const isInflow = ['IN', 'CREDIT', 'RECEIPT', 'RECEBIMENTO', 'ENTRADA'].includes(rawType);
+        const reversalType = isInflow ? 'OUT' : 'IN';
 
         const authModule = await import('../authService');
         const user = authModule.authService.getCurrentUser();
-        const { error } = await supabase
+        
+        // Se SQL canônico estiver ativo, logs extras... (opcional)
+
+        // Safe check for created_by UUID to avoid 409 Conflict/FK violations
+        const isValidUUID = (id: any) => 
+            typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
+        const safeCreatedBy = [user?.appUserId, row.created_by]
+            .find(id => isValidUUID(id)) || null;
+
+        const { data: newTx, error: txError } = await supabase
             .from('financial_transactions')
             .insert({
                 transaction_date: getTodayBR(),
@@ -50,11 +65,34 @@ export const financialTransactionService = {
                 account_id: row.account_id,
                 company_id: row.company_id,
                 entry_id: row.entry_id, // ✅ CRITICAL: Link to parent entry for trigger update
-                created_by: user?.id || row.created_by || null
-            });
+                created_by: safeCreatedBy
+            })
+            .select()
+            .single();
 
-        if (error) {
-            throw error;
+        if (txError) throw txError;
+
+        // 2. Propagate links to the new financial_links table for full history visibility
+        const { data: links } = await supabase
+            .from('financial_links')
+            .select('*')
+            .eq('transaction_id', row.id);
+
+        if (links && links.length > 0) {
+            const newLinks = links.map(link => ({
+                transaction_id: newTx.id,
+                purchase_order_id: link.purchase_order_id,
+                sales_order_id: link.sales_order_id,
+                loading_id: link.loading_id,
+                standalone_id: link.standalone_id,
+                shareholder_tx_id: link.shareholder_tx_id,
+                link_type: 'reversal'
+            }));
+
+            const { error: linkError } = await supabase.from('financial_links').insert(newLinks);
+            if (linkError) {
+                console.error('Error propagating links in createReversal:', linkError);
+            }
         }
     },
 
@@ -108,6 +146,7 @@ export const financialTransactionService = {
                         loading_id: linkData.loadingId,
                         commission_id: linkData.commissionId,
                         standalone_id: linkData.standaloneId,
+                        shareholder_tx_id: linkData.shareholderTxId,
                         link_type: linkData.linkType
                     });
 
@@ -134,8 +173,8 @@ export const financialTransactionService = {
     /**
      * Lists transactions via the new financial_links table
      */
-    async getLinksByEntity(entityId: string, entityType: 'purchase_order' | 'sales_order' | 'loading' | 'commission' | 'standalone') {
-        const column = `${entityType}_id`;
+    async getLinksByEntity(entityId: string, entityType: 'purchase_order' | 'sales_order' | 'loading' | 'commission' | 'standalone' | 'shareholder_tx') {
+        const column = entityType === 'shareholder_tx' ? 'shareholder_tx_id' : `${entityType}_id`;
 
         const { data, error } = await supabase
             .from('financial_links')
@@ -154,39 +193,29 @@ export const financialTransactionService = {
     },
 
     /**
-     * Registra estorno de uma transação (ledger imutável)
+     * Remove uma transação financeira (Delete Físico)
+     * Atende ao requisito do usuário de "apagar ao invés de estornar" 
+     * para manter o saldo e a UI limpos.
      */
     async delete(txId: string) {
-        const { data, error } = await supabase
+        if (!txId) return;
+        const { error } = await supabase
             .from('financial_transactions')
-            .select('*')
-            .eq('id', txId)
-            .maybeSingle();
+            .delete()
+            .eq('id', txId);
 
-        if (error) {
-            throw error;
-        }
-
-        if (!data) {
-            return;
-        }
-
-        await this.createReversal(data);
+        if (error) throw error;
     },
 
     async deleteByRecordId(recordId: string, type: 'payable' | 'receivable'): Promise<boolean> {
         try {
             const field = type === 'payable' ? 'payable_id' : 'receivable_id';
-            const { data, error } = await supabase
+            const { error } = await supabase
                 .from('financial_transactions')
-                .select('*')
+                .delete()
                 .eq(field, recordId);
 
             if (error) throw error;
-
-            for (const row of data || []) {
-                await this.createReversal(row);
-            }
             return true;
         } catch (err) {
             console.error('Error in deleteByRecordId:', err);
@@ -216,18 +245,12 @@ export const financialTransactionService = {
     },
 
     async deleteByRef(refId: string) {
-        const { data, error } = await supabase
+        const { error } = await supabase
             .from('financial_transactions')
-            .select('*')
+            .delete()
             .ilike('description', `%[REF:${refId}]%`);
 
-        if (error) {
-            throw error;
-        }
-
-        for (const row of data || []) {
-            await this.createReversal(row);
-        }
+        if (error) throw error;
     },
 
     /**

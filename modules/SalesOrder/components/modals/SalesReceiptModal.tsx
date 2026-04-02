@@ -32,6 +32,7 @@ const SalesReceiptModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, totalP
   const [discount, setDiscount] = useState('');
   const [accountId, setAccountId] = useState('');
   const [notes, setNotes] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { data: allAccounts = [] } = useAccounts();
   const bankAccounts = useMemo(() =>
@@ -69,22 +70,28 @@ const SalesReceiptModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, totalP
   const totalOperation = valAmount + valDiscount;
   const isCashMovement = valAmount > 0;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (totalOperation <= 0) return addToast('warning', 'Informe valores');
     if (isCashMovement && !accountId) return addToast('warning', 'Conta Obrigatória');
 
     const selectedAccount = bankAccounts.find(a => a.id === accountId);
 
-    onConfirm({
-      date,
-      amount: valAmount,
-      discount: valDiscount,
-      accountId: accountId,
-      accountName: selectedAccount?.account_name || (isCashMovement ? 'Caixa' : 'ABATIMENTO'),
-      notes: notes,
-      isAsset: false
-    });
+    setIsSubmitting(true);
+    try {
+      await onConfirm({
+        date,
+        amount: valAmount,
+        discount: valDiscount,
+        accountId: accountId,
+        accountName: selectedAccount?.account_name || (isCashMovement ? 'Caixa' : 'ABATIMENTO'),
+        notes: notes,
+        isAsset: false
+      });
+    } catch (err) {
+      console.error('[SalesReceiptModal] Erro:', err);
+      setIsSubmitting(false);
+    }
   };
 
   const inputClass = 'w-full border-2 border-slate-200 rounded-xl bg-white text-slate-900 font-bold px-4 py-2.5 focus:border-emerald-500 outline-none transition-all placeholder:text-slate-300 text-sm';
@@ -118,8 +125,21 @@ const SalesReceiptModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, totalP
             ) : <div className="p-3 bg-slate-100 rounded-xl text-center text-xs text-slate-500 font-medium italic">Abatimento de saldo direto.</div>}
             <div><label className={labelClass}>Histórico / Observações</label><div className="relative"><FileText className="absolute left-3 top-3 text-slate-300" size={18} /><textarea rows={2} value={notes} onChange={e => setNotes(e.target.value)} className={`${inputClass} pl-10 text-xs font-medium`} placeholder="Notas..." /></div></div>
             <div className="pt-4 flex justify-end gap-3 border-t border-slate-100">
-              <button type="button" onClick={onClose} className="px-6 py-3 rounded-xl border border-slate-200 text-slate-500 font-black uppercase text-xs">Cancelar</button>
-              <button type="submit" className="px-8 py-3 rounded-xl bg-emerald-600 text-white font-black uppercase text-xs shadow-lg active:scale-95 transition-all">Confirmar Recebimento</button>
+              <button type="button" onClick={onClose} disabled={isSubmitting} className="px-6 py-3 rounded-xl border border-slate-200 text-slate-500 font-black uppercase text-xs disabled:opacity-50">Cancelar</button>
+              <button 
+                type="submit" 
+                disabled={isSubmitting}
+                className="px-8 py-3 rounded-xl bg-emerald-600 text-white font-black uppercase text-xs shadow-lg active:scale-95 transition-all disabled:bg-slate-400 disabled:shadow-none flex items-center gap-2"
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Processando...
+                  </>
+                ) : (
+                  'Confirmar Recebimento'
+                )}
+              </button>
             </div>
           </form>
         </div>

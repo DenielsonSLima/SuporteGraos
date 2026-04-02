@@ -72,8 +72,11 @@ const CreditFormModal: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialDa
     setDisplayValue(formatBRL(num));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     
     const value = parseFloat(formData.value);
 
@@ -83,14 +86,21 @@ const CreditFormModal: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialDa
 
     const selectedAccount = bankAccounts.find(a => a.id === formData.accountId);
 
-    onSubmit({
-      date: formData.date,
-      description: formData.description,
-      value,
-      accountId: formData.accountId,
-      accountName: selectedAccount?.account_name || ''
-    });
-    onClose();
+    setIsSubmitting(true);
+    try {
+      await onSubmit({
+        date: formData.date,
+        description: formData.description,
+        value,
+        accountId: formData.accountId,
+        accountName: selectedAccount?.account_name || ''
+      });
+      onClose();
+    } catch (error) {
+      addToast('error', 'Erro ao salvar', 'Ocorreu um erro ao processar o crédito.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -194,16 +204,18 @@ const CreditFormModal: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialDa
               <button
                 type="button"
                 onClick={onClose}
-                className="flex-1 py-3 px-4 text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-2xl font-black uppercase tracking-wider transition-all"
+                disabled={isSubmitting}
+                className="flex-1 py-3 px-4 text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-2xl font-black uppercase tracking-wider transition-all disabled:opacity-50"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
-                className="flex-1 py-3 px-4 text-white bg-gradient-to-r from-emerald-500 to-emerald-600 hover:shadow-lg rounded-2xl font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2"
+                disabled={isSubmitting}
+                className="flex-1 py-3 px-4 text-white bg-gradient-to-r from-emerald-500 to-emerald-600 hover:shadow-lg rounded-2xl font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 <Save size={18} />
-                {initialData ? 'Atualizar' : 'Criar'}
+                {isSubmitting ? 'Salvando...' : (initialData ? 'Atualizar' : 'Criar')}
               </button>
             </div>
           </form>

@@ -10,6 +10,7 @@ import { ModuleId } from '../../../../types';
 import FinancialEntityCard from '../../components/shared/FinancialEntityCard';
 import FinancialTable from '../../components/shared/FinancialTable';
 import FinancialBatchFooter from '../../components/shared/FinancialBatchFooter';
+import QuickPaymentViewModal from '../../components/modals/QuickPaymentViewModal';
 
 interface Props {
   records: FinancialRecord[];
@@ -24,7 +25,7 @@ const UnifiedReceivableManager: React.FC<Props> = ({ records, onRefresh, viewMod
   const searchTerm = externalSearch !== undefined ? externalSearch : internalSearch;
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [isPayModalOpen, setIsPayModalOpen] = useState(false);
+  const [modalType, setModalType] = useState<null | 'pay' | 'quick_view'>(null);
   const [selectedRecordForSinglePay, setSelectedRecordForSinglePay] = useState<FinancialRecord | null>(null);
 
   const currency = (val: number) => {
@@ -63,9 +64,8 @@ const UnifiedReceivableManager: React.FC<Props> = ({ records, onRefresh, viewMod
   };
 
   const handleRowClick = (item: FinancialRecord) => {
-    if (item.status === 'paid') return;
     setSelectedRecordForSinglePay(item);
-    setIsPayModalOpen(true);
+    setModalType('quick_view');
   };
 
   const handleNavigateToOrder = (e: React.MouseEvent, item: FinancialRecord) => {
@@ -81,21 +81,29 @@ const UnifiedReceivableManager: React.FC<Props> = ({ records, onRefresh, viewMod
     .filter(r => selectedIds.includes(r.id))
     .reduce((acc, r) => acc + (r.remainingValue || 0), 0);
 
+  const { addToast } = (window as any).useToast ? (window as any).useToast() : { addToast: (type: any, title: any, msg: any) => console.log(type, title, msg) };
+
   const handleConfirmPayment = async (data: PaymentData) => {
-    if (selectedRecordForSinglePay) {
-      await financialActionService.processRecord(selectedRecordForSinglePay.id, data, selectedRecordForSinglePay.subType);
-    } else {
-      for (const id of selectedIds) {
-        const record = records.find(r => r.id === id);
-        if (record) {
-          const balance = record.remainingValue || 0;
-          await financialActionService.processRecord(id, { ...data, amount: balance, discount: 0 }, record.subType);
+    try {
+      if (selectedRecordForSinglePay) {
+        await financialActionService.processRecord(selectedRecordForSinglePay.id, data, selectedRecordForSinglePay.subType);
+      } else {
+        for (const id of selectedIds) {
+          const record = records.find(r => r.id === id);
+          if (record) {
+            const balance = record.remainingValue || 0;
+            await financialActionService.processRecord(id, { ...data, amount: balance, discount: 0 }, record.subType);
+          }
         }
       }
+      setModalType(null);
+      setSelectedIds([]);
+      onRefresh();
+      addToast('success', 'Operação Realizada', 'Recebimento registrado com sucesso!');
+    } catch (err: any) {
+      console.error('[UnifiedReceivableManager] Erro no recebimento:', err);
+      addToast('error', 'Falha ao Registrar', err.message || 'Erro inesperado ao processar o recebimento.');
     }
-    setIsPayModalOpen(false);
-    setSelectedIds([]);
-    onRefresh();
   };
 
   const headers = [
@@ -219,20 +227,30 @@ const UnifiedReceivableManager: React.FC<Props> = ({ records, onRefresh, viewMod
           selectedCount={selectedIds.length}
           totalAmount={totalSelected}
           currency={currency}
-          onConfirm={() => { setSelectedRecordForSinglePay(null); setIsPayModalOpen(true); }}
+          onConfirm={() => { setSelectedRecordForSinglePay(null); setModalType('pay'); }}
           onCancel={() => setSelectedIds([])}
           type="receivable"
         />
       )}
 
       <FinancialPaymentModal
-        isOpen={isPayModalOpen}
-        onClose={() => setIsPayModalOpen(false)}
+        isOpen={modalType === 'pay'}
+        onClose={() => setModalType(null)}
         onConfirm={handleConfirmPayment}
         record={selectedRecordForSinglePay}
         bulkTotal={selectedRecordForSinglePay ? undefined : totalSelected}
         bulkCount={selectedIds.length}
       />
+
+      {selectedRecordForSinglePay && (
+        <QuickPaymentViewModal
+          isOpen={modalType === 'quick_view'}
+          onClose={() => setModalType(null)}
+          record={selectedRecordForSinglePay}
+          onAddPayment={() => setModalType('pay')}
+          onRefresh={onRefresh}
+        />
+      )}
     </div>
   );
 };

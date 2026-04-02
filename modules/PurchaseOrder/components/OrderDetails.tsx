@@ -177,7 +177,8 @@ const OrderDetails: React.FC<Props> = ({ order, onBack, onEdit, onDelete, onFina
         <OrderFinancialCard
           orderId={currentOrder.id}
           transactions={mergedTransactions}
-          totalOrderValue={stats.totalPurchaseVal}
+          paidValue={currentOrder.paidValue}
+          balanceValue={currentOrder.balanceValue}
           onAddPayment={() => setIsPayModalOpen(true)}
           onAddAdvance={() => setIsAdvanceModalOpen(true)} // ABRE MODAL DE ADIANTAMENTO
           onRefresh={() => actions.refreshLoadings()}
@@ -201,6 +202,8 @@ const OrderDetails: React.FC<Props> = ({ order, onBack, onEdit, onDelete, onFina
             brokerName={currentOrder.brokerName || 'Não Informado'}
             commissionPerSc={currentOrder.brokerCommissionPerSc || 0}
             totalDue={stats.totalCommissionDue}
+            paidValue={currentOrder.brokerPaidValue || 0}
+            balanceValue={currentOrder.brokerBalanceValue || 0}
             transactions={mergedTransactions}
             onAddPayment={() => setIsBrokerModalOpen(true)}
             onEditTx={setSelectedTx}

@@ -7,6 +7,8 @@ interface Props {
   brokerName: string;
   commissionPerSc: number;
   totalDue: number;
+  paidValue: number;
+  balanceValue: number;
   transactions: OrderTransaction[];
   onAddPayment: () => void;
   onEditTx: (tx: OrderTransaction) => void;
@@ -17,6 +19,8 @@ const OrderBrokerCard: React.FC<Props> = ({
   brokerName, 
   commissionPerSc, 
   totalDue, 
+  paidValue,
+  balanceValue,
   transactions, 
   onAddPayment, 
   onEditTx, 
@@ -24,10 +28,6 @@ const OrderBrokerCard: React.FC<Props> = ({
 }) => {
   const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
   const brokerTxs = transactions.filter(t => t.type === 'commission');
-  
-  // CORREÇÃO: Soma valor (dinheiro) + descontos para abater o total devido
-  const totalPaid = brokerTxs.reduce((acc, t) => acc + t.value + (t.discountValue || 0), 0);
-  const balance = Math.max(0, totalDue - totalPaid);
 
   return (
     <div className="bg-white rounded-2xl border-2 border-violet-100 shadow-sm overflow-hidden w-full animate-in slide-in-from-bottom-4">
@@ -58,11 +58,11 @@ const OrderBrokerCard: React.FC<Props> = ({
           </div>
           <div>
             <span className="text-[9px] text-slate-400 font-black uppercase">Total Liquidado</span>
-            <p className="text-lg font-black text-emerald-600">{currency(totalPaid)}</p>
+            <p className="text-lg font-black text-emerald-600">{currency(paidValue)}</p>
           </div>
           <div className="bg-violet-100/30 p-3 rounded-xl border border-violet-100">
             <span className="text-[9px] text-violet-600 font-black uppercase">Saldo em Aberto</span>
-            <p className="text-xl font-black text-violet-700">{currency(balance)}</p>
+            <p className="text-xl font-black text-violet-700">{currency(balanceValue)}</p>
           </div>
         </div>
         

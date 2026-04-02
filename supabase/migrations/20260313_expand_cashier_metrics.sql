@@ -46,6 +46,10 @@ DECLARE
   v_expense_distribution JSON := '{}'::json;
   v_revenue_distribution JSON := '{}'::json;
 
+  -- NOVOS CAMPOS PARA SALDO DE ABERTURA DINÂMICO
+  v_opening_balances_json JSON := '[]'::json;
+  v_total_initial_month_balance NUMERIC := 0;
+
   result JSON;
 BEGIN
   -- ┌─────────────────────────────────────────────┐
@@ -331,6 +335,49 @@ BEGIN
   )
   INTO v_revenue_distribution;
 
+  -- 5. Cálculo Dinâmico do Saldo de Abertura (Saldo Atual - Créditos no Mês + Débitos no Mês)
+  WITH account_metrics AS (
+    SELECT
+      a.id,
+      a.account_name,
+      a.owner,
+      a.balance AS current_balance,
+      -- Créditos (Entradas) no mês atual
+      COALESCE((
+        SELECT SUM(ft.amount)
+        FROM public.financial_transactions ft
+        WHERE ft.account_id = a.id
+          AND ft.type = 'credit'
+          AND ft.transaction_date >= v_start_of_month
+          AND ft.transaction_date <= v_end_of_month
+      ), 0) AS month_credits,
+      -- Débitos (Saídas) no mês atual
+      COALESCE((
+        SELECT SUM(ft.amount)
+        FROM public.financial_transactions ft
+        WHERE ft.account_id = a.id
+          AND ft.type = 'debit'
+          AND ft.transaction_date >= v_start_of_month
+          AND ft.transaction_date <= v_end_of_month
+      ), 0) AS month_debits
+    FROM public.accounts a
+    WHERE a.company_id = p_company_id
+      AND COALESCE(a.is_active, true) = true
+  )
+  SELECT
+    COALESCE(json_agg(json_build_object(
+      'id', id,
+      'accountId', id,
+      'accountName', account_name,
+      'bankName', account_name,
+      'owner', owner,
+      'currentBalance', current_balance,
+      'openingBalance', (current_balance - month_credits + month_debits)
+    ) ORDER BY account_name), '[]'::json),
+    COALESCE(SUM(current_balance - month_credits + month_debits), 0)
+  INTO v_opening_balances_json, v_total_initial_month_balance
+  FROM account_metrics;
+
   -- ┌─────────────────────────────────────────────┐
   -- │ TOTAIS                                       │
   -- └─────────────────────────────────────────────┘
@@ -360,10 +407,10 @@ BEGIN
   SELECT json_build_object(
     'bankBalances', v_bank_balances,
     'totalBankBalance', v_total_bank_balance,
-    'initialBalances', v_initial_balances,
+     'initialBalances', v_initial_balances,
     'totalInitialBalance', v_total_initial_balance,
-    'totalInitialMonthBalance', v_total_initial_balance,
-    'initialMonthBalances', v_initial_balances,
+    'totalInitialMonthBalance', v_total_initial_month_balance,
+    'initialMonthBalances', v_opening_balances_json,
 
     'pendingSalesReceipts', v_pending_sales_receipts,
     'merchandiseInTransitValue', v_merchandise_in_transit_value,

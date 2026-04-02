@@ -256,7 +256,7 @@ BEGIN
   -- ========================================================================
   WITH expense_cats AS (
     SELECT
-      COALESCE(ec.name, 'Outros') AS cat_name,
+      COALESCE(ae.description, ec.name, 'Outros') AS cat_name,
       COALESCE(ec.type, 'variable') AS cat_type,
       SUM(ae.amount) AS total
     FROM admin_expenses ae
@@ -264,43 +264,46 @@ BEGIN
     WHERE ae.company_id = p_company_id
       AND ae.status != 'cancelled'
       AND COALESCE(ae.expense_date, ae.due_date, CURRENT_DATE) >= v_date_from
-    GROUP BY ec.name, ec.type
+    GROUP BY COALESCE(ae.description, ec.name, 'Outros'), ec.type
   ),
-  grouped AS (
+  pre_grouped AS (
     SELECT
-      CASE
-        WHEN cat_type = 'fixed' THEN 'Despesas Fixas'
-        WHEN cat_type = 'variable' THEN 'Despesas Variáveis'
-        ELSE 'Custos Administrativos'
-      END AS label,
       CASE
         WHEN cat_type = 'fixed' THEN 'fixed'
         WHEN cat_type = 'variable' THEN 'variable'
         ELSE 'administrative'
       END AS type_key,
-      json_agg(json_build_object(
+      json_build_object(
         'name', cat_name,
         'value', total,
         'percentage', CASE WHEN v_total_admin_expenses > 0
                           THEN ROUND((total / v_total_admin_expenses) * 100, 1)
                           ELSE 0 END
-      )) AS items,
-      SUM(total) AS group_total
+      ) AS item_obj,
+      total
     FROM expense_cats
-    GROUP BY cat_type
   )
-  SELECT COALESCE(json_agg(json_build_object(
-    'label', g.label,
-    'total', g.group_total,
-    'type', g.type_key,
-    'items', g.items
-  )), json_build_array(
-    json_build_object('label', 'Despesas Fixas', 'total', 0, 'type', 'fixed', 'items', '[]'::json),
-    json_build_object('label', 'Despesas Variáveis', 'total', 0, 'type', 'variable', 'items', '[]'::json),
-    json_build_object('label', 'Custos Administrativos', 'total', 0, 'type', 'administrative', 'items', '[]'::json)
+  SELECT json_agg(json_build_object(
+    'label', base.label,
+    'type', base.type_key,
+    'total', COALESCE(agg.total_sum, 0),
+    'items', COALESCE(agg.items_json, '[]'::json)
   ))
   INTO v_expense_breakdown
-  FROM grouped g;
+  FROM (
+    VALUES 
+      ('Despesas Fixas', 'fixed'),
+      ('Despesas Variáveis', 'variable'),
+      ('Custos Administrativos', 'administrative')
+  ) AS base(label, type_key)
+  LEFT JOIN (
+    SELECT 
+      type_key,
+      SUM(total) AS total_sum,
+      json_agg(item_obj) AS items_json
+    FROM pre_grouped
+    GROUP BY type_key
+  ) agg ON agg.type_key = base.type_key;
 
   -- ========================================================================
   -- 8. TOP PROFIT / LOSS ORDERS (por carregamento, receita - custo)

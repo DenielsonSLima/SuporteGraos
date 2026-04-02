@@ -44,18 +44,18 @@ export function calculateSalesPerformance(order: SalesOrder, loadings: Loading[]
   const activeLoadings = loadings.filter(l => l.status !== 'canceled');
 
   // 1. Volumes (Sacas)
-  const totalLoadedSc = activeLoadings.reduce((acc, l) => acc + l.weightSc, 0);
-  const totalDeliveredSc = activeLoadings.reduce((acc, l) => acc + (l.unloadWeightKg ? l.unloadWeightKg / 60 : 0), 0);
+  const totalLoadedSc = order.totalWeightKgOrig ? (order.totalWeightKgOrig / 60) : activeLoadings.reduce((acc, l) => acc + l.weightSc, 0);
+  const totalDeliveredSc = order.deliveredQtySc ?? activeLoadings.reduce((acc, l) => acc + (l.unloadWeightKg ? l.unloadWeightKg / 60 : 0), 0);
   const contractQty = order.quantity || 0;
   const pendingQty = Math.max(0, contractQty - totalLoadedSc);
 
   // 2. Financeiro (Custos)
-  const totalGrainCost = activeLoadings.reduce((acc, l) => acc + (l.totalPurchaseValue || 0), 0);
-  const totalFreightCost = activeLoadings.reduce((acc, l) => acc + (l.totalFreightValue || 0), 0);
+  const totalGrainCost = order.totalGrainCost ?? activeLoadings.reduce((acc, l) => acc + (l.totalPurchaseValue || 0), 0);
+  const totalFreightCost = order.totalFreightCost ?? activeLoadings.reduce((acc, l) => acc + (l.totalFreightValue || 0), 0);
   const totalDirectInvestment = totalGrainCost + totalFreightCost;
 
   // 3. Financeiro (Receita/Faturamento) — Peso Destino se houver, senão Origem × Preço Venda
-  const totalRevenueRealized = activeLoadings.reduce((acc, l) => {
+  const totalRevenueRealized = order.deliveredValue ?? activeLoadings.reduce((acc, l) => {
     const weightSc = l.unloadWeightKg ? l.unloadWeightKg / 60 : l.weightSc;
     return acc + (weightSc * (l.salesPrice || order.unitPrice || 0));
   }, 0);
@@ -102,13 +102,13 @@ export function calculateInternalPdfStats(order: SalesOrder, loadings: Loading[]
   const safeLoadings = Array.isArray(loadings) ? loadings : [];
   const activeLoadings = safeLoadings.filter((l) => l?.status !== 'canceled');
 
-  const totalWeightKgOrig = activeLoadings.reduce((acc, l) => acc + (Number(l?.weightKg) || 0), 0);
-  const totalWeightKgDest = activeLoadings.reduce((acc, l) => acc + (Number(l?.unloadWeightKg) || 0), 0);
+  const totalWeightKgOrig = order.totalWeightKgOrig ?? activeLoadings.reduce((acc, l) => acc + (Number(l?.weightKg) || 0), 0);
+  const totalWeightKgDest = order.totalWeightKgDest ?? activeLoadings.reduce((acc, l) => acc + (Number(l?.unloadWeightKg) || 0), 0);
   const totalWeightScOrig = totalWeightKgOrig / 60;
 
-  const totalGrainCost = activeLoadings.reduce((acc, l) => acc + (Number(l?.totalPurchaseValue) || 0), 0);
-  const totalFreightCost = activeLoadings.reduce((acc, l) => acc + (Number(l?.totalFreightValue) || 0), 0);
-  const totalRevenue = activeLoadings.reduce((acc, l) => acc + (Number(l?.totalSalesValue) || 0), 0);
+  const totalGrainCost = order.totalGrainCost ?? activeLoadings.reduce((acc, l) => acc + (Number(l?.totalPurchaseValue) || 0), 0);
+  const totalFreightCost = order.totalFreightCost ?? activeLoadings.reduce((acc, l) => acc + (Number(l?.totalFreightValue) || 0), 0);
+  const totalRevenue = order.deliveredValue ?? activeLoadings.reduce((acc, l) => acc + (Number(l?.totalSalesValue) || 0), 0);
 
   const transactions = Array.isArray(order?.transactions) ? order.transactions : [];
   const orderExpenses = transactions

@@ -16,7 +16,7 @@ import { ModuleId } from '../../../../types';
 import FinancialEntityCard from '../../components/shared/FinancialEntityCard';
 import FinancialTable from '../../components/shared/FinancialTable';
 import FinancialBatchFooter from '../../components/shared/FinancialBatchFooter';
-import QuickPaymentViewModal from './modals/QuickPaymentViewModal';
+import QuickPaymentViewModal from '../../components/modals/QuickPaymentViewModal';
 
 interface Props {
   records: FinancialRecord[];

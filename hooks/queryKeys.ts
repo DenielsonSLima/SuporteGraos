@@ -22,6 +22,8 @@ export const QUERY_KEYS = {
 
   // ─── Sócios ─────────────────────────────────────────────
   SHAREHOLDERS: ['shareholders'] as const,
+  SHAREHOLDER_DETAILS: (id: string) => ['shareholder', id] as const,
+  SHAREHOLDER_TOTALS: (id: string) => ['shareholder_totals', id] as const,
 
   // ─── Financeiro — configurações ─────────────────────────
   BANK_ACCOUNTS: ['bank_accounts'] as const,
@@ -88,6 +90,9 @@ export const QUERY_KEYS = {
   // ─── Caixa ──────────────────────────────────────────────
   CASHIER_CURRENT: ['cashier', 'current'] as const,
   CASHIER_HISTORY: ['cashier', 'history'] as const,
+
+  // ─── Dashboard ──────────────────────────────────────────
+  DASHBOARD: ['dashboard'] as const,
 
   // ─── Reports (lazy loaded) ──────────────────────────────
   REPORTS: ['reports'] as const,

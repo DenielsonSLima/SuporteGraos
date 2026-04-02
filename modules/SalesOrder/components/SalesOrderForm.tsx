@@ -17,15 +17,21 @@ const SalesOrderForm: React.FC<Props> = ({ initialData, onSave, onCancel }) => {
   const dropdownRef = useRef<HTMLDivElement>(null);
   
   const [formData, setFormData] = useState<Partial<SalesOrder>>({
-    number: `PV-${new Date().getFullYear()}-${Math.floor(Math.random() * 1000)}`,
-    date: new Date().toISOString().split('T')[0],
-    status: 'approved',
+    consultantName: '',
     productName: 'Milho em Grãos',
+    quantity: 0,
+    unitPrice: 0,
     totalValue: 0,
-    ...initialData
+    status: 'draft',
+    date: new Date().toISOString().split('T')[0],
+    ...initialData,
+    id: initialData?.id || crypto.randomUUID(),
+    number: initialData?.number || `PV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
+    loadings: initialData?.loadings || [],
+    transactions: initialData?.transactions || []
   });
 
-  const [displayPrice, setDisplayPrice] = useState('');
+  const [displayPrice, setDisplayPrice] = useState(initialData?.unitPrice ? String(initialData.unitPrice) : '');
   const { data: partnersData } = usePartners({ page: 1, pageSize: 2000, category: 'all' });
   const { data: shareholdersRaw = [] } = useShareholders();
   const [customerSearch, setCustomerSearch] = useState(initialData?.customerName || '');

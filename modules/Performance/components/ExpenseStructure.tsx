@@ -18,6 +18,18 @@ const ExpenseStructure: React.FC<Props> = ({ data }) => {
     }
   };
 
+  if (!data || data.length === 0) {
+    return (
+      <div className="bg-white p-12 rounded-2xl border border-slate-200 shadow-sm text-center">
+        <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-slate-50 text-slate-400 mb-4">
+          <Briefcase size={24} />
+        </div>
+        <h3 className="text-slate-900 font-bold mb-1">Sem dados de custos</h3>
+        <p className="text-slate-500 text-sm">Não encontramos movimentações para este período.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {data.map((category) => {
@@ -39,7 +51,7 @@ const ExpenseStructure: React.FC<Props> = ({ data }) => {
 
             {/* List */}
             <div className="p-5 flex-1 space-y-5">
-              {category.items.length === 0 ? (
+              {!category.items || category.items.length === 0 ? (
                 <div className="py-10 text-center text-slate-400 text-xs italic font-medium">Nenhum lançamento no período.</div>
               ) : (
                 category.items.map((item, idx) => (
@@ -64,9 +76,9 @@ const ExpenseStructure: React.FC<Props> = ({ data }) => {
             </div>
             
             {/* Footer */}
-            <div className="px-5 py-3 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between text-[10px] font-black text-slate-400 uppercase tracking-tighter">
+            <div className="px-5 py-4 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest">
               <span>Peso no Grupo</span>
-              <ChevronRight size={12} />
+              <ChevronRight size={12} className="opacity-50" />
             </div>
           </div>
         );

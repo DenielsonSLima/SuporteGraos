@@ -37,6 +37,30 @@ export function useShareholders() {
   });
 }
 
+export function useShareholder(id: string | null) {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!id) return;
+    const unsub = shareholderService.subscribeRealtime(() => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SHAREHOLDER_DETAILS(id) });
+      // Também invalida a lista geral pois o saldo pode ter mudado
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SHAREHOLDERS });
+    });
+    return unsub;
+  }, [queryClient, id]);
+
+  return useQuery({
+    queryKey: QUERY_KEYS.SHAREHOLDER_DETAILS(id!),
+    queryFn: () => {
+        if (!id) return null;
+        return shareholderService.getById(id);
+    },
+    enabled: !!id,
+    staleTime: STALE_1_MIN,
+  });
+}
+
 // ─── Mutations ────────────────────────────────────────────────
 
 export function useAddShareholder() {
@@ -68,7 +92,13 @@ export function useShareholderTransaction() {
   return useMutation({
     mutationFn: (params: { shareholderId: string; transaction: any }) =>
       shareholderService.addTransaction(params.shareholderId, params.transaction),
-    onSuccess: () => { void qc.invalidateQueries({ queryKey: QUERY_KEYS.SHAREHOLDERS }); },
+    onSuccess: (_, variables) => { 
+        void qc.invalidateQueries({ queryKey: QUERY_KEYS.SHAREHOLDERS }); 
+        void qc.invalidateQueries({ queryKey: QUERY_KEYS.SHAREHOLDER_DETAILS(variables.shareholderId) });
+        void qc.invalidateQueries({ queryKey: QUERY_KEYS.SHAREHOLDER_TOTALS(variables.shareholderId) });
+        void qc.invalidateQueries({ queryKey: QUERY_KEYS.BANK_ACCOUNTS });
+        void qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_TRANSACTIONS });
+    },
   });
 }
 
@@ -77,7 +107,13 @@ export function useUpdateShareholderTransaction() {
   return useMutation({
     mutationFn: (params: { shareholderId: string; transaction: any }) =>
       shareholderService.updateTransaction(params.shareholderId, params.transaction),
-    onSuccess: () => { void qc.invalidateQueries({ queryKey: QUERY_KEYS.SHAREHOLDERS }); },
+    onSuccess: (_, variables) => { 
+        void qc.invalidateQueries({ queryKey: QUERY_KEYS.SHAREHOLDERS }); 
+        void qc.invalidateQueries({ queryKey: QUERY_KEYS.SHAREHOLDER_DETAILS(variables.shareholderId) });
+        void qc.invalidateQueries({ queryKey: QUERY_KEYS.SHAREHOLDER_TOTALS(variables.shareholderId) });
+        void qc.invalidateQueries({ queryKey: QUERY_KEYS.BANK_ACCOUNTS });
+        void qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_TRANSACTIONS });
+    },
   });
 }
 
@@ -86,7 +122,14 @@ export function useDeleteShareholderTransaction() {
   return useMutation({
     mutationFn: (params: { shareholderId: string; transactionId: string }) =>
       shareholderService.deleteTransaction(params.shareholderId, params.transactionId),
-    onSuccess: () => { void qc.invalidateQueries({ queryKey: QUERY_KEYS.SHAREHOLDERS }); },
+    onSuccess: (_, variables) => { 
+        void qc.invalidateQueries({ queryKey: QUERY_KEYS.SHAREHOLDERS }); 
+        void qc.invalidateQueries({ queryKey: QUERY_KEYS.SHAREHOLDER_DETAILS(variables.shareholderId) });
+        void qc.invalidateQueries({ queryKey: QUERY_KEYS.SHAREHOLDER_TOTALS(variables.shareholderId) });
+        // Invalida também o banco para refletir o estorno
+        void qc.invalidateQueries({ queryKey: QUERY_KEYS.BANK_ACCOUNTS });
+        void qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_TRANSACTIONS });
+    },
   });
 }
 
@@ -97,13 +140,13 @@ export function useShareholderTotals(shareholderId: string | null) {
   useEffect(() => {
     if (!shareholderId) return;
     const unsub = shareholderService.subscribeRealtime(() => {
-      queryClient.invalidateQueries({ queryKey: ['shareholder_totals', shareholderId] });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SHAREHOLDER_TOTALS(shareholderId) });
     });
     return unsub;
   }, [queryClient, shareholderId]);
 
   return useQuery({
-    queryKey: ['shareholder_totals', shareholderId],
+    queryKey: QUERY_KEYS.SHAREHOLDER_TOTALS(shareholderId!),
     queryFn: () => {
       if (!shareholderId) return { totalCredits: 0, totalDebits: 0, balance: 0 };
       return shareholderService.getShareholderTotals(shareholderId);

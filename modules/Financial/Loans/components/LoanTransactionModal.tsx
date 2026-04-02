@@ -65,8 +65,12 @@ const LoanTransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, loanTy
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+
       const val = parseCurrencyInput(value);
       if (!val || val <= 0) {
          addToast('warning', 'Valor inválido');
@@ -81,16 +85,23 @@ const LoanTransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, loanTy
 
     const account = bankAccounts.find(a => a.id === accountId);
 
-      onSave({
-         id: initialTx?.id,
-      date,
-      type,
-      value: val,
-      description: description || (isAdjustment ? 'Ajuste / Abatimento de Saldo' : (type === 'increase' ? 'Reforço de Capital' : 'Pagamento de Parcela')),
-      accountId: (isHistorical || isAdjustment) ? undefined : accountId,
-      accountName: (isHistorical || isAdjustment) ? undefined : account?.account_name,
-      isHistorical: isHistorical || isAdjustment // Ajustes funcionam como históricos (não geram caixa)
-    });
+    setIsSubmitting(true);
+    try {
+      await onSave({
+        id: initialTx?.id,
+        date,
+        type,
+        value: val,
+        description: description || (isAdjustment ? 'Ajuste / Abatimento de Saldo' : (type === 'increase' ? 'Reforço de Capital' : 'Pagamento de Parcela')),
+        accountId: (isHistorical || isAdjustment) ? undefined : accountId,
+        accountName: (isHistorical || isAdjustment) ? undefined : account?.account_name,
+        isHistorical: isHistorical || isAdjustment // Ajustes funcionam como históricos (não geram caixa)
+      });
+    } catch (error) {
+       addToast('error', 'Erro ao salvar', 'Ocorreu um erro ao processar o lançamento.');
+    } finally {
+       setIsSubmitting(false);
+    }
   };
 
   const inputClass = 'w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold text-slate-900 bg-white placeholder:text-slate-300 focus:border-slate-800 outline-none transition-all text-sm';
@@ -186,8 +197,21 @@ const LoanTransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, loanTy
             )}
 
             <div className="flex justify-end gap-3 pt-4">
-              <button type="button" onClick={onClose} className="px-6 py-3 border-2 border-slate-200 rounded-xl text-slate-400 font-black uppercase text-xs">Cancelar</button>
-              <button type="submit" className={`px-8 py-3 rounded-xl text-white font-black uppercase text-xs shadow-lg transition-all active:scale-95 ${isAdjustment ? 'bg-amber-600' : 'bg-slate-900'}`}>Confirmar Lançamento</button>
+              <button 
+                type="button" 
+                onClick={onClose} 
+                disabled={isSubmitting}
+                className="px-6 py-3 border-2 border-slate-200 rounded-xl text-slate-400 font-black uppercase text-xs disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button 
+                type="submit" 
+                disabled={isSubmitting}
+                className={`px-8 py-3 rounded-xl text-white font-black uppercase text-xs shadow-lg transition-all active:scale-95 disabled:opacity-50 ${isAdjustment ? 'bg-amber-600' : 'bg-slate-900'}`}
+              >
+                {isSubmitting ? 'Salvando...' : 'Confirmar Lançamento'}
+              </button>
             </div>
           </form>
         </div>

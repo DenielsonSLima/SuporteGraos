@@ -1,18 +1,9 @@
-
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Calendar } from 'lucide-react';
 import { ReportModule } from '../../types';
 import UniversalReportTemplate from '../../templates/UniversalReportTemplate';
-import { getFreightCarrierOptions, fetchMonthlyFreightHistoryData } from './data';
-
+import { supabase } from '../../../../services/supabase';
 import DefaultFilters from '../../components/DefaultFilters';
-
-// TODO: Migrar para campo balance pré-computado no SQL de fetchMonthlyFreightHistory\nconst getOpenBalance = (total: number, paid: number) => Math.max(0, total - paid);
-
-const MonthlyFreightHistoryFilters: React.FC<any> = (props) => {
-  const carriers = getFreightCarrierOptions();
-  return <DefaultFilters {...props} carrierOptions={carriers} />;
-};
 
 const monthlyFreightHistoryReport: ReportModule = {
   metadata: {
@@ -27,45 +18,35 @@ const monthlyFreightHistoryReport: ReportModule = {
     startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
     endDate: new Date().toISOString().split('T')[0],
   },
-  FilterComponent: MonthlyFreightHistoryFilters,
+  FilterComponent: DefaultFilters,
   fetchData: async ({ startDate, endDate, carrierName }) => {
-    const records = await fetchMonthlyFreightHistoryData({
-      startDate,
-      endDate,
-      carrierName
+    const { data, error } = await supabase.rpc('rpc_get_freight_history_report', {
+      p_start_date: startDate,
+      p_end_date: endDate,
+      p_carrier_name: carrierName || null
     });
 
-    // Agregação em memória (agora segura pois só temos os dados filtrados)
-    const totalTon = records.reduce((acc, l) => acc + ((l.weightKg || 0) / 1000), 0);
-    const totalValue = records.reduce((acc, l) => acc + (l.totalFreightValue || 0), 0);
+    if (error) throw error;
+
+    const result = data as { rows: any[], summary: any[] };
 
     return {
       title: 'Histórico de Fretes do Mês',
       subtitle: `Movimentação consolidada de ${startDate} a ${endDate}` + (carrierName ? ` • Transportadora: ${carrierName}` : ''),
       columns: [
         { header: 'Data', accessor: 'date', format: 'date' },
-        { header: 'Transportadora', accessor: 'carrierName' },
-        { header: 'Motorista', accessor: 'driverName', align: 'left' },
-        { header: 'Peso (ton)', accessor: 'weightTon', format: 'number', align: 'right' },
-        { header: 'Obs. Peso', accessor: 'weightType', align: 'center' },
-        { header: 'Quebra', accessor: 'breakageKg', format: 'number', align: 'right' },
-        { header: 'Valor/ton', accessor: 'freightPricePerTon', format: 'currency', align: 'right' },
-        { header: 'V. Frete Total', accessor: 'totalFreightValue', format: 'currency', align: 'right' },
-        { header: 'Pago', accessor: 'freightPaid', format: 'currency', align: 'right' },
+        { header: 'Transportadora', accessor: 'carrier_name' },
+        { header: 'Motorista', accessor: 'driver_name', align: 'left' },
+        { header: 'Placa', accessor: 'vehicle_plate', align: 'center' },
+        { header: 'Peso (ton)', accessor: 'weight_ton', format: 'number', align: 'right' },
+        { header: 'Obs. Peso', accessor: 'weight_type', align: 'center' },
+        { header: 'Quebra', accessor: 'breakage_kg', format: 'number', align: 'right' },
+        { header: 'V. Frete Total', accessor: 'total_freight_value', format: 'currency', align: 'right' },
+        { header: 'Pago', accessor: 'freight_paid', format: 'currency', align: 'right' },
         { header: 'Em Aberto', accessor: 'balance', format: 'currency', align: 'right' }
       ],
-      rows: records.map(l => ({
-        ...l,
-        balance: getOpenBalance(l.totalFreightValue || 0, l.freightPaid || 0),
-        driverName: l.driverName || '-',
-        weightType: l.unloadWeightKg ? 'Destino' : 'Origem',
-        breakageKg: l.breakageKg || 0,
-        weightTon: l.unloadWeightKg ? (l.unloadWeightKg / 1000) : l.weightTon || (l.weightKg / 1000) || 0
-      })),
-      summary: [
-        { label: 'Volume Total (Toneladas)', value: totalTon, format: 'number' },
-        { label: 'Custo Logístico Total', value: totalValue, format: 'currency' }
-      ]
+      rows: result.rows,
+      summary: result.summary
     };
   },
   Template: UniversalReportTemplate

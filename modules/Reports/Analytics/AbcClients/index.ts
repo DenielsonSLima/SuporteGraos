@@ -1,7 +1,7 @@
 
 import { BarChart3 } from 'lucide-react';
 import { ReportModule } from '../../types';
-import { reportsCache } from '../../../../services/reportsCache';
+import { supabase } from '../../../../services/supabase';
 import UniversalReportTemplate from '../../templates/UniversalReportTemplate';
 import DefaultFilters from '../../components/DefaultFilters';
 
@@ -19,40 +19,25 @@ const abcClientsReport: ReportModule = {
     endDate: new Date().toISOString().split('T')[0],
   },
   FilterComponent: DefaultFilters,
-  fetchData: ({ startDate, endDate }) => {
-    const sales = reportsCache.getAllSales().filter(s => s.status !== 'canceled');
-    const filteredSales = sales.filter(s => (!startDate || s.date >= startDate) && (!endDate || s.date <= endDate));
-
-    const map: Record<string, number> = {};
-    filteredSales.forEach(s => {
-      map[s.customerName] = (map[s.customerName] || 0) + s.totalValue;
+  fetchData: async ({ startDate, endDate }) => {
+    const { data, error } = await supabase.rpc('rpc_get_abc_report', {
+      p_group_by: 'customer',
+      p_start_date: startDate,
+      p_end_date: endDate
     });
 
-    const sorted = Object.entries(map)
-      .map(([name, total]) => ({ name, total }))
-      .sort((a, b) => b.total - a.total);
+    if (error) throw error;
 
-    const grandTotal = sorted.reduce((acc, curr) => acc + curr.total, 0);
-    let cumulative = 0;
+    const rows = (data || []).map((item: any) => ({
+      rank: item.rank,
+      name: item.name,
+      total: item.total,
+      percent: item.percent.toFixed(2) + '%',
+      cumulative: item.cumulative.toFixed(2) + '%',
+      class: item.class
+    }));
 
-    const rows = sorted.map((item, index) => {
-      cumulative += item.total;
-      const percent = grandTotal > 0 ? (item.total / grandTotal) * 100 : 0;
-      const cumulativePercent = grandTotal > 0 ? (cumulative / grandTotal) * 100 : 0;
-      
-      let classification = 'C';
-      if (cumulativePercent <= 80) classification = 'A';
-      else if (cumulativePercent <= 95) classification = 'B';
-
-      return {
-        rank: index + 1,
-        name: item.name,
-        total: item.total,
-        percent: percent.toFixed(2) + '%',
-        cumulative: cumulativePercent.toFixed(2) + '%',
-        class: classification
-      };
-    });
+    const grandTotal = rows.reduce((acc, curr) => acc + curr.total, 0);
 
     return {
       title: 'Relatório Curva ABC de Clientes',

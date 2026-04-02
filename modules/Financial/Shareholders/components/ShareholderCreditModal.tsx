@@ -59,8 +59,12 @@ const ShareholderCreditModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, s
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+
     const finalId = shareholderName 
       ? shareholders.find(s => s.name === shareholderName)?.id 
       : selectedShareholderId;
@@ -71,12 +75,24 @@ const ShareholderCreditModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, s
     if (payImmediately && !accountId) return addToast('warning', 'Conta Obrigatória');
 
     const account = bankAccounts.find(a => a.id === accountId);
-    onConfirm({
-      shareholderId: finalId, date, value: val, description, payImmediately,
-      accountId: payImmediately ? accountId : undefined,
-      accountName: payImmediately ? (account?.account_name || 'Conta') : undefined
-    });
-    onClose();
+    
+    setIsSubmitting(true);
+    try {
+      await onConfirm({
+        shareholderId: finalId, 
+        date, 
+        value: val, 
+        description, 
+        payImmediately,
+        accountId: payImmediately ? accountId : undefined,
+        accountName: payImmediately ? (account?.account_name || 'Conta') : undefined
+      });
+      onClose();
+    } catch (error) {
+       addToast('error', 'Erro ao salvar', 'Ocorreu um erro ao processar o crédito do sócio.');
+    } finally {
+       setIsSubmitting(false);
+    }
   };
 
   const inputClass = 'w-full pl-10 pr-4 py-3 border-2 border-slate-200 rounded-2xl bg-white text-slate-900 font-black focus:border-indigo-500 focus:ring-0 outline-none transition-all placeholder:text-slate-300 text-sm';
@@ -114,9 +130,20 @@ const ShareholderCreditModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, s
             </div>
           )}
           <div className="pt-4 flex justify-end gap-3 border-t border-slate-100">
-            <button type="button" onClick={onClose} className="px-8 py-3.5 border-2 border-slate-200 rounded-2xl text-slate-500 font-black uppercase text-xs">Cancelar</button>
-            <button type="submit" className="px-10 py-3.5 rounded-2xl bg-indigo-600 text-white font-black text-xs uppercase tracking-widest shadow-xl flex items-center gap-2">
-              <Save size={18} /> {payImmediately ? 'Confirmar e Pagar' : 'Confirmar Lançamento'}
+            <button 
+              type="button" 
+              onClick={onClose} 
+              disabled={isSubmitting}
+              className="px-8 py-3.5 border-2 border-slate-200 rounded-2xl text-slate-500 font-black uppercase text-xs disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+            <button 
+              type="submit" 
+              disabled={isSubmitting}
+              className="px-10 py-3.5 rounded-2xl bg-indigo-600 text-white font-black text-xs uppercase tracking-widest shadow-xl flex items-center gap-2 disabled:opacity-50"
+            >
+              <Save size={18} /> {isSubmitting ? 'Salvando...' : (payImmediately ? 'Confirmar e Pagar' : 'Confirmar Lançamento')}
             </button>
           </div>
         </form>

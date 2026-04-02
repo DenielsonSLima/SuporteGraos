@@ -183,13 +183,15 @@ export const financialActionService = {
     await standaloneRecordsService.add(record);
   },
   deleteStandaloneRecord: async (id: string) => {
+    const isValidUUID = (val: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+
     if (standaloneRecordsService.getById(id)) {
       await standaloneRecordsService.delete(id);
     } else if (creditService.getCredits().find((c: any) => c.id === id)) {
       await creditService.remove(id);
-    } else if (shareholderService.getById(id)) {
+    } else if (isValidUUID(id) && await shareholderService.getById(id)) {
       await shareholderService.delete(id);
-    } else if (receiptService.getById(id)) {
+    } else if (isValidUUID(id) && receiptService.getById(id)) {
       await receiptService.delete(id);
     }
   },

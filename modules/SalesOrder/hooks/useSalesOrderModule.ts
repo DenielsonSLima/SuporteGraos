@@ -16,7 +16,7 @@ import { loadingService } from '../../../services/loadingService';
 import { SalesOrder } from '../types';
 
 export function useSalesOrderModule() {
-  const { data: sales = [] } = useSalesOrders();
+  const { data: sales = [], isLoading, isFetching } = useSalesOrders();
   const { data: shareholdersRaw = [] } = useShareholders();
 
   // Mapeia sócios para formato leve (id + name)
@@ -55,6 +55,8 @@ export function useSalesOrderModule() {
   return {
     sales,
     shareholders,
+    isLoading,
+    isFetching,
     getOrderById,
     getLinkedLoadings,
     saveOrder,

@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { X, Wallet, Calendar, ArrowUpRight, ArrowDownLeft, Trash2, Edit2, AlertCircle, Plus } from 'lucide-react';
-import { FinancialRecord, FinancialTransaction } from '../../../types';
-import { financialTransactionService } from '../../../../../services/financial/financialTransactionService';
-import { useAccounts } from '../../../../../hooks/useAccounts';
-import { useToast } from '../../../../../contexts/ToastContext';
-import ActionConfirmationModal from '../../../../../components/ui/ActionConfirmationModal';
+import { FinancialRecord, FinancialTransaction } from '../../types';
+import { financialTransactionService } from '../../../../services/financial/financialTransactionService';
+import { useAccounts } from '../../../../hooks/useAccounts';
+import { useToast } from '../../../../contexts/ToastContext';
+import ActionConfirmationModal from '../../../../components/ui/ActionConfirmationModal';
 
 interface Props {
     isOpen: boolean;
@@ -14,7 +14,7 @@ interface Props {
     onRefresh: () => void;
 }
 
-import ModalPortal from '../../../../../components/ui/ModalPortal';
+import ModalPortal from '../../../../components/ui/ModalPortal';
 
 const QuickPaymentViewModal: React.FC<Props> = ({ isOpen, onClose, record, onAddPayment, onRefresh }) => {
     const [history, setHistory] = useState<any[]>([]);
@@ -27,8 +27,12 @@ const QuickPaymentViewModal: React.FC<Props> = ({ isOpen, onClose, record, onAdd
         setLoading(true);
         try {
             // Usando o service robusto que busca via financial_links
-            const subType = record.subType === 'purchase_order' ? 'purchase_order' :
-                (record.subType === 'freight' ? 'loading' : 'standalone');
+            const subType = 
+                record.subType === 'purchase_order' ? 'purchase_order' :
+                record.subType === 'sales_order' ? 'sales_order' :
+                record.subType === 'freight' ? 'loading' : 
+                record.subType === 'commission' ? 'commission' :
+                'standalone';
 
             const links = await financialTransactionService.getLinksByEntity(record.originId || record.id, subType as any);
             setHistory(links || []);
@@ -50,15 +54,20 @@ const QuickPaymentViewModal: React.FC<Props> = ({ isOpen, onClose, record, onAdd
     const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
     const formatDate = (date: string) => new Date(date).toLocaleDateString('pt-BR');
 
+    const isReceivable = record.category === 'Vendas' || record.subType === 'sales_order' || record.subType === 'receipt';
+    const actionLabel = isReceivable ? 'Recebimento' : 'Pagamento';
+    const accentColor = isReceivable ? 'emerald' : 'rose';
+    const primaryColor = isReceivable ? 'emerald' : 'indigo';
+
     const handleDelete = async () => {
         if (!pendingDeleteId) return;
         try {
             await financialTransactionService.delete(pendingDeleteId);
-            addToast('success', 'Estorno realizado com sucesso!');
+            addToast('success', `${actionLabel} estornado com sucesso!`);
             fetchHistory();
             onRefresh();
         } catch (error) {
-            addToast('error', 'Erro ao realizar estorno');
+            addToast('error', `Erro ao realizar estorno de ${actionLabel.toLowerCase()}`);
         } finally {
             setPendingDeleteId(null);
         }
@@ -88,12 +97,12 @@ const QuickPaymentViewModal: React.FC<Props> = ({ isOpen, onClose, record, onAdd
                                 <span className="text-lg font-black text-slate-900 italic tracking-tighter">{currency(record.originalValue)}</span>
                             </div>
                             <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100">
-                                <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest block mb-1">Total Pago</span>
+                                <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest block mb-1">Total {isReceivable ? 'Recebido' : 'Pago'}</span>
                                 <span className="text-lg font-black text-emerald-700 italic tracking-tighter">{currency(record.paidValue + (record.discountValue || 0))}</span>
                             </div>
-                            <div className="bg-rose-50 p-4 rounded-2xl border border-rose-100">
-                                <span className="text-[9px] font-black text-rose-600 uppercase tracking-widest block mb-1">Saldo Aberto</span>
-                                <span className="text-lg font-black text-rose-700 italic tracking-tighter">{currency(record.remainingValue || 0)}</span>
+                            <div className={`p-4 rounded-2xl border ${accentColor === 'rose' ? 'bg-rose-50 border-rose-100' : 'bg-emerald-50 border-emerald-100'}`}>
+                                <span className={`text-[9px] font-black uppercase tracking-widest block mb-1 ${accentColor === 'rose' ? 'text-rose-600' : 'text-emerald-600'}`}>Saldo Aberto</span>
+                                <span className={`text-lg font-black italic tracking-tighter ${accentColor === 'rose' ? 'text-rose-700' : 'text-emerald-700'}`}>{currency(record.remainingValue || 0)}</span>
                             </div>
                         </div>
 
@@ -101,15 +110,15 @@ const QuickPaymentViewModal: React.FC<Props> = ({ isOpen, onClose, record, onAdd
                         <div className="mb-6">
                             <div className="flex items-center justify-between mb-4">
                                 <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-[0.2em] flex items-center gap-2">
-                                    <Wallet size={14} className="text-indigo-500" />
+                                    <Wallet size={14} className={`text-${primaryColor}-500`} />
                                     Histórico de Movimentações
                                 </h4>
                                 <button
                                     onClick={onAddPayment}
                                     disabled={record.status === 'paid'}
-                                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 text-white text-[10px] font-black uppercase hover:bg-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-600/20"
+                                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-white text-[10px] font-black uppercase transition-all shadow-lg ${primaryColor === 'emerald' ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/20'}`}
                                 >
-                                    <Plus size={14} /> Novo Pagamento
+                                    <Plus size={14} /> Novo {actionLabel}
                                 </button>
                             </div>
 
@@ -178,8 +187,8 @@ const QuickPaymentViewModal: React.FC<Props> = ({ isOpen, onClose, record, onAdd
                     isOpen={!!pendingDeleteId}
                     onClose={() => setPendingDeleteId(null)}
                     onConfirm={handleDelete}
-                    title="Estornar Lançamento?"
-                    description="Esta ação criará um lançamento reverso no financeiro para anular este valor. O saldo voltará a constar como aberto."
+                    title={`Estornar ${actionLabel}?`}
+                    description={`Esta ação criará um lançamento reverso no financeiro para anular este valor. O saldo voltará a constar como aberto.`}
                     type="danger"
                 />
             </div>

@@ -22,9 +22,9 @@ const partnerReceivablesReport: ReportModule = {
     partnerName: ''
   },
   FilterComponent: Filters,
-  fetchData: ({ startDate, endDate, partnerName }) => {
+  fetchData: async ({ startDate, endDate, partnerName }) => {
     // 1. Get Receivables from Integration (Sales)
-    const receivables = financialIntegrationService.getReceivables()
+    const receivables = (await financialIntegrationService.getReceivables())
       .filter(r => r.status !== 'paid' && r.subType === 'sales_order');
 
     // 2. Get Advances GIVEN (Assets)

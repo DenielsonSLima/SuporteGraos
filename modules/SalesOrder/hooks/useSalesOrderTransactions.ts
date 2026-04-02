@@ -59,10 +59,13 @@ export function useSalesOrderTransactions(salesOrderId: string) {
 
             const entryId = entries[0].id;
 
-            // Busca as transações dessa entry
+            // Busca as transações dessa entry com o nome da conta (JOIN)
             const { data: txs } = await supabase
                 .from('financial_transactions')
-                .select('*')
+                .select(`
+                    *,
+                    account:accounts(account_name, owner)
+                `)
                 .eq('entry_id', entryId)
                 .order('transaction_date', { ascending: false });
 
@@ -75,7 +78,8 @@ export function useSalesOrderTransactions(salesOrderId: string) {
                 date: tx.transaction_date,
                 type: tx.type === 'IN' || tx.type === 'receipt' || tx.type === 'credit' ? 'receipt' : 'payment',
                 notes: tx.description,
-                accountId: tx.account_id || tx.bank_account_id
+                accountId: tx.account_id || tx.bank_account_id,
+                accountName: tx.account ? `${tx.account.account_name}${tx.account.owner ? ` - ${tx.account.owner}` : ''}` : null
             }));
         },
         enabled: !!salesOrderId,

@@ -18,13 +18,17 @@ const LogisticsModule: React.FC = () => {
   // useFreights: cálculos (balance, financial_status, breakage) vêm da VIEW do banco
   const { data: freights = [], isLoading: freightsLoading } = useFreights();
   // useLoadings: necessário apenas para findLoadingById (LoadingManagement requer Loading completo)
-  const { data: rawLoadings = [] } = useLoadings();
+  const { data: rawLoadings = [] } = useLoadings() as { data: Loading[] };
   const { data: carriers = [], isLoading: carriersLoading } = useCarriers();
   const [activeTab, setActiveTab] = useState<'open' | 'all' | 'financial'>('open');
   const [searchTerm, setSearchTerm] = useState('');
   const [carrierFilter, setCarrierFilter] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [startDate, setStartDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return d.toISOString().split('T')[0];
+  });
+  const [endDate, setEndDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [selectedLoading, setSelectedLoading] = useState<Loading | null>(null);
 
   const selectedLoadingRef = React.useRef<Loading | null>(null);
@@ -33,7 +37,7 @@ const LogisticsModule: React.FC = () => {
   useEffect(() => {
     const handleGlobalNav = (e: any) => {
         if (e.detail?.moduleId === 'logistics' && e.detail?.loadingId) {
-          const l = rawLoadings.find((x: any) => x.id === e.detail.loadingId);
+          const l = rawLoadings.find((x: Loading) => x.id === e.detail.loadingId);
             if (l) setSelectedLoading(l);
         }
     };
@@ -68,10 +72,32 @@ const LogisticsModule: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex h-96 items-center justify-center">
-        <div className="text-center">
-          <Loader2 size={40} className="animate-spin text-primary-600 mx-auto mb-4" />
-          <p className="text-slate-500 font-medium">Carregando logística...</p>
+      <div className="space-y-6 animate-pulse">
+        {/* KPI Skeletons */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="bg-slate-100 h-24 rounded-2xl border border-slate-200" />
+          ))}
+        </div>
+
+        {/* Search/Filter Skeleton */}
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm h-32" />
+
+        {/* Tab Skeleton */}
+        <div className="flex space-x-8 border-b border-slate-200">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="h-10 w-24 bg-slate-100 rounded-t-lg" />
+          ))}
+        </div>
+
+        {/* Table Skeleton */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-6">
+          <div className="space-y-4">
+            <div className="h-10 bg-slate-900 rounded-lg w-full mb-6" />
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="h-8 bg-slate-50 rounded w-full" />
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -89,7 +115,7 @@ const LogisticsModule: React.FC = () => {
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Buscar por placa, motorista ou pedido..." className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 py-3 pl-10 pr-4 text-sm font-bold focus:bg-white transition-all outline-none" />
             </div>
-            { (searchTerm || carrierFilter || startDate || endDate) && <button onClick={() => { setSearchTerm(''); setCarrierFilter(''); setStartDate(''); setEndDate(''); }} className="text-xs font-black text-rose-600 uppercase bg-rose-50 px-4 py-2 rounded-xl">Limpar Filtros</button> }
+            { (searchTerm || carrierFilter || startDate || endDate) && <button onClick={() => { setSearchTerm(''); setCarrierFilter(''); setStartDate(''); setEndDate(''); }} className="text-xs font-black text-rose-600 uppercase bg-rose-50 px-4 py-2 rounded-xl border border-rose-100 hover:bg-rose-100 transition-colors">Limpar Filtros</button> }
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 pt-4 border-t border-slate-50">

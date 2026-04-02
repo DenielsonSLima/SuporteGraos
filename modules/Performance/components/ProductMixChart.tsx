@@ -42,9 +42,12 @@ const ProductMixChart: React.FC<Props> = ({ data }) => {
             />
             <Legend
               verticalAlign="bottom"
-              height={36}
+              align="center"
+              iconType="circle"
+              iconSize={8}
+              wrapperStyle={{ paddingTop: '25px', paddingBottom: '10px' }}
               formatter={(value, entry: any) => (
-                <span className="text-slate-600 font-medium ml-1">
+                <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest ml-1">
                   {value} ({Math.round(entry.payload.percentage)}%)
                 </span>
               )}

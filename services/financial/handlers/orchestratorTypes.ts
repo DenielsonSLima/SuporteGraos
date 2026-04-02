@@ -13,6 +13,10 @@ export interface PaymentData {
   notes?: string;
   entityName?: string;
   partnerId?: string;
+  category?: string;
+  subType?: string;
+  isExtraExpense?: boolean;
+  deductFromPartner?: boolean;
   // Asset fields
   isAsset?: boolean;
   assetName?: string;
@@ -26,7 +30,7 @@ export interface PaymentResult {
 
 export interface CleanupParams {
   entityId: string;
-  entityType: 'loading' | 'purchase_order' | 'sales_order' | 'commission' | 'standalone';
+  entityType: 'loading' | 'purchase_order' | 'sales_order' | 'commission' | 'standalone' | 'shareholder_tx';
   payableIds?: string[];
   receivableIds?: string[];
 }
@@ -49,4 +53,5 @@ export interface RegisterFinancialParams {
   partnerId?: string;
   notes?: string;
   companyId?: string;
+  shareholderTxId?: string;
 }

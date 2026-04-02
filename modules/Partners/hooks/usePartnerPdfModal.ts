@@ -18,18 +18,27 @@ export function usePartnerPdfModal({ isOpen, partner }: UsePartnerPdfModalParams
   const [data, setData] = useState<any>(null);
 
   useEffect(() => {
-    if (isOpen && partner) {
-      const purchases = purchaseService.getAll().filter(p => p.partnerId === partner.id);
-      const sales = salesService.getAll().filter(s => s.customerId === partner.id);
-      const loadings = loadingService.getAll().filter(l =>
-        l.carrierId === partner.id || l.supplierName === partner.name || l.customerName === partner.name
-      );
-      const payables = financialIntegrationService.getPayables().filter(r => r.entityName === partner.name);
-      const receivables = financialIntegrationService.getReceivables().filter(r => r.entityName === partner.name);
-      const advances = advanceService.getTransactionsByPartner(partner.id);
+    const fetchData = async () => {
+      if (isOpen && partner) {
+        const purchases = purchaseService.getAll().filter(p => p.partnerId === partner.id);
+        const sales = salesService.getAll().filter(s => s.customerId === partner.id);
+        const loadings = loadingService.getAll().filter(l =>
+          l.carrierId === partner.id || l.supplierName === partner.name || l.customerName === partner.name
+        );
+        const [payables, receivables] = await Promise.all([
+          financialIntegrationService.getPayables(),
+          financialIntegrationService.getReceivables()
+        ]);
 
-      setData({ partner, purchases, sales, loadings, payables, receivables, advances });
-    }
+        const partnerPayables = payables.filter(r => r.entityName === partner.name);
+        const partnerReceivables = receivables.filter(r => r.entityName === partner.name);
+        const advances = advanceService.getTransactionsByPartner(partner.id);
+
+        setData({ partner, purchases, sales, loadings, payables: partnerPayables, receivables: partnerReceivables, advances });
+      }
+    };
+
+    fetchData();
   }, [isOpen, partner]);
 
   const handleDownload = async () => {

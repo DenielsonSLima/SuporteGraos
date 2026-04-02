@@ -62,10 +62,10 @@ export const authService = {
       const firstName = metadata.first_name || authData.user.email?.split('@')[0] || 'Usuario';
       const lastName = metadata.last_name || '';
 
-      // 2. Buscar dados adicionais na tabela app_users (incluindo company_id)
+      // 2. Buscar dados adicionais na tabela app_users (incluindo id real da tabela e company_id)
       const { data: userData, error: userError } = await supabase
         .from('app_users')
-        .select('company_id, role, active, first_name, last_name')
+        .select('id, company_id, role, active, first_name, last_name')
         .eq('auth_user_id', authData.user.id)
         .single();
 
@@ -93,6 +93,7 @@ export const authService = {
 
       const userSession: User = {
         id: authData.user.id,
+        appUserId: userData?.id, // ID real da tabela app_users
         name: userData ? `${userData.first_name} ${userData.last_name}`.trim() : `${firstName} ${lastName}`.trim(),
         email: authData.user.email || email,
         role: roleValue,
@@ -249,7 +250,7 @@ export const authService = {
       // Buscar do app_users para garantir dados atualizados e company_id
       const { data: userData } = await supabase
         .from('app_users')
-        .select('company_id, role, active, first_name, last_name')
+        .select('id, company_id, role, active, first_name, last_name')
         .eq('auth_user_id', session.user.id)
         .single();
 
@@ -275,6 +276,7 @@ export const authService = {
 
       const userSession: User = {
         id: session.user.id,
+        appUserId: userData?.id,
         name: userData ? `${userData.first_name} ${userData.last_name}`.trim() : `${firstName} ${lastName}`.trim(),
         email: session.user.email || '',
         role: roleValue,

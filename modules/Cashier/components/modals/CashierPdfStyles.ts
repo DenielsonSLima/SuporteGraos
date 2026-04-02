@@ -2,7 +2,7 @@ import { StyleSheet } from '@react-pdf/renderer';
 
 export const styles = StyleSheet.create({
   page: {
-    padding: 30,
+    padding: 25,
     fontFamily: 'Helvetica',
     fontSize: 8,
     color: '#0f172a',
@@ -335,7 +335,7 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 'auto',
+    marginTop: 15,
     marginBottom: 20,
   },
   finalLeft: {
@@ -371,9 +371,9 @@ export const styles = StyleSheet.create({
   // FOOTER
   footer: {
     position: 'absolute',
-    bottom: 20,
-    left: 30,
-    right: 30,
+    bottom: 15,
+    left: 25,
+    right: 25,
     borderTop: 1,
     borderTopColor: '#e2e8f0',
     paddingTop: 8,

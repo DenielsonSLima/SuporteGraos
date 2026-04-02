@@ -104,7 +104,9 @@ export const handleStandalonePayment = async (
 
     } else {
     }
-  } catch (err) {
+  } catch (err: any) {
+    console.error('[standaloneHandler] Erro no registro avulso:', err);
+    throw err;
   }
 
   return { success: true, txId };

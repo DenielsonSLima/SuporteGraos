@@ -1,8 +1,7 @@
 
 import { Map } from 'lucide-react';
 import { ReportModule } from '../../types';
-import { financialIntegrationService } from '../../../../services/financialIntegrationService';
-import { partnerService } from '../../../../services/partnerService';
+import { supabase } from '../../../../services/supabase';
 import UniversalReportTemplate from '../../templates/UniversalReportTemplate';
 import DefaultFilters from '../../components/DefaultFilters';
 
@@ -20,52 +19,25 @@ const abcStatesReport: ReportModule = {
     endDate: new Date().toISOString().split('T')[0],
   },
   FilterComponent: DefaultFilters,
-  fetchData: ({ startDate, endDate }) => {
-    const receivables = financialIntegrationService
-      .getReceivables()
-      .filter((r) => r.subType === 'sales_order')
-      .filter((r) => {
-        const referenceDate = r.issueDate || r.dueDate;
-        return (!startDate || referenceDate >= startDate) && (!endDate || referenceDate <= endDate);
-      });
-
-    const partners = partnerService.getAll();
-    const stateByCustomer: Record<string, string> = {};
-    partners.forEach((partner) => {
-      stateByCustomer[partner.name] = partner.address?.stateUf || 'N/D';
+  fetchData: async ({ startDate, endDate }) => {
+    const { data, error } = await supabase.rpc('rpc_get_abc_report', {
+      p_group_by: 'state',
+      p_start_date: startDate,
+      p_end_date: endDate
     });
 
-    const map: Record<string, number> = {};
-    receivables.forEach((record) => {
-      const uf = stateByCustomer[record.entityName] || 'N/D';
-      map[uf] = (map[uf] || 0) + record.originalValue;
-    });
+    if (error) throw error;
 
-    const sorted = Object.entries(map)
-      .map(([uf, total]) => ({ uf, total }))
-      .sort((a, b) => b.total - a.total);
+    const rows = (data || []).map((item: any) => ({
+      rank: item.rank,
+      uf: item.name,
+      total: item.total,
+      percent: item.percent.toFixed(2) + '%',
+      cumulative: item.cumulative.toFixed(2) + '%',
+      class: item.class
+    }));
 
-    const grandTotal = sorted.reduce((acc, curr) => acc + curr.total, 0);
-    let cumulative = 0;
-
-    const rows = sorted.map((item, index) => {
-      cumulative += item.total;
-      const percent = grandTotal > 0 ? (item.total / grandTotal) * 100 : 0;
-      const cumulativePercent = grandTotal > 0 ? (cumulative / grandTotal) * 100 : 0;
-      
-      let classification = 'C';
-      if (cumulativePercent <= 80) classification = 'A';
-      else if (cumulativePercent <= 95) classification = 'B';
-
-      return {
-        rank: index + 1,
-        uf: item.uf,
-        total: item.total,
-        percent: percent.toFixed(2) + '%',
-        cumulative: cumulativePercent.toFixed(2) + '%',
-        class: classification
-      };
-    });
+    const grandTotal = rows.reduce((acc, curr) => acc + curr.total, 0);
 
     return {
       title: 'Curva ABC Geográfica (Destino)',

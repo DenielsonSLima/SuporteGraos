@@ -11,17 +11,27 @@ interface Props {
  * This is essential for modals to break out of parent stacking contexts (like z-index, opacity, or transform)
  * and cover the entire screen correctly, including application headers and sidebars.
  */
+let activeModalsCounter = 0;
+
 const ModalPortal: React.FC<Props> = ({ children }) => {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-    // Prevent scrolling on body when modal is open
-    const originalStyle = window.getComputedStyle(document.body).overflow;
-    document.body.style.overflow = 'hidden';
+    
+    // Increment counter and lock scroll only on the first modal
+    activeModalsCounter++;
+    if (activeModalsCounter === 1) {
+      document.body.style.overflow = 'hidden';
+    }
     
     return () => {
-      document.body.style.overflow = originalStyle;
+      // Decrement and unlock scroll only when no modals are left
+      activeModalsCounter--;
+      if (activeModalsCounter <= 0) {
+        activeModalsCounter = 0;
+        document.body.style.overflow = '';
+      }
     };
   }, []);
 

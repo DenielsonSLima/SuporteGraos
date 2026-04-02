@@ -20,13 +20,13 @@ const partnerBalanceReport: ReportModule = {
     partnerName: ''
   },
   FilterComponent: Filters,
-  fetchData: ({ partnerName }) => {
+  fetchData: async ({ partnerName }) => {
     // 1. Payables (Debits)
-    const payables = financialIntegrationService.getPayables()
+    const payables = (await financialIntegrationService.getPayables())
       .filter(r => r.status !== 'paid' && ['purchase_order', 'freight', 'commission'].includes(r.subType || ''));
     
     // 2. Receivables (Credits)
-    const receivables = financialIntegrationService.getReceivables()
+    const receivables = (await financialIntegrationService.getReceivables())
       .filter(r => r.status !== 'paid' && r.subType === 'sales_order');
 
     // 3. Advances

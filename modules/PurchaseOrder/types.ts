@@ -66,15 +66,25 @@ export interface PurchaseOrder {
   brokerName?: string;
   brokerCommissionPerSc?: number; 
   deductBrokerCommission?: boolean; 
+  brokerPaidValue?: number; // Valor de comissão já pago
+  brokerBalanceValue?: number; // Saldo de comissão a pagar
 
   // Financials
   items: OrderItem[];
   transactions: OrderTransaction[]; 
   totalValue: number;
   paidValue: number;
+  balanceValue: number; // Saldo pendente (Backend-driven)
   discountValue?: number; // Total acumulado de descontos
   transportValue: number;
   
+  // KPI Fields (Backend-driven from enriched view)
+  totalPurchaseValCalc?: number;
+  totalFreightValCalc?: number;
+  totalSalesValCalc?: number;
+  totalKg?: number;
+  totalSc?: number;
+
   // Notes System
   notes?: string; 
   notesList?: OrderNote[]; 

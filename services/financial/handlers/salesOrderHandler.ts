@@ -40,26 +40,23 @@ export const handleSalesOrderReceipt = async (
   }
 
   if (canonicalOpsEnabled) {
-    // RESOLUÇÃO OTIMIZADA: Busca entry e info do parceiro em paralelo ou no mesmo query via VIEW
-    // Tentamos encontrar a entry pelo ID direto (UUID) ou pelo origin_id
-    const { data: entries } = await supabase
-      .from('financial_entries')
-      .select(`
-        id, 
-        origin_id, 
-        partner_id,
-        vw_receivables_enriched!inner(partner_name, sales_order_number)
-      `)
+    // RESOLUÇÃO CORRIGIDA: Busca diretamente da View de recebíveis
+    const { data: entries, error: queryErr } = await supabase
+      .from('vw_receivables_enriched')
+      .select('id, origin_id, partner_id, partner_name')
       .or(`id.eq.${resolvedRecordId},origin_id.eq.${resolvedRecordId}`)
-      .eq('origin_type', 'sales_order')
       .limit(1);
+
+    if (queryErr) {
+      console.error('[handleSalesOrderReceipt] Erro ao buscar recebível:', queryErr);
+    }
 
     const entry = entries?.[0];
 
     if (entry) {
       entryId = entry.id;
       orderId = entry.origin_id || resolvedRecordId;
-      customerName = (entry.vw_receivables_enriched as any)?.partner_name || customerName;
+      customerName = entry.partner_name || customerName;
     } else {
       // Tentativa 3: Se não encontrou, chamar rebuild RPC para criar a entry on-the-fly
       if (resolvedRecordId) {

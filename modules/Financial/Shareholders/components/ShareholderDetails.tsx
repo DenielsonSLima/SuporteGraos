@@ -16,7 +16,12 @@ import {
   Trash2
 } from 'lucide-react';
 import type { Shareholder, ShareholderTransaction } from '../../../../services/shareholderService';
-import { useUpdateShareholderTransaction, useDeleteShareholderTransaction, useShareholderTotals } from '../../../../hooks/useShareholders';
+import { 
+  useUpdateShareholderTransaction, 
+  useDeleteShareholderTransaction, 
+  useShareholderTotals,
+  useShareholder 
+} from '../../../../hooks/useShareholders';
 import ShareholderCreditModal from './ShareholderCreditModal';
 import FinancialPaymentModal, { PaymentData } from '../../components/modals/FinancialPaymentModal';
 import ActionConfirmationModal from '../../../../components/ui/ActionConfirmationModal';
@@ -30,10 +35,24 @@ interface Props {
   onAddCredit: () => void; // Ação de Adicionar (Aumentar saldo)
 }
 
-const ShareholderDetails: React.FC<Props> = ({ shareholder, onBack, onGeneratePdf, onWithdraw, onAddCredit }) => {
+const ShareholderDetails: React.FC<Props> = ({ shareholder: initialShareholder, onBack, onGeneratePdf, onWithdraw, onAddCredit }) => {
   const { addToast } = useToast();
+  
+  // ✅ DATA FETCHING: Busca dados completos (incluindo histórico) e mantém sincronizado via Realtime
+  const { data: fullShareholder, isLoading: isLoadingFull } = useShareholder(initialShareholder.id);
+  const shareholder = fullShareholder || initialShareholder;
+
   const updateTransaction = useUpdateShareholderTransaction();
   const deleteTransaction = useDeleteShareholderTransaction();
+
+  if (isLoadingFull && !fullShareholder) {
+    return (
+      <div className="flex flex-col items-center justify-center p-20 text-slate-400">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mb-4"></div>
+        <p className="font-medium">Carregando histórico detalhado...</p>
+      </div>
+    );
+  }
   
   // Estado para Edição
   const [editingTx, setEditingTx] = useState<ShareholderTransaction | null>(null);
@@ -86,8 +105,7 @@ const ShareholderDetails: React.FC<Props> = ({ shareholder, onBack, onGeneratePd
     addToast('success', 'Lançamento Atualizado');
     setIsEditCreditOpen(false);
     setEditingTx(null);
-    onBack(); // Refresh hack (component pai vai recarregar) - idealmente usar um onRefresh prop
-    setTimeout(() => onBack(), 10); // Re-trigger visual refresh by forcing parent update via navigation toggle or reload
+    // ✅ Removido refresh hack: useShareholder cuida da invalidação via mutation onSuccess + realtime
   };
 
   const handleConfirmEditDebit = async (data: PaymentData) => {
@@ -107,8 +125,6 @@ const ShareholderDetails: React.FC<Props> = ({ shareholder, onBack, onGeneratePd
     addToast('success', 'Retirada Atualizada');
     setIsEditDebitOpen(false);
     setEditingTx(null);
-    onBack(); // Refresh hack
-    setTimeout(() => onBack(), 10);
   };
 
   const handleConfirmDelete = async () => {
@@ -116,8 +132,6 @@ const ShareholderDetails: React.FC<Props> = ({ shareholder, onBack, onGeneratePd
     await deleteTransaction.mutateAsync({ shareholderId: shareholder.id, transactionId: deletingTx.id });
     addToast('success', 'Transação Excluída');
     setDeletingTx(null);
-    onBack(); // Refresh hack
-    setTimeout(() => onBack(), 10);
   };
 
   return (
@@ -300,7 +314,7 @@ const ShareholderDetails: React.FC<Props> = ({ shareholder, onBack, onGeneratePd
                           {currency(accumulatedBalance)}
                         </td>
                         <td className="px-6 py-4 text-center">
-                           <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                           <div className="flex items-center justify-center gap-2 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
                               <button onClick={() => handleEditClick(t)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Editar">
                                  <Pencil size={14} />
                               </button>

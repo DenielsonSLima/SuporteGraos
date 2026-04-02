@@ -11,10 +11,10 @@ const CurrentMonthTab: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="flex h-96 items-center justify-center">
+      <div className="flex h-96 items-center justify-center animate-in fade-in duration-300">
         <div className="text-center">
           <Loader2 size={40} className="animate-spin text-primary-600 mx-auto mb-4" />
-          <p className="text-slate-500">Carregando fechamento atual...</p>
+          <p className="text-slate-500 font-medium">Carregando fechamento atual...</p>
         </div>
       </div>
     );

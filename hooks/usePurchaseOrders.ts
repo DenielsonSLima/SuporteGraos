@@ -34,6 +34,11 @@ function ensurePurchaseChannel() {
     )
     .on(
       'postgres_changes',
+      { event: '*', schema: 'public', table: 'ops_loadings' },
+      () => _purchaseListeners.forEach(cb => cb()),
+    )
+    .on(
+      'postgres_changes',
       {
         event: '*',
         schema: 'public',
@@ -80,7 +85,7 @@ export function usePurchaseOrders() {
     queryKey: QUERY_KEYS.PURCHASE_ORDERS,
     // Delega ao purchaseService que sabe lidar com modo canônico e enriquecimento
     queryFn: () => purchaseService.loadFromSupabase(),
-    staleTime: STALE_TIMES.REFERENCE,    // 5 min — dados moderadamente estáticos
+    staleTime: 0, // ⚡ REALTIME: Refetch imediato em qualquer mudança do banco
     placeholderData: (prev) => prev,      // Sem piscar ao revalidar
   });
 }
@@ -104,7 +109,9 @@ export function useAddPurchaseOrder() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (order: PurchaseOrder) => purchaseService.add(order),
-    onSuccess: () => { void qc.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS }); },
+    onSuccess: async () => { 
+      await qc.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS });
+    },
   });
 }
 
@@ -112,7 +119,9 @@ export function useUpdatePurchaseOrder() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (order: PurchaseOrder) => purchaseService.update(order),
-    onSuccess: () => { void qc.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS }); },
+    onSuccess: async () => { 
+      await qc.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS });
+    },
   });
 }
 
@@ -120,7 +129,9 @@ export function useDeletePurchaseOrder() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => purchaseService.delete(id),
-    onSuccess: () => { void qc.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS }); },
+    onSuccess: async () => { 
+      await qc.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS });
+    },
   });
 }
 
@@ -129,7 +140,9 @@ export function useUpdatePurchaseTransaction() {
   return useMutation({
     mutationFn: (params: { orderId: string; transaction: any }) =>
       purchaseService.updateTransaction(params.orderId, params.transaction),
-    onSuccess: () => { void qc.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS }); },
+    onSuccess: async () => { 
+      await qc.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS });
+    },
   });
 }
 
@@ -137,8 +150,10 @@ export function useDeletePurchaseTransaction() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (params: { orderId: string; txId: string }) => {
-      purchaseService.deleteTransaction(params.orderId, params.txId);
+      await purchaseService.deleteTransaction(params.orderId, params.txId);
     },
-    onSuccess: () => { void qc.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS }); },
+    onSuccess: async () => { 
+      await qc.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS });
+    },
   });
 }

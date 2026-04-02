@@ -69,8 +69,12 @@ const AdvanceForm: React.FC<Props> = ({ isOpen, onClose, onSave }) => {
     }).format(amount));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+
     const sortedPartners = [...partners].sort((a, b) => a.name.localeCompare(b.name));
     const partner = sortedPartners.find(p => p.id === partnerId);
     
@@ -89,17 +93,24 @@ const AdvanceForm: React.FC<Props> = ({ isOpen, onClose, onSave }) => {
 
     const selectedAccount = accounts.find(a => a.id === accountId);
 
-    onSave({
-      partnerId,
-      partnerName: partner.name,
-      type,
-      date,
-      value: numericValue,
-      description,
-      accountId,
-      accountName: selectedAccount?.account_name || 'Conta'
-    });
-    onClose();
+    setIsSubmitting(true);
+    try {
+      await onSave({
+        partnerId,
+        partnerName: partner.name,
+        type,
+        date,
+        value: numericValue,
+        description,
+        accountId,
+        accountName: selectedAccount?.account_name || 'Conta'
+      });
+      onClose();
+    } catch (error) {
+      addToast('error', 'Erro ao salvar', 'Ocorreu um erro ao processar o adiantamento.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const inputClass = 'block w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 focus:border-slate-800 focus:outline-none transition-all placeholder:text-slate-300 font-bold shadow-sm';
@@ -257,10 +268,11 @@ const AdvanceForm: React.FC<Props> = ({ isOpen, onClose, onSave }) => {
             <button 
               form="advance-form"
               type="submit" 
-              className={`px-10 py-3.5 rounded-2xl text-white font-black shadow-xl flex items-center gap-2 transition-all active:scale-95 uppercase text-xs tracking-widest ${type === 'given' ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200' : 'bg-amber-600 hover:bg-amber-700 shadow-amber-200'}`}
+              disabled={isSubmitting}
+              className={`px-10 py-3.5 rounded-2xl text-white font-black shadow-xl flex items-center gap-2 transition-all active:scale-95 uppercase text-xs tracking-widest disabled:opacity-50 ${type === 'given' ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200' : 'bg-amber-600 hover:bg-amber-700 shadow-amber-200'}`}
             >
               <Save size={18} />
-              Salvar Registro
+              {isSubmitting ? 'Salvando...' : 'Salvar Registro'}
             </button>
           </div>
 

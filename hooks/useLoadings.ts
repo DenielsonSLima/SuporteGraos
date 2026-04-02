@@ -42,7 +42,7 @@ export function useLoadings() {
   return useQuery({
     queryKey: QUERY_KEYS.LOADINGS,
     queryFn: () => loadingService.loadFromSupabase(),
-    staleTime: STALE_TIMES.DYNAMIC,
+    staleTime: 0, // ⚡ REALTIME: Sempre busca o dado mais fresco
     placeholderData: keepPreviousData,
   });
 }

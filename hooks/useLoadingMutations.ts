@@ -30,10 +30,12 @@ export function useUpdateLoading() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (loading: Loading) => { loadingService.update(loading); },
-    onSuccess: (_result, loading) => {
+    mutationFn: async (loading: Loading) => { 
+      await loadingService.update(loading); 
+    },
+    onSuccess: async (_result, loading) => {
       // ✅ SKIL Gap 7: LoadingCache removido — TanStack Query é a fonte canônica de cache
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOADINGS });
+      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOADINGS });
       dispatchGlobalEvents({ type: 'loading_updated', loadingId: loading.id });
     },
   });
@@ -47,9 +49,11 @@ export function useDeleteLoading() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (loadingId: string) => { await loadingService.delete(loadingId); },
-    onSuccess: (_result, loadingId) => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOADINGS });
+    mutationFn: async (loadingId: string) => { 
+      await loadingService.delete(loadingId); 
+    },
+    onSuccess: async (_result, loadingId) => {
+      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOADINGS });
       dispatchGlobalEvents({ type: 'loading_deleted', loadingId });
     },
   });
@@ -63,9 +67,11 @@ export function useSaveLoadingTransaction() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (loading: Loading) => { loadingService.update(loading); },
-    onSuccess: (_result, loading) => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOADINGS });
+    mutationFn: async (loading: Loading) => { 
+      await loadingService.update(loading); 
+    },
+    onSuccess: async (_result, loading) => {
+      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOADINGS });
       dispatchGlobalEvents({ type: 'freight_payment', loadingId: loading.id });
     },
   });

@@ -253,7 +253,7 @@ const CashierPdfDocument: React.FC<Props> = ({ report, title }) => {
         </View>
 
         {/* ESPELHO CONSOLIDADO - ATIVOS E PASSIVOS */}
-        <View style={{ marginBottom: 12 }}>
+        <View style={{ marginBottom: 12 }} wrap={false}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Espelho Consolidado do Caixa</Text>
             <Text style={styles.sectionSubtitle}>Referência • {referenceLabel}</Text>
@@ -341,7 +341,7 @@ const CashierPdfDocument: React.FC<Props> = ({ report, title }) => {
 
           <View style={styles.chartGrid}>
             {/* Gráfico 1: Comparativo Ativos vs Passivos */}
-            <View style={styles.chartBox}>
+            <View style={styles.chartBox} wrap={false}>
               <Text style={styles.chartBoxTitle}>Ativos vs Passivos Totais</Text>
               <View style={styles.chartLegend}>
                 {totalComparison.map((item, idx) => (
@@ -370,7 +370,7 @@ const CashierPdfDocument: React.FC<Props> = ({ report, title }) => {
 
             {/* Gráfico 2: Detalhamento dos Ativos */}
             {assetsBreakdown.length > 0 && (
-              <View style={styles.chartBox}>
+              <View style={styles.chartBox} wrap={false}>
                 <Text style={styles.chartBoxTitle}>Composição dos Ativos</Text>
                 <View style={styles.chartLegend}>
                   {assetsBreakdown.slice(0, 6).map((item, idx) => (
@@ -405,7 +405,7 @@ const CashierPdfDocument: React.FC<Props> = ({ report, title }) => {
           <View style={styles.chartGrid}>
             {/* Gráfico 3: Detalhamento dos Passivos */}
             {liabilitiesBreakdown.length > 0 && (
-              <View style={styles.chartBox}>
+              <View style={styles.chartBox} wrap={false}>
                 <Text style={styles.chartBoxTitle}>Composição dos Passivos</Text>
                 <View style={styles.chartLegend}>
                   {liabilitiesBreakdown.slice(0, 6).map((item, idx) => (
@@ -439,7 +439,7 @@ const CashierPdfDocument: React.FC<Props> = ({ report, title }) => {
         </View>
 
         {/* PATRIMÔNIO LÍQUIDO FINAL */}
-        <View style={styles.finalBox}>
+        <View style={styles.finalBox} wrap={false}>
           <View style={styles.finalLeft}>
             <Text style={styles.finalTitle}>Patrimônio Líquido Real Projetado</Text>
             <Text style={styles.finalSubtitle}>Sobra estimada após liquidação integral de ativos e passivos operacionais.</Text>

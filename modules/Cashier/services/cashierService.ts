@@ -36,17 +36,15 @@ export const cashierService = {
 
     const totalBankBalance = Number(sqlData?.totalBankBalance) || 0;
     const totalInitialBalance = Number(sqlData?.totalInitialBalance) || 0;
-
+    const totalInitialMonthBalance = Number(sqlData?.totalInitialMonthBalance) || totalInitialBalance;
+    
     // Saldos iniciais do SQL
-    const sqlInitialBalances: AccountInitialBalance[] = (sqlData?.initialBalances ?? []).map((ib: any) => ({
-      id: ib.accountId,
-      bankName: ib.accountName,
+    const initialMonthBalances: AccountInitialBalance[] = (sqlData?.initialMonthBalances ?? sqlData?.initialBalances ?? []).map((ib: any) => ({
+      id: ib.accountId || ib.id,
+      bankName: ib.accountName || ib.bankName,
+      owner: ib.owner || undefined,
       value: Number(ib.value) || 0,
     }));
-
-    // Para saldo de abertura do mês, por enquanto usa o saldo inicial
-    const totalInitialMonthBalance = totalInitialBalance;
-    const initialMonthBalances = sqlInitialBalances;
 
     const pendingSalesReceipts = Number(sqlData?.pendingSalesReceipts) || 0;
     const merchandiseInTransitValue = Number(sqlData?.merchandiseInTransitValue) || 0;

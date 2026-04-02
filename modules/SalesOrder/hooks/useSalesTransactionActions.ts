@@ -17,26 +17,24 @@ import { SalesTransaction } from '../types';
 export function useSalesTransactionActions(orderId: string) {
   const queryClient = useQueryClient();
 
-  const refreshAll = () => {
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS });
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOADINGS });
+  const refreshAll = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS }),
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOADINGS }),
+      queryClient.invalidateQueries({ queryKey: ['sales_order_transactions', orderId] })
+    ]);
   };
 
   /** Atualiza uma transação existente e refresca o cache */
   const updateTransaction = async (updated: SalesTransaction) => {
     await salesService.updateTransaction(orderId, updated);
-    refreshAll();
+    await refreshAll();
   };
 
   /** Exclui uma transação e seu registro financeiro correspondente */
   const deleteTransaction = async (txId: string) => {
     await salesService.deleteTransaction(orderId, txId);
-    try {
-      await financialActionService.deleteStandaloneRecord('hist-' + txId);
-    } catch (err) {
-      console.error('[useSalesTransactionActions] Falha ao excluir registro financeiro:', err);
-    }
-    refreshAll();
+    await refreshAll();
   };
 
   return { updateTransaction, deleteTransaction };

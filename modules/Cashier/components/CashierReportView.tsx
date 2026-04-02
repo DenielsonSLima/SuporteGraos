@@ -99,7 +99,10 @@ const CashierReportView: React.FC<Props> = ({ report, title }) => {
               <div key={acc.id} className="flex items-center justify-between p-3 bg-slate-50/50 rounded-xl border border-slate-100 hover:bg-white transition-all group">
                 <div className="flex items-center gap-2 flex-1 min-w-0">
                   <Landmark size={16} className="text-slate-300 group-hover:text-blue-500 transition-colors shrink-0" />
-                  <span className="text-xs font-bold text-slate-600 uppercase leading-tight">{acc.bankName}</span>
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-xs font-bold text-slate-600 uppercase leading-tight">{acc.bankName}</span>
+                    {acc.owner && <span className="text-[10px] text-slate-400 font-medium leading-tight mt-0.5">{acc.owner}</span>}
+                  </div>
                 </div>
                 <span className="text-sm font-black text-slate-900 ml-2 shrink-0">{currency(acc.value)}</span>
               </div>

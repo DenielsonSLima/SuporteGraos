@@ -10,12 +10,13 @@ import { useAccounts } from '../../../../hooks/useAccounts';
 interface Props {
   orderId: string;
   transactions: SalesTransaction[];
-  totalOrderValue: number;
+  paidValue: number;    // Valor já recebido (Backend-driven)
+  balanceValue: number; // Saldo pendente (Backend-driven/Calculado)
   onAddReceipt: () => void;
   onRefresh: () => void;
 }
 
-const SalesFinancialCard: React.FC<Props> = ({ orderId, transactions, totalOrderValue, onAddReceipt, onRefresh }) => {
+const SalesFinancialCard: React.FC<Props> = ({ orderId, transactions, paidValue, balanceValue, onAddReceipt, onRefresh }) => {
   const [selectedTx, setSelectedTx] = useState<any>(null);
   const { updateTransaction, deleteTransaction } = useSalesTransactionActions(orderId);
   const { data: accounts = [] } = useAccounts();
@@ -24,12 +25,12 @@ const SalesFinancialCard: React.FC<Props> = ({ orderId, transactions, totalOrder
   const dateStr = (val: string) => formatDateBR(val);
   const cleanNotes = (val?: string) => val ? val.replace(/\s*\[ORIGIN:[^\]]+\]\s*/g, ' ').trim() : '';
 
-  // Filtra apenas recebimentos
+  // Filtra apenas recebimentos para exibição na lista (o somatório vem de paidValue)
   const receipts = transactions.filter(t => t.type === 'receipt');
 
-  const totalReceived = receipts.reduce((acc, t) => acc + t.value, 0);
-  const pending = Math.max(0, totalOrderValue - totalReceived);
-  const progress = totalOrderValue > 0 ? Math.min((totalReceived / totalOrderValue) * 100, 100) : 0;
+  // Cálculo da barra de progresso (vindo do backend)
+  const totalInvoiced = paidValue + balanceValue;
+  const progress = totalInvoiced > 0 ? Math.min((paidValue / totalInvoiced) * 100, 100) : 0;
 
   const handleUpdateTx = async (updated: any) => {
     await updateTransaction(updated);
@@ -72,11 +73,11 @@ const SalesFinancialCard: React.FC<Props> = ({ orderId, transactions, totalOrder
           <div className="flex justify-between mt-3">
             <div>
               <span className="text-slate-400 block text-[9px] font-black uppercase">Já Recebido</span>
-              <span className="font-black text-emerald-600 text-xl">{currency(totalReceived)}</span>
+              <span className="font-black text-emerald-600 text-xl">{currency(paidValue)}</span>
             </div>
             <div className="text-right">
               <span className="text-slate-400 block text-[9px] font-black uppercase">Saldo Pendente</span>
-              <span className="font-black text-slate-800 text-xl">{currency(pending)}</span>
+              <span className="font-black text-slate-800 text-xl">{currency(balanceValue)}</span>
             </div>
           </div>
         </div>

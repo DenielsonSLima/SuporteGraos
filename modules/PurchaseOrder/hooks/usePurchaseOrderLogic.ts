@@ -11,7 +11,8 @@ import { SettingsCache } from '../../../services/settingsCache';
 import { ledgerService } from '../../../services/ledgerService';
 import { payablesService } from '../../../services/financial/payablesService';
 import { usePurchaseOrderTransactions } from './usePurchaseOrderTransactions';
-
+import { useQueryClient } from '@tanstack/react-query';
+import { QUERY_KEYS } from '../../../hooks/queryKeys';
 export const usePurchaseOrderLogic = (initialOrder: PurchaseOrder, onFinalizeCallback: () => void) => {
   const { addToast } = useToast();
   const [currentOrder, setCurrentOrder] = useState<PurchaseOrder>(initialOrder);
@@ -19,10 +20,20 @@ export const usePurchaseOrderLogic = (initialOrder: PurchaseOrder, onFinalizeCal
   const [isFinalizePromptOpen, setIsFinalizePromptOpen] = useState(false);
 
   const { data: liveTransactions = [] } = usePurchaseOrderTransactions(currentOrder.id);
+  const queryClient = useQueryClient();
 
   // Function to refresh loadings and order data
-  const refreshLoadings = (id?: string) => {
+  const refreshLoadings = async (id?: string) => {
     const orderId = id || currentOrder.id;
+    
+    // Invalidar caches via TanStack Query (AGORA AGUARDADO)
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS }),
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOADINGS }),
+      queryClient.invalidateQueries({ queryKey: ['purchase_order_transactions', orderId] }),
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_TRANSACTIONS })
+    ]);
+
     const list = loadingService.getByPurchaseOrder(orderId);
     setLoadings([...list]);
     const freshOrder = purchaseService.getById(orderId);
@@ -100,30 +111,30 @@ export const usePurchaseOrderLogic = (initialOrder: PurchaseOrder, onFinalizeCal
   }, [currentOrder.transactions, liveTransactions]);
 
   const stats = useMemo(() => {
-    const totalPurchaseVal = activeLoadings.reduce((acc, l) => acc + (l.totalPurchaseValue || 0), 0);
-    const totalFreightVal = activeLoadings.reduce((acc, l) => acc + (l.totalFreightValue || 0), 0);
-    const totalSalesVal = activeLoadings.reduce((acc, l) => acc + (l.totalSalesValue || 0), 0);
+    const totalPurchaseVal = currentOrder.totalPurchaseValCalc || 0;
+    const totalFreightVal = currentOrder.totalFreightValCalc || 0;
+    const totalSalesVal = currentOrder.totalSalesValCalc || 0;
 
     const txs = mergedTransactions;
 
+    // Cálculo de abatimentos agora considera o discount_value do backend + gastos debitáveis
     const expensesDeducted = txs
       .filter(t => (t.type === 'expense' || t.type === 'commission') && t.deductFromPartner)
-      .reduce((acc, t) => acc + t.value + (t.discountValue || 0), 0);
-
-    const paidFromTx = txs
-      .filter(t => t.type === 'payment' || t.type === 'advance')
       .reduce((acc, t) => acc + (t.value || 0), 0);
-    const discFromTx = txs.reduce((acc, t) => acc + (t.discountValue || 0), 0);
 
-    const totalPaidCash = Math.max(paidFromTx, currentOrder.paidValue || 0);
-    const totalDisc = Math.max(discFromTx, currentOrder.discountValue || 0);
-
-    const totalSettled = totalPaidCash + totalDisc + expensesDeducted;
-    const balancePartner = Math.max(0, totalPurchaseVal - totalSettled);
+    const paidValue = currentOrder.paidValue || 0;
+    const balanceValue = currentOrder.balanceValue || 0;
+    const totalDisc = currentOrder.discountValue || 0;
+    
+    const totalSettled = paidValue + totalDisc + expensesDeducted;
+    
+    // O balancePartner é o saldo real vindo do banco. 
+    // AdvanceBalance é o que foi pago a mais que o total do contrato.
+    const balancePartner = balanceValue; 
     const advanceBalance = Math.max(0, totalSettled - totalPurchaseVal);
 
-    const totalSc = activeLoadings.reduce((acc, l) => acc + l.weightSc, 0);
-    const totalKg = activeLoadings.reduce((acc, l) => acc + l.weightKg, 0);
+    const totalSc = currentOrder.totalSc || 0;
+    const totalKg = currentOrder.totalKg || 0;
 
     const totalCommissionDue = currentOrder.hasBroker ? totalSc * (currentOrder.brokerCommissionPerSc || 0) : 0;
 
@@ -164,7 +175,7 @@ export const usePurchaseOrderLogic = (initialOrder: PurchaseOrder, onFinalizeCal
         setCurrentOrder(updated);
 
         SettingsCache.refreshBalances();
-        refreshLoadings();
+        await refreshLoadings();
         addToast('success', 'Pagamento Confirmado');
 
         // Verificar se pagamento quitou o saldo
@@ -204,7 +215,7 @@ export const usePurchaseOrderLogic = (initialOrder: PurchaseOrder, onFinalizeCal
       });
       SettingsCache.refreshBalances();
       ledgerService.onTransactionChange('add', tx);
-      refreshLoadings();
+      await refreshLoadings();
       addToast('success', 'Adiantamento Concedido');
     },
     handleAddExpense: async (data: any) => {
@@ -217,13 +228,12 @@ export const usePurchaseOrderLogic = (initialOrder: PurchaseOrder, onFinalizeCal
         `expense-extra-${currentOrder.id}-${tx.id}`,
         {
           amount: tx.value,
+          discount: 0,
           date: tx.date,
           accountId: tx.accountId,
           accountName: tx.accountName,
-          bankAccount: tx.accountId,
           notes: tx.notes,
           entityName: currentOrder.partnerName,
-          subType: 'expense',
           category: tx.expenseSubtypeName,
           isExtraExpense: true,
           deductFromPartner: tx.deductFromPartner,
@@ -233,7 +243,7 @@ export const usePurchaseOrderLogic = (initialOrder: PurchaseOrder, onFinalizeCal
 
       SettingsCache.refreshBalances();
       ledgerService.onTransactionChange('add', tx);
-      refreshLoadings();
+      await refreshLoadings();
     },
     handleAddCommission: async (data: any) => {
       const tx = { id: Math.random().toString(36).substr(2, 9), type: 'commission' as const, ...data };
@@ -269,20 +279,20 @@ export const usePurchaseOrderLogic = (initialOrder: PurchaseOrder, onFinalizeCal
 
       SettingsCache.refreshBalances();
       ledgerService.onTransactionChange('add', tx);
-      refreshLoadings();
+      await refreshLoadings();
     },
     // Added handleSaveNote for persistent order observations
     handleSaveNote: async (note: any) => {
       const newNote = { ...note, id: Math.random().toString(36).substr(2, 9) };
       const updated = { ...currentOrder, notesList: [newNote, ...(currentOrder.notesList || [])] };
       await purchaseService.update(updated);
-      refreshLoadings();
+      await refreshLoadings();
     },
     handleUpdateTx: async (tx: OrderTransaction) => {
       await purchaseService.updateTransaction(currentOrder.id, tx);
       SettingsCache.refreshBalances();
       ledgerService.onTransactionChange('update', tx);
-      refreshLoadings();
+      await refreshLoadings();
     },
     handleDeleteTx: async (id: string) => {
       await purchaseService.deleteTransaction(currentOrder.id, id);
@@ -292,20 +302,20 @@ export const usePurchaseOrderLogic = (initialOrder: PurchaseOrder, onFinalizeCal
 
       SettingsCache.refreshBalances();
       ledgerService.onTransactionChange('delete', { id });
-      refreshLoadings();
+      await refreshLoadings();
     },
-    handleSaveNewLoading: (loading: Loading) => {
+    handleSaveNewLoading: async (loading: Loading) => {
       loadingService.add(loading);
-      refreshLoadings();
+      await refreshLoadings();
     },
     handleDeleteLoading: async (loadingId: string) => {
       await loadingService.delete(loadingId);
-      refreshLoadings();
+      await refreshLoadings();
     },
     confirmFinalize: async () => {
       await purchaseService.update({ ...currentOrder, status: 'completed' });
       setIsFinalizePromptOpen(false);
-      refreshLoadings();
+      await refreshLoadings();
       onFinalizeCallback();
     }
   };

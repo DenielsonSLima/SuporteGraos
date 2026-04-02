@@ -22,8 +22,11 @@ import { SkeletonCards } from '../../components/ui/SkeletonCards';
 import { usePartnersModule } from './hooks/usePartnersModule';
 import { authService } from '../../services/authService';
 import { partnersService } from './partners.service';
+import { useQueryClient } from '@tanstack/react-query';
+import { QUERY_KEYS } from '../../hooks/queryKeys';
 
 const PartnersPage: React.FC = () => {
+  const queryClient = useQueryClient();
   const { addToast } = useToast();
   const [activeTab, setActiveTab] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -161,13 +164,8 @@ const PartnersPage: React.FC = () => {
       });
 
       // Invalida as queries do TanStack Query
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-ignore
-      const queryClient = await import('../../hooks/queryKeys').then(m => (window as any).queryClient);
-      if (queryClient) {
-        queryClient.invalidateQueries({ queryKey: ['partners'] });
-        queryClient.invalidateQueries({ queryKey: ['addresses'] });
-      }
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PARTNERS });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ADDRESSES });
 
       addToast('success', editingPartner ? 'Dados Atualizados' : 'Parceiro Cadastrado');
       setBalancesTick(prev => prev + 1);

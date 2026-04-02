@@ -20,16 +20,32 @@ const SalesOrderModule: React.FC = () => {
   const queryClient = useQueryClient();
 
   // Data State — via hook co-localizado (SKIL: zero service imports no TSX)
-  const { sales, shareholders, getOrderById, getLinkedLoadings, saveOrder, deleteOrder, finalizeOrder } = useSalesOrderModule();
+  const { 
+    sales, 
+    shareholders, 
+    isLoading, 
+    isFetching, 
+    getOrderById, 
+    getLinkedLoadings, 
+    saveOrder, 
+    deleteOrder, 
+    finalizeOrder 
+  } = useSalesOrderModule();
 
   // UI/Filter State
-  const [activeTab, setActiveTab] = useState<'active' | 'finalized' | 'all'>('active');
+  const [activeTab, setActiveTab] = useState<'active' | 'finalized' | 'all'>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('sg_erp_sales_active_tab') as any) || 'active';
+    }
+    return 'active';
+  });
   const [groupBy, setGroupBy] = useState<SalesGroupByOption>('none'); // Default none p/ respeitar ordem alfabética global
   const [viewMode, setViewMode] = useState<'list' | 'form' | 'details'>('list');
   const [selectedOrder, setSelectedOrder] = useState<SalesOrder | undefined>(undefined);
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [selectedShareholder, setSelectedShareholder] = useState('');
@@ -48,6 +64,17 @@ const SalesOrderModule: React.FC = () => {
     description: null,
     onConfirm: () => { }
   });
+
+  // Persist active tab change
+  useEffect(() => {
+    localStorage.setItem('sg_erp_sales_active_tab', activeTab);
+  }, [activeTab]);
+
+  // Debounce for search to improve performance/responsiveness
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   useEffect(() => {
     const handleNavigation = (e: any) => {
@@ -217,8 +244,8 @@ const SalesOrderModule: React.FC = () => {
   // --- LÓGICA DE FILTRAGEM E ORDENAÇÃO ALFABÉTICA ---
   const filteredSales = useMemo(() => {
     return sales.filter(s => {
-      // 1. Busca
-      const search = searchTerm.toLowerCase();
+      // 1. Busca Debounced
+      const search = debouncedSearch.toLowerCase();
       const customerName = (s.customerName || '').toLowerCase();
       const orderNumber = (s.number || '').toLowerCase();
       const matchesSearch =
@@ -245,7 +272,7 @@ const SalesOrderModule: React.FC = () => {
 
       return matchesSearch && matchesDate && matchesShareholder && matchesTab;
     }).sort((a, b) => (a.customerName || '').localeCompare(b.customerName || '')); // ORDENAÇÃO ALFABÉTICA SOLICITADA
-  }, [sales, activeTab, searchTerm, startDate, endDate, selectedShareholder]);
+  }, [sales, activeTab, debouncedSearch, startDate, endDate, selectedShareholder]);
 
   const groupedSales = useMemo(() => {
     if (groupBy === 'none') return [{ title: '', orders: filteredSales }];
@@ -417,8 +444,20 @@ const SalesOrderModule: React.FC = () => {
               </div>
             </div>
           ))}
-          {filteredSales.length === 0 && (
-            <div className="text-center py-20 text-slate-400 italic">Nenhum pedido encontrado nesta visão.</div>
+          {filteredSales.length === 0 && !isLoading && (
+            <div className="text-center py-20 text-slate-400 italic bg-white rounded-3xl border-2 border-dashed border-slate-100 flex flex-col items-center gap-3">
+              <AlertTriangle className="text-slate-300" size={40} />
+              <p>Nenhum pedido encontrado nesta visão.</p>
+              {hasFilters && (
+                <button onClick={handleClearFilters} className="text-blue-500 font-bold uppercase text-[10px] tracking-widest mt-2 hover:underline">Limpar Filtros</button>
+              )}
+            </div>
+          )}
+          {isLoading && (
+            <div className="flex flex-col items-center justify-center py-40 gap-4">
+              <div className="w-12 h-12 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin"></div>
+              <p className="text-sm font-black text-slate-400 uppercase tracking-widest animate-pulse">Carregando Pedidos...</p>
+            </div>
           )}
         </div>
       </div>

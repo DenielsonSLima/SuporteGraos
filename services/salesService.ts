@@ -58,6 +58,14 @@ interface SalesOrderOpsRow {
   load_count?: number;
   transit_count?: number;
   transit_value?: number;
+  paid_value?: number;
+  balance_value?: number;
+  discount_value?: number;
+  total_grain_cost?: number;
+  total_freight_cost?: number;
+  total_weight_kg_orig?: number;
+  total_weight_kg_dest?: number;
+  notes?: string;
   metadata?: SalesOrder;
 }
 
@@ -142,35 +150,37 @@ const mapOrderFromDb = (row: SalesOrderDbRow): SalesOrder => {
   };
 };
 
-const mapOrderFromOpsRow = (row: SalesOrderOpsRow): SalesOrder => {
-  const meta: SalesOrder | undefined = row?.metadata;
+const mapOrderFromOpsRow = (row: any): SalesOrder => {
+  // 1. Decodificar Metadata (JSONB pode vir como string ou objeto)
+  const meta: any = typeof row?.metadata === 'string' 
+    ? JSON.parse(row.metadata) 
+    : (row?.metadata || {});
 
-  return {
+  // 2. Construir objeto base garantindo tipos numéricos
+  // Prioriza colunas da VIEW, mas aceita o que estiver no meta
+  const order: SalesOrder = {
+    ...meta, // Começa com tudo o que está no payload original (inclui consultantName, productName, etc)
     id: row?.legacy_id ?? row?.id ?? meta?.id ?? '',
     number: row?.number ?? meta?.number ?? '',
     date: row?.order_date ?? meta?.date ?? getTodayBR(),
     status: (meta?.status as SalesStatus) ?? statusFromDb(row?.status),
-    consultantName: meta?.consultantName ?? '',
     customerId: row?.customer_id ?? meta?.customerId ?? '',
     customerName: row?.customer_name ?? meta?.customerName ?? 'Cliente Não Informado',
-    customerDocument: meta?.customerDocument,
-    customerCity: meta?.customerCity,
-    customerState: meta?.customerState,
-    productName: meta?.productName ?? '',
-    quantity: meta?.quantity,
-    unitPrice: meta?.unitPrice,
     totalValue: Number(row?.total_value ?? meta?.totalValue ?? 0),
-    paidValue: Number(row?.received_value ?? meta?.paidValue ?? 0),
-    transactions: meta?.transactions ?? [],
-    loadings: meta?.loadings ?? [],
-    notes: meta?.notes ?? '',
+    paidValue: Number(row?.received_value ?? row?.paid_value ?? meta?.paidValue ?? 0),
+    quantity: Number(meta?.quantity || 0),
+    unitPrice: Number(meta?.unitPrice || 0),
+    
     // ═══════ Dados pré-calculados pelo SQL (VIEW vw_sales_orders_enriched) ═══════
-    deliveredQtySc: row?.delivered_qty_sc != null ? Number(row.delivered_qty_sc) : undefined,
-    deliveredValue: row?.delivered_value != null ? Number(row.delivered_value) : undefined,
-    loadCount: row?.load_count != null ? Number(row.load_count) : undefined,
-    transitCount: row?.transit_count != null ? Number(row.transit_count) : undefined,
-    transitValue: row?.transit_value != null ? Number(row.transit_value) : undefined,
+    // Estes têm precedência máxima pois vêm de agregados reais do banco
+    deliveredQtySc: row?.delivered_qty_sc != null ? Number(row.delivered_qty_sc) : meta?.deliveredQtySc,
+    deliveredValue: row?.delivered_value != null ? Number(row.delivered_value) : meta?.deliveredValue,
+    loadCount: row?.load_count != null ? Number(row.load_count) : meta?.loadCount,
+    transitCount: row?.transit_count != null ? Number(row.transit_count) : meta?.transitCount,
+    transitValue: row?.transit_value != null ? Number(row.transit_value) : meta?.transitValue,
   };
+
+  return order;
 };
 
 // ============================================================================
@@ -260,7 +270,8 @@ const loadFromSupabase = async (retries = 2): Promise<SalesOrder[]> => {
       await new Promise(r => setTimeout(r, 1000));
       return loadFromSupabase(retries - 1);
     }
-    return [];
+    sqlCanonicalOpsLog('Falha ao carregar sales_orders (modo legado)', error);
+    return db.getAll();
   }
 };
 
@@ -431,8 +442,9 @@ export const salesService = {
     // 2. Se sucesso, atualizar cache local
     db.add(sale);
 
-    // ℹ️ Receivable é criado SOMENTE quando a mercadoria for entregue
-    // (via loadingReceivableSync quando carregamento com unloadWeightKg é registrado)
+    // ℹ️ REGRA DE GRÃOS: O "Contas a Receber" (Receivable) reflete apenas o valor ENTREGUE.
+    // O rpc_ops_sales_rebuild_financial_v1 calcula o saldo baseado na soma dos descarregamentos.
+    // Um pedido novo começa com saldo R$ 0,00 até que a primeira carga seja descarregada.
 
     const { userId, userName } = getLogInfo();
     logService.addLog({
@@ -579,17 +591,10 @@ export const salesService = {
     }
 
     const newTxs = (order.transactions || []).map(t => t.id === updatedTx.id ? updatedTx : t);
-    const updated = isSqlCanonicalOpsEnabled()
-      ? { ...order, transactions: newTxs }
-      : {
-        ...order,
-        transactions: newTxs,
-        paidValue: newTxs
-          .filter(t => t.type === 'receipt')
-          .reduce((acc, t) => acc + t.value + (t.discountValue || 0), 0)
-      };
+    const updated = { ...order, transactions: newTxs };
     db.update(updated);
     await persistUpsert(updated);
+    await upsertSalesOrderCanonical(updated);
     // ❌ REMOVIDO: void financialSyncService.syncSalesOrder(orderId);
     // Sync agora é feito apenas via financialActionService.processRecord()
     const { userId, userName } = getLogInfo();
@@ -603,22 +608,14 @@ export const salesService = {
 
     // ✅ Limpeza COMPLETA via orquestrador centralizado
     // Remove: financial_history + admin_expenses + financial_transactions
-    void import('./financial/paymentOrchestrator').then(({ removeFinancialTransaction }) => {
-      removeFinancialTransaction(txId);
-    });
+    const { removeFinancialTransaction } = await import('./financial/paymentOrchestrator');
+    await removeFinancialTransaction(txId);
 
     const newTxs = (order.transactions || []).filter(t => t.id !== txId);
-    const updated = isSqlCanonicalOpsEnabled()
-      ? { ...order, transactions: newTxs }
-      : {
-        ...order,
-        transactions: newTxs,
-        paidValue: newTxs
-          .filter(t => t.type === 'receipt')
-          .reduce((acc, t) => acc + t.value + (t.discountValue || 0), 0)
-      };
+    const updated = { ...order, transactions: newTxs };
     db.update(updated);
     await persistUpsert(updated);
+    await upsertSalesOrderCanonical(updated);
     // ❌ REMOVIDO: void financialSyncService.syncSalesOrder(orderId);
     // Sync agora é feito apenas via financialActionService.processRecord()
     const { userId, userName } = getLogInfo();
@@ -738,7 +735,8 @@ export const salesService = {
   subscribe: (callback: (items: SalesOrder[]) => void) => db.subscribe(callback),
 
   reload: () => {
-    db.clear();
+    // ⚡ OTIMIZAÇÃO: Não limpamos o DB antes de carregar para evitar "tela branca" se a rede falhar.
+    // O setAll dentro de loadFromSupabase substituirá os dados atuais se o fetch tiver sucesso.
     return loadFromSupabase();
   },
   loadFromSupabase,

@@ -167,7 +167,7 @@ const ReceivablesTab: React.FC = () => {
       <div className="animate-in slide-in-from-bottom-5 duration-700">
         <UnifiedReceivableManager
           records={paginatedRecords}
-          onRefresh={() => { }}
+          onRefresh={() => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_RECEIVABLES })}
           viewMode={activeSubTab}
           searchTerm={activeSubTab === 'all' ? searchTerm : undefined}
           hideSearchBar={activeSubTab === 'all'}

@@ -56,7 +56,7 @@ const SalesLoadingsTable: React.FC<Props> = ({ loadings, onNavigateToPurchase, o
                 const effectiveSc = (l.unloadWeightKg && l.unloadWeightKg > 0) ? (l.unloadWeightKg / 60) : l.weightSc;
                 const totalCargaVenda = effectiveSc * (l.salesPrice || 0);
 
-                const isDelivered = l.unloadWeightKg && l.unloadWeightKg > 0;
+                const isDelivered = (l.unloadWeightKg && l.unloadWeightKg > 0) || l.status === 'completed';
 
                 // Lógica de Diferença (Origem - Destino)
                 // Se diff > 0 = Quebra (Perda). Se diff < 0 = Ganho.

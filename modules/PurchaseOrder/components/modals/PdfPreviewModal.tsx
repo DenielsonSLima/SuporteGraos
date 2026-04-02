@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { X, Download, Loader2, UserCheck, ShieldCheck } from 'lucide-react';
 import { Loading } from '../../../Loadings/types';
 import { loadingService } from '../../../../services/loadingService';
@@ -25,23 +25,41 @@ const PdfPreviewModal: React.FC<Props> = ({ isOpen, onClose, order, variant }) =
   const { company, watermark, isLoaded } = useSettings();
   const [showIframe, setShowIframe] = useState(false);
 
+  // ✅ Estabiliza a lista de carregamentos para evitar re-geração se a referência mudar mas o conteúdo não
+  const loadingsKey = useMemo(() => {
+    return (loadings || []).map(l => l.id).join(',');
+  }, [loadings]);
+
   useEffect(() => {
-    if (isOpen && order.id) {
+    if (isOpen && order?.id) {
       const isSales = !!(order as any).customerName;
       const list = isSales
         ? loadingService.getBySalesOrder(order.id)
         : loadingService.getByPurchaseOrder(order.id);
-      setLoadings(list);
+      
+      // Só atualiza se a lista for diferente (compara IDs para estabilidade)
+      const currentIds = list.map(l => l.id).join(',');
+      const prevIds = (loadings || []).map(l => l.id).join(',');
+      if (currentIds !== prevIds) {
+        setLoadings(list);
+      }
     }
-  }, [isOpen, order.id]);
+  }, [isOpen, order?.id]);
 
   useEffect(() => {
     let url: string | null = null;
+    let isMounted = true;
 
     const generatePreview = async () => {
-      // ✅ SÓ GERA SE AS CONFIGURAÇÕES ESTIVEREM CARREGADAS
-      if (isOpen && isLoaded && loadings.length >= 0) {
+      // ✅ SÓ GERA SE AS CONFIGURAÇÕES ESTIVEREM CARREGADAS E O MODAL ESTIVER ABERTO
+      if (isOpen && isLoaded && order?.id) {
         try {
+          // Não resetamos o showIframe aqui para evitar o "pisca-pisca" visual se for apenas uma atualização
+          // Só resetamos se o PDF ainda não existir
+          if (!pdfUrl) {
+            setShowIframe(false);
+          }
+
           const blob = await pdf(
             <PdfDocument
               order={order}
@@ -51,9 +69,18 @@ const PdfPreviewModal: React.FC<Props> = ({ isOpen, onClose, order, variant }) =
               watermark={watermark}
             />
           ).toBlob();
+
+          if (!isMounted) return;
+
           url = URL.createObjectURL(blob);
           setPdfUrl(url);
-          setTimeout(() => setShowIframe(true), 100);
+          
+          // Se já estava mostrando, mantém. Se não, mostra após curto delay
+          if (!showIframe) {
+            setTimeout(() => {
+              if (isMounted) setShowIframe(true);
+            }, 100);
+          }
         } catch (error) {
           console.error("Erro ao gerar preview:", error);
         }
@@ -63,10 +90,19 @@ const PdfPreviewModal: React.FC<Props> = ({ isOpen, onClose, order, variant }) =
     generatePreview();
 
     return () => {
+      isMounted = false;
       if (url) URL.revokeObjectURL(url);
-      setShowIframe(false);
+      // ✅ IMPORTANTE: Só resetamos o iframe se o modal realmente fechar ou o pedido mudar
     };
-  }, [isOpen, order, loadings, variant, company, watermark, isLoaded]);
+  }, [isOpen, order?.id, order?.updated_at, loadingsKey, variant, isLoaded, company?.razaoSocial]);
+
+  // Limpeza total apenas ao fechar o modal ou desmontar
+  useEffect(() => {
+    if (!isOpen) {
+      setShowIframe(false);
+      setPdfUrl(null);
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 

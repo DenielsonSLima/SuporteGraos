@@ -13,15 +13,25 @@ import { Loading } from '../../Loadings/types';
  */
 export function useSalesOrderStats(order: SalesOrder, loadings: Loading[], transactions: any[] = []) {
   return useMemo(() => {
-    const active = loadings.filter(l => l.status !== 'canceled');
-    const totalDeliveredVal = active.filter(l => (l.unloadWeightKg || 0) > 0).reduce((acc, l) => acc + (l.totalSalesValue || 0), 0);
-    const totalTransitVal = active.filter(l => !(l.unloadWeightKg || 0)).reduce((acc, l) => acc + (l.weightSc * (l.salesPrice || order.unitPrice || 0)), 0);
-
-    // Confia no total recebido vindo do SQL (v2)
+    // Confia 100% nos dados pré-calculados pelo SQL (VIEW vw_sales_orders_enriched)
+    // Isso garante consistência absoluta com os relatórios e dashboard
+    const totalDeliveredVal = order.deliveredValue || 0;
+    const totalTransitVal = order.transitValue || 0;
     const totalReceived = order.paidValue || 0;
+    
+    // Novo cálculo solicitado: Valor Faturado/Entregue - Valor Recebido
+    // Evita saldo pendente do contrato total antes da entrega
+    const balance = Math.max(0, totalDeliveredVal - totalReceived);
+    const contractBalance = order.balanceValue || 0;
 
-    return { totalDeliveredVal, totalTransitVal, totalReceived, balance: Math.max(0, totalDeliveredVal - totalReceived) };
-  }, [loadings, order, transactions]);
+    return { 
+      totalDeliveredVal, 
+      totalTransitVal, 
+      totalReceived, 
+      balance,
+      contractBalance
+    };
+  }, [order]);
 }
 
 /**
@@ -39,20 +49,24 @@ export function useCrossModuleNavigation() {
 export function useSalesOrderDetailsOperations() {
   const queryClient = useQueryClient();
 
-  const refreshData = () => {
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS });
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOADINGS });
-    queryClient.invalidateQueries({ queryKey: ['sales_order_transactions'] });
+  const refreshData = async () => {
+    // Await all invalidations to ensure TanStack is ready before next UI action
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS }),
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOADINGS }),
+      queryClient.invalidateQueries({ queryKey: ['sales_order_transactions'] }),
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS })
+    ]);
   };
 
   const confirmReceipt = async (orderId: string, data: any) => {
     await financialActionService.processRecord(`so-${orderId}`, data, 'sales_order');
-    refreshData();
+    await refreshData();
   };
 
   const saveNote = async (order: SalesOrder, note: OrderNote) => {
     await salesService.update({ ...order, notesList: [note, ...(order.notesList || [])] });
-    refreshData();
+    await refreshData();
   };
 
   return {

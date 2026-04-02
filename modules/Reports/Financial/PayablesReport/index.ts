@@ -1,7 +1,7 @@
 
 import { DollarSign } from 'lucide-react';
 import { ReportModule } from '../../types';
-import { reportsCache } from '../../../../services/reportsCache';
+import { financialIntegrationService } from '../../../../services/financialIntegrationService';
 import Template from './Template';
 import PdfDocument from './PdfDocument';
 import DefaultFilters from '../../components/DefaultFilters';
@@ -20,8 +20,8 @@ const payablesReport: ReportModule = {
     endDate: new Date(new Date().getFullYear(), new Date().getMonth() + 2, 0).toISOString().split('T')[0], // +2 months for payables
   },
   FilterComponent: DefaultFilters,
-  fetchData: ({ startDate, endDate }) => {
-    const all = reportsCache.getPayables();
+  fetchData: async ({ startDate, endDate }) => {
+    const all = await financialIntegrationService.getPayables();
     const records = all.filter(r => {
       // Empréstimos ativos sempre aparecem (são contratos de longo prazo)
       const isActiveLoan = r.subType === 'loan_taken' && r.status !== 'paid';

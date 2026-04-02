@@ -10,7 +10,8 @@ import { isSqlCanonicalOpsEnabled } from '../../sqlCanonicalOps';
 export const handleShareholderPayment = async (
     shareholderId: string,
     data: PaymentData,
-    type: 'credit' | 'debit'
+    type: 'credit' | 'debit',
+    shareholderTxId?: string
 ): Promise<PaymentResult> => {
     const txId = generateTxId();
     const transactionValue = data.amount;
@@ -34,7 +35,8 @@ export const handleShareholderPayment = async (
         historyType: 'Movimentação de Sócio',
         entityName: data.entityName || 'Sócio',
         partnerId: data.partnerId,
-        notes: data.notes
+        notes: data.notes,
+        shareholderTxId
     });
 
     // Nota: A atualização do saldo do sócio (tabela shareholder_transactions) 

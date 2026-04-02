@@ -21,8 +21,8 @@ const payablesSummaryPartner: ReportModule = {
     partnerId: ''
   },
   FilterComponent: Filters,
-  fetchData: ({ startDate, endDate, partnerId }) => {
-    const payables = financialIntegrationService.getPayables()
+  fetchData: async ({ startDate, endDate, partnerId }) => {
+    const payables = (await financialIntegrationService.getPayables())
       .filter(r => r.status !== 'paid');
 
     const advances = advanceService.getAllTransactions()

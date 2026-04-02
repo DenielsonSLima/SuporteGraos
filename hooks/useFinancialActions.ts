@@ -42,12 +42,16 @@ export function useProcessPayment() {
   return useMutation({
     mutationFn: (params: { recordId: string; data: any; subType?: string }) =>
       financialActionService.processRecord(params.recordId, params.data, params.subType),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: QUERY_KEYS.STANDALONE_RECORDS });
-      void qc.invalidateQueries({ queryKey: QUERY_KEYS.TRANSFERS });
-      void qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS });
-      void qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_ENTRIES });
-      void qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_TRANSACTIONS });
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.STANDALONE_RECORDS }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.TRANSFERS }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_ENTRIES }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_TRANSACTIONS }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
+      ]);
     },
   });
 }
@@ -57,9 +61,12 @@ export function useAddAdminExpense() {
   return useMutation({
     mutationFn: (record: FinancialRecord) =>
       financialActionService.addAdminExpense(record),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: QUERY_KEYS.STANDALONE_RECORDS });
-      void qc.invalidateQueries({ queryKey: QUERY_KEYS.ADMIN_EXPENSES });
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.STANDALONE_RECORDS }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.ADMIN_EXPENSES }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD })
+      ]);
     },
   });
 }
@@ -69,9 +76,12 @@ export function useDeleteStandaloneRecord() {
   return useMutation({
     mutationFn: (id: string) =>
       financialActionService.deleteStandaloneRecord(id),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: QUERY_KEYS.STANDALONE_RECORDS });
-      void qc.invalidateQueries({ queryKey: QUERY_KEYS.ADMIN_EXPENSES });
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.STANDALONE_RECORDS }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.ADMIN_EXPENSES }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD })
+      ]);
     },
   });
 }
@@ -81,9 +91,11 @@ export function useAddTransfer() {
   return useMutation({
     mutationFn: (transfer: any) =>
       financialActionService.addTransfer(transfer),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: QUERY_KEYS.TRANSFERS });
-      void qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS });
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.TRANSFERS }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS })
+      ]);
     },
   });
 }
@@ -93,9 +105,11 @@ export function useUpdateTransfer() {
   return useMutation({
     mutationFn: (transfer: any) =>
       financialActionService.updateTransfer(transfer),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: QUERY_KEYS.TRANSFERS });
-      void qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS });
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.TRANSFERS }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS })
+      ]);
     },
   });
 }
@@ -105,9 +119,11 @@ export function useDeleteTransfer() {
   return useMutation({
     mutationFn: (id: string) =>
       financialActionService.deleteTransfer(id),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: QUERY_KEYS.TRANSFERS });
-      void qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS });
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.TRANSFERS }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS })
+      ]);
     },
   });
 }

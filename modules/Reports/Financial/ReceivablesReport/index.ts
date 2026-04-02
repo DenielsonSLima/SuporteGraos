@@ -1,7 +1,7 @@
 
 import { HandCoins } from 'lucide-react';
 import { ReportModule } from '../../types';
-import { reportsCache } from '../../../../services/reportsCache';
+import { financialIntegrationService } from '../../../../services/financialIntegrationService';
 import Template from './Template';
 import PdfDocument from './PdfDocument';
 import DefaultFilters from '../../components/DefaultFilters';
@@ -20,8 +20,8 @@ const receivablesReport: ReportModule = {
     endDate: new Date(new Date().getFullYear(), new Date().getMonth() + 2, 0).toISOString().split('T')[0],
   },
   FilterComponent: DefaultFilters,
-  fetchData: ({ startDate, endDate }) => {
-    const all = reportsCache.getReceivables();
+  fetchData: async ({ startDate, endDate }) => {
+    const all = await financialIntegrationService.getReceivables();
     const records = all.filter(r => {
       // Empréstimos concedidos ativos sempre aparecem (são contratos de longo prazo)
       const isActiveLoan = r.subType === 'loan_granted' && r.status !== 'paid';

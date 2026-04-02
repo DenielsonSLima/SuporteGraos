@@ -62,10 +62,15 @@ const SalesOrderDetails: React.FC<Props> = ({ order, onBack, onEdit, onDelete, o
   const stats = useSalesOrderStats(currentOrder, loadings, realTransactions);
 
   const handleConfirmReceipt = async (data: any) => {
-    await confirmReceipt(currentOrder.id, data);
-    setIsPayModalOpen(false);
-    addToast('success', 'Recebimento Registrado');
-    if (stats.balance <= data.amount + 1) setIsFinalizePromptOpen(true);
+    try {
+      await confirmReceipt(currentOrder.id, data);
+      setIsPayModalOpen(false);
+      addToast('success', 'Recebimento Registrado');
+      if (stats.balance <= data.amount + 1) setIsFinalizePromptOpen(true);
+    } catch (error: any) {
+      console.error('[SalesOrderDetails] Erro ao confirmar recebimento:', error);
+      addToast('error', `Falha ao registrar: ${error.message || 'Erro desconhecido'}`);
+    }
   };
 
   return (
@@ -130,7 +135,14 @@ const SalesOrderDetails: React.FC<Props> = ({ order, onBack, onEdit, onDelete, o
       <SalesLoadingsTable loadings={loadings} onNavigateToPurchase={(id) => navigateTo(ModuleId.PURCHASE_ORDER, id)} onViewLoading={setSelectedLoading} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
-        <SalesFinancialCard orderId={currentOrder.id} transactions={realTransactions} totalOrderValue={stats.totalDeliveredVal} onAddReceipt={() => setIsPayModalOpen(true)} onRefresh={refreshData} />
+        <SalesFinancialCard 
+          orderId={currentOrder.id} 
+          transactions={realTransactions} 
+          paidValue={stats.totalReceived} 
+          balanceValue={stats.balance} 
+          onAddReceipt={() => setIsPayModalOpen(true)} 
+          onRefresh={refreshData} 
+        />
         <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
           <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest mb-6 border-b border-slate-50 pb-2">Anotações da Venda</h3>
           <button onClick={() => setIsNoteModalOpen(true)} className="w-full py-3 border-2 border-dashed border-slate-200 rounded-xl text-[10px] font-black uppercase text-slate-400 hover:border-blue-300 hover:text-blue-600 transition-all">+ Nova Observação</button>

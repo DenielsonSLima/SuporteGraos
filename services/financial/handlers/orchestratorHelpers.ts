@@ -97,7 +97,8 @@ export const registerFinancialRecords = async (params: RegisterFinancialParams) 
         salesOrderId: referenceType === 'sales_order' ? referenceId : (recordId.startsWith('so-') ? recordId : undefined),
         loadingId: referenceType === 'loading' ? referenceId : (recordId.startsWith('fr-') ? recordId : undefined),
         commissionId: referenceType === 'commission' ? referenceId : undefined,
-        standaloneId: !['purchase_order', 'sales_order', 'loading', 'commission'].includes(referenceType) ? recordId : undefined
+        standaloneId: !['purchase_order', 'sales_order', 'loading', 'commission', 'shareholder'].includes(referenceType) ? recordId : undefined,
+        shareholderTxId: params.shareholderTxId
       };
 
       txResult = await financialTransactionService.add({

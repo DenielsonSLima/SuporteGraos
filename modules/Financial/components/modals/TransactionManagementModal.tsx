@@ -11,8 +11,8 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   transaction: OrderTransaction;
-  onUpdate: (data: OrderTransaction) => void;
-  onDelete: (id: string) => void;
+  onUpdate: (data: OrderTransaction) => void | Promise<void>;
+  onDelete: (id: string) => void | Promise<void>;
   title?: string;
 }
 
@@ -124,7 +124,10 @@ const TransactionManagementModal: React.FC<Props> = ({ isOpen, onClose, transact
         <ActionConfirmationModal 
           isOpen={isDeleteConfirmOpen}
           onClose={() => setIsDeleteConfirmOpen(false)}
-          onConfirm={() => { onDelete(transaction.id); onClose(); }}
+          onConfirm={async () => { 
+            await onDelete(transaction.id); 
+            onClose(); 
+          }}
           title="Estornar Lançamento?"
           description="Esta operação removerá o valor do fluxo de caixa e o saldo voltará a constar como aberto no pedido. Deseja continuar?"
           type="danger"

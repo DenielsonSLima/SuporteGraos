@@ -40,53 +40,68 @@ export function useFinancialRecordDetailsModal({
   }, [record, isSystem]);
 
   const handleDelete = async () => {
-    if (standaloneRecordsService.getById(record.id)) {
-      await standaloneRecordsService.delete(record.id);
-      addToast('success', 'Registro Avulso Excluído');
+    try {
+      if (standaloneRecordsService.getById(record.id)) {
+        await standaloneRecordsService.delete(record.id);
+        addToast('success', 'Registro Avulso Excluído');
+        onRefresh();
+        onClose();
+        return;
+      }
+
+      if (financialHistoryService.getById(record.id)) {
+        await financialHistoryService.delete(record.id);
+        addToast('success', 'Registro Estornado', 'Um estorno compensatório foi criado no histórico.');
+        onRefresh();
+        onClose();
+        return;
+      }
+
+      if (isSystem) {
+        addToast('warning', 'Registro Bloqueado', 'Para excluir um saldo de pedido, você deve estornar os pagamentos individuais ou excluir o pedido na origem.');
+        return;
+      }
+
+      await (financialActionService as any).deleteStandaloneRecord?.(record.id);
+      addToast('success', 'Registro Excluído');
       onRefresh();
       onClose();
-      return;
+    } catch (err: any) {
+      console.error('[useFinancialRecordDetailsModal] Erro ao excluir:', err);
+      addToast('error', 'Falha ao Excluir', err.message || 'Erro inesperado ao excluir o registro.');
     }
+  };
 
-    if (financialHistoryService.getById(record.id)) {
-      await financialHistoryService.delete(record.id);
-      addToast('success', 'Registro Estornado', 'Um estorno compensatório foi criado no histórico.');
+  const handleUpdateTx = async (updated: any) => {
+    try {
+      if (record.subType === 'purchase_order') {
+        await purchaseService.updateTransaction(record.id.replace('po-grain-', ''), updated);
+      } else if (record.subType === 'sales_order') {
+        await salesService.updateTransaction(record.id.replace('so-', ''), updated);
+      }
       onRefresh();
-      onClose();
-      return;
+      setSelectedTx(null);
+      addToast('success', 'Pagamento Atualizado');
+    } catch (err: any) {
+      console.error('[useFinancialRecordDetailsModal] Erro ao atualizar:', err);
+      addToast('error', 'Falha ao Atualizar', err.message || 'Erro inesperado.');
     }
-
-    if (isSystem) {
-      addToast('warning', 'Registro Bloqueado', 'Para excluir um saldo de pedido, você deve estornar os pagamentos individuais ou excluir o pedido na origem.');
-      return;
-    }
-
-    (financialActionService as any).deleteStandaloneRecord?.(record.id);
-    addToast('success', 'Registro Excluído');
-    onRefresh();
-    onClose();
   };
 
-  const handleUpdateTx = (updated: any) => {
-    if (record.subType === 'purchase_order') {
-      purchaseService.updateTransaction(record.id.replace('po-grain-', ''), updated);
-    } else if (record.subType === 'sales_order') {
-      salesService.updateTransaction(record.id.replace('so-', ''), updated);
+  const handleDeleteTx = async (id: string) => {
+    try {
+      if (record.subType === 'purchase_order') {
+        await purchaseService.deleteTransaction(record.id.replace('po-grain-', ''), id);
+      } else if (record.subType === 'sales_order') {
+        await salesService.deleteTransaction(record.id.replace('so-', ''), id);
+      }
+      onRefresh();
+      setSelectedTx(null);
+      addToast('success', 'Pagamento Estornado');
+    } catch (err: any) {
+      console.error('[useFinancialRecordDetailsModal] Erro ao estornar:', err);
+      addToast('error', 'Falha ao Estornar', err.message || 'Erro inesperado ao processar o estorno.');
     }
-    onRefresh();
-    setSelectedTx(null);
-    addToast('success', 'Pagamento Atualizado');
-  };
-
-  const handleDeleteTx = (id: string) => {
-    if (record.subType === 'purchase_order') {
-      purchaseService.deleteTransaction(record.id.replace('po-grain-', ''), id);
-    } else if (record.subType === 'sales_order') {
-      salesService.deleteTransaction(record.id.replace('so-', ''), id);
-    }
-    onRefresh();
-    setSelectedTx(null);
-    addToast('success', 'Pagamento Estornado');
   };
 
   const handleNavigateToOrigin = () => {

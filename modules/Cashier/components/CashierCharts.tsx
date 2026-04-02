@@ -1,5 +1,4 @@
-
-import React from 'react';
+import React, { useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { CashierReport } from '../types';
 
@@ -15,7 +14,7 @@ const CashierCharts: React.FC<Props> = ({ data }) => {
     maximumFractionDigits: 2
   }).format(val);
 
-  const incomeData = [
+  const incomeData = useMemo(() => [
     { name: 'Em Contas', value: data.totalBankBalance, color: '#3b82f6' },
     { name: 'Vendas a Receber', value: data.pendingSalesReceipts, color: '#10b981' },
     { name: 'Patrimônio', value: data.totalFixedAssetsValue, color: '#6366f1' },
@@ -24,25 +23,23 @@ const CashierCharts: React.FC<Props> = ({ data }) => {
     { name: 'Mercad. em Trânsito', value: data.merchandiseInTransitValue, color: '#f59e0b' },
     { name: 'Haveres de Sócios', value: data.shareholderReceivables, color: '#eab308' },
     { name: 'Adiant. Concedidos', value: data.advancesGiven, color: '#d97706' },
-  ].filter(d => d.value > 0);
+  ].filter(d => d.value > 0), [data]);
 
-  // Total de ativos vem pré-calculado do SQL — frontend NÃO recalcula
-  const totalIncome = data.totalAssets;
-
-  const expenseData = [
+  const expenseData = useMemo(() => [
     { name: 'Fornecedores (Grãos)', value: data.pendingPurchasePayments, color: '#ef4444' },
     { name: 'Fretes a Pagar', value: data.pendingFreightPayments, color: '#f97316' },
     { name: 'Adiant. Recebidos', value: data.advancesTaken, color: '#8b5cf6' },
     { name: 'Empréstimos Tomados', value: data.loansTaken, color: '#ec4899' },
     { name: 'Comissões a Pagar', value: data.commissionsToPay, color: '#f43f5e' },
     { name: 'Obrigações com Sócios', value: data.shareholderPayables, color: '#64748b' },
-  ].filter(d => d.value > 0);
+  ].filter(d => d.value > 0), [data]);
 
-  // Total de passivos vem pré-calculado do SQL — frontend NÃO recalcula
+  // Total de ativos vem pré-calculado do SQL — frontend NÃO recalcula
+  const totalIncome = data.totalAssets;
   const totalExpense = data.totalLiabilities;
 
-  const ChartCard = ({ title, chartData, total }: any) => (
-    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col h-auto min-h-[450px]">
+  const ChartCard = useMemo(() => React.memo(({ title, chartData, total }: any) => (
+    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col h-auto min-h-[450px] animate-in fade-in duration-700">
       <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 text-center">{title}</h4>
 
       <div className="h-64 w-full relative mb-6">
@@ -56,8 +53,8 @@ const CashierCharts: React.FC<Props> = ({ data }) => {
               outerRadius={95}
               paddingAngle={4}
               dataKey="value"
-              animationBegin={0}
-              animationDuration={800}
+              animationBegin={100}
+              animationDuration={600}
             >
               {chartData.map((entry: any, index: number) => (
                 <Cell key={`cell-${index}`} fill={entry.color} stroke="none" className="hover:opacity-80 transition-opacity" />
@@ -94,7 +91,7 @@ const CashierCharts: React.FC<Props> = ({ data }) => {
         })}
       </div>
     </div>
-  );
+  )), [currency]);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">

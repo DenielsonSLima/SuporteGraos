@@ -25,12 +25,19 @@ export const useCarrierFinancials = (carrierName: string, allFreights: Freight[]
   }, [carrierName]);
 
   const totals = useMemo(() => {
-    const totalDebt = carrierFreights.reduce((acc, f) => acc + f.balanceValue, 0);
-    const totalAdvances = carrierFreights.reduce((acc, f) => acc + f.advanceValue, 0);
-    
-    const selectedDebt = carrierFreights
-        .filter(f => selectedFreightIds.includes(f.id))
-        .reduce((acc, f) => acc + f.balanceValue, 0);
+    // Backend Cérebro: Não usamos mais .reduce() complexo para cálculos financeiros.
+    // As colunas balanceValue e advanceValue já vêm prontas do banco de dados (Trigger/View).
+    let totalDebt = 0;
+    let totalAdvances = 0;
+    let selectedDebt = 0;
+
+    carrierFreights.forEach(f => {
+      totalDebt += f.balanceValue || 0;
+      totalAdvances += f.advanceValue || 0;
+      if (selectedFreightIds.includes(f.id)) {
+        selectedDebt += f.balanceValue || 0;
+      }
+    });
 
     return { totalDebt, totalAdvances, selectedDebt, globalCredit };
   }, [carrierFreights, selectedFreightIds, globalCredit]);

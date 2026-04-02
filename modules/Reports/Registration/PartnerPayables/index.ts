@@ -22,9 +22,9 @@ const partnerPayablesReport: ReportModule = {
     partnerName: ''
   },
   FilterComponent: Filters,
-  fetchData: ({ startDate, endDate, partnerName }) => {
+  fetchData: async ({ startDate, endDate, partnerName }) => {
     // 1. Get Payables from Integration (Purchase, Freight, Commissions)
-    const payables = financialIntegrationService.getPayables()
+    const payables = (await financialIntegrationService.getPayables())
       .filter(r => r.status !== 'paid' && ['purchase_order', 'freight', 'commission'].includes(r.subType || ''));
 
     // 2. Get Advances TAKEN (Liabilities)

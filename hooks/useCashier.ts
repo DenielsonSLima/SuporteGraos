@@ -61,7 +61,7 @@ export function useCashierCurrentMonth() {
   return useQuery({
     queryKey: QUERY_KEYS.CASHIER_CURRENT,
     queryFn: () => cashierService.getCurrentMonthReport(),
-    staleTime: STALE_TIMES.VOLATILE,
+    staleTime: 5000, // ⚡ Dados estáveis por 5s ao abrir a aba (previne flick de refetch imediato)
     placeholderData: keepPreviousData,
   });
 }

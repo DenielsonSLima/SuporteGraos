@@ -49,6 +49,8 @@ export interface SalesOrder {
   // Financials
   transactions: SalesTransaction[];
   paidValue: number; // Amount received so far
+  balanceValue: number; // Saldo pendente (Backend-driven)
+  discountValue: number; // Novidade: descontos via DB
 
   // Logistics
   loadings: SalesLoading[];
@@ -59,6 +61,12 @@ export interface SalesOrder {
   loadCount?: number;        // Total de carregamentos entregues
   transitCount?: number;     // Cargas ainda na estrada
   transitValue?: number;     // Valor projetado em trânsito
+  
+  // Performance Stats (Backend-driven)
+  totalGrainCost?: number;
+  totalFreightCost?: number;
+  totalWeightKgOrig?: number;
+  totalWeightKgDest?: number;
 
   status: SalesStatus;
   notes?: string; // Mantido para compatibilidade

@@ -19,8 +19,8 @@ const expensesDetailedReport: ReportModule = {
     endDate: new Date().toISOString().split('T')[0],
   },
   FilterComponent: DefaultFilters,
-  fetchData: ({ startDate, endDate }) => {
-    const payables = financialIntegrationService.getPayables();
+  fetchData: async ({ startDate, endDate }) => {
+    const payables = await financialIntegrationService.getPayables();
     
     // Filtra apenas despesas administrativas (exclui compras, fretes e recebíveis)
     const records = payables.filter(r => {

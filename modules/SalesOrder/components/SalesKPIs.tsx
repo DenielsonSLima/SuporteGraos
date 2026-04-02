@@ -13,21 +13,23 @@ const SalesKPIs: React.FC<Props> = React.memo(({ orders }) => {
   // ═══════ Stats vindos do SQL (VIEW vw_sales_orders_enriched) ═══════
   // Zero cálculo no frontend — apenas soma valores pré-calculados pelo banco
   const stats = useMemo(() => {
-    const totalContractValue = orders.reduce((acc, o) => acc + o.totalValue, 0);
-    const totalDeliveredValue = orders.reduce((acc, o) => acc + (o.deliveredValue ?? 0), 0);
-    const totalReceived = orders.reduce((acc, o) => acc + (o.paidValue ?? 0), 0);
-    const totalTransitValue = orders.reduce((acc, o) => acc + (o.transitValue ?? 0), 0);
-    const transitCount = orders.reduce((acc, o) => acc + (o.transitCount ?? 0), 0);
-    const pendingReceipt = Math.max(0, totalDeliveredValue - totalReceived);
-
-    return {
-        totalContractValue,
-        totalDeliveredValue,
-        pendingReceipt,
-        totalTransitValue,
-        count: orders.length,
-        transitCount
-    };
+    return orders.reduce((acc, o) => {
+      acc.totalContractValue += o.totalValue;
+      acc.totalDeliveredValue += (o.deliveredValue ?? 0);
+      acc.totalReceived += (o.paidValue ?? 0);
+      acc.totalTransitValue += (o.transitValue ?? 0);
+      acc.transitCount += (o.transitCount ?? 0);
+      acc.pendingReceipt = Math.max(0, acc.totalDeliveredValue - acc.totalReceived);
+      return acc;
+    }, {
+      totalContractValue: 0,
+      totalDeliveredValue: 0,
+      totalReceived: 0,
+      totalTransitValue: 0,
+      transitCount: 0,
+      count: orders.length,
+      pendingReceipt: 0
+    });
   }, [orders]);
 
   const StatCard = ({ label, value, icon: Icon, color, subtext, bgClass }: any) => (

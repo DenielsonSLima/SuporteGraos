@@ -9,9 +9,7 @@ import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-quer
 import { useEffect, useRef } from 'react';
 import { dashboardService } from '../modules/Dashboard/services/dashboardService';
 import { supabase } from '../services/supabase';
-import { STALE_TIMES } from './queryKeys';
-
-const DASHBOARD_KEY = ['dashboard'] as const;
+import { QUERY_KEYS, STALE_TIMES } from './queryKeys';
 
 export function useDashboard() {
   const queryClient = useQueryClient();
@@ -22,7 +20,7 @@ export function useDashboard() {
     const invalidate = () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: DASHBOARD_KEY });
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD });
       }, 500);
     };
 
@@ -49,7 +47,7 @@ export function useDashboard() {
 
   // Query: carrega dados com cache
   return useQuery({
-    queryKey: DASHBOARD_KEY,
+    queryKey: QUERY_KEYS.DASHBOARD,
     queryFn: () => dashboardService.getDashboardData(),
     staleTime: STALE_TIMES.VOLATILE,
     placeholderData: keepPreviousData,

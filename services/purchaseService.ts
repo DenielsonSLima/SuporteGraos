@@ -33,7 +33,7 @@ const loadFromSupabase = async (): Promise<PurchaseOrder[]> => {
     try {
       const user = authService.getCurrentUser();
       let query = supabase
-        .from('ops_purchase_orders')
+        .from('vw_purchase_orders_enriched')
         .select('*');
 
       if (user?.companyId) {
@@ -338,14 +338,7 @@ export const purchaseService = {
     }
 
     const newTxs = (order.transactions || []).map(t => t.id === updatedTx.id ? updatedTx : t);
-    const updated = isSqlCanonicalOpsEnabled()
-      ? { ...order, transactions: newTxs }
-      : {
-        ...order,
-        transactions: newTxs,
-        paidValue: newTxs.filter(t => t.type === 'payment' || t.type === 'advance').reduce((acc, t) => acc + t.value, 0),
-        discountValue: newTxs.reduce((acc, t) => acc + (t.discountValue || 0), 0)
-      };
+    const updated = { ...order, transactions: newTxs };
     db.update(updated);
     void persistUpsert(updated);
     // ❌ REMOVIDO: void financialSyncService.syncPurchaseOrder(orderId);
@@ -371,14 +364,7 @@ export const purchaseService = {
     // Financial records should be managed via Financial module if needed.
 
     const newTxs = (order.transactions || []).filter(t => t.id !== txId);
-    const updated = isSqlCanonicalOpsEnabled()
-      ? { ...order, transactions: newTxs }
-      : {
-        ...order,
-        transactions: newTxs,
-        paidValue: newTxs.filter(t => t.type === 'payment' || t.type === 'advance').reduce((acc, t) => acc + t.value, 0),
-        discountValue: newTxs.reduce((acc, t) => acc + (t.discountValue || 0), 0)
-      };
+    const updated = { ...order, transactions: newTxs };
     db.update(updated);
     void persistUpsert(updated);
     // ❌ REMOVIDO: void financialSyncService.syncPurchaseOrder(orderId);

@@ -216,7 +216,7 @@ const PayablesTab: React.FC = () => {
               <h2 className="text-xl font-black text-slate-800 uppercase tracking-tighter italic">Fluxo de Compras</h2>
               <span className="text-[10px] font-black bg-rose-100 text-rose-600 px-3 py-1 rounded-full uppercase tracking-widest leading-none">{allPurchases.length} títulos</span>
             </div>
-            <UnifiedPayableManager type="purchase" records={paginatedPurchases} onRefresh={() => { }} searchTerm={searchTerm} hideSearchBar={true} />
+            <UnifiedPayableManager type="purchase" records={paginatedPurchases} onRefresh={() => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_PAYABLES })} searchTerm={searchTerm} hideSearchBar={true} />
           </section>
 
           <section className="space-y-6">
@@ -224,7 +224,7 @@ const PayablesTab: React.FC = () => {
               <h2 className="text-xl font-black text-slate-800 uppercase tracking-tighter italic">Logística de Cargas</h2>
               <span className="text-[10px] font-black bg-blue-100 text-blue-600 px-3 py-1 rounded-full uppercase tracking-widest leading-none">{allFreights.length} títulos</span>
             </div>
-            <UnifiedPayableManager type="freight" records={paginatedFreights} onRefresh={() => { }} searchTerm={searchTerm} hideSearchBar={true} />
+            <UnifiedPayableManager type="freight" records={paginatedFreights} onRefresh={() => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_PAYABLES })} searchTerm={searchTerm} hideSearchBar={true} />
           </section>
 
           <section className="space-y-6">
@@ -232,7 +232,7 @@ const PayablesTab: React.FC = () => {
               <h2 className="text-xl font-black text-slate-800 uppercase tracking-tighter italic">Comissões Comerciais</h2>
               <span className="text-[10px] font-black bg-violet-100 text-violet-600 px-3 py-1 rounded-full uppercase tracking-widest leading-none">{allCommissions.length} títulos</span>
             </div>
-            <UnifiedPayableManager type="commission" records={paginatedCommissions} onRefresh={() => { }} searchTerm={searchTerm} hideSearchBar={true} />
+            <UnifiedPayableManager type="commission" records={paginatedCommissions} onRefresh={() => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_PAYABLES })} searchTerm={searchTerm} hideSearchBar={true} />
           </section>
         </div>
       ) : (
@@ -249,7 +249,7 @@ const PayablesTab: React.FC = () => {
               );
               return isTypeMatch && r.status !== 'paid';
             })}
-            onRefresh={() => { }}
+            onRefresh={() => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_PAYABLES })}
           />
         </div>
       )}

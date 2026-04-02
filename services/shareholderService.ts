@@ -284,7 +284,7 @@ export const shareholderService = {
 
     if (!profile?.company_id) throw new Error('Usuário sem empresa vinculada');
 
-    const { error } = await supabase.from('shareholder_transactions').insert({
+    const { data: txRow, error: txErr } = await supabase.from('shareholder_transactions').insert({
       company_id: profile.company_id,
       shareholder_id: shareholderId,
       date: tx.date,
@@ -292,16 +292,14 @@ export const shareholderService = {
       value: tx.value,
       description: tx.description || '',
       account_name: tx.accountId ?? null,
-    });
-
-    if (error) throw new Error(`Erro ao registrar transação: ${error.message}`);
+    }).select().single();
+    
+    if (txErr) throw new Error(`Erro ao registrar transação: ${txErr.message}`);
 
     // ✅ NOVO: Sincronizar com o Ledger Bancário se houver conta vinculada
     if (tx.accountId) {
       try {
         const { handleShareholderPayment, resolveAccountLabel } = await import('./financial/paymentOrchestrator');
-
-        // Buscar o nome do sócio para o log (opcional, mas bom pra UX)
         const shareholder = db.getById(shareholderId);
 
         await handleShareholderPayment(
@@ -315,7 +313,8 @@ export const shareholderService = {
             entityName: shareholder?.name || 'Sócio',
             notes: tx.description
           },
-          tx.type // 'credit' ou 'debit'
+          tx.type,
+          txRow.id // Passando o ID gerado para o link robusto
         );
       } catch (syncErr) {
         console.warn('[shareholderService] Falha ao sincronizar com Ledger Bancário:', syncErr);
@@ -353,6 +352,21 @@ export const shareholderService = {
     shareholderId: string,
     tx: ShareholderTransaction,
   ): Promise<void> => {
+    // 1. Verificar se existe transação bancária vinculada
+    const { financialTransactionService } = await import('./financial/financialTransactionService');
+    const links = await financialTransactionService.getLinksByEntity(tx.id, 'shareholder_tx');
+    
+    // 2. Se houver link, deletar (estornar) a transação antiga no banco primeiro
+    // para limpar o ledger antes de re-criar a nova versão.
+    if (links && links.length > 0) {
+        for (const link of links) {
+            if (link.transaction_id) {
+                await financialTransactionService.delete(link.transaction_id);
+            }
+        }
+    }
+
+    // 3. Atualizar a transação do sócio
     const { error } = await supabase
       .from('shareholder_transactions')
       .update({
@@ -366,6 +380,27 @@ export const shareholderService = {
 
     if (error) throw new Error(`Erro ao atualizar transação: ${error.message}`);
 
+    // 4. Se a nova versão tiver conta vinculada, gerar nova entrada no banco
+    if (tx.accountId) {
+        const { handleShareholderPayment, resolveAccountLabel } = await import('./financial/paymentOrchestrator');
+        const shareholder = db.getById(shareholderId);
+        
+        await handleShareholderPayment(
+            shareholderId,
+            {
+                date: tx.date,
+                amount: tx.value,
+                discount: 0,
+                accountId: tx.accountId,
+                accountName: resolveAccountLabel(tx.accountId),
+                entityName: shareholder?.name || 'Sócio',
+                notes: `(Editado) ${tx.description}`
+            },
+            tx.type,
+            tx.id
+        );
+    }
+
     await shareholderService._recalcBalance(shareholderId);
     await shareholderService.loadFromSupabase();
     invalidateDashboardCache();
@@ -378,6 +413,23 @@ export const shareholderService = {
     shareholderId: string,
     txId: string,
   ): Promise<void> => {
+    // 1. Estornar transações bancárias vinculadas
+    try {
+        const { financialTransactionService } = await import('./financial/financialTransactionService');
+        const links = await financialTransactionService.getLinksByEntity(txId, 'shareholder_tx');
+        
+        if (links && links.length > 0) {
+            for (const link of links) {
+                if (link.transaction_id) {
+                    await financialTransactionService.delete(link.transaction_id);
+                }
+            }
+        }
+    } catch (linkErr) {
+        console.warn('[shareholderService] Falha ao estornar vínculo bancário:', linkErr);
+    }
+
+    // 2. Excluir a transação do sócio
     const { error } = await supabase
       .from('shareholder_transactions')
       .delete()
