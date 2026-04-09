@@ -30,13 +30,7 @@ export function useLogisticsKPIs(filters: LogisticsKPIFilters = {}) {
     searchTerm: filters.searchTerm || '',
   }), [filters.carrierName, filters.startDate, filters.endDate, filters.searchTerm]);
 
-  // Invalida quando loadings mudam (realtime)
-  useEffect(() => {
-    const unsub = loadingService.subscribe(() => {
-      queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.FREIGHTS, 'kpis'] });
-    });
-    return unsub;
-  }, [queryClient]);
+  // A invalidação agora é gerenciada globalmente pelo Realtime Sync do Supabase
 
   return useQuery({
     queryKey: [...QUERY_KEYS.FREIGHTS, 'kpis', stableFilters],

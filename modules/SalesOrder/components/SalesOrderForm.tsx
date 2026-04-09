@@ -22,7 +22,7 @@ const SalesOrderForm: React.FC<Props> = ({ initialData, onSave, onCancel }) => {
     quantity: 0,
     unitPrice: 0,
     totalValue: 0,
-    status: 'draft',
+    status: 'pending',
     date: new Date().toISOString().split('T')[0],
     ...initialData,
     id: initialData?.id || crypto.randomUUID(),
@@ -184,7 +184,7 @@ const SalesOrderForm: React.FC<Props> = ({ initialData, onSave, onCancel }) => {
                                         >
                                             <div className="font-black text-slate-900 uppercase text-sm group-hover:text-emerald-700 transition-colors">{p.name}</div>
                                             <div className="flex justify-between items-center mt-1 text-[10px] font-bold text-slate-400 uppercase tracking-tight">
-                                                <span className="flex items-center gap-1"><FileText size={10}/> {p.document}</span>
+                                                <span className="flex items-center gap-1"><FileText size={10}/> {p.document}{p.nickname ? ` • ${p.nickname}` : ''}</span>
                                                 <span className="flex items-center gap-1"><MapPin size={10}/> {p.address?.cityName || (p.address as any)?.city || 'N/D'}/{p.address?.stateUf || (p.address as any)?.state || '??'}</span>
                                             </div>
                                         </div>

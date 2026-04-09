@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { ArrowLeft, ShieldCheck, UserCheck } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, UserCheck, X } from 'lucide-react';
 import { PurchaseOrder, OrderTransaction } from '../types';
 
 // HOOK PERSONALIZADO
@@ -47,6 +47,7 @@ const OrderDetails: React.FC<Props> = ({ order, onBack, onEdit, onDelete, onFina
     mergedTransactions,
     isFinalizePromptOpen,
     setIsFinalizePromptOpen,
+    isProcessing,
     actions
   } = usePurchaseOrderLogic(order, onFinalize);
 
@@ -115,7 +116,7 @@ const OrderDetails: React.FC<Props> = ({ order, onBack, onEdit, onDelete, onFina
             <ArrowLeft size={22} />
           </button>
           <div>
-            <h1 className="text-3xl font-black text-slate-900 tracking-tight italic uppercase">Compra {currentOrder.number}</h1>
+            <h1 className="text-3xl font-black text-slate-900 tracking-tight uppercase">Compra {currentOrder.number}</h1>
             <p className="text-xs text-slate-500 font-black uppercase tracking-widest mt-1">Status: {currentOrder.status}</p>
           </div>
         </div>
@@ -130,9 +131,38 @@ const OrderDetails: React.FC<Props> = ({ order, onBack, onEdit, onDelete, onFina
 
           <div className="w-px h-10 bg-slate-200 mx-1"></div>
 
-          {currentOrder.status !== 'completed' && (
-            <button onClick={onFinalize} className="px-4 py-2.5 rounded-xl bg-emerald-600 text-xs font-black uppercase text-white hover:bg-emerald-700 shadow-lg">Finalizar</button>
+          {currentOrder.status !== 'completed' ? (
+            <button disabled={isProcessing} onClick={onFinalize} className="px-4 py-2.5 rounded-xl bg-emerald-600 text-xs font-black uppercase text-white hover:bg-emerald-700 shadow-lg transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2">
+              {isProcessing && <div className="w-3 h-3 rounded-full border-2 border-white border-t-emerald-600 animate-spin"></div>}
+              Finalizar
+            </button>
+          ) : (
+            <button disabled={isProcessing} onClick={actions.handleReopen} className="px-4 py-2.5 rounded-xl border-2 border-amber-500 bg-amber-50 text-xs font-black uppercase text-amber-700 hover:bg-amber-100 transition-all active:scale-95 shadow-sm disabled:opacity-50 flex items-center gap-2">
+              {isProcessing && <div className="w-3 h-3 rounded-full border-2 border-amber-500 border-t-amber-100 animate-spin"></div>}
+              Reabrir Pedido
+            </button>
           )}
+
+          {currentOrder.status !== 'canceled' && currentOrder.status !== 'completed' && (
+            <button
+              onClick={() => {
+                setActionModal({
+                  isOpen: true,
+                  type: 'danger',
+                  title: 'Cancelar Pedido?',
+                  description: 'Esta ação irá cancelar o pedido e invalidar todos os lançamentos financeiros vinculados no banco de dados.',
+                  onConfirm: () => {
+                    actions.handleCancel('Cancelado via Detalhes');
+                    setActionModal(prev => ({ ...prev, isOpen: false }));
+                  }
+                });
+              }}
+              className="px-4 py-2.5 rounded-xl border border-red-200 bg-red-50 text-xs font-black uppercase text-red-700 hover:bg-red-100 transition-all flex items-center gap-2"
+            >
+              <X size={16} /> Cancelar Pedido
+            </button>
+          )}
+
           <button onClick={onEdit} className="px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-xs font-black uppercase text-slate-700 hover:bg-slate-50 transition-all">Editar</button>
           <button onClick={onDelete} className="px-4 py-2.5 rounded-xl border border-red-100 bg-white text-xs font-black uppercase text-red-600 hover:bg-red-50 transition-all">Excluir</button>
         </div>
@@ -177,10 +207,12 @@ const OrderDetails: React.FC<Props> = ({ order, onBack, onEdit, onDelete, onFina
         <OrderFinancialCard
           orderId={currentOrder.id}
           transactions={mergedTransactions}
-          paidValue={currentOrder.paidValue}
-          balanceValue={currentOrder.balanceValue}
+          paidValue={stats.totalSettled}    // REATIVO: Considera pagamentos + adiantamentos + despesas parceiro
+          balanceValue={stats.balancePartner} // REATIVO: Calculado a partir dos romaneios v1
+          deliveredValue={stats.totalPurchaseVal}
+          contractValue={currentOrder.totalValue}
           onAddPayment={() => setIsPayModalOpen(true)}
-          onAddAdvance={() => setIsAdvanceModalOpen(true)} // ABRE MODAL DE ADIANTAMENTO
+          onAddAdvance={() => setIsAdvanceModalOpen(true)}
           onRefresh={() => actions.refreshLoadings()}
           onDeleteTx={setPendingDeleteTxId}
         />
@@ -249,7 +281,7 @@ const OrderDetails: React.FC<Props> = ({ order, onBack, onEdit, onDelete, onFina
           onClose={() => setSelectedTx(null)}
           transaction={selectedTx}
           onUpdate={onTxUpdate}
-          onDelete={setPendingDeleteTxId}
+          onDelete={actions.handleDeleteTx}
           title={selectedTx.type === 'expense' ? "Editar Despesa Extra" : (selectedTx.type === 'commission' ? "Editar Comissão" : (selectedTx.type === 'advance' ? "Editar Adiantamento" : "Editar Pagamento"))}
         />
       )}
@@ -257,7 +289,12 @@ const OrderDetails: React.FC<Props> = ({ order, onBack, onEdit, onDelete, onFina
       <ActionConfirmationModal
         isOpen={!!pendingDeleteTxId}
         onClose={() => setPendingDeleteTxId(null)}
-        onConfirm={() => { if (pendingDeleteTxId) actions.handleDeleteTx(pendingDeleteTxId); setPendingDeleteTxId(null); }}
+        onConfirm={async () => {
+          if (pendingDeleteTxId) {
+            await actions.handleDeleteTx(pendingDeleteTxId);
+          }
+          setPendingDeleteTxId(null);
+        }}
         title="Estornar Lançamento?"
         description="O valor sairá do histórico e o saldo voltará a constar como aberto."
         type="danger"
@@ -266,7 +303,12 @@ const OrderDetails: React.FC<Props> = ({ order, onBack, onEdit, onDelete, onFina
       <ActionConfirmationModal
         isOpen={!!pendingDeleteLoadingId}
         onClose={() => setPendingDeleteLoadingId(null)}
-        onConfirm={() => { if (pendingDeleteLoadingId) { actions.handleDeleteLoading(pendingDeleteLoadingId); } setPendingDeleteLoadingId(null); }}
+        onConfirm={async () => {
+          if (pendingDeleteLoadingId) {
+            await actions.handleDeleteLoading(pendingDeleteLoadingId);
+          }
+          setPendingDeleteLoadingId(null);
+        }}
         title="Excluir Romaneio?"
         description="⚠️ AVISO: O frete será DELETADO do Financeiro também! Esta ação é permanente."
         type="danger"

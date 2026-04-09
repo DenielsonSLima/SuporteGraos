@@ -7,13 +7,12 @@ import { PartnerAddress, PartnerAddressInput } from './types';
 
 export const partnerAddressSyncService = {
   /**
-   * Insere um novo endereço
+   * Insere um novo endereço (parceiros_enderecos)
    */
   syncInsert: async (address: PartnerAddress): Promise<PartnerAddress> => {
     const { data, error } = await supabase
-      .from('partner_addresses')
+      .from('parceiros_enderecos')
       .insert({
-        id: address.id,
         partner_id: address.partner_id,
         street: address.street,
         number: address.number || null,
@@ -24,27 +23,21 @@ export const partnerAddressSyncService = {
         zip_code: address.zip_code || null,
         address_type: address.address_type,
         is_primary: address.is_primary,
-        coordinates: address.coordinates || null,
-        active: address.active,
-        created_at: address.created_at,
-        updated_at: address.updated_at
+        active: address.active !== false
       })
       .select()
       .single();
 
-    if (error) {
-      throw error;
-    }
-
+    if (error) throw error;
     return data as PartnerAddress;
   },
 
   /**
-   * Atualiza um endereço existente
+   * Atualiza um endereço existente (parceiros_enderecos)
    */
   syncUpdate: async (address: PartnerAddress): Promise<PartnerAddress> => {
     const { data, error } = await supabase
-      .from('partner_addresses')
+      .from('parceiros_enderecos')
       .update({
         street: address.street,
         number: address.number || null,
@@ -55,51 +48,41 @@ export const partnerAddressSyncService = {
         zip_code: address.zip_code || null,
         address_type: address.address_type,
         is_primary: address.is_primary,
-        coordinates: address.coordinates || null,
-        active: address.active,
+        active: address.active !== false,
         updated_at: new Date().toISOString()
       })
       .eq('id', address.id)
       .select()
       .single();
 
-    if (error) {
-      throw error;
-    }
-
+    if (error) throw error;
     return data as PartnerAddress;
   },
 
   /**
-   * Deleta um endereço
+   * Deleta um endereço (parceiros_enderecos)
    */
   syncDelete: async (id: string): Promise<void> => {
     const { error } = await supabase
-      .from('partner_addresses')
+      .from('parceiros_enderecos')
       .delete()
       .eq('id', id);
 
-    if (error) {
-      throw error;
-    }
-
+    if (error) throw error;
   },
 
   /**
-   * Carrega todos os endereços de um parceiro
+   * Carrega todos os endereços de um parceiro (parceiros_enderecos)
    */
   syncLoadByPartner: async (partnerId: string): Promise<PartnerAddress[]> => {
     const { data, error } = await supabase
-      .from('partner_addresses')
+      .from('parceiros_enderecos')
       .select('*')
       .eq('partner_id', partnerId)
       .order('is_primary', { ascending: false })
       .order('created_at');
 
-    if (error) {
-      throw error;
-    }
-
+    if (error) throw error;
     return (data || []) as PartnerAddress[];
   }
 };

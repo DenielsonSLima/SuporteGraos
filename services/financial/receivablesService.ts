@@ -143,15 +143,16 @@ const loadFromSupabase = async (): Promise<Receivable[]> => {
     const user = authService.getCurrentUser();
     let query = supabase
       .from('receivables')
-      .select('*');
+      // Egress: usa campos nomeados + cap de 500 registros mais recentes
+      .select(RECEIVABLES_SELECT_FIELDS)
+      .order('due_date', { ascending: false })
+      .limit(500);
 
     if (user?.companyId) {
       query = query.eq('company_id', user.companyId);
     }
 
-    const data = await supabaseWithRetry(() =>
-      query.order('due_date', { ascending: true })
-    );
+    const data = await supabaseWithRetry(() => query);
 
     const mapped = (data as any[] || []).map(mapFromDb);
     db.setAll(mapped);

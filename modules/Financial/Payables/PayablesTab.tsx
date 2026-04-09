@@ -87,39 +87,42 @@ const PayablesTab: React.FC = () => {
 
   const PAGE_SIZE = 100;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [currentPage, setCurrentPage] = useState(1);
 
-  const { data: rawPayables = [], isLoading: loading } = usePayables();
-  const records = useMemo(() => rawPayables.map(toFinancialRecord), [rawPayables]);
-
-
-
-  const filteredRecords = useMemo(() => {
-    if (!startDate && !endDate && !searchTerm) return records;
-    const searchLower = searchTerm.toLowerCase();
-    return records.filter(r => {
-      const d = r.dueDate || r.issueDate || '';
-      if (startDate && d < startDate) return false;
-      if (endDate && d > endDate) return false;
-      if (searchTerm) {
-        return r.description.toLowerCase().includes(searchLower) ||
-          r.entityName.toLowerCase().includes(searchLower) ||
-          r.notes?.toLowerCase().includes(searchLower);
-      }
-      return true;
+  const { data: rawPayables = [], isLoading: loading } = usePayables({
+    startDate: startDate || undefined,
+    endDate: endDate || undefined,
+    search: searchTerm || undefined,
+    page: currentPage - 1,
+    pageSize: PAGE_SIZE
+  });
+  
+  const records = useMemo(() => {
+    const mapped = rawPayables.map(toFinancialRecord);
+    console.log('[PayablesTab] Log:', {
+      rawTotal: rawPayables.length,
+      mappedTotal: mapped.length,
+      purchaseCount: mapped.filter(r => r.subType === 'purchase_order').length,
+      freightCount: mapped.filter(r => r.subType === 'freight').length,
+      commissionCount: mapped.filter(r => r.subType === 'commission').length,
+      records: mapped
     });
-  }, [records, startDate, endDate, searchTerm]);
+    return mapped;
+  }, [rawPayables]);
 
-  const allPurchases = useMemo(() => filteredRecords.filter(r => r.subType === 'purchase_order'), [filteredRecords]);
-  const allFreights = useMemo(() => filteredRecords.filter(r => r.subType === 'freight'), [filteredRecords]);
-  const allCommissions = useMemo(() => filteredRecords.filter(r => r.subType === 'commission'), [filteredRecords]);
+  const allPurchases = useMemo(() => records.filter(r => r.subType === 'purchase_order'), [records]);
+  const allFreights = useMemo(() => records.filter(r => r.subType === 'freight'), [records]);
+  const allCommissions = useMemo(() => records.filter(r => r.subType === 'commission'), [records]);
 
-  const paginatedPurchases = useMemo(() => allPurchases.slice(0, visibleCount), [allPurchases, visibleCount]);
-  const paginatedFreights = useMemo(() => allFreights.slice(0, visibleCount), [allFreights, visibleCount]);
-  const paginatedCommissions = useMemo(() => allCommissions.slice(0, visibleCount), [allCommissions, visibleCount]);
+  const paginatedPurchases = allPurchases;
+  const paginatedFreights = allFreights;
+  const paginatedCommissions = allCommissions;
 
-  const totalFiltered = allPurchases.length + allFreights.length + allCommissions.length;
+  const totalFiltered = records.length;
 
-  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [startDate, endDate, searchTerm]);
+  useEffect(() => { 
+    setCurrentPage(1); 
+  }, [startDate, endDate, searchTerm]);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
@@ -236,7 +239,6 @@ const PayablesTab: React.FC = () => {
           </section>
         </div>
       ) : (
-        /* VISÃO ESPECÍFICA (SÓ ABERTOS) */
         <div className="animate-in slide-in-from-right-10 duration-500">
           <UnifiedPayableManager
             key={activeSubTab}
@@ -251,6 +253,26 @@ const PayablesTab: React.FC = () => {
             })}
             onRefresh={() => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_PAYABLES })}
           />
+        </div>
+      )}
+
+      {/* Pagination Controls */}
+      {activeSubTab === 'all' && (
+        <div className="flex flex-col items-center gap-3 py-10">
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">
+            Exibindo página {currentPage}
+          </span>
+          <button
+            onClick={() => setCurrentPage(prev => prev + 1)}
+            disabled={loading || records.length < PAGE_SIZE}
+            className={`px-12 py-4 rounded-[1.5rem] text-[10px] font-black uppercase tracking-[0.2em] border-2 transition-all shadow-xl active:scale-95 ${
+              records.length < PAGE_SIZE 
+                ? 'border-slate-100 text-slate-300 cursor-not-allowed' 
+                : 'border-slate-200 text-slate-600 hover:bg-slate-900 hover:text-white hover:border-slate-900'
+            }`}
+          >
+            {loading ? 'Carregando...' : (records.length < PAGE_SIZE ? 'Fim dos Resultados' : 'Carregar Mais Resultados')}
+          </button>
         </div>
       )}
     </div>

@@ -49,7 +49,7 @@ const SalesFinancialCard: React.FC<Props> = ({ orderId, transactions, paidValue,
       <div className="bg-blue-50 px-6 py-4 border-b border-blue-100 flex justify-between items-center">
         <div className="flex items-center gap-2 text-blue-800">
           <DollarSign size={20} />
-          <h3 className="font-black uppercase text-[10px] tracking-widest italic">Recebimentos do Pedido</h3>
+          <h3 className="font-bold uppercase text-[10px] tracking-widest">Recebimentos do Pedido</h3>
         </div>
         <button
           onClick={onAddReceipt}

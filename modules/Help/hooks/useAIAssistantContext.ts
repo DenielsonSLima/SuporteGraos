@@ -11,11 +11,12 @@ import { useCurrentUser } from '../../../hooks/useCurrentUser';
 export const useAIAssistantContext = () => {
   const currentUser = useCurrentUser();
 
-  const getSystemContext = useCallback(() => {
+  const getSystemContext = useCallback(async () => {
     const partners = partnerService.getAll();
-    const purchases = purchaseService.getAll();
+    const purchases = await purchaseService.loadFromSupabase();
     const sales = salesService.getAll();
-    const loadings = loadingService.getAll().filter((loading) => loading.status !== 'canceled');
+    const allLoadings = await loadingService.loadFromSupabase();
+    const loadings = allLoadings.filter((loading) => loading.status !== 'canceled');
     const accounts = financialService.getBankAccounts();
     const shareholders = shareholderService.getAll();
     const standalone = financialActionService.getStandaloneRecords();

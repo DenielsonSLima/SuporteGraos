@@ -18,17 +18,26 @@ const OpenFreights: React.FC<Props> = ({ freights, onFreightClick }) => {
   const number = (val: number) => new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 }).format(val);
   const dateStr = (val: string) => new Date(val).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
 
-  // 1. Filtragem Inicial: Apenas o que não está finalizado OU tem financeiro pendente
+  // 1. Filtragem Inicial: Apenas o que ainda tem pendência (operacional OU financeira)
   const activeFreights = useMemo(() => 
-    freights.filter(f => f.status !== 'completed' || f.balanceValue > 0.05),
+    freights.filter(f => {
+       if (f.status === 'completed' || f.status === 'canceled') return false;
+       
+       const hasWeightPendency = !f.unloadWeightKg || f.unloadWeightKg <= 0;
+       const hasFinancialPendency = f.balanceValue > 0.05;
+       
+       return hasWeightPendency || hasFinancialPendency;
+    }),
   [freights]);
 
   // 2. Filtragem por Sub-modo
   const filteredData = useMemo(() => {
     switch (viewMode) {
       case 'pending_unload':
-        return activeFreights.filter(f => f.status !== 'completed');
+        // Apenas o que NÃO tem peso de destino confirmado (ainda em trânsito/carregado)
+        return activeFreights.filter(f => f.status !== 'completed' && (!f.unloadWeightKg || f.unloadWeightKg <= 0));
       case 'pending_financial':
+        // Apenas o que tem saldo devedor real
         return activeFreights.filter(f => f.balanceValue > 0.05);
       default:
         return activeFreights;

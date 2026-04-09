@@ -126,7 +126,9 @@ export const useUpdateCredit = () => {
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CREDITS }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.TOTAL_BALANCE }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_ENTRIES }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD })
       ]);

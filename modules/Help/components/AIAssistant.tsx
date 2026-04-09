@@ -36,7 +36,7 @@ const AIAssistant: React.FC = () => {
     try {
       // Corrected: Initialize GoogleGenAI with API key from environment variable as per coding guidelines
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const contextData = getSystemContext();
+      const contextData = await getSystemContext();
 
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',

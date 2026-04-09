@@ -68,14 +68,14 @@ const fetchPage = async (options: StandaloneRecordsPageOptions): Promise<Financi
 /**
  * Carrega todos os registros do Supabase
  */
-const loadFromSupabase = async (): Promise<void> => {
+const loadFromSupabase = async (): Promise<FinancialRecord[]> => {
   try {
     const { authService } = await import('./authService');
     const user = authService.getCurrentUser();
     const companyId = user?.companyId;
 
     if (!companyId) {
-      return;
+      return [];
     }
 
     const { data, error } = await supabase
@@ -86,12 +86,13 @@ const loadFromSupabase = async (): Promise<void> => {
 
     if (error) throw error;
 
-    if (data) {
-      const records = data.map(fromSupabase);
-      db.clear();
-      records.forEach(record => db.add(record));
-    }
+    const records = (data || []).map(fromSupabase);
+    db.clear();
+    records.forEach(record => db.add(record));
+    
+    return records;
   } catch (error) {
+    return [];
   }
 };
 
@@ -123,7 +124,7 @@ const setupRealtimeSubscription = (): void => {
           if (existing) db.update(record);
           else db.add(record);
         } else if (payload.eventType === 'DELETE' && payload.old) {
-          db.delete((payload.old as StandaloneRecordDB).id);
+          db.delete((payload.old as any).id);
         }
 
         // Invalidar caches
@@ -152,17 +153,18 @@ export const standaloneRecordsService = {
    */
   initialize,
 
-  /**
-   * Retorna todos os registros
-   */
-  getAll: (): FinancialRecord[] => db.getAll(),
-
+  loadFromSupabase,
+  getAll: () => {
+    return db.getAll();
+  },
   fetchPage,
 
   /**
    * Retorna um registro por ID
    */
-  getById: (id: string): FinancialRecord | undefined => db.getById(id),
+  getById: (id: string): FinancialRecord | undefined => {
+    return db.getById(id);
+  },
 
   /**
    * Adiciona um novo registro

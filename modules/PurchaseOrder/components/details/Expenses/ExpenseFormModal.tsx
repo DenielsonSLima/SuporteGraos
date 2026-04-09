@@ -57,14 +57,28 @@ const ExpenseFormModal: React.FC<Props> = ({ isOpen, onClose, onSave }) => {
     return group ? [...group.subtypes].sort((a, b) => a.name.localeCompare(b.name)) : [];
   }, [selectedType, expenseCategories]);
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Auxiliares para formatação de moeda em tempo real
+  const formatCurrencyInput = (val: string) => {
+    const raw = val.replace(/\D/g, '');
+    if (!raw) return '';
+    const num = Number(raw) / 100;
+    return num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
+  const parseCurrencyInput = (val: string) => {
+    const normalized = val.replace(/\./g, '').replace(',', '.');
+    const num = parseFloat(normalized);
+    return Number.isNaN(num) ? 0 : num;
+  };
+
   if (!isOpen) return null;
 
   const formatBRL = (val: number) => {
     const normalized = Math.abs(val) < 0.01 ? 0 : val;
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(normalized);
   };
-
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,7 +97,7 @@ const ExpenseFormModal: React.FC<Props> = ({ isOpen, onClose, onSave }) => {
     try {
       await onSave({
         date: formData.date,
-        value: parseFloat(formData.value),
+        value: parseCurrencyInput(formData.value),
         accountId: formData.accountId,
         accountName: account ? account.account_name : 'Caixa Central',
         notes: finalNotes,
@@ -156,7 +170,15 @@ const ExpenseFormModal: React.FC<Props> = ({ isOpen, onClose, onSave }) => {
                   <label className={labelClass}>Valor (R$)</label>
                   <div className="relative">
                       <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                      <input type="number" step="0.01" required value={formData.value} onChange={e => setFormData({...formData, value: e.target.value})} className={`${inputClass} pl-10 text-lg`} placeholder="0,00" />
+                      <input 
+                        type="text" 
+                        inputMode="decimal" 
+                        required 
+                        value={formData.value} 
+                        onChange={e => setFormData({...formData, value: formatCurrencyInput(e.target.value)})} 
+                        className={`${inputClass} pl-10 text-lg`} 
+                        placeholder="0,00" 
+                      />
                   </div>
                 </div>
             </div>

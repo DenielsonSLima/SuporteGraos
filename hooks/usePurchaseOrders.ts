@@ -52,6 +52,11 @@ function ensurePurchaseChannel() {
       { event: '*', schema: 'public', table: 'financial_transactions' },
       () => _purchaseListeners.forEach(cb => cb()),
     )
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'purchase_expenses' },
+      () => _purchaseListeners.forEach(cb => cb()),
+    )
     .subscribe();
 }
 
@@ -110,7 +115,11 @@ export function useAddPurchaseOrder() {
   return useMutation({
     mutationFn: (order: PurchaseOrder) => purchaseService.add(order),
     onSuccess: async () => { 
-      await qc.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS });
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
+      ]);
     },
   });
 }
@@ -120,7 +129,11 @@ export function useUpdatePurchaseOrder() {
   return useMutation({
     mutationFn: (order: PurchaseOrder) => purchaseService.update(order),
     onSuccess: async () => { 
-      await qc.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS });
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
+      ]);
     },
   });
 }
@@ -130,7 +143,11 @@ export function useDeletePurchaseOrder() {
   return useMutation({
     mutationFn: (id: string) => purchaseService.delete(id),
     onSuccess: async () => { 
-      await qc.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS });
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
+      ]);
     },
   });
 }
@@ -141,7 +158,11 @@ export function useUpdatePurchaseTransaction() {
     mutationFn: (params: { orderId: string; transaction: any }) =>
       purchaseService.updateTransaction(params.orderId, params.transaction),
     onSuccess: async () => { 
-      await qc.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS });
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
+      ]);
     },
   });
 }
@@ -153,7 +174,11 @@ export function useDeletePurchaseTransaction() {
       await purchaseService.deleteTransaction(params.orderId, params.txId);
     },
     onSuccess: async () => { 
-      await qc.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS });
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
+      ]);
     },
   });
 }

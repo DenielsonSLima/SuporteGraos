@@ -1,6 +1,5 @@
-
 import React from 'react';
-import { Package, Calculator, TrendingUp, Scale, Truck, ShoppingBag, Info, Coins, ArrowRight } from 'lucide-react';
+import { Package, TrendingUp, Scale, Truck, ShoppingBag, Info, Coins, ArrowRight } from 'lucide-react';
 import { Loading } from '../../../Loadings/types';
 import { SalesOrder } from '../../types';
 import { useSalesPerformanceStats } from '../../hooks/useSalesPerformanceStats';
@@ -70,57 +69,63 @@ const SalesProductSummary: React.FC<Props> = ({ order, loadings }) => {
 
           {/* BLOCO DIREITO: CONTROLE FINANCEIRO (RESULTADO) */}
           <div className="lg:col-span-8">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+            <div className="flex flex-col xl:flex-row gap-4 h-full">
               
-              {/* CUSTO DO GRÃO */}
-              <div className="space-y-1 bg-slate-50 p-3 rounded-xl border border-slate-100">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <ShoppingBag size={12} className="text-rose-500" />
-                  <span className={labelClass}>Custo Grão</span>
+              {/* GRID 2X2 PARA CUSTOS E FATURAMENTO */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1 min-w-0">
+                
+                {/* CUSTO DO GRÃO */}
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex flex-col justify-center">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <ShoppingBag size={14} className="text-rose-500" />
+                    <span className={labelClass}>Custo Grão</span>
+                  </div>
+                  <p className="text-xl font-black text-slate-800 tracking-tighter truncate">{currency(totalGrainCost)}</p>
+                  <p className="text-[9px] text-slate-400 font-bold uppercase italic mt-1">Total Romaneios</p>
                 </div>
-                <p className="text-base font-black text-slate-800">{currency(totalGrainCost)}</p>
-                <p className="text-[9px] text-slate-400 font-bold uppercase italic">Total Romaneios</p>
+
+                {/* CUSTO DO FRETE */}
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex flex-col justify-center">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <Truck size={14} className="text-amber-500" />
+                    <span className={labelClass}>Custo Frete</span>
+                  </div>
+                  <p className="text-xl font-black text-slate-800 tracking-tighter truncate">{currency(totalFreightCost)}</p>
+                  <p className="text-[9px] text-slate-400 font-bold uppercase italic mt-1">Logística Geral</p>
+                </div>
+
+                {/* SOMA DOS CUSTOS */}
+                <div className="bg-rose-50/30 p-4 rounded-2xl border border-rose-100/50 flex flex-col justify-center">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <Coins size={14} className="text-rose-600" />
+                    <span className={labelClass}>Total Custos</span>
+                  </div>
+                  <p className="text-xl font-black text-rose-700 tracking-tighter truncate">{currency(totalDirectInvestment)}</p>
+                  <p className="text-[9px] text-rose-400 font-black uppercase mt-1">(Grão + Frete)</p>
+                </div>
+
+                {/* FATURAMENTO REALIZADO */}
+                <div className="bg-emerald-50/20 p-4 rounded-2xl border border-emerald-100/50 flex flex-col justify-center">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <TrendingUp size={14} className="text-emerald-600" />
+                    <span className={labelClass}>Faturamento</span>
+                  </div>
+                  <p className="text-xl font-black text-emerald-700 tracking-tighter truncate">{currency(totalRevenueRealized)}</p>
+                  <p className="text-[9px] text-emerald-500 font-black uppercase mt-1">Receita Real</p>
+                </div>
+
               </div>
 
-              {/* CUSTO DO FRETE */}
-              <div className="space-y-1 bg-slate-50 p-3 rounded-xl border border-slate-100">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <Truck size={12} className="text-amber-500" />
-                  <span className={labelClass}>Custo Frete</span>
+              {/* LUCRO BRUTO FINAL (DESTAQUE GRANDE) */}
+               <div className={`p-6 rounded-3xl flex flex-col justify-center shadow-lg border-2 transition-all hover:scale-[1.02] xl:w-[280px] min-w-[240px] ${grossProfit >= 0 ? 'bg-emerald-600 border-emerald-500 text-white' : 'bg-rose-600 border-rose-500 text-white'}`}>
+                <div className="flex items-center justify-between mb-2">
+                   <span className="text-[10px] font-black uppercase tracking-widest opacity-80 italic">Lucro Bruto</span>
                 </div>
-                <p className="text-base font-black text-slate-800">{currency(totalFreightCost)}</p>
-                <p className="text-[9px] text-slate-400 font-bold uppercase italic">Logística Geral</p>
-              </div>
-
-              {/* SOMA DOS CUSTOS (SOLICITADO) */}
-              <div className="space-y-1 bg-rose-50/30 p-3 rounded-xl border border-rose-100/50">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <Coins size={12} className="text-rose-600" />
-                  <span className={labelClass}>Total Custos</span>
-                </div>
-                <p className="text-base font-black text-rose-700">{currency(totalDirectInvestment)}</p>
-                <p className="text-[8px] text-rose-400 font-black uppercase">(Grão + Frete)</p>
-              </div>
-
-              {/* FATURAMENTO REALIZADO */}
-              <div className="space-y-1 bg-emerald-50/20 p-3 rounded-xl border border-emerald-100/50">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <TrendingUp size={12} className="text-emerald-600" />
-                  <span className={labelClass}>Faturamento</span>
-                </div>
-                <p className="text-base font-black text-emerald-700">{currency(totalRevenueRealized)}</p>
-                <p className="text-[8px] text-emerald-500 font-black uppercase">Receita Real</p>
-              </div>
-
-              {/* LUCRO BRUTO FINAL */}
-              <div className={`p-3 rounded-2xl flex flex-col justify-center shadow-md border-2 transition-all hover:scale-105 ${grossProfit >= 0 ? 'bg-emerald-600 border-emerald-500 text-white' : 'bg-rose-600 border-rose-500 text-white'}`}>
-                <div className="flex items-center justify-between mb-1">
-                   <span className="text-[9px] font-black uppercase tracking-widest opacity-80">Lucro Bruto</span>
-                   <Calculator size={14} className="opacity-60" />
-                </div>
-                <p className="text-lg font-black leading-none">{currency(grossProfit)}</p>
-                <div className="mt-2 flex justify-between items-center border-t border-white/20 pt-1.5">
-                   <span className="text-[9px] font-black opacity-90 uppercase">{marginPercent.toFixed(1)}% Margem</span>
+                <p className="text-2xl font-black leading-none tracking-tighter break-words antialiased">
+                  {currency(grossProfit)}
+                </p>
+                <div className="mt-4 flex justify-between items-center border-t border-white/20 pt-3">
+                   <span className="text-[11px] font-black opacity-90 uppercase tracking-tight">{marginPercent.toFixed(1)}% de Margem</span>
                 </div>
               </div>
 

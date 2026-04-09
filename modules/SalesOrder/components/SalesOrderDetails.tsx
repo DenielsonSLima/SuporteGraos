@@ -1,13 +1,9 @@
-
-import React, { useState } from 'react';
-import { ArrowLeft, CheckCircle, Plus, DollarSign, Truck, PackageCheck, TrendingUp, Clock, Calculator, ShieldCheck, UserCheck } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { SalesOrder } from '../types';
-import { OrderNote } from '../../PurchaseOrder/types';
-import SalesFinancialCard from './details/SalesFinancialCard';
+import SalesReceiptsCard from './details/SalesReceiptsCard';
 import SalesOrderHeader from './details/SalesOrderHeader';
 import SalesProductSummary from './details/SalesProductSummary';
 import SalesLoadingsTable from './details/SalesLoadingsTable';
-import SalesReceiptModal from './modals/SalesReceiptModal';
 import NoteModal from '../../PurchaseOrder/components/modals/NoteModal';
 import LoadingManagement from '../../Loadings/components/LoadingManagement';
 import SalesPdfPreviewModal from './modals/SalesPdfPreviewModal';
@@ -17,8 +13,14 @@ import { useToast } from '../../../contexts/ToastContext';
 import { ModuleId } from '../../../types';
 import { useSalesOrders } from '../../../hooks/useSalesOrders';
 import { useLoadingsBySalesOrder } from '../../../hooks/useLoadings';
-import { useSalesOrderDetailsOperations, useSalesOrderStats, useCrossModuleNavigation } from '../hooks/useSalesOrderDetailsOperations';
+import { useSalesOrderDetailsOperations, useCrossModuleNavigation } from '../hooks/useSalesOrderDetailsOperations';
 import { useSalesOrderTransactions } from '../hooks/useSalesOrderTransactions';
+import { kpiService } from '../../../services/sales/kpiService';
+
+// Componentes Modulares
+import SalesOrderActionButtons from './sections/SalesOrderActionButtons';
+import SalesOrderKPIGrid from './sections/SalesOrderKPIGrid';
+import SalesOrderNotesSection from './sections/SalesOrderNotesSection';
 
 interface Props {
   order: SalesOrder;
@@ -26,15 +28,16 @@ interface Props {
   onEdit: () => void;
   onDelete: () => void;
   onFinalize: () => void;
+  onReopen: () => void;
+  onCancel: () => void;
 }
 
-const SalesOrderDetails: React.FC<Props> = ({ order, onBack, onEdit, onDelete, onFinalize }) => {
+const SalesOrderDetails: React.FC<Props> = ({ order, onBack, onEdit, onDelete, onFinalize, onReopen, onCancel }) => {
   const { addToast } = useToast();
-  const { refreshData, confirmReceipt, saveNote } = useSalesOrderDetailsOperations();
+  const { refreshData, saveNote } = useSalesOrderDetailsOperations();
   const { navigateTo } = useCrossModuleNavigation();
 
-  // Live data via TanStack Query (cache + realtime automático)
-  // currentOrder sempre reflete o estado mais recente do banco; order prop é apenas o fallback inicial
+  // Invalida cache e busca dados atualizados
   const { data: allOrders = [] } = useSalesOrders();
   const currentOrder: SalesOrder = allOrders.find(o =>
     o.id === order.id ||
@@ -44,124 +47,155 @@ const SalesOrderDetails: React.FC<Props> = ({ order, onBack, onEdit, onDelete, o
   ) ?? order;
 
   const { data: loadings = [] } = useLoadingsBySalesOrder(currentOrder.id || order.id);
+  const { data: realTransactions = [] } = useSalesOrderTransactions(currentOrder.id);
 
-  const [isPayModalOpen, setIsPayModalOpen] = useState(false);
+  // INTELIGÊNCIA CENTRALIZADA
+  const stats = useMemo(() => 
+    kpiService.calculateOrderStats(currentOrder, loadings, realTransactions),
+    [currentOrder, loadings, realTransactions]
+  );
+
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [isPdfOpen, setIsPdfOpen] = useState(false);
   const [pdfVariant, setPdfVariant] = useState<'producer' | 'internal'>('producer');
   const [selectedLoading, setSelectedLoading] = useState<Loading | null>(null);
   const [isFinalizePromptOpen, setIsFinalizePromptOpen] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [shouldCheckCompletion, setShouldCheckCompletion] = useState(false);
 
-  // Busca as transações financeiras reais do banco (recebimentos)
-  const { data: realTransactions = [] } = useSalesOrderTransactions(currentOrder.id);
+  // 🔄 REFACTORED: Validar fechamento apenas após um recebimento real
+  useEffect(() => {
+    if (!shouldCheckCompletion || isFinalizePromptOpen || isProcessing) return;
 
-  // Não é mais necessário useEffect para carregar dados:
-  // useSalesOrders() + useLoadingsBySalesOrder() gerenciam isso com cache + realtime.
-
-  // Stats delegados ao hook (SKILL: lógica financeira fora de componentes visuais)
-  const stats = useSalesOrderStats(currentOrder, loadings, realTransactions);
-
-  const handleConfirmReceipt = async (data: any) => {
-    try {
-      await confirmReceipt(currentOrder.id, data);
-      setIsPayModalOpen(false);
-      addToast('success', 'Recebimento Registrado');
-      if (stats.balance <= data.amount + 1) setIsFinalizePromptOpen(true);
-    } catch (error: any) {
-      console.error('[SalesOrderDetails] Erro ao confirmar recebimento:', error);
-      addToast('error', `Falha ao registrar: ${error.message || 'Erro desconhecido'}`);
+    // 🛡️ SEGURANÇA: Só pede pra finalizar se o financeiro E o operacional baterem com o contrato.
+    // O sistema anterior pedia pra finalizar assim que o 'pendente' zerava, 
+    // mas o pendente era calculado sobre o que foi faturado (totalRevenueRealized),
+    // o que causava prompts em adiantamentos ou entregas parciais.
+    
+    const isFinancialComplete = stats.totalReceived >= (stats.totalContractValue - 1.0); // margem para arredondamento
+    const isOperationalComplete = stats.totalRevenueRealized >= (stats.totalContractValue - 1.0);
+    const isNotFinalized = currentOrder.status !== 'completed';
+    
+    if (isFinancialComplete && isOperationalComplete && isNotFinalized) {
+      setIsFinalizePromptOpen(true);
     }
+    
+    // Reseta flag após a verificação
+    setShouldCheckCompletion(false);
+  }, [shouldCheckCompletion, stats.totalReceived, stats.totalContractValue, stats.totalRevenueRealized, currentOrder.status, isFinalizePromptOpen, isProcessing]);
+
+  const handleReceiptSuccess = () => {
+    // Dá um pequeno atraso para o TanStack Query atualizar os stats antes da verificação
+    setTimeout(() => setShouldCheckCompletion(true), 1500);
+  };
+
+
+  const handleOpenPdf = (variant: 'producer' | 'internal') => {
+    setPdfVariant(variant);
+    setIsPdfOpen(true);
   };
 
   return (
     <div className="animate-in slide-in-from-right-4 duration-300 pb-20">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
-        <div className="flex items-center gap-4">
-          <button onClick={onBack} className="p-2.5 rounded-full bg-white border border-slate-200 text-slate-500 hover:bg-slate-50 transition-all shadow-sm">
-            <ArrowLeft size={22} />
-          </button>
-          <div>
-            <h1 className="text-3xl font-black text-slate-900 uppercase italic tracking-tighter">Venda {currentOrder.number}</h1>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Status: {currentOrder.status}</p>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => {
-              setPdfVariant('producer');
-              setIsPdfOpen(true);
-            }}
-            className="px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-[10px] font-black uppercase text-slate-700 hover:bg-slate-50 transition-all shadow-sm flex items-center gap-2"
-          >
-            <UserCheck size={16} /> PDF Cliente
-          </button>
-          <button
-            onClick={() => {
-              setPdfVariant('internal');
-              setIsPdfOpen(true);
-            }}
-            className="px-4 py-2.5 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase hover:bg-slate-800 transition-all shadow-lg flex items-center gap-2"
-          >
-            <ShieldCheck size={16} /> Auditoria
-          </button>
-          <div className="w-px h-10 bg-slate-200 mx-2"></div>
-          <button onClick={onEdit} className="px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-black uppercase text-slate-700 hover:bg-slate-50">Editar</button>
-          <button onClick={onDelete} className="px-4 py-2.5 bg-white border border-rose-200 rounded-xl text-xs font-black uppercase text-rose-600 hover:bg-rose-50">Excluir</button>
-        </div>
-      </div>
+      {/* 1. Bar de Ações e Título */}
+      <SalesOrderActionButtons 
+        orderNumber={currentOrder.number}
+        orderStatus={currentOrder.status}
+        onBack={onBack}
+        onEdit={onEdit}
+        onDelete={onDelete}
+        onOpenPdf={handleOpenPdf}
+        onReopen={async () => {
+          setIsProcessing(true);
+          try {
+            await onReopen();
+            addToast('success', 'Venda Reaberta com Sucesso');
+            await refreshData(currentOrder.id);
+          } finally {
+            setIsProcessing(false);
+          }
+        }}
+        onCancel={onCancel}
+      />
 
+      {/* 2. Cabeçalho de Dados Estáticos */}
       <SalesOrderHeader order={currentOrder} />
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-          <span className="text-[9px] font-black text-slate-400 uppercase block mb-1">Mercadoria em Trânsito</span>
-          <p className="text-xl font-black text-blue-600 italic">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stats.totalTransitVal)}</p>
-        </div>
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-          <span className="text-[9px] font-black text-emerald-600 uppercase block mb-1">Faturado Realizado</span>
-          <p className="text-xl font-black text-slate-900">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stats.totalDeliveredVal)}</p>
-        </div>
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-          <span className="text-[9px] font-black text-emerald-600 uppercase block mb-1">Total Recebido</span>
-          <p className="text-xl font-black text-emerald-700 italic">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stats.totalReceived)}</p>
-        </div>
-        <div className={`p-5 rounded-2xl border-2 shadow-lg ${stats.balance > 0.1 ? 'bg-amber-50 border-amber-300' : 'bg-emerald-600 border-emerald-500 text-white'}`}>
-          <span className={`text-[9px] font-black uppercase block mb-1 ${stats.balance > 0.1 ? 'text-amber-700' : 'text-emerald-100'}`}>Saldo a Receber</span>
-          <p className="text-xl font-black">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stats.balance)}</p>
-        </div>
-      </div>
+      {/* 3. Cards de Resumo Financeiro (KPIs) */}
+      <SalesOrderKPIGrid 
+        transitValue={Number(currentOrder.transitValue) || 0}
+        totalRevenueRealized={stats.totalRevenueRealized}
+        totalReceived={stats.totalReceived}
+        totalPending={stats.totalPending}
+      />
 
+      {/* 4. Resumo de Performance do Produto */}
       <SalesProductSummary order={currentOrder} loadings={loadings} />
-      <SalesLoadingsTable loadings={loadings} onNavigateToPurchase={(id) => navigateTo(ModuleId.PURCHASE_ORDER, id)} onViewLoading={setSelectedLoading} />
+      
+      {/* 5. Tabela de Carregamentos */}
+      <SalesLoadingsTable 
+        loadings={loadings} 
+        onNavigateToPurchase={(id) => navigateTo(ModuleId.PURCHASE_ORDER, id)} 
+        onViewLoading={setSelectedLoading} 
+      />
 
+      {/* 6. Recebimentos e Notas */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
-        <SalesFinancialCard 
-          orderId={currentOrder.id} 
-          transactions={realTransactions} 
-          paidValue={stats.totalReceived} 
-          balanceValue={stats.balance} 
-          onAddReceipt={() => setIsPayModalOpen(true)} 
-          onRefresh={refreshData} 
+        <SalesReceiptsCard 
+          orderId={currentOrder.id}
+          customerName={currentOrder.customerName || 'Cliente'}
+          transactions={realTransactions}
+          totalReceived={stats.totalReceived}
+          totalPending={stats.totalPending}
+          totalBilled={stats.totalRevenueRealized}
+          receivedPercent={stats.receivedPercent}
+          onRefresh={() => refreshData(currentOrder.id)}
+          onReceiptSuccess={handleReceiptSuccess}
         />
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-          <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest mb-6 border-b border-slate-50 pb-2">Anotações da Venda</h3>
-          <button onClick={() => setIsNoteModalOpen(true)} className="w-full py-3 border-2 border-dashed border-slate-200 rounded-xl text-[10px] font-black uppercase text-slate-400 hover:border-blue-300 hover:text-blue-600 transition-all">+ Nova Observação</button>
-          <div className="mt-4 space-y-3">
-            {currentOrder.notesList?.map(n => (
-              <div key={n.id} className="p-3 bg-slate-50 rounded-xl text-xs">
-                <p className="font-bold text-slate-400 text-[9px] uppercase mb-1">{new Date(n.date).toLocaleDateString()} - {n.author}</p>
-                <p className="font-medium text-slate-700 italic">"{n.text}"</p>
-              </div>
-            ))}
-          </div>
-        </div>
+        
+        <SalesOrderNotesSection 
+          notes={currentOrder.notesList || []}
+          onAddNote={() => setIsNoteModalOpen(true)}
+        />
       </div>
 
-      <SalesReceiptModal isOpen={isPayModalOpen} onClose={() => setIsPayModalOpen(false)} onConfirm={handleConfirmReceipt} totalPending={stats.balance} recordDescription={`Cliente ${currentOrder.customerName}`} />
-      <NoteModal isOpen={isNoteModalOpen} onClose={() => setIsNoteModalOpen(false)} onSave={(n) => { const note = { ...n, id: Math.random().toString(36).substr(2, 9) }; void saveNote(currentOrder, note); }} consultantName={currentOrder.consultantName} />
-      <SalesPdfPreviewModal isOpen={isPdfOpen} onClose={() => setIsPdfOpen(false)} order={currentOrder} loadings={loadings} variant={pdfVariant} />
-      {selectedLoading && <LoadingManagement loading={selectedLoading} onClose={() => setSelectedLoading(null)} onUpdate={refreshData} originContext="sales" />}
-      <ActionConfirmationModal isOpen={isFinalizePromptOpen} onClose={() => setIsFinalizePromptOpen(false)} onConfirm={() => { onFinalize(); refreshData(); setIsFinalizePromptOpen(false); }} title="Saldo Quitado!" description="Deseja marcar esta venda como finalizada?" type="success" confirmLabel="Finalizar" />
+      {/* 7. Modais e Gerenciamento */}
+      <NoteModal 
+        isOpen={isNoteModalOpen} 
+        onClose={() => setIsNoteModalOpen(false)} 
+        onSave={(n) => { 
+          const note = { ...n, id: Math.random().toString(36).substr(2, 9) }; 
+          void saveNote(currentOrder, note); 
+        }} 
+        consultantName={currentOrder.consultantName || 'Auditante'} 
+      />
+      
+      <SalesPdfPreviewModal 
+        isOpen={isPdfOpen} 
+        onClose={() => setIsPdfOpen(false)} 
+        order={currentOrder} 
+        loadings={loadings} 
+        variant={pdfVariant} 
+      />
+      
+      {selectedLoading && (
+        <LoadingManagement 
+          loading={selectedLoading} 
+          onClose={() => setSelectedLoading(null)} 
+          onUpdate={() => refreshData(currentOrder.id)} 
+          originContext="sales" 
+        />
+      )}
+      
+      <ActionConfirmationModal 
+        isOpen={isFinalizePromptOpen} 
+        onClose={() => setIsFinalizePromptOpen(false)} 
+        onConfirm={() => { onFinalize(); refreshData(currentOrder.id); setIsFinalizePromptOpen(false); }} 
+        title="Saldo Quitado!" 
+        description="Deseja marcar esta venda como finalizada no sistema?" 
+        type="success" 
+        confirmLabel="Finalizar Pedido" 
+      />
     </div>
   );
 };

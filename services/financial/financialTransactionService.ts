@@ -11,6 +11,7 @@ export interface TransactionLinkParams {
     standaloneId?: string;
     shareholderTxId?: string;
     linkType: 'payment' | 'receipt' | 'deduction' | 'reversal';
+    metadata?: any;
 }
 
 export const financialTransactionService = {
@@ -147,7 +148,8 @@ export const financialTransactionService = {
                         commission_id: linkData.commissionId,
                         standalone_id: linkData.standaloneId,
                         shareholder_tx_id: linkData.shareholderTxId,
-                        link_type: linkData.linkType
+                        link_type: linkData.linkType,
+                        metadata: linkData.metadata
                     });
 
                 if (linkError) {
@@ -199,12 +201,20 @@ export const financialTransactionService = {
      */
     async delete(txId: string) {
         if (!txId) return;
-        const { error } = await supabase
-            .from('financial_transactions')
-            .delete()
-            .eq('id', txId);
 
-        if (error) throw error;
+        const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(txId);
+
+        if (isValidUUID) {
+            const { error } = await supabase
+                .from('financial_transactions')
+                .delete()
+                .eq('id', txId);
+            if (error) throw error;
+        } else {
+            // Fallback para delete por REF ou ORIGIN se não for UUID (caso de despesas extras)
+            await this.deleteByRef(txId);
+            await this.deleteByOrigin(txId);
+        }
     },
 
     async deleteByRecordId(recordId: string, type: 'payable' | 'receivable'): Promise<boolean> {
@@ -245,10 +255,48 @@ export const financialTransactionService = {
     },
 
     async deleteByRef(refId: string) {
+        if (!refId) return;
+        
+        // Deleta por REF ou ORIGIN (cobre ambos os tipos de metadados na descrição)
         const { error } = await supabase
             .from('financial_transactions')
             .delete()
-            .ilike('description', `%[REF:${refId}]%`);
+            .or(`description.ilike.%[REF:${refId}]%,description.ilike.%[ORIGIN:${refId}]%`);
+            
+        if (error) throw error;
+    },
+
+    async deleteByOrigin(originId: string) {
+        if (!originId) return;
+
+        const isValidUUID = (id: string) => 
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
+        // 1. Tentar deletar via Robust Links (Foundation V2)
+        // Só tenta se for um UUID válido, para evitar erro de cast no Postgres
+        if (isValidUUID(originId)) {
+            const { data: linkedTxs, error: linkError } = await supabase
+                .from('financial_links')
+                .select('transaction_id')
+                .or(`purchase_order_id.eq.${originId},sales_order_id.eq.${originId},loading_id.eq.${originId},commission_id.eq.${originId},standalone_id.eq.${originId}`);
+
+            if (!linkError && linkedTxs && linkedTxs.length > 0) {
+                const txIds = linkedTxs.map(l => l.transaction_id);
+                const { error: delError } = await supabase
+                    .from('financial_transactions')
+                    .delete()
+                    .in('id', txIds);
+                
+                if (delError) throw delError;
+                return;
+            }
+        }
+
+        // 2. Fallback: Deletar via Tags na descrição (Metadados legados)
+        const { error } = await supabase
+            .from('financial_transactions')
+            .delete()
+            .ilike('description', `%[ORIGIN:${originId}]%`);
 
         if (error) throw error;
     },

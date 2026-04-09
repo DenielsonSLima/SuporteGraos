@@ -1,7 +1,6 @@
 import { Persistence } from './persistence';
 import { supabase } from './supabase';
 import { waitForInit } from './supabaseInitService';
-import { authService } from './authService';
 
 export type LogAction = 'create' | 'update' | 'delete' | 'login' | 'logout' | 'approve' | 'cancel' | 'export';
 
@@ -44,14 +43,13 @@ const mapLogFromDb = (record: any): LogEntry => ({
 
 const mapLogToDb = (log: LogEntry) => ({
   id: log.id,
-  user_id: isValidUuid(log.userId) ? log.userId : null,  // NULL em vez de string inválida
+  user_id: isValidUuid(log.userId) ? log.userId : null,
   user_name: log.userName,
   action: log.action,
   module: log.module,
   entity_id: log.entityId,
   description: log.description,
   metadata: log.metadata,
-  company_id: log.companyId || authService.getCurrentUser()?.companyId,
   created_at: log.timestamp
 });
 

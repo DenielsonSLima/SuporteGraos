@@ -57,7 +57,8 @@ export const searchService = {
     });
 
     // 3. BUSCA EM PEDIDOS DE COMPRA
-    purchaseService.getAll().forEach(p => {
+    const allPurchases = await purchaseService.loadFromSupabase();
+    allPurchases.forEach(p => {
       if (p.number.toLowerCase().includes(query) || p.partnerName.toLowerCase().includes(query)) {
         results.push({
           id: p.id,
@@ -85,7 +86,8 @@ export const searchService = {
     });
 
     // 5. BUSCA EM LOGÍSTICA (PLACAS E NFs)
-    loadingService.getAll().forEach(l => {
+    const allLoadingsFiltered = await loadingService.loadFromSupabase();
+    allLoadingsFiltered.forEach(l => {
       if (l.vehiclePlate.toLowerCase().includes(query) || l.invoiceNumber?.toLowerCase().includes(query) || l.driverName.toLowerCase().includes(query)) {
         results.push({
           id: l.id,

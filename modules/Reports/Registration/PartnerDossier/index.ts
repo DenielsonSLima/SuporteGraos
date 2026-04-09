@@ -22,24 +22,27 @@ const partnerDossierReport: ReportModule = {
     partnerId: ''
   },
   FilterComponent: Filters,
-  fetchData: ({ partnerId }) => {
+  fetchData: async ({ partnerId }) => {
     if (!partnerId) {
       return { title: 'Selecione um Parceiro', columns: [], rows: [] };
     }
 
-    const partner = partnerService.getById(partnerId);
+    const partner = await partnerService.getById(partnerId);
     if (!partner) {
       return { title: 'Parceiro não encontrado', columns: [], rows: [] };
     }
 
     // --- 1. PURCHASES ---
-    const purchases = reportsCache.getAllPurchases().filter(p => p.partnerId === partnerId && p.status !== 'canceled');
+    const allPurchases = await reportsCache.getAllPurchases();
+    const purchases = allPurchases.filter(p => p.partnerId === partnerId && p.status !== 'canceled');
     
     // --- 2. SALES ---
-    const sales = reportsCache.getAllSales().filter(s => s.customerId === partnerId && s.status !== 'canceled');
+    const allSales = await reportsCache.getAllSales();
+    const sales = allSales.filter(s => s.customerId === partnerId && s.status !== 'canceled');
 
     // --- 3. LOADINGS (As Supplier or Customer or Carrier) ---
-    const loadings = reportsCache.getAllLoadings().filter(l => 
+    const allLoadings = await reportsCache.getAllLoadings();
+    const loadings = allLoadings.filter(l => 
         l.supplierName === partner.name || 
         l.customerName === partner.name || 
         l.carrierId === partnerId
@@ -47,13 +50,13 @@ const partnerDossierReport: ReportModule = {
 
     // --- 4. FINANCIAL SUMMARY ---
     // Calculate pending values
-    const payables = financialIntegrationService
-      .getPayables()
-      .filter(p => p.entityName === partner.name && p.status !== 'paid');
-    const receivables = financialIntegrationService
-      .getReceivables()
-      .filter(r => r.entityName === partner.name && r.status !== 'paid');
-    const advances = advanceService.getTransactionsByPartner(partnerId);
+    const allPayables = await financialIntegrationService.getPayables();
+    const payables = allPayables.filter(p => p.entityName === partner.name && p.status !== 'paid');
+
+    const allReceivables = await financialIntegrationService.getReceivables();
+    const receivables = allReceivables.filter(r => r.entityName === partner.name && r.status !== 'paid');
+
+    const advances = await advanceService.getTransactionsByPartner(partnerId);
 
     const totalToPay = payables.reduce((acc, p) => acc + (p.remainingValue || 0), 0);
     const totalToReceive = receivables.reduce((acc, r) => acc + (r.remainingValue || 0), 0);

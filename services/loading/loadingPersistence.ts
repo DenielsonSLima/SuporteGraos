@@ -1,21 +1,17 @@
 import { Loading } from '../../modules/Loadings/types';
-import { Persistence } from '../persistence';
 import { supabase } from '../supabase';
 import { supabaseWithRetry } from '../../utils/fetchWithRetry';
 import { mapLoadingFromDb, generateUUID } from './loadingMapper';
 import { getTodayBR } from '../../utils/dateUtils';
 import { sqlCanonicalOpsLog } from '../sqlCanonicalOps';
 
-const db = new Persistence<Loading>('logistics_loadings', [], { useStorage: false });
 let isLoaded = false;
 
 export const loadingPersistence = {
-  db,
-  
   isLoaded: () => isLoaded,
   setLoaded: (val: boolean) => { isLoaded = val; },
 
-  loadFromSupabase: async (companyId?: string) => {
+  loadFromSupabase: async (companyId?: string): Promise<Loading[]> => {
     try {
       let query = supabase
         .from('ops_loadings')
@@ -33,13 +29,12 @@ export const loadingPersistence = {
       );
 
       const mapped = (data as any[] || []).map(mapLoadingFromDb);
-      db.setAll(mapped);
       isLoaded = true;
       return mapped;
     } catch (error) {
       sqlCanonicalOpsLog('Falha ao carregar carregamentos do Supabase', error);
       isLoaded = false;
-      return db.getAll();
+      return [];
     }
   },
 

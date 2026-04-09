@@ -10,6 +10,7 @@
  * ✅ Elimina salesService.loadFromSupabase() + startRealtime() + subscribe() diretos
  */
 
+import { useEffect } from 'react';
 import { useSalesOrders } from './useSalesOrders';
 import { SalesOrder } from '../modules/SalesOrder/types';
 
@@ -20,11 +21,20 @@ const ACTIVE_STATUSES = ['approved', 'pending'] as const;
  * Compartilha cache e realtime do useSalesOrders — zero overhead extra.
  */
 export function useActiveSales() {
-  const query = useSalesOrders();
+  const query = useSalesOrders({ 
+    statuses: ['approved', 'pending', 'draft']
+  });
 
-  const activeSales: SalesOrder[] = (query.data ?? []).filter(
-    (s) => ACTIVE_STATUSES.includes(s.status as any)
-  );
+  useEffect(() => {
+    if (query.data) {
+      console.log(`[useActiveSales] Encontrados ${query.data.length || 0} pedidos ativos.`);
+      if (query.data.length === 0) {
+        console.warn('[useActiveSales] Nenhum pedido retornado. Verifique filtros e RLS.');
+      }
+    }
+  }, [query.data]);
+
+  const activeSales: SalesOrder[] = query.data ?? [];
 
   return {
     ...query,

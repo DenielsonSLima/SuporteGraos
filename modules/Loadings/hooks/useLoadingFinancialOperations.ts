@@ -62,36 +62,43 @@ export function useLoadingFinancialOperations({ loading, onUpdate }: UseLoadingF
 
   // ─── Adiciona despesa do motorista ────────────────────────────────────
   const addExpense = async (expenseData: any) => {
-    const expense = {
-      id: Math.random().toString(36).substr(2, 9),
-      description: expenseData.description,
-      value: expenseData.value,
-      type: expenseData.type,
-      date: expenseData.date
-    };
-
-    // 1. Registra no histórico financeiro geral (vincunlado ao frete)
-    await financialActionService.processRecord(
-      `fr-${loading.id}`,
-      {
-        amount: expenseData.value,
-        discount: expenseData.discountValue || 0,
-        date: expenseData.date,
-        accountId: expenseData.accountId,
-        accountName: expenseData.accountName,
-        notes: `${expenseData.description} - ${expenseData.type === 'deduction' ? 'Desconto' : 'Adicional'} Frete ${loading.vehiclePlate}${expenseData.notes ? ' | ' + expenseData.notes : ''}`
-      },
-      'freight'
-    );
-
-    // 2. Invalida caches via TanStack Query (AGUARDADO)
-    await invalidateFinancialCaches();
-
-    // 3. Atualiza carregamento local
-    onUpdate({
-      ...loading,
-      extraExpenses: [...(loading.extraExpenses || []), expense]
+    const description = `${expenseData.description} - Frete ${loading.vehiclePlate}`;
+    
+    // 1. Execução Atômica via RPC (SQL-First)
+    // Este RPC atualiza o carregamento, a financial_entry e opcionalmente gera o ledger se houver conta.
+    const { data: result, error } = await supabase.rpc('rpc_ops_loading_manage_expense', {
+      p_loading_id: loading.id,
+      p_description: description,
+      p_amount: expenseData.value,
+      p_type: expenseData.type, // 'addition' | 'deduction'
+      p_date: expenseData.date,
+      p_account_id: expenseData.accountId || null
     });
+
+    if (error) {
+      throw new Error(`Erro ao registrar despesa no banco: ${error.message}`);
+    }
+
+    // 2. Injeta histórico leve para compatibilidade de UI
+    await registerFinancialRecords({
+      txId: `exp-${loading.id.slice(0, 5)}`,
+      date: expenseData.date,
+      amount: expenseData.value,
+      discount: 0,
+      accountId: expenseData.accountId,
+      accountName: expenseData.accountName,
+      type: expenseData.type === 'addition' ? 'receipt' : 'payment',
+      recordId: loading.id,
+      referenceType: 'loading',
+      referenceId: loading.id,
+      description,
+      historyType: 'Ajuste de Frete',
+      entityName: loading.driverName || 'Motorista',
+      notes: expenseData.notes
+    });
+
+    // 3. Invalida caches via TanStack Query
+    await invalidateFinancialCaches();
 
     addToast('success', 'Despesa registrada com sucesso!');
   };
@@ -101,7 +108,7 @@ export function useLoadingFinancialOperations({ loading, onUpdate }: UseLoadingF
     const amount = parseFloat(String(data.amount)) || 0;
     const discount = parseFloat(String(data.discount)) || 0;
 
-    const currentLoading = loadingService.getAll().find(l => l.id === loading.id) || loading;
+    const currentLoading = loading;
     const updatedTransactions = (currentLoading.transactions || []).map((t: any) =>
       t.id === editPayment.id
         ? {
@@ -139,7 +146,7 @@ export function useLoadingFinancialOperations({ loading, onUpdate }: UseLoadingF
       freightPaid: Number(totalPaidUpdated.toFixed(2))
     };
 
-    loadingService.update(loadingAtualizado);
+    await loadingService.update(loadingAtualizado);
 
     const standaloneId = `hist-${editPayment.id}`;
     const standalone = standaloneRecordsService.getById(standaloneId);
@@ -180,40 +187,22 @@ export function useLoadingFinancialOperations({ loading, onUpdate }: UseLoadingF
     onUpdate(loadingAtualizado);
   };
 
-  // ─── Estorna pagamento (SKIL §3.6: transações imutáveis) ────────────
-  // Em vez de excluir, cria transação compensatória preservando auditoria.
+  // ─── Estorna pagamento (SQL-First: Estorno Real) ────────────────────
   const deletePayment = async (tx: any) => {
-    const reversalId = `rev-${tx.id}-${Date.now()}`;
-    const now = new Date().toISOString().split('T')[0];
-
-    // 1. Marca a transação original como estornada (preserva registro)
-    const updatedTransactions: OrderTransaction[] = (loading.transactions || []).map(t =>
-      t.id === tx.id ? { ...t, status: 'reversed' as const } : t
-    );
-
-    // 2. Adiciona transação de estorno (valor negativo, referencia a original)
-    updatedTransactions.push({
-      id: reversalId,
-      date: now,
-      value: -(tx.value || 0),
-      discountValue: 0,
-      accountId: tx.accountId || '',
-      accountName: tx.accountName || '',
-      notes: `[ESTORNO] Ref: ${tx.id} — ${tx.notes || 'Pagamento estornado'}`,
-      type: 'reversal',
-      originalTxId: tx.id,
+    // 1. Execução Atômica via RPC de Estorno
+    // Isso deleta a transação e restaura os saldos automaticamente no banco.
+    const { error } = await supabase.rpc('rpc_ops_financial_void_transaction', {
+      p_transaction_id: tx.id
     });
 
-    // 3. Recalcula saldo pago (mesmo efeito líquido)
-    const updatedPaid = Math.max(0, (loading.freightPaid || 0) - (tx.value || 0));
-
-    const loadingAtualizado = { ...loading, transactions: updatedTransactions, freightPaid: updatedPaid };
+    if (error) {
+      throw new Error(`Erro ao realizar estorno no banco: ${error.message}`);
+    }
     
-    // Invalidação via mutation hook + TanStack Query (AGUARDADO)
+    // 2. Invalida caches via TanStack Query
     await invalidateFinancialCaches();
 
-    onUpdate(loadingAtualizado);
-    addToast('success', 'Estorno registrado com sucesso!');
+    addToast('success', 'Estorno realizado com sucesso!');
   };
 
   return {

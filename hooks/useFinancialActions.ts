@@ -65,7 +65,9 @@ export function useAddAdminExpense() {
       await Promise.all([
         qc.invalidateQueries({ queryKey: QUERY_KEYS.STANDALONE_RECORDS }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.ADMIN_EXPENSES }),
-        qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD })
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS })
       ]);
     },
   });
@@ -80,7 +82,9 @@ export function useDeleteStandaloneRecord() {
       await Promise.all([
         qc.invalidateQueries({ queryKey: QUERY_KEYS.STANDALONE_RECORDS }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.ADMIN_EXPENSES }),
-        qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD })
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS })
       ]);
     },
   });
@@ -94,7 +98,9 @@ export function useAddTransfer() {
     onSuccess: async () => {
       await Promise.all([
         qc.invalidateQueries({ queryKey: QUERY_KEYS.TRANSFERS }),
-        qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS })
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
       ]);
     },
   });
@@ -108,7 +114,9 @@ export function useUpdateTransfer() {
     onSuccess: async () => {
       await Promise.all([
         qc.invalidateQueries({ queryKey: QUERY_KEYS.TRANSFERS }),
-        qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS })
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
       ]);
     },
   });
@@ -122,7 +130,9 @@ export function useDeleteTransfer() {
     onSuccess: async () => {
       await Promise.all([
         qc.invalidateQueries({ queryKey: QUERY_KEYS.TRANSFERS }),
-        qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS })
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
       ]);
     },
   });

@@ -1,6 +1,5 @@
-
 import React from 'react';
-import { X, Truck, Pencil, Save, Trash2 } from 'lucide-react';
+import { X, Truck, Pencil, Save, Trash2, Check } from 'lucide-react';
 import { Loading } from '../../types';
 
 interface Props {
@@ -10,9 +9,20 @@ interface Props {
     onSave: () => void;
     onDelete: () => void;
     onClose: () => void;
+    onFinalize?: () => void;
+    canFinalize?: boolean;
 }
 
-const LoadingHeader: React.FC<Props> = ({ loading, isEditing, onEditToggle, onSave, onDelete, onClose }) => {
+const LoadingHeader: React.FC<Props> = ({ 
+    loading, 
+    isEditing, 
+    onEditToggle, 
+    onSave, 
+    onDelete, 
+    onClose,
+    onFinalize,
+    canFinalize
+}) => {
     return (
         <div className={`px-4 py-2.5 flex justify-between items-center shrink-0 transition-all duration-500 ${isEditing ? 'bg-amber-600' : 'bg-slate-950'} shadow-md z-10`}>
             <div className="flex items-center gap-3">
@@ -20,7 +30,7 @@ const LoadingHeader: React.FC<Props> = ({ loading, isEditing, onEditToggle, onSa
                     <Truck size={20} className={isEditing ? 'animate-pulse' : ''} />
                 </div>
                 <div>
-                    <h2 className="text-base font-black uppercase tracking-tighter italic text-white leading-tight">
+                    <h2 className="text-base font-black uppercase tracking-tighter text-white leading-tight">
                         {isEditing ? 'Edição Estrutural' : 'Gestão de Carga'}
                     </h2>
                     <div className="flex items-center gap-2">
@@ -31,6 +41,14 @@ const LoadingHeader: React.FC<Props> = ({ loading, isEditing, onEditToggle, onSa
                         <p className="text-[9px] text-white/50 font-black uppercase tracking-widest">
                             {new Date(loading.date).toLocaleDateString()} | {loading.vehiclePlate}
                         </p>
+                        {loading.status === 'completed' && (
+                            <>
+                                <span className="text-white/40 text-[9px]">•</span>
+                                <span className="px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 rounded text-[9px] font-black uppercase tracking-widest border border-emerald-500/30">
+                                    Concluída
+                                </span>
+                            </>
+                        )}
                     </div>
                 </div>
             </div>
@@ -38,6 +56,14 @@ const LoadingHeader: React.FC<Props> = ({ loading, isEditing, onEditToggle, onSa
             <div className="flex items-center gap-3">
                 {!isEditing ? (
                     <>
+                        {canFinalize && loading.status !== 'completed' && (
+                            <button
+                                onClick={onFinalize}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 active:scale-95 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all text-white shadow-lg shadow-emerald-900/20"
+                            >
+                                <Check size={12} /> Finalizar Carga
+                            </button>
+                        )}
                         <button
                             onClick={() => onEditToggle(true)}
                             className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 active:scale-95 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all text-white border border-white/10"

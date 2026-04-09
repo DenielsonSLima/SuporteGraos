@@ -32,7 +32,9 @@ export { handleCommissionPayment } from './handlers/commissionHandler';
 export { handleStandalonePayment } from './handlers/standaloneHandler';
 export { handleShareholderPayment } from './handlers/shareholderHandler';
 export { cleanupFinancialRecords } from './handlers/cleanupHandler';
-export { removeFinancialTransaction } from './handlers/transactionCleanupHandler';
+export { handleTransactionVoid } from './handlers/transactionCleanupHandler';
+// Alias de compatibilidade — removeFinancialTransaction foi renomeado para handleTransactionVoid
+export { handleTransactionVoid as removeFinancialTransaction } from './handlers/transactionCleanupHandler';
 
 // Import para montar o export consolidado
 import { resolveAccountId, resolveAccountLabel } from './handlers/orchestratorHelpers';
@@ -43,7 +45,8 @@ import { handleCommissionPayment } from './handlers/commissionHandler';
 import { handleStandalonePayment } from './handlers/standaloneHandler';
 import { handleShareholderPayment } from './handlers/shareholderHandler';
 import { cleanupFinancialRecords } from './handlers/cleanupHandler';
-import { removeFinancialTransaction } from './handlers/transactionCleanupHandler';
+import { handleTransactionVoid } from './handlers/transactionCleanupHandler';
+const removeFinancialTransaction = handleTransactionVoid;
 
 // ============================================================================
 // EXPORT CONSOLIDADO (para quem importa paymentOrchestrator como objeto)

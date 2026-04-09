@@ -36,6 +36,7 @@ export interface SalesOrder {
   consultantName: string; // Sócio/Vendedor
   customerId: string;
   customerName: string;
+  customerNickname?: string;
   customerDocument: string;
   customerCity: string;
   customerState: string;
@@ -65,6 +66,8 @@ export interface SalesOrder {
   // Performance Stats (Backend-driven)
   totalGrainCost?: number;
   totalFreightCost?: number;
+  grossProfit?: number;
+  marginPercent?: number;
   totalWeightKgOrig?: number;
   totalWeightKgDest?: number;
 

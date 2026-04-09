@@ -33,10 +33,10 @@ export class DashboardCache {
   private static readonly TTL = 10000; // 10 segundos
 
   /**
-   * Carrega dados do cache em memória
+   * Carrega dados do cache em memória (ou refresca se stale)
    * @returns Dados cacheados com timestamp
    */
-  static load(): CachedData {
+  static async load(): Promise<CachedData> {
     const now = Date.now();
 
     // Cache HIT - dados ainda válidos na memória
@@ -45,31 +45,47 @@ export class DashboardCache {
     }
 
     // 🔄 Cache MISS ou expirado - carregar do zero
-    return this.refreshCache();
+    return await this.refreshCache();
   }
 
   /**
-   * 🔄 Atualiza cache com dados frescos
+   * 🔄 Atualiza cache com dados frescos do Supabase (SQL-FIRST)
    */
-  private static refreshCache(): CachedData {
+  private static async refreshCache(): Promise<CachedData> {
     const now = Date.now();
 
+    // Disparar TODAS as cargas em paralelo para máxima performance
+    // Eliminamos dependência de getAll() síncronos
+    const [
+      purchases,
+      sales,
+      loadings,
+      payables,
+      receivables,
+      standaloneRecords,
+      transfers
+    ] = await Promise.all([
+      purchaseService.loadFromSupabase(),
+      salesService.loadFromSupabase(),
+      loadingService.loadFromSupabase(),
+      FinancialCache.getPayables(),
+      FinancialCache.getReceivables(),
+      FinancialCache.getStandaloneRecords(),
+      financialActionService.getTransfers()
+    ]);
+
     this.instance = {
-      // Core data (leituras pesadas)
-      purchases: purchaseService.getAll(),
-      sales: salesService.getAll(),
-      loadings: loadingService.getAll(),
-      
-      // Financial data - agora via FinancialCache para evitar duplicação
-      payables: FinancialCache.getPayables(),
-      receivables: FinancialCache.getReceivables(),
-      standaloneRecords: FinancialCache.getStandaloneRecords(),
-      transfers: financialActionService.getTransfers(),
+      purchases,
+      sales,
+      loadings,
+      payables,
+      receivables,
+      standaloneRecords,
+      transfers,
       
       // Cashier report (já deve estar previamente carregado de forma assíncrona)
       cashierReport: CashierCache.getCachedReport(),
       
-      // Metadata
       timestamp: now
     };
 

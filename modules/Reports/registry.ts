@@ -27,6 +27,7 @@ const lazyReportImports = {
   advancesReport: () => import('./Financial/AdvancesReport'),
   expensesDetailedReport: () => import('./Financial/ExpensesDetailed'),
   shareholdersReport: () => import('./Financial/ShareholdersReport'),
+  netWorthEvolutionReport: () => import('./Financial/NetWorthEvolution'),
 
   // Comercial
   revenueReport: () => import('./Commercial/RevenueReport'),
@@ -70,6 +71,7 @@ export const REPORT_METADATA = [
   { id: 'advances_report', category: 'financial' as const, order: 8 },
   { id: 'expenses_detailed', category: 'financial' as const, order: 9 },
   { id: 'shareholders_report', category: 'financial' as const, order: 10 },
+  { id: 'net_worth_evolution', category: 'financial' as const, order: 11 },
 
   // Comercial
   { id: 'revenue_report', category: 'commercial' as const, order: 1 },
@@ -112,7 +114,8 @@ const reportIdToImportKey: Record<string, keyof typeof lazyReportImports> = {
   'partner_receivables': 'partnerReceivablesReport',
   'partner_payables': 'partnerPayablesReport',
   'partner_balance': 'partnerBalanceReport',
-  'partner_dossier': 'partnerDossierReport'
+  'partner_dossier': 'partnerDossierReport',
+  'net_worth_evolution': 'netWorthEvolutionReport'
 };
 
 // Função assíncrona para carregar relatório sob demanda

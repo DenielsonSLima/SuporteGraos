@@ -23,38 +23,31 @@ export function useOrderCardStats(order: PurchaseOrder) {
   useEffect(() => {
     const handleChange = () => setRefreshKey(prev => prev + 1);
     const unsubLedger = ledgerService.subscribe(handleChange);
-    const unsubLoading = loadingService.subscribe(handleChange);
     return () => {
       unsubLedger();
-      unsubLoading();
     };
   }, []);
 
   return useMemo(() => {
-    const loadings = loadingService.getByPurchaseOrder(order.id);
-    const activeLoadings = loadings.filter(l => l.status !== 'canceled');
-    const loadedQty = activeLoadings.reduce((acc, l) => acc + l.weightSc, 0);
+    // ═══════ SQL-FIRST DATA ═══════
+    // Estes campos já chegam calculados pelo banco (vêm da view vw_purchase_orders_enriched)
+    const totalLoadedValue = Number(order.totalPurchaseValCalc) || 0;
+    const totalSettled = Number(order.paidValue) || 0;
+    const loadedQty = Number(order.totalSc) || 0;
+    
     const contractQty = order.items.reduce((acc, i) => acc + i.quantity, 0);
-    const totalLoadedValue = activeLoadings.reduce((acc, l) => acc + (l.totalPurchaseValue || 0), 0);
-
-    const txs = order.transactions || [];
-    const cashPaidTx = txs
-      .filter(t => t.type === 'payment' || t.type === 'advance')
-      .reduce((acc, t) => acc + (t.value || 0), 0);
-    const discountTx = txs.reduce((acc, t) => acc + (t.discountValue || 0), 0);
-
-    const cashPaid = Math.max(cashPaidTx, order.paidValue || 0);
-    const directDiscounts = Math.max(discountTx, order.discountValue || 0);
-
-    const deductedExpenses = txs
-      .filter(t => (t.type === 'expense' || t.type === 'commission') && t.deductFromPartner)
-      .reduce((acc, t) => acc + t.value + (t.discountValue || 0), 0);
-
-    const totalSettled = cashPaid + directDiscounts + deductedExpenses;
     const pendingValue = Math.max(0, totalLoadedValue - totalSettled);
     const advanceBalance = Math.max(0, totalSettled - totalLoadedValue);
     const progress = contractQty > 0 ? Math.min((loadedQty / contractQty) * 100, 100) : 0;
 
-    return { loadedQty, contractQty, totalLoadedValue, totalSettled, pendingValue, advanceBalance, progress };
+    return { 
+      loadedQty, 
+      contractQty, 
+      totalLoadedValue, 
+      totalSettled, 
+      pendingValue, 
+      advanceBalance, 
+      progress 
+    };
   }, [order, refreshKey]);
 }

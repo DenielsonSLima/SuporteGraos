@@ -193,4 +193,43 @@ export const dashboardService = {
       // noop
     });
   },
+
+  // REALTIME — Singleton channel (otimiza WebSocket)
+  subscribeRealtime: (() => {
+    const listeners = new Set<() => void>();
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+    return (onAnyChange: () => void): (() => void) => {
+      listeners.add(onAnyChange);
+
+      if (!channel) {
+        const invalidate = () => {
+          if (debounceTimer) clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(() => {
+            listeners.forEach((fn) => fn());
+          }, 500); // ⚡ Debounce de 500ms para evitar spam de refresh
+        };
+
+        channel = supabase
+          .channel('realtime:dashboard_singleton')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'financial_entries' }, invalidate)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'financial_transactions' }, invalidate)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'accounts' }, invalidate)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'ops_loadings' }, invalidate)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'ops_purchase_orders' }, invalidate)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'ops_sales_orders' }, invalidate)
+          .subscribe();
+      }
+
+      return () => {
+        listeners.delete(onAnyChange);
+        if (listeners.size === 0 && channel) {
+          supabase.removeChannel(channel);
+          channel = null;
+          if (debounceTimer) clearTimeout(debounceTimer);
+        }
+      };
+    };
+  })(),
 };

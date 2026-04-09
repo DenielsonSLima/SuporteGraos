@@ -13,34 +13,20 @@ import { QUERY_KEYS, STALE_TIMES } from './queryKeys';
 
 export function useDashboard() {
   const queryClient = useQueryClient();
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Realtime: um único canal ouvindo 6 tabelas
+  // Realtime: consome o canal singleton do serviço
   useEffect(() => {
     const invalidate = () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD });
-      }, 500);
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD });
     };
 
-    const realtimeChannel = supabase
-      .channel('realtime:dashboard')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'financial_entries' }, invalidate)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'financial_transactions' }, invalidate)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'accounts' }, invalidate)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'ops_loadings' }, invalidate)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'ops_purchase_orders' }, invalidate)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'ops_sales_orders' }, invalidate)
-      .subscribe();
+    const unsub = dashboardService.subscribeRealtime(invalidate);
 
-    // Ouvir evento de init completo para primeira carga
+    // Ouvir evento de init completo para primeira carga (resiliência)
     const handleInitComplete = () => invalidate();
     window.addEventListener('supabase:init:complete', handleInitComplete);
 
     return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      supabase.removeChannel(realtimeChannel);
+      unsub();
       window.removeEventListener('supabase:init:complete', handleInitComplete);
     };
   }, [queryClient]);

@@ -29,7 +29,9 @@ const SalesOrderModule: React.FC = () => {
     getLinkedLoadings, 
     saveOrder, 
     deleteOrder, 
-    finalizeOrder 
+    finalizeOrder,
+    reopenOrder,
+    cancelOrder
   } = useSalesOrderModule();
 
   // UI/Filter State
@@ -226,17 +228,63 @@ const SalesOrderModule: React.FC = () => {
       type: 'success',
       title: 'Finalizar Venda',
       description: 'Deseja marcar este pedido como Concluído? O status será alterado permanentemente.',
-      onConfirm: () => {
-        const freshOrder = getOrderById(order.id);
-        if (freshOrder) {
-          const updated = { ...freshOrder, status: 'completed' as const };
-          saveOrder(updated, true);
-          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS });
-          if (viewMode === 'details') setSelectedOrder(updated);
-          addToast('success', 'Venda Finalizada');
-        } else {
-          addToast('error', 'Erro', 'Pedido de venda não encontrado.');
+      onConfirm: async () => {
+        await finalizeOrder(order.id);
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS });
+        if (viewMode === 'details') {
+          const fresh = getOrderById(order.id);
+          if (fresh) setSelectedOrder(fresh);
         }
+        addToast('success', 'Venda Finalizada');
+        setActionModal(prev => ({ ...prev, isOpen: false }));
+      }
+    });
+  };
+
+  const handleReopenRequest = (order: SalesOrder) => {
+    setActionModal({
+      isOpen: true,
+      type: 'warning',
+      title: 'Reabrir Venda',
+      description: 'Deseja reabrir este pedido? Ele voltará para o status "Aprovado".',
+      onConfirm: async () => {
+        await reopenOrder(order.id);
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS });
+        if (viewMode === 'details') {
+          const fresh = getOrderById(order.id);
+          if (fresh) setSelectedOrder(fresh);
+        }
+        addToast('success', 'Venda Reaberta');
+        setActionModal(prev => ({ ...prev, isOpen: false }));
+      }
+    });
+  };
+
+  const handleCancelRequest = (order: SalesOrder) => {
+    setActionModal({
+      isOpen: true,
+      type: 'danger',
+      title: `Cancelar Venda ${order.number}?`,
+      description: (
+        <div className="text-left space-y-3">
+          <p className="text-slate-700">Esta ação é irreversível e terá os seguintes efeitos:</p>
+          <ul className="list-disc list-inside text-sm text-slate-600 space-y-1">
+            <li>Status do pedido mudará para <strong>CANCELADO</strong>.</li>
+            <li>Todos os recebimentos vinculados serão <strong>INVALIDADOS</strong> no financeiro.</li>
+            <li>O saldo dos clientes e contas bancárias será ajustado automaticamente.</li>
+          </ul>
+        </div>
+      ),
+      onConfirm: async () => {
+        const result = await cancelOrder(order.id, 'Cancelado manualmente via Painel');
+        if (result?.success) {
+          addToast('success', 'Venda Cancelada', 'Pedido e financeiro sincronizados com sucesso.');
+          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS });
+          if (viewMode === 'details') setViewMode('list');
+        } else {
+          addToast('error', 'Erro ao Cancelar', result?.error || 'Falha ao cancelar pedido.');
+        }
+        setActionModal(prev => ({ ...prev, isOpen: false }));
       }
     });
   };
@@ -320,6 +368,8 @@ const SalesOrderModule: React.FC = () => {
         onEdit={() => setViewMode('form')}
         onDelete={() => handleDeleteRequest(selectedOrder)}
         onFinalize={() => handleFinalizeRequest(selectedOrder)}
+        onReopen={() => handleReopenRequest(selectedOrder)}
+        onCancel={() => handleCancelRequest(selectedOrder)}
       />
     );
 

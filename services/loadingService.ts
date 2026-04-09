@@ -16,8 +16,11 @@ import { freightExpenseService } from './freightExpenseService';
 import { loadingPersistence } from './loading/loadingPersistence';
 import { loadingRealtime } from './loading/loadingRealtime';
 import { isSqlCanonicalOpsEnabled } from './sqlCanonicalOps';
-import { getTodayBR } from '../utils/dateUtils';
+import { Persistence } from './persistence';
 import { supabase } from './supabase';
+
+const db = new Persistence<Loading>('ops_loadings', [], { useStorage: false });
+
 
 let toastCallback: ((type: 'success' | 'error' | 'info', title: string, message?: string) => void) | null = null;
 
@@ -34,88 +37,70 @@ const getLogInfo = async () => {
 export const loadingService = {
   setToastCallback: (callback: any) => { toastCallback = callback; },
 
-  getAll: () => loadingPersistence.db.getAll(),
-  getById: (id: string) => loadingPersistence.db.getById(id),
-  subscribe: (callback: (items: Loading[]) => void) => loadingPersistence.db.subscribe(callback),
+  subscribe: (callback: (items: Loading[]) => void) => {
+    return db.subscribe(callback);
+  },
+
+  getAll: () => {
+    return db.getAll();
+  },
+  getById: (id: string) => {
+    return db.getById(id);
+  },
 
   getByPurchaseOrder: (purchaseId: string) => {
-    return loadingPersistence.db.getAll().filter(l => l.purchaseOrderId === purchaseId);
+    return db.getAll().filter(l => l.purchaseOrderId === purchaseId);
   },
 
   getBySalesOrder: (salesId: string) => {
-    return loadingPersistence.db.getAll().filter(l => l.salesOrderId === salesId);
+    return db.getAll().filter(l => l.salesOrderId === salesId);
   },
 
   loadFromSupabase: async () => {
     const { companyId } = await getLogInfo();
-    return loadingPersistence.loadFromSupabase(companyId);
+    const data = await loadingPersistence.loadFromSupabase(companyId);
+    db.setAll(data);
+    return data;
   },
 
   startRealtime: async () => {
-    const { companyId } = await getLogInfo();
-    return loadingRealtime.start(companyId, loadingPersistence.db);
+    // Deprecated via TanStack Query refactoring since React sets its own channel/subs
+    // Mantido como no-op para retrocompatibilidade
   },
 
-  stopRealtime: () => loadingRealtime.stop(),
+  stopRealtime: () => {
+    // Mantido como no-op
+  },
 
   add: async (loading: Loading) => {
-    // 1. Cálculos de UI (opcionais, banco recalculado via Trigger)
-    if (!loading.totalPurchaseValue && loading.weightKg && loading.purchasePricePerSc) {
-      loading.totalPurchaseValue = Number(((loading.weightKg / 60) * loading.purchasePricePerSc).toFixed(2));
-    }
-
-    loadingPersistence.db.add(loading);
-
-    // 2. Persistência (Trigger no banco cria o financial_entry automaticamente)
+    // Persistência no Banco (RPC-First)
     const { companyId, userId, userName } = await getLogInfo();
     const success = await loadingPersistence.persistLoading(loading, companyId);
 
     if (!success) {
       showToast('error', 'Erro ao salvar', 'O banco de dados não respondeu corretamente.');
-      loadingPersistence.db.delete(loading.id);
-      return;
+      throw new Error('Falha ao inserir no Supabase');
     }
 
-    // 3. Lógica Especializada (Comissão ainda é TS-based)
-    if (loading.purchaseOrderId) {
-      const purchaseOrder = purchaseService.getById(loading.purchaseOrderId);
-      if (purchaseOrder?.brokerId && purchaseOrder.brokerCommissionPerSc) {
-        const commissionValue = Number(((loading.weightKg / 60) * purchaseOrder.brokerCommissionPerSc).toFixed(2));
-        if (commissionValue > 0) {
-          void commissionService.add({
-            loadingId: loading.id,
-            partnerId: purchaseOrder.brokerId,
-            amount: commissionValue,
-            date: loading.date,
-            status: 'pending',
-            description: `Comissão - Placa ${loading.vehiclePlate} - Pedido ${purchaseOrder.number}`,
-            companyId: companyId || ''
-          });
-        }
-      }
-    }
-
-    // Logs
+    db.add(loading); // Optimistic update
     invalidateDashboardCache();
     logService.addLog({ userId, userName, action: 'create', module: 'Logística', description: `Carregamento: ${loading.vehiclePlate}`, entityId: loading.id });
     void auditService.logAction('create', 'Logística', `Carregamento criado: ${loading.vehiclePlate}`, { entityType: 'Loading', entityId: loading.id });
   },
 
   update: async (updatedLoading: Loading) => {
-    loadingPersistence.db.update(updatedLoading);
     const { companyId, userId, userName } = await getLogInfo();
     
-    // Persistência (Trigger atualiza o financeiro)
-    await loadingPersistence.persistLoading(updatedLoading, companyId);
+    // Persistência
+    const success = await loadingPersistence.persistLoading(updatedLoading, companyId);
+    if (!success) throw new Error('Falha ao atualizar no Supabase');
 
+    db.update(updatedLoading);
     logService.addLog({ userId, userName, action: 'update', module: 'Logística', description: `Atualizou carregamento ${updatedLoading.vehiclePlate}`, entityId: updatedLoading.id });
     void auditService.logAction('update', 'Logística', `Carregamento atualizado: ${updatedLoading.vehiclePlate}`, { entityType: 'Loading', entityId: updatedLoading.id });
   },
 
   delete: async (id: string) => {
-    const loading = loadingService.getById(id);
-    if (!loading) return;
-
     // 🛡️ O XERIFÃO: Verificação de bloqueio (Fontes canônicas)
     const { data: paidEntries } = await supabase
       .from('financial_entries')
@@ -125,20 +110,20 @@ export const loadingService = {
 
     if (paidEntries && paidEntries.length > 0) {
       showToast('error', 'Exclusão Bloqueada', 'Existem pagamentos vinculados a este frete/compra.');
-      return;
+      throw new Error('Bloqueado por pagamentos ativos');
     }
 
     // 1. Deletar no Banco (RPC-First)
     const success = await loadingPersistence.deleteLoading(id);
     if (!success) {
       showToast('error', 'Erro na Exclusão', 'A exclusão foi negada pela segurança do banco.');
-      return;
+      throw new Error('Falha na deleção');
     }
 
-    // 2. Limpeza local e Audit
-    loadingPersistence.db.delete(id);
+    // 2. Audit
     const { userId, userName } = await getLogInfo();
-    logService.addLog({ userId, userName, action: 'delete', module: 'Logística', description: `Excluiu placa ${loading.vehiclePlate}`, entityId: id });
+    logService.addLog({ userId, userName, action: 'delete', module: 'Logística', description: `Excluiu carregamento ID ${id}`, entityId: id });
+    db.delete(id);
     invalidateDashboardCache();
     DashboardCache.clearAll();
   },

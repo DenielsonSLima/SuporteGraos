@@ -35,6 +35,10 @@ export const cleanupFinancialRecords = async (params: CleanupParams) => {
       }
     }
 
+    // 1.1 Safety Fallback: Deletar via tag [ORIGIN:entityId] na descrição
+    // Garante que transações "avulsas" vinculadas por tag (como despesas extras) sejam limpas
+    await financialTransactionService.deleteByOrigin(entityId);
+
     // 2. Limpar legacy transactions (via IDs antigos)
     for (const payableId of payableIds) {
       await financialTransactionService.deleteByRecordId(payableId, 'payable');

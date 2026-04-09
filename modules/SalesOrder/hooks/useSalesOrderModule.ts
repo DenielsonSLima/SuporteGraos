@@ -52,6 +52,20 @@ export function useSalesOrderModule() {
     return updated;
   };
 
+  // Reabre pedido (status → approved)
+  const reopenOrder = async (orderId: string) => {
+    const freshOrder = getOrderById(orderId);
+    if (!freshOrder) return null;
+    const updated = { ...freshOrder, status: 'approved' as const };
+    await salesService.update(updated);
+    return updated;
+  };
+
+  // Cancela pedido (status → canceled) e limpa financeiro via RPC
+  const cancelOrder = async (orderId: string, reason?: string) => {
+    return salesService.cancel(orderId, reason);
+  };
+
   return {
     sales,
     shareholders,
@@ -62,5 +76,7 @@ export function useSalesOrderModule() {
     saveOrder,
     deleteOrder,
     finalizeOrder,
+    reopenOrder,
+    cancelOrder,
   };
 }

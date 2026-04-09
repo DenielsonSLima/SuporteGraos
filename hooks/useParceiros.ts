@@ -27,6 +27,14 @@ export function usePartners(params?: {
         }
 
         const unsub = parceirosService.subscribeRealtime(() => {
+            // Limpa o cache interno do serviço (nossa "memória rápida")
+            if ((parceirosService as any).clearCache) {
+              (parceirosService as any).clearCache();
+            }
+            if ((parceirosService as any).driversActions?.clearCache) {
+               (parceirosService as any).driversActions.clearCache();
+            }
+
             queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PARTNERS });
             queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ADDRESSES });
             queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DRIVERS });
@@ -35,12 +43,20 @@ export function usePartners(params?: {
         return unsub;
     }, [queryClient, shouldUseRealtime]);
 
-    return useQuery({
+    const query = useQuery({
         queryKey: [...QUERY_KEYS.PARTNERS, params],
         queryFn: () => parceirosService.getPartners(params),
         staleTime: STALE_5_MIN,
         placeholderData: keepPreviousData,
     });
+
+    useEffect(() => {
+        if (query.data) {
+            console.log(`[usePartners] Encontrados ${query.data.data?.length || 0} parceiros.`, { params });
+        }
+    }, [query.data, params]);
+
+    return query;
 }
 
 /**
@@ -60,13 +76,21 @@ export function usePartnerAddresses(partnerId: string) {
  * Hook para motoristas vinculados a um parceiro (Transportadora).
  */
 export function usePartnerDrivers(partnerId: string) {
-    return useQuery({
+    const query = useQuery({
         queryKey: [...QUERY_KEYS.DRIVERS, partnerId],
         queryFn: () => parceirosService.getDrivers(partnerId),
         enabled: !!partnerId,
         staleTime: STALE_5_MIN,
         placeholderData: keepPreviousData,
     });
+
+    useEffect(() => {
+        if (query.data) {
+            console.log(`[usePartnerDrivers] Encontrados ${query.data.length || 0} motoristas para o parceiro ${partnerId}.`);
+        }
+    }, [query.data, partnerId]);
+
+    return query;
 }
 
 /**

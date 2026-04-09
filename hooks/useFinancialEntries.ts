@@ -15,11 +15,12 @@ import {
   financialEntriesService,
   FinancialEntryType,
   EntryStatus,
+  FinancialFilterParams,
 } from '../services/financialEntriesService';
 import { QUERY_KEYS, STALE_TIMES } from './queryKeys';
 
 // Hook principal: Contas a Pagar
-export function usePayables() {
+export function usePayables(params?: FinancialFilterParams) {
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -33,15 +34,15 @@ export function usePayables() {
   }, [queryClient]);
 
   return useQuery({
-    queryKey: QUERY_KEYS.FINANCIAL_PAYABLES,
-    queryFn: () => financialEntriesService.getPayables(),
+    queryKey: [QUERY_KEYS.FINANCIAL_PAYABLES, params],
+    queryFn: () => financialEntriesService.getPayables(params),
     staleTime: STALE_TIMES.DYNAMIC,
     placeholderData: keepPreviousData,
   });
 }
 
 // Hook principal: Contas a Receber
-export function useReceivables() {
+export function useReceivables(params?: FinancialFilterParams) {
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -57,8 +58,8 @@ export function useReceivables() {
   }, [queryClient]);
 
   return useQuery({
-    queryKey: QUERY_KEYS.FINANCIAL_RECEIVABLES,
-    queryFn: () => financialEntriesService.getReceivables(),
+    queryKey: [QUERY_KEYS.FINANCIAL_RECEIVABLES, params],
+    queryFn: () => financialEntriesService.getReceivables(params),
     staleTime: STALE_TIMES.DYNAMIC,
     placeholderData: keepPreviousData,
   });
@@ -88,10 +89,10 @@ export function useEntryById(id: string | null) {
 }
 
 // Hook auxiliar: Totais (SEM subscription própria — usa invalidação via payables/receivables)
-export function useTotalsByType(type: FinancialEntryType) {
+export function useTotalsByType(type: FinancialEntryType, startDate?: string, endDate?: string) {
   return useQuery({
-    queryKey: ['totals', type],
-    queryFn: () => financialEntriesService.getTotalsByType(type),
+    queryKey: ['totals', type, startDate, endDate],
+    queryFn: () => financialEntriesService.getTotalsByType(type, startDate, endDate),
     staleTime: STALE_TIMES.DYNAMIC,
     placeholderData: keepPreviousData,
   });

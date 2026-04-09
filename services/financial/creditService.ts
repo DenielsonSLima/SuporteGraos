@@ -615,6 +615,13 @@ export const getCredits = (): FinancialRecord[] => {
 };
 
 /**
+ * Obtém um crédito por ID
+ */
+export const getById = (id: string): FinancialRecord | undefined => {
+    return db.getById(id);
+};
+
+/**
  * Agrupa créditos por mês
  */
 export const groupByMonth = (credits: FinancialRecord[]): Record<string, FinancialRecord[]> =>

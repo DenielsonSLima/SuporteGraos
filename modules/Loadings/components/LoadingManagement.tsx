@@ -7,15 +7,16 @@ import {
   ArrowRightLeft, Check, LayoutGrid, Info, MapPin
 } from 'lucide-react';
 import { Loading } from '../types';
-import TransactionModal from '../../PurchaseOrder/components/modals/TransactionModal';
-import LoadingFinancialTab from './LoadingFinancialTab';
+import { loadingKpiService } from '../../../services/loadings/loadingKpiService';
 import ModalPortal from '../../../components/ui/ModalPortal';
 import { useToast } from '../../../contexts/ToastContext';
+
+// ─── TanStack Query Hooks ──────────────────────────────────────────────────
 import { useActiveSales } from '../../../hooks/useActiveSales';
 import { useCarrierPartners } from '../../../hooks/useCarrierPartners';
 import { usePartnerDrivers, usePartnerVehicles } from '../../../hooks/useParceiros';
 import { useUpdateLoading, useDeleteLoading, useSaveLoadingTransaction } from '../../../hooks/useLoadingMutations';
-import { computeLoadingStats, recalcFreightValue, recalcSalesValue } from '../calculations';
+import LoadingFinancialTab from './LoadingFinancialTab';
 
 // ─── Componentes Modulados (Seções) ────────────────────────────────────────
 import LoadingHeader from './sections/LoadingHeader';
@@ -43,8 +44,6 @@ const LoadingManagement: React.FC<Props> = ({ loading, onClose, onUpdate, origin
   const [activeTab, setActiveTab] = useState<'info' | 'financial'>('info');
   const [isEditing, setIsEditing] = useState(false);
   const [isQuickRedirecting, setIsQuickRedirecting] = useState(false);
-  const [isTxModalOpen, setIsTxModalOpen] = useState(false);
-  const [txType, setTxType] = useState<'payment' | 'advance'>('payment');
 
   const [editForm, setEditForm] = useState<Loading>({ ...loading });
   const [freightBase, setFreightBase] = useState<'origin' | 'destination'>('origin');
@@ -73,7 +72,8 @@ const LoadingManagement: React.FC<Props> = ({ loading, onClose, onUpdate, origin
     }
   }, [loading.id, loading.unloadWeightKg, loading.freightPricePerTon]);
 
-  const stats = useMemo(() => computeLoadingStats(editForm, freightBase), [editForm, freightBase]);
+  const stats = useMemo(() => loadingKpiService.computeLoadingStats(editForm, freightBase), [editForm, freightBase]);
+  const summary = useMemo(() => loadingKpiService.computeFreightSummary(editForm), [editForm]);
 
   const handleToggleFreightBase = (newBase: 'origin' | 'destination') => {
     if (newBase === freightBase) return;
@@ -82,7 +82,7 @@ const LoadingManagement: React.FC<Props> = ({ loading, onClose, onUpdate, origin
       return;
     }
     const wRef = newBase === 'origin' ? editForm.weightKg : editForm.unloadWeightKg!;
-    const newTotalFreight = recalcFreightValue(wRef, editForm.freightPricePerTon, editForm.redirectDisplacementValue);
+    const newTotalFreight = loadingKpiService.calculateFreightValue(wRef, editForm.freightPricePerTon, editForm.redirectDisplacementValue);
     const updated = { ...editForm, freightBase: (newBase === 'origin' ? 'Origem' : 'Destino') as Loading['freightBase'], totalFreightValue: newTotalFreight };
     setFreightBase(newBase);
     setEditForm(updated);
@@ -94,16 +94,9 @@ const LoadingManagement: React.FC<Props> = ({ loading, onClose, onUpdate, origin
   const handleQuickWeightConfirm = () => {
     const wDest = parseFloat(quickWeight);
     if (isNaN(wDest) || wDest <= 0) return addToast('warning', 'Peso Inválido');
-    const wRef = freightBase === 'destination' ? wDest : editForm.weightKg;
-    const newTotalFreight = recalcFreightValue(wRef, editForm.freightPricePerTon, editForm.redirectDisplacementValue);
-    const updated: Loading = {
-      ...editForm,
-      unloadWeightKg: wDest,
-      breakageKg: Math.max(0, editForm.weightKg - wDest),
-      status: 'completed' as const,
-      totalSalesValue: recalcSalesValue(wDest, editForm.salesPrice),
-      totalFreightValue: newTotalFreight
-    };
+    
+    const updated = loadingKpiService.applyUnloadWeight(editForm, wDest, freightBase);
+    
     setEditForm(updated);
     updateLoadingMut.mutate(updated);
     onUpdate(updated);
@@ -143,21 +136,22 @@ const LoadingManagement: React.FC<Props> = ({ loading, onClose, onUpdate, origin
     addToast('success', 'Carga Redirecionada', `Destino alterado para ${updated.customerName}`);
   };
 
-  const handleSaveTransaction = (data: any) => {
-    const newTx = { id: Math.random().toString(36).substr(2, 9), type: txType, ...data };
-    const updated = {
-      ...editForm,
-      freightPaid: (editForm.freightPaid || 0) + data.value,
-      freightAdvances: txType === 'advance' ? (editForm.freightAdvances || 0) + data.value : (editForm.freightAdvances || 0),
-      transactions: [newTx, ...(editForm.transactions || [])]
-    };
-    setEditForm(updated);
-    saveTransactionMut.mutate(updated);
-    onUpdate(updated);
-    setIsTxModalOpen(false);
+  const handleFinalize = () => {
+    if (window.confirm('Deseja finalizar esta carga?\n\nIsso moverá o registro para o histórico de concluídos.')) {
+      const updated: Loading = { ...editForm, status: 'completed' };
+      setEditForm(updated);
+      updateLoadingMut.mutate(updated);
+      onUpdate(updated);
+      addToast('success', 'Carga Finalizada', 'O registro foi marcado como concluído.');
+      onClose();
+    }
   };
 
+  // A aba financeira agora gerencia suas próprias transações via FreightPaymentsCard
+
   const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
+
+  const canFinalize = summary.balance <= 0.05 && (editForm.unloadWeightKg ?? 0) > 0;
 
   return (
     <ModalPortal>
@@ -168,7 +162,7 @@ const LoadingManagement: React.FC<Props> = ({ loading, onClose, onUpdate, origin
         <div className="w-full max-w-4xl bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] border border-slate-200 animate-in zoom-in-95 duration-300">
 
         <LoadingHeader
-          loading={loading}
+          loading={editForm}
           isEditing={isEditing}
           onEditToggle={setIsEditing}
           onSave={handleSaveStructural}
@@ -179,6 +173,8 @@ const LoadingManagement: React.FC<Props> = ({ loading, onClose, onUpdate, origin
             if (window.confirm(msg)) { deleteLoadingMut.mutate(loading.id); onUpdate(null); onClose(); }
           }}
           onClose={onClose}
+          onFinalize={handleFinalize}
+          canFinalize={canFinalize}
         />
 
         {!isEditing && (
@@ -235,20 +231,11 @@ const LoadingManagement: React.FC<Props> = ({ loading, onClose, onUpdate, origin
               <LoadingFinancialTab
                 loading={editForm}
                 onUpdate={(up) => { setEditForm(up); updateLoadingMut.mutate(up); onUpdate(up); }}
-                onAddPayment={() => { setTxType('payment'); setIsTxModalOpen(true); }}
               />
             </div>
           )}
         </div>
       </div>
-
-      <TransactionModal
-        isOpen={isTxModalOpen}
-        onClose={() => setIsTxModalOpen(false)}
-        onSave={handleSaveTransaction}
-        type={txType}
-        title={txType === 'advance' ? 'Lançar Adiantamento Frete' : 'Baixar Saldo de Frete'}
-      />
     </div>
     </ModalPortal>
   );

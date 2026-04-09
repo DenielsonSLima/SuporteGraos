@@ -31,6 +31,7 @@ export function usePurchaseOrderModule({ addToast }: UsePurchaseOrderModuleOptio
   // ─── Inicialização de serviços legados ──────────────────
   useEffect(() => {
     loadingService.startRealtime();
+    purchaseService.startRealtime('active'); // Assume active company for now or pass context
     void loadingService.loadFromSupabase();
 
     const unsubscribeLoadings = loadingService.subscribe(() => {
@@ -41,6 +42,7 @@ export function usePurchaseOrderModule({ addToast }: UsePurchaseOrderModuleOptio
     return () => {
       unsubscribeLoadings?.();
       loadingService.stopRealtime();
+      purchaseService.stopRealtime();
     };
   }, []);
 

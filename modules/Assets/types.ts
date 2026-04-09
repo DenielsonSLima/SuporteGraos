@@ -19,6 +19,7 @@ export interface Asset {
   // Sale Info (If status === 'sold')
   saleDate?: string;
   saleValue?: number;
+  paidValue?: number;
   buyerName?: string;
   buyerId?: string;
 

@@ -25,51 +25,27 @@ const purchasesHistoryReport: ReportModule = {
     product: ''
   },
   FilterComponent: Filters,
-  fetchData: ({ startDate, endDate, partnerId, product }) => {
-    // Buscar pedidos e carregamentos
-    let allOrders = reportsCache.getAllPurchases();
-    const allLoadings = reportsCache.getAllLoadings();
+  fetchData: async ({ startDate, endDate, partnerId, product }) => {
+    const { authService } = await import('../../../../services/authService');
+    const { reportsService } = await import('../../../../services/reportsService');
+    const companyId = authService.getCurrentUser()?.companyId || '';
 
-    // Filtrar pedidos por data
-    allOrders = allOrders.filter(p => {
-      if (startDate && endDate) {
-        const d = new Date(p.date).getTime();
-        const start = new Date(startDate).getTime();
-        const end = new Date(endDate).getTime();
-        if (d < start || d > end) return false;
-      }
-      if (partnerId && p.partnerName !== partnerId) return false;
-      if (product) {
-        const hasProduct = (p.items || []).some((i: any) => i.productName === product);
-        if (!hasProduct) return false;
-      }
-      return true;
+    // Buscar dados já filtrados e agregados (volumes inclusos) do servidor
+    const records = await reportsService.getPurchasesHistory(companyId, {
+      startDate,
+      endDate,
+      partnerId,
+      productName: product
     });
 
-    // Para cada pedido, calcular totais a partir dos carregamentos (loadings)
-    const rows = allOrders.map(p => {
-      const orderLoadings = allLoadings.filter(
-        (l: any) => l.purchaseOrderId === p.id && l.status !== 'canceled'
-      );
-
-      // Somar valores dos carregamentos (mesma lógica que usePurchaseOrderLogic)
-      const totalPurchaseValue = orderLoadings.reduce((acc: number, l: any) => acc + (l.totalPurchaseValue || 0), 0);
-      const totalSc = orderLoadings.reduce((acc: number, l: any) => acc + (l.weightSc || 0), 0);
-
-      // Produto: pegar do item do pedido ou do loading
-      const primaryProduct = (p.items && p.items[0]?.productName)
-        || (orderLoadings[0] as any)?.productName
-        || 'Grãos';
-
-      return {
-        date: p.date,
-        number: p.number,
-        partnerName: p.partnerName,
-        product: primaryProduct,
-        volume: totalSc > 0 ? `${formatNumber(totalSc)} SC` : '-',
-        total: totalPurchaseValue
-      };
-    });
+    const rows = records.map(p => ({
+      date: p.date,
+      number: p.number,
+      partnerName: p.partnerName,
+      product: p.productName,
+      volume: p.volumeSc > 0 ? `${formatNumber(p.volumeSc)} SC` : '-',
+      total: p.totalValue
+    }));
 
     const totalVal = rows.reduce((acc, r) => acc + (Number(r.total) || 0), 0);
 

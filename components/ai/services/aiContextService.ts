@@ -28,8 +28,8 @@ export const aiContextService = {
       const sales = salesService?.getAll?.() || [];
       const loadings = (loadingService?.getAll?.() || []).filter(l => l && l.status !== 'canceled');
       const bankAccounts = financialService?.getBankAccountsWithBalances?.() || [];
-      const payables = financialIntegrationService?.getPayables?.() || [];
-      const receivables = financialIntegrationService?.getReceivables?.() || [];
+      const payables = (await financialIntegrationService?.getPayables?.()) || [];
+      const receivables = (await financialIntegrationService?.getReceivables?.()) || [];
 
       const formatMoney = (val: number) => `R$${val.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 

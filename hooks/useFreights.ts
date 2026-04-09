@@ -23,13 +23,7 @@ import { loadingService } from '../services/loadingService';
 export function useFreights() {
   const queryClient = useQueryClient();
 
-  // Quando loadings mudam (realtime), os freights derivados também mudam
-  useEffect(() => {
-    const unsub = loadingService.subscribe(() => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FREIGHTS });
-    });
-    return unsub;
-  }, [queryClient]);
+  // A invalidação agora é gerenciada globalmente pelo Realtime Sync do Supabase
 
   return useQuery({
     queryKey: QUERY_KEYS.FREIGHTS,

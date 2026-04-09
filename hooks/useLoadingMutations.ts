@@ -23,6 +23,31 @@ function dispatchGlobalEvents(detail?: Record<string, any>) {
 }
 
 /**
+ * Mutation para criar um novo carregamento.
+ * Invalida cache TanStack e sincroniza Dashboard/Caixa.
+ */
+export function useCreateLoading() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (loading: Loading) => { 
+      // O ID e campos iniciais são gerados no form/service
+      await loadingService.add(loading); 
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOADINGS }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
+      ]);
+      dispatchGlobalEvents({ type: 'loading_created' });
+    },
+  });
+}
+
+/**
  * Mutation para atualizar um carregamento.
  * Invalida cache TanStack + loadingCache legacy.
  */
@@ -35,7 +60,13 @@ export function useUpdateLoading() {
     },
     onSuccess: async (_result, loading) => {
       // ✅ SKIL Gap 7: LoadingCache removido — TanStack Query é a fonte canônica de cache
-      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOADINGS });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOADINGS }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
+      ]);
       dispatchGlobalEvents({ type: 'loading_updated', loadingId: loading.id });
     },
   });
@@ -53,7 +84,13 @@ export function useDeleteLoading() {
       await loadingService.delete(loadingId); 
     },
     onSuccess: async (_result, loadingId) => {
-      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOADINGS });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOADINGS }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
+      ]);
       dispatchGlobalEvents({ type: 'loading_deleted', loadingId });
     },
   });
@@ -71,7 +108,13 @@ export function useSaveLoadingTransaction() {
       await loadingService.update(loading); 
     },
     onSuccess: async (_result, loading) => {
-      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOADINGS });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOADINGS }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
+      ]);
       dispatchGlobalEvents({ type: 'freight_payment', loadingId: loading.id });
     },
   });

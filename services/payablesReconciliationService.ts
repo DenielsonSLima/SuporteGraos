@@ -81,7 +81,7 @@ export const reconcilePayablesFromHistory = async () => {
   payables.forEach(p => {
   });
 
-  const orders = purchaseService.getAll();
+  const orders = await purchaseService.loadFromSupabase();
   const orderById = new Map(orders.map(o => [o.id, o]));
 
   historyByOrigin.forEach((records, origin) => {
@@ -170,7 +170,7 @@ export const reconcilePayablesFromOrders = async () => {
   
   const allPayables = payablesService.getAll();
   const payables = allPayables.filter(p => p.subType === 'purchase_order');
-  const orders = purchaseService.getAll();
+  const orders = await purchaseService.loadFromSupabase();
   
   
   // Log todos os payables para debug
@@ -256,7 +256,8 @@ export const reconcilePayablesFromFreights = async () => {
 
 
   const payables = payablesService.getAll().filter(p => p.subType === 'freight');
-  const loadings = loadingService.getAll().filter(l => l.totalFreightValue && l.totalFreightValue > 0 && l.status !== 'canceled');
+  const allLoadings = await loadingService.loadFromSupabase();
+  const loadings = allLoadings.filter(l => l.totalFreightValue && l.totalFreightValue > 0 && l.status !== 'canceled');
 
   const payableByLoading = new Map(
     payables
@@ -330,7 +331,7 @@ if (typeof window !== 'undefined') {
   
   // Função de correção direta para o payable do parceiro
   (window as any).fixPayableForOrder = async (orderNumber: string) => {
-    const orders = purchaseService.getAll();
+    const orders = await purchaseService.loadFromSupabase();
     const order = orders.find(o => o.number === orderNumber);
     
     if (!order) {

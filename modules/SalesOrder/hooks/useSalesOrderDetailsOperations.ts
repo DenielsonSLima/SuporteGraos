@@ -1,44 +1,15 @@
-import { useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { QUERY_KEYS } from '../../../hooks/queryKeys';
 import { salesService } from '../../../services/salesService';
 import { financialActionService } from '../../../services/financialActionService';
 import { SalesOrder } from '../types';
 import { OrderNote } from '../../PurchaseOrder/types';
-import { Loading } from '../../Loadings/types';
-
-/**
- * Calcula stats financeiros de um pedido de venda.
- * SKILL: lógica financeira não deve residir em componentes visuais.
- */
-export function useSalesOrderStats(order: SalesOrder, loadings: Loading[], transactions: any[] = []) {
-  return useMemo(() => {
-    // Confia 100% nos dados pré-calculados pelo SQL (VIEW vw_sales_orders_enriched)
-    // Isso garante consistência absoluta com os relatórios e dashboard
-    const totalDeliveredVal = order.deliveredValue || 0;
-    const totalTransitVal = order.transitValue || 0;
-    const totalReceived = order.paidValue || 0;
-    
-    // Novo cálculo solicitado: Valor Faturado/Entregue - Valor Recebido
-    // Evita saldo pendente do contrato total antes da entrega
-    const balance = Math.max(0, totalDeliveredVal - totalReceived);
-    const contractBalance = order.balanceValue || 0;
-
-    return { 
-      totalDeliveredVal, 
-      totalTransitVal, 
-      totalReceived, 
-      balance,
-      contractBalance
-    };
-  }, [order]);
-}
 
 /**
  * Hook de navegação cross-módulo via CustomEvent.
- * Centraliza o padrão de navegação para evitar uso direto de window em componentes.
  */
 export function useCrossModuleNavigation() {
+
   const navigateTo = (moduleId: string, orderId: string) => {
     (window as any).__pendingOrderNav = { moduleId, orderId };
     window.dispatchEvent(new CustomEvent('app:navigate', { detail: { moduleId, orderId } }));
@@ -49,12 +20,14 @@ export function useCrossModuleNavigation() {
 export function useSalesOrderDetailsOperations() {
   const queryClient = useQueryClient();
 
-  const refreshData = async () => {
-    // Await all invalidations to ensure TanStack is ready before next UI action
+  const refreshData = async (orderId?: string) => {
+    // 🚀 OTIMIZAÇÃO: Invalidação granular (SKIL: Performance First)
+    const filters = orderId ? { queryKey: [QUERY_KEYS.SALES_ORDERS, orderId] } : { queryKey: QUERY_KEYS.SALES_ORDERS };
+    
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS }),
+      queryClient.invalidateQueries({ queryKey: filters.queryKey } as any),
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOADINGS }),
-      queryClient.invalidateQueries({ queryKey: ['sales_order_transactions'] }),
+      queryClient.invalidateQueries({ queryKey: ['sales_order_transactions', orderId] }),
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS })
     ]);
   };
@@ -72,6 +45,6 @@ export function useSalesOrderDetailsOperations() {
   return {
     refreshData,
     confirmReceipt,
-    saveNote,
+    saveNote
   };
 }

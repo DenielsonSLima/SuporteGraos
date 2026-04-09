@@ -2,7 +2,7 @@
 import React, { useMemo } from 'react';
 import { DollarSign, Truck, Clock, CheckCircle2 } from 'lucide-react';
 import { PurchaseOrder } from '../types';
-import { loadingService } from '../../../services/loadingService';
+import { useLoadings } from '../../../hooks/useLoadings';
 
 interface Props {
   orders: PurchaseOrder[];
@@ -16,6 +16,7 @@ const formatCurrency = (val: number) => new Intl.NumberFormat('pt-BR', {
 }).format(Math.abs(val) < 0.005 ? 0 : val);
 
 const KPIs: React.FC<Props> = ({ orders }) => {
+  const { data: allLoadings = [] } = useLoadings();
   
   const stats = useMemo(() => {
     // 1. Total Ativo (Valor Contratual)
@@ -33,7 +34,6 @@ const KPIs: React.FC<Props> = ({ orders }) => {
     // 3. Financeiro Pendente (A Pagar)
     // Lógica ajustada PEDIDO DE COMPRA: Valor do que foi CARREGADO (Peso Origem) - Valor Pago.
     // Ignora o peso de chegada. Se carregou, deve.
-    const allLoadings = loadingService.getAll();
     
     // Filtra cargas vinculadas a pedidos de compra (exclui cancelados)
     const purchaseLoadings = allLoadings.filter(l => 
@@ -60,7 +60,7 @@ const KPIs: React.FC<Props> = ({ orders }) => {
         totalInTransitValue,
         activeCount: activeOrders.length
     };
-  }, [orders]);
+  }, [orders, allLoadings]);
 
   const StatCard = ({ label, value, icon: Icon, color, subtext }: any) => (
     <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-start justify-between">

@@ -32,30 +32,14 @@ import { cashierService } from '../modules/Cashier/services/cashierService';
 export function useCashierCurrentMonth() {
   const queryClient = useQueryClient();
 
+  // Realtime: consome o canal singleton do serviço (escuta 7+ tabelas)
   useEffect(() => {
     const invalidate = () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT });
     };
 
-    const unsubEntries = financialEntriesService.subscribeRealtime(invalidate);
-    const unsubTx = financialTransactionService.subscribeRealtime(invalidate);
-    const unsubAccounts = accountsService.subscribeRealtime(invalidate);
-    const unsubAssets = assetService.subscribeRealtime(invalidate);
-
-    // Invalida também em mudanças de Pedidos e Carregamentos (Realtime UI)
-    const subOrders = supabase.channel('cashier_orders_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'ops_purchase_orders' }, invalidate)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'ops_sales_orders' }, invalidate)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'ops_loadings' }, invalidate)
-      .subscribe();
-
-    return () => {
-      unsubEntries();
-      unsubTx();
-      unsubAccounts();
-      unsubAssets();
-      supabase.removeChannel(subOrders);
-    };
+    const unsub = cashierService.subscribeRealtime(invalidate);
+    return unsub;
   }, [queryClient]);
 
   return useQuery({

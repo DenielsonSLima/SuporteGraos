@@ -37,22 +37,29 @@ export function useCarrierPartners() {
     return unsub;
   }, [queryClient]);
 
-  return useQuery<Partner[]>({
+    const query = useQuery<Partner[]>({
     queryKey: CARRIER_PARTNERS_KEY,
     queryFn: async () => {
       const result = await parceirosService.getPartners({
         page: 1,
-        pageSize: 2000,
+        pageSize: 1000,
         category: PARTNER_CATEGORY_IDS.CARRIER,
+        active: true,
       });
 
-      return (result.data || []).filter((p: Partner) =>
+      const filtered = (result.data || []).filter((p: Partner) =>
         Array.isArray(p.categories)
           ? p.categories.includes(PARTNER_CATEGORY_IDS.CARRIER)
           : (p as any).partnerTypeId === PARTNER_CATEGORY_IDS.CARRIER
       );
+      
+      console.log(`[useCarrierPartners] Encontradas ${filtered.length} transportadoras filtradas de ${result.data?.length || 0} retornadas.`);
+      
+      return filtered;
     },
     staleTime: STALE_TIMES.REFERENCE,
     placeholderData: keepPreviousData,
   });
+
+  return query;
 }

@@ -24,17 +24,9 @@ let isLoaded = false;
 
 const loadFromSupabase = async () => {
   if (isLoaded) return;
-
-  if (isSqlCanonicalOpsEnabled()) {
-    sqlCanonicalOpsLog('partnerAddressService.loadFromSupabase ignorado em modo canônico (partner_addresses legado)');
-    db.setAll([]);
-    isLoaded = true;
-    return;
-  }
-
   try {
     const { data, error } = await supabase
-      .from('partner_addresses')
+      .from('parceiros_enderecos')
       .select('*')
       .order('is_primary', { ascending: false })
       .order('created_at');
@@ -44,24 +36,16 @@ const loadFromSupabase = async () => {
     db.setAll(transformedData);
     isLoaded = true;
   } catch (error) {
+    console.error('❌ Erro ao carregar endereços (parceiros_enderecos):', error);
   }
 };
-
-// ============================================================================
-// REALTIME
-// ============================================================================
 
 const startRealtime = () => {
   if (realtimeChannel) return;
 
-  if (isSqlCanonicalOpsEnabled()) {
-    sqlCanonicalOpsLog('partnerAddressService.startRealtime ignorado em modo canônico (partner_addresses legado)');
-    return;
-  }
-
   realtimeChannel = supabase
-    .channel('realtime:partner_addresses')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'partner_addresses' }, (payload) => {
+    .channel('realtime:parceiros_enderecos')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'parceiros_enderecos' }, (payload) => {
       const rec = payload.new || payload.old;
       if (!rec) return;
 
@@ -74,12 +58,8 @@ const startRealtime = () => {
       } else if (payload.eventType === 'DELETE') {
         db.delete(transformed.id);
       }
-
     })
-    .subscribe((status) => {
-      if (status === 'CHANNEL_ERROR') {
-      }
-    });
+    .subscribe();
 };
 
 const stopRealtime = () => {
@@ -89,15 +69,6 @@ const stopRealtime = () => {
   }
 };
 
-// Inicializar ao carregar o módulo
-// ❌ NÃO inicializar automaticamente - aguardar autenticação
-// loadFromSupabase();
-// startRealtime();
-
-// ============================================================================
-// HELPER
-// ============================================================================
-
 const getLogInfo = () => {
   const user = authService.getCurrentUser();
   return {
@@ -105,10 +76,6 @@ const getLogInfo = () => {
     userName: user?.name || 'Sistema'
   };
 };
-
-// ============================================================================
-// EXPORT SERVICE
-// ============================================================================
 
 export const partnerAddressService = {
   getAll: (): PartnerAddress[] => db.getAll(),
@@ -133,179 +100,68 @@ export const partnerAddressService = {
   add: async (input: PartnerAddressCreateInput) => {
     const now = new Date().toISOString();
 
-    // Cria com ID temporário para UX rápida
-    const address: PartnerAddress = {
-      ...input,
-      id: generateUUID(),
-      created_at: now,
-      updated_at: now
-    };
-
-    // Adiciona no cache local imediatamente
-    db.add(address);
-
     const { userId, userName } = getLogInfo();
     logService.addLog({
-      userId,
-      userName,
-      action: 'create',
-      module: 'Parceiros',
-      description: `Cadastrou endereço: ${input.street}`,
-      entityId: address.id
+      userId, userName, action: 'create', module: 'Parceiros',
+      description: `Cadastrou endereço: ${input.street}`, entityId: 'temp'
     });
 
     try {
-      // Resolve state_id/city_id se vierem os nomes
-      let resolvedStateId: number | null = address.state_id ?? null;
-      let resolvedCityId: number | null = address.city_id ?? null;
+      let resolvedStateId: number | null = input.state_id ?? null;
+      let resolvedCityId: number | null = input.city_id ?? null;
 
+      // ... Lógica de resolução de cidades/estados (mantida) ...
       if (!resolvedStateId && input.stateName) {
         const stateStr = (input.stateName || '').trim();
         const ufCode = stateStr.length === 2 ? stateStr.toUpperCase() : null;
-
-        // tenta por UF (ex: "SP") senão por nome (ex: "São Paulo")
         let ufRow: any | null = null;
         if (ufCode) {
-          const { data } = await supabase.from('ufs').select('id, uf, name').eq('uf', ufCode).limit(1).single();
-          ufRow = data || null;
+          const { data } = await supabase.from('ufs').select('id').eq('uf', ufCode).limit(1).single();
+          ufRow = data;
         }
         if (!ufRow) {
-          const { data } = await supabase.from('ufs').select('id, uf, name').ilike('name', stateStr).limit(1).single();
-          ufRow = data || null;
+          const { data } = await supabase.from('ufs').select('id').ilike('name', stateStr).limit(1).single();
+          ufRow = data;
         }
         resolvedStateId = ufRow?.id ?? null;
       }
 
-      if (!resolvedCityId && input.cityName) {
+      if (!resolvedCityId && input.cityName && resolvedStateId) {
         const cityStr = (input.cityName || '').trim();
-        if (resolvedStateId) {
-          const { data } = await supabase
-            .from('cities')
-            .select('id, name')
-            .eq('uf_id', resolvedStateId)
-            .ilike('name', cityStr)
-            .limit(1)
-            .single();
-          if (data?.id) {
-            resolvedCityId = data.id as number;
-          } else {
-            // cria cidade vinculada à UF se não encontrada
-            const { data: created, error: cityCreateErr } = await supabase
-              .from('cities')
-              .insert({
-                name: cityStr,
-                uf_id: resolvedStateId,
-                company_id: authService.getCurrentUser()?.companyId
-              })
-              .select('id')
-              .single();
-            if (!cityCreateErr && created?.id) {
-              resolvedCityId = created.id as number;
-            }
-          }
-        } else {
-          const { data } = await supabase
-            .from('cities')
-            .select('id, name')
-            .ilike('name', cityStr)
-            .limit(1)
-            .single();
-          resolvedCityId = data?.id ?? null;
-        }
+        const { data } = await supabase.from('cities').select('id').eq('uf_id', resolvedStateId).ilike('name', cityStr).limit(1).single();
+        resolvedCityId = data?.id ?? null;
       }
 
-      // Atualiza os IDs resolvidos para o insert
-      address.state_id = (resolvedStateId ?? null) as any;
-      address.city_id = (resolvedCityId ?? null) as any;
+      const addressToSave = {
+        ...input,
+        id: '', // Supabase gera o UUID
+        state_id: resolvedStateId as any,
+        city_id: resolvedCityId as any,
+        active: true,
+        created_at: now,
+        updated_at: now
+      };
 
-      // Sincroniza com Supabase
-      const savedAddress = await partnerAddressSyncService.syncInsert(address);
-
-      // Substitui pelo registro real do Supabase (em caso de diferenças)
-      db.delete(address.id);
+      const savedAddress = await partnerAddressSyncService.syncInsert(addressToSave);
       db.add(savedAddress);
       return savedAddress;
     } catch (error) {
-      db.delete(address.id);
       throw error;
     }
   },
 
   update: async (address: PartnerAddress & { cityName?: string; stateName?: string }) => {
-    const existing = db.getById(address.id);
-    db.update(address);
-
     const { userId, userName } = getLogInfo();
     logService.addLog({
-      userId,
-      userName,
-      action: 'update',
-      module: 'Parceiros',
-      description: `Atualizou endereço: ${address.street}`,
-      entityId: address.id
+      userId, userName, action: 'update', module: 'Parceiros',
+      description: `Atualizou endereço: ${address.street}`, entityId: address.id
     });
 
     try {
-      // Resolve IDs se nomes fornecidos
-      let resolvedStateId: number | null = address.state_id ?? null;
-      let resolvedCityId: number | null = address.city_id ?? null;
-      if (address.stateName && !resolvedStateId) {
-        const stateStr = (address.stateName || '').trim();
-        const ufCode = stateStr.length === 2 ? stateStr.toUpperCase() : null;
-        let ufRow: any | null = null;
-        if (ufCode) {
-          const { data } = await supabase.from('ufs').select('id, uf, name').eq('uf', ufCode).limit(1).single();
-          ufRow = data || null;
-        }
-        if (!ufRow) {
-          const { data } = await supabase.from('ufs').select('id, uf, name').ilike('name', stateStr).limit(1).single();
-          ufRow = data || null;
-        }
-        resolvedStateId = ufRow?.id ?? null;
-      }
-      if (address.cityName && !resolvedCityId) {
-        const cityStr = (address.cityName || '').trim();
-        if (resolvedStateId) {
-          const { data } = await supabase
-            .from('cities')
-            .select('id, name')
-            .eq('uf_id', resolvedStateId)
-            .ilike('name', cityStr)
-            .limit(1)
-            .single();
-          if (data?.id) {
-            resolvedCityId = data.id as number;
-          } else {
-            const { data: created, error: cityCreateErr } = await supabase
-              .from('cities')
-              .insert({
-                name: cityStr,
-                uf_id: resolvedStateId,
-                company_id: authService.getCurrentUser()?.companyId
-              })
-              .select('id')
-              .single();
-            if (!cityCreateErr && created?.id) {
-              resolvedCityId = created.id as number;
-            }
-          }
-        } else {
-          const { data } = await supabase
-            .from('cities')
-            .select('id, name')
-            .ilike('name', cityStr)
-            .limit(1)
-            .single();
-          resolvedCityId = data?.id ?? null;
-        }
-      }
-      address.state_id = (resolvedStateId ?? null) as any;
-      address.city_id = (resolvedCityId ?? null) as any;
       const savedAddress = await partnerAddressSyncService.syncUpdate(address);
       db.update(savedAddress);
       return savedAddress;
     } catch (error) {
-      if (existing) db.update(existing);
       throw error;
     }
   },
@@ -314,43 +170,20 @@ export const partnerAddressService = {
     const address = db.getById(id);
     if (!address) return;
 
-    db.delete(id);
-
-    const { userId, userName } = getLogInfo();
-    logService.addLog({
-      userId,
-      userName,
-      action: 'delete',
-      module: 'Parceiros',
-      description: `Removeu endereço: ${address.street}`,
-      entityId: id
-    });
-
     try {
       await partnerAddressSyncService.syncDelete(id);
+      db.delete(id);
     } catch (error) {
-      db.add(address);
       throw error;
     }
   },
 
   loadByPartner: async (partnerId: string): Promise<PartnerAddress[]> => {
-    try {
-      const addresses = await partnerAddressSyncService.syncLoadByPartner(partnerId);
-      const transformed = addresses.map(transformAddressFromSupabase);
-      // Atualiza cache com os endereços do parceiro
-      transformed.forEach(a => {
-        const existing = db.getById(a.id);
-        if (existing) db.update(a);
-        else db.add(a);
-      });
-      return transformed;
-    } catch (error) {
-      throw error;
-    }
+    const addresses = await partnerAddressSyncService.syncLoadByPartner(partnerId);
+    const transformed = addresses.map(transformAddressFromSupabase);
+    transformed.forEach(a => db.update(a));
+    return transformed;
   },
-
-  importData: (data: PartnerAddress[]) => db.setAll(data),
 
   reload: () => {
     isLoaded = false;

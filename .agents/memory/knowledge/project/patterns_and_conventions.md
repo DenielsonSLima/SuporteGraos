@@ -14,9 +14,17 @@ O Suporte Grãos ERP utiliza uma estética moderna e limpa, focada em produtivid
 
 ---
 
-## 🏗️ ARQUITETURA DE SERVIÇOS
+## 🏗️ ARQUITETURA DE SERVIÇOS (Modular Service Pattern)
 - **Handlers Especializados**: Lógicas complexas (como recálculo de frete ou sincronização de pagamentos) devem ser movidas para `handlers` específicos (ex: `loadingRecalculation.ts`).
 - **Orquestradores**: Módulos que coordenam múltiplos serviços devem usar `orchestratorHelpers.ts`.
+- **Estrutura de Pastas**: Cada domínio deve ter sua própria subpasta em `/services` (ex: `/services/user`).
+- **Arquivos Obrigatórios**:
+  - `types.ts`: Definições de interfaces e enums do domínio.
+  - `loader.ts`: Funções de leitura (SELECT) e busca.
+  - `actions.ts`: Funções de escrita (INSERT, UPDATE, DELETE).
+  - `realtime.ts`: Lógica de ouvintes do Supabase (subscribe).
+  - `index.ts`: Ponto de entrada que exporta tudo via Barrel Export.
+- **Compatibilidade**: Ao refatorar um serviço legados (ex: `userService.ts`), mantenha o arquivo original como um barrel export para evitar quebras em componentes que já o utilizavam.
 
 ---
 

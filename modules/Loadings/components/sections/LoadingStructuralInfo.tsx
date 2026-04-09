@@ -35,7 +35,7 @@ const LoadingStructuralInfo: React.FC<Props> = ({
                         <div className="p-1.5 bg-slate-100 rounded-lg text-slate-500"><ShoppingBag size={14} /></div>
                         <span className={labelClass}>1. Origem & Produto</span>
                     </div>
-                    <p className="font-black text-slate-900 text-sm mb-2 truncate italic tracking-tighter uppercase leading-tight">{editForm.supplierName}</p>
+                    <p className="font-black text-slate-900 text-sm mb-2 truncate tracking-tighter uppercase leading-tight">{editForm.supplierName}</p>
                     <div className="space-y-4">
                         <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 shadow-inner">
                             <span className={labelClass}>Preço Compra (R$/SC)</span>
@@ -80,7 +80,7 @@ const LoadingStructuralInfo: React.FC<Props> = ({
                         </div>
                     ) : (
                         <>
-                            <p className="font-black text-slate-900 text-sm truncate uppercase italic tracking-tighter leading-tight">{editForm.carrierName}</p>
+                            <p className="font-black text-slate-900 text-sm truncate uppercase tracking-tighter leading-tight">{editForm.carrierName}</p>
                             <p className="text-[10px] text-slate-500 mt-1 font-bold uppercase tracking-tight">{editForm.driverName}</p>
                             <div className="mt-3 inline-block px-3 py-1 bg-slate-900 text-white font-mono font-black rounded-lg text-xs tracking-[0.2em] shadow-md border border-slate-800">
                                 {editForm.vehiclePlate}
@@ -123,12 +123,12 @@ const LoadingStructuralInfo: React.FC<Props> = ({
                         </div>
                     ) : (
                         <>
-                            <p className="font-black text-slate-900 text-sm truncate uppercase italic tracking-tighter leading-tight">{editForm.customerName}</p>
+                            <p className="font-black text-slate-900 text-sm truncate uppercase tracking-tighter leading-tight">{editForm.customerName}</p>
                             <p className="text-[9px] text-slate-400 mt-1 font-black uppercase tracking-widest">Ped. Venda: #{editForm.salesOrderNumber}</p>
                             {editForm.isRedirected && (
                                 <div className="mt-3 p-3 bg-indigo-50 rounded-xl border border-indigo-100 shadow-inner">
                                     <div className="flex items-center gap-1.5 text-[9px] font-black text-indigo-700 uppercase tracking-widest"><ArrowRightLeft size={12} /> Carga Remanejada</div>
-                                    <p className="text-[8px] text-indigo-400 font-bold mt-1 uppercase italic">Origem Original: {editForm.originalDestination}</p>
+                                    <p className="text-[8px] text-indigo-400 font-bold mt-1 uppercase">Origem Original: {editForm.originalDestination}</p>
                                 </div>
                             )}
                         </>
@@ -146,7 +146,7 @@ const LoadingStructuralInfo: React.FC<Props> = ({
                         <div className="flex items-center gap-5">
                             <div className="p-4 bg-indigo-600 rounded-3xl shadow-xl shadow-indigo-900/40"><MapPin size={24} /></div>
                             <div>
-                                <h4 className="font-black text-xl uppercase italic tracking-tighter">Custos Adicionais de Remanejo</h4>
+                                <h4 className="font-black text-xl uppercase tracking-tighter">Custos Adicionais de Remanejo</h4>
                                 <p className="text-[10px] text-indigo-300 font-black uppercase tracking-[0.2em] mt-1">Valor de deslocamento extra para o transportador</p>
                             </div>
                         </div>

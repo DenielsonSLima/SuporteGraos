@@ -35,6 +35,7 @@ const mapAssetToDb = (asset: Asset) => ({
   status: asset.status,
   sale_date: asset.saleDate || null,
   sale_value: asset.saleValue || null,
+  paid_value: asset.paidValue || 0,
   buyer_name: asset.buyerName || null,
   buyer_id: asset.buyerId || null,
   write_off_date: asset.writeOffDate || null,
@@ -58,6 +59,7 @@ const mapAssetFromDb = (row: any): Asset => {
     status: row?.status || 'active',
     saleDate: row?.sale_date || undefined,
     saleValue: Number(row?.sale_value) || undefined,
+    paidValue: Number(row?.paid_value) || 0,
     buyerName: row?.buyer_name || undefined,
     buyerId: row?.buyer_id || undefined,
     writeOffDate: row?.write_off_date || undefined,
@@ -188,7 +190,7 @@ const persistUpsert = async (asset: Asset) => {
 
 const persistDelete = async (id: string) => {
   try {
-    const { error } = await supabase.from('assets').delete().eq('id', id);
+    const { error } = await supabase.rpc('rpc_ops_asset_delete_v1', { p_asset_id: id });
     if (error) throw error;
   } catch (err) {
     console.error('[assetService] persistDelete:', err);

@@ -37,8 +37,24 @@ Sempre que a tarefa envolver criação, revisão ou refatoração de código, ex
 | 9 | Realtime APENAS onde a UX exige — não em todas as tabelas. |
 | 10 | DRY — se repetiu 2x, extraia para função/hook/service. |
 | 11 | Segurança Financeira — Features de cálculo crítico exigem auditoria de QA (Xerifão). |
+| 12 | SQL-First Financial Integrity — Lógica de baixa, saldo e estorno SEMPRE via RPC atômico. No-Redux/No-Local-Sync. |
 
 ---
+
+## 🏦 ARQUITETURA SQL-FIRST (Mandato Financeiro)
+
+Para evitar inconsistências de saldo e condições de corrida entre módulos (Caixa, Pedidos, Logística), seguimos o padrão **SQL-First**:
+
+### ✅ O QUE FAZER (The Right Way)
+1. **Intenção no Frontend**: O React apenas envia os IDs e valores para um RPC (ex: `rpc_ops_financial_process_action`).
+2. **Atomicidade no Banco**: O Postgres cuida de atualizar Pedido, Financeiro, Histórico e Saldo Bancário em uma única transação (`BEGIN...COMMIT`).
+3. **Reatividade via Triggers**: Status de títulos (Pago, Parcial, Pendente) são calculados por Triggers no banco, nunca no frontend.
+4. **Interface como View**: O frontend apenas exibe os dados que o banco retorna. Se precisar atualizar a tela, use a invalidação de cache do TanStack Query.
+
+### ❌ O QUE NÃO FAZER (Anti-Patterns)
+1. **Saldos via .reduce()**: Nunca calcule o "Valor Total Pago" somando transações no frontend. Use o campo `paid_amount` da tabela `financial_entries`.
+2. **Orquestração Manual**: Nunca faça `await serviceA.update(); await serviceB.update();` para operações que deveriam ser síncronas entre tabelas.
+3. **Sincronização de 'Cola'**: Evite services que apenas 'copiam' dados de um módulo para outro no React. Use Views SQL para consolidar dados.
 
 ## 🏎️ PROTOCOLO DE EXECUÇÃO (Economia de Tokens)
 

@@ -28,53 +28,39 @@ const accountStatementReport: ReportModule = {
         return { title: 'Extrato de Conta', subtitle: 'Selecione uma conta nos filtros', columns: [], rows: [] };
     }
 
-    const accounts = await accountsService.getAll();
-    const account = accounts.find(a => a.id === accountId);
-    if (!account) return { title: 'Erro', subtitle: 'Conta não encontrada', columns: [], rows: [] };
-
-    // 1. Get Initial Balance for this Account from Database
-    const initialBalances = await initialBalanceService.getAll();
-    const initialBalanceRecord = initialBalances.find(b => b.accountId === accountId);
-    const startBalanceVal = initialBalanceRecord ? initialBalanceRecord.value : 0;
-    const startBalanceDate = initialBalanceRecord ? initialBalanceRecord.date : '2000-01-01';
-
-    // 2. Gather ALL canonical account transactions from ledger
-    const accountTransactions = await financialTransactionsService.getByAccount(accountId);
-    const allTransactions: any[] = accountTransactions.map((tx) => ({
-      date: tx.transaction_date,
-      description: tx.description || (tx.type === 'credit' ? 'Entrada' : 'Saída'),
-      entity: '',
-      type: tx.type,
-      value: tx.amount,
-      category: tx.type === 'credit' ? 'Crédito' : 'Débito'
-    }));
-
-    // Sort by Date
-    allTransactions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-    // 3. Calculate Balance up to Start Date (Retroativo)
-    let runningBalance = startBalanceVal;
-    allTransactions.forEach(t => {
-        if (t.date < startDate && t.date >= startBalanceDate) {
-            if (t.type === 'credit') runningBalance += t.value;
-            else runningBalance -= t.value;
-        }
+    // SQL-FIRST: Busca tudo calculado pelo banco (Saldo Anterior + Transações do Período)
+    const { data: result, error } = await supabase.rpc('rpc_report_account_statement_v1', {
+      p_account_id: accountId,
+      p_start_date: startDate,
+      p_end_date: endDate
     });
 
-    const previousBalance = runningBalance;
+    if (error) {
+      console.error('Erro ao gerar extrato via RPC:', error);
+      throw error;
+    }
 
-    // 4. Process Range
-    const rows = allTransactions
-      .filter(t => t.date >= startDate && t.date <= endDate)
-      .map(t => {
-        if (t.type === 'credit') runningBalance += t.value;
-        else runningBalance -= t.value;
-        return { ...t, balanceAfter: runningBalance };
-      });
+    const { opening_balance, transactions = [] } = result;
+    
+    // Processar o saldo acumulado (Running Balance) apenas para o período retornado
+    let runningBalance = opening_balance;
+    const rows = (transactions as any[]).map(t => {
+      if (t.type === 'IN' || t.type === 'credit' || t.type === 'receipt') {
+        runningBalance += t.value;
+      } else {
+        runningBalance -= t.value;
+      }
+      return { 
+        ...t, 
+        balanceAfter: runningBalance,
+        credit: (t.type === 'IN' || t.type === 'credit' || t.type === 'receipt') ? t.value : null,
+        debit: (t.type === 'OUT' || t.type === 'debit' || t.type === 'payment') ? t.value : null
+      };
+    });
 
     return {
-      title: `Extrato Analítico: ${account?.account_name || 'Conta'}`,
-      subtitle: `Movimentação de ${dateStr(startDate)} a ${dateStr(endDate)}`,
+      title: `Extrato Analítico`, 
+      subtitle: `Período: ${dateStr(startDate)} a ${dateStr(endDate)}`,
       columns: [
         { header: 'Data', accessor: 'date', format: 'date' },
         { header: 'Histórico / Parceiro', accessor: 'description' },
@@ -83,15 +69,11 @@ const accountStatementReport: ReportModule = {
         { header: 'Débito (-)', accessor: 'debit', format: 'currency', align: 'right' },
         { header: 'Saldo Atualizado', accessor: 'balanceAfter', format: 'currency', align: 'right' }
       ],
-      rows: rows.map(r => ({
-          ...r,
-          credit: r.type === 'credit' ? r.value : null,
-          debit: r.type === 'debit' ? r.value : null
-      })),
+      rows,
       summary: [
-          { label: 'Saldo Anterior', value: previousBalance, format: 'currency' },
-          { label: 'Total Entradas', value: rows.filter(r => r.type === 'credit').reduce((a,b) => a+b.value, 0), format: 'currency' },
-          { label: 'Total Saídas', value: rows.filter(r => r.type === 'debit').reduce((a,b) => a+b.value, 0), format: 'currency' },
+          { label: 'Saldo Anterior', value: opening_balance, format: 'currency' },
+          { label: 'Total Entradas', value: rows.reduce((acc, r) => acc + (r.credit || 0), 0), format: 'currency' },
+          { label: 'Total Saídas', value: rows.reduce((acc, r) => acc + (r.debit || 0), 0), format: 'currency' },
           { label: 'Saldo Final', value: runningBalance, format: 'currency' }
       ]
     };

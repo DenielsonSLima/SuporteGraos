@@ -43,8 +43,7 @@ const getLogInfo = () => {
 /**
  * Converte registro do Supabase (snake_case) para o formato do app (camelCase)
  */
-const fromSupabase = (record: StandaloneRecordDB): FinancialRecord => {
-
+const fromSupabase = (record: any): FinancialRecord => {
   return {
     id: record.id,
     description: record.description,
@@ -272,8 +271,12 @@ const stopRealtime = () => {
 // ============================================================================
 
 export const loansService = {
-  getAll: () => db.getAll(),
-  getById: (id: string) => db.getById(id),
+    getAll: () => {
+        return db.getAll();
+    },
+    getById: (id: string) => {
+        return db.getById(id);
+    },
   subscribe: (callback: (items: FinancialRecord[]) => void) => db.subscribe(callback),
   loadFromSupabase,
   fetchPage,

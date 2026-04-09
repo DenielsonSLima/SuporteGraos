@@ -1,128 +1,92 @@
 
-import { payablesService, Payable } from '../payablesService';
+import { payablesService } from '../payablesService';
 import { generateTxId, registerFinancialRecords } from './orchestratorHelpers';
 import type { PaymentData, PaymentResult } from './orchestratorTypes';
-import { isSqlCanonicalOpsEnabled, sqlCanonicalOpsLog } from '../../sqlCanonicalOps';
+import { isSqlCanonicalOpsEnabled } from '../../sqlCanonicalOps';
 
 /**
  * Handler para pagamento de Comissão (Corretores).
- * Refatorado para Foundation V2 (Links robustos + Triggers).
+ * Refatorado para usar rpc_ops_financial_process_action (SQL-First).
  */
 export const handleCommissionPayment = async (
   recordId: string,
   data: PaymentData
 ): Promise<PaymentResult> => {
-  const canonicalOpsEnabled = isSqlCanonicalOpsEnabled();
   const txId = generateTxId();
-  const transactionValue = data.amount;
-  const discountValue = data.discount;
+  const { supabase } = await import('../../supabase');
+  const canonicalOpsEnabled = isSqlCanonicalOpsEnabled();
 
-  await payablesService.loadFromSupabase();
-
-  let payable = payablesService.getById(recordId);
+  let entryId = '';
   let commissionId = '';
+  let brokerName = data.entityName || 'Corretor';
 
-  if (!payable) {
-    const allCommissionPayables = payablesService.getAll().filter(p => p.subType === 'commission');
-    const orderId = recordId.replace('com-', '');
-    payable = allCommissionPayables.find(p => p.purchaseOrderId === orderId);
+  // 1. Resolução do ID do Lançamento Financeiro (entry_id)
+  if (canonicalOpsEnabled) {
+    // Busca direta via view enriquecida (que vincula brokerage a entries)
+    const { data: entry } = await supabase
+      .from('vw_payables_enriched')
+      .select('id, origin_id, partner_name')
+      .or(`id.eq.${recordId},origin_id.eq.${recordId}`)
+      .eq('origin_type', 'commission')
+      .maybeSingle();
+
+    if (entry) {
+      entryId = entry.id;
+      commissionId = entry.origin_id || '';
+      brokerName = entry.partner_name || brokerName;
+    }
+  } else {
+    // MODO LEGADO (Fallback)
+    await payablesService.loadFromSupabase();
+    const payable = payablesService.getById(recordId) || payablesService.getAll().find(p => p.subType === 'commission' && p.purchaseOrderId === recordId);
+    if (payable) {
+      entryId = payable.id;
+      commissionId = payable.id; // Em legado, o entry_id costuma ser o ID do payable
+      brokerName = payable.partner_name || brokerName;
+    }
   }
 
-  if (payable) {
-    commissionId = payable.commissionId || '';
+  if (!entryId) {
+    throw new Error(`Não foi possível localizar o lançamento financeiro de comissão para: ${recordId}`);
   }
 
-  // --- 1. Atualizar o PAYABLE ---
-  if (payable && !canonicalOpsEnabled) {
-    const newPaidAmount = (payable.paidAmount || 0) + transactionValue + discountValue;
-    const status: Payable['status'] = newPaidAmount >= (payable.amount - 0.01)
-      ? 'paid' : newPaidAmount > 0 ? 'partially_paid' : 'pending';
+  // 2. Descrição formatada
+  const description = `Pagamento Comissão: ${brokerName}`;
 
-    payablesService.update({
-      ...payable,
-      paidAmount: Number(newPaidAmount.toFixed(2)),
-      status,
-      paymentMethod: data.accountName,
-      bankAccountId: data.accountId,
-      paymentDate: data.date
-    });
-  } else if (payable && canonicalOpsEnabled) {
-    sqlCanonicalOpsLog('commissionHandler: atualização local de payable ignorada (SQL canônico ativo)');
+  // 3. EXECUÇÃO ATÔMICA (RPC SQL-First)
+  const { data: result, error: rpcError } = await supabase.rpc('rpc_ops_financial_process_action', {
+    p_entry_id: entryId,
+    p_account_id: data.accountId,
+    p_amount: data.amount,
+    p_discount: data.discount || 0,
+    p_description: description,
+    p_transaction_date: data.date,
+    p_metadata: { source: 'commissionHandler', tx_id: txId }
+  });
+
+  if (rpcError || (result && !result.success)) {
+    throw new Error(`Erro no processamento SQL de pagamento de comissão: ${rpcError?.message || result?.error}`);
   }
 
-  // --- 2. Descrição padronizada ---
-  const brokerName = payable?.partnerName || data.entityName || 'Corretor';
-  const description = `Pagamento Comissão: ${brokerName}${payable?.description ? ` - ${payable.description}` : ''}`;
-
-  // --- 3. Registrar via Orquestrador (Foundation V2) ---
+  // 4. Registro de Histórico (Compatibilidade de UI)
   await registerFinancialRecords({
     txId,
     date: data.date,
-    amount: transactionValue,
-    discount: discountValue,
+    amount: data.amount,
+    discount: data.discount || 0,
     accountId: data.accountId,
     accountName: data.accountName,
     type: 'payment',
-    recordId: payable?.id || recordId,
+    recordId: entryId,
     referenceType: 'commission',
     referenceId: commissionId || recordId,
     description,
     historyType: 'Pagamento Comissão',
     entityName: brokerName,
-    partnerId: payable?.partnerId || data.partnerId,
-    notes: data.notes
+    partnerId: data.partnerId,
+    notes: data.notes,
+    purchaseOrderId
   });
-
-  // ✅ SINGLE LEDGER: Processar o pagamento e desconto no banco de dados via RPC
-  try {
-    const { supabase } = await import('../../supabase');
-
-    // Tenta encontrar a financial_entry correta:
-    // Para Comissão, origin_type = 'purchase_commission' e origin_id = commissionId (ou recordId)
-    // No addcommission do PO handler, usamos o ID da transação (tx.id) como origin_id.
-    const targetOriginId = commissionId || recordId;
-
-    const { data: entries } = await supabase
-      .from('financial_entries')
-      .select('id, origin_type')
-      .eq('origin_id', targetOriginId)
-      .eq('origin_type', 'purchase_commission');
-
-    let entry = entries?.[0];
-
-    // Se não encontrou por purchase_commission, tenta o tipo genérico commission
-    if (!entry) {
-      const { data: altEntries } = await supabase
-        .from('financial_entries')
-        .select('id')
-        .eq('origin_id', targetOriginId)
-        .eq('type', 'commission');
-      entry = altEntries?.[0];
-    }
-
-    if (entry && data.accountId) {
-      // Pagar o valor (debit)
-      if (transactionValue > 0) {
-        await supabase.rpc('pay_financial_entry', {
-          p_entry_id: entry.id,
-          p_account_id: data.accountId,
-          p_amount: transactionValue,
-          p_description: `Pagamento Comissão: ${data.entityName || 'Corretor'}`
-        });
-      }
-
-      // Registrar abatimento/desconto na obrigação
-      if (discountValue > 0) {
-        await supabase.rpc('apply_discount_financial_entry', {
-          p_entry_id: entry.id,
-          p_amount: discountValue
-        });
-      }
-
-    } else {
-    }
-  } catch (err) {
-  }
 
   return { success: true, txId };
 };

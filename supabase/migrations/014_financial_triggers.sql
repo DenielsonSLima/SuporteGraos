@@ -178,6 +178,7 @@ BEGIN
   IF NEW.status = 'paid' AND OLD.status IS DISTINCT FROM 'paid' THEN
     
     -- Se é de uma Compra (PO)
+    /* 
     IF NEW.origin_type = 'purchase_order' AND NEW.origin_id IS NOT NULL THEN
       -- Valida se a tabela purchase_orders existe antes de tentar UPDATE
       BEGIN
@@ -199,6 +200,7 @@ BEGIN
         NULL;  -- Tabela não existe ainda, ignora
       END;
     END IF;
+    */
 
   END IF;
 

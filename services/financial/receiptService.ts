@@ -60,6 +60,7 @@ const toSupabase = (record: FinancialRecord): any => ({
 });
 
 export const receiptService = {
+    subscribe: (callback: any) => db.subscribe(callback),
     initialize: async () => {
         if (shouldSkipLegacyTableOps('standalone_receipts')) {
             sqlCanonicalOpsLog('receiptService.initialize ignorado: tabela standalone_receipts indisponível no modo canônico');
@@ -72,10 +73,10 @@ export const receiptService = {
         isInitialized = true;
     },
 
-    loadFromSupabase: async () => {
+    loadFromSupabase: async (): Promise<FinancialRecord[]> => {
         if (shouldSkipLegacyTableOps('standalone_receipts')) {
             db.setAll([]);
-            return;
+            return [];
         }
 
         try {
@@ -85,10 +86,11 @@ export const receiptService = {
                 .order('issue_date', { ascending: false });
 
             if (error) throw error;
-            if (data) {
-                db.setAll(data.map(fromSupabase));
-            }
+            const mapped = (data || []).map(fromSupabase);
+            db.setAll(mapped);
+            return mapped;
         } catch (error) {
+            return [];
         }
     },
 
@@ -115,8 +117,12 @@ export const receiptService = {
         }
     },
 
-    getAll: () => db.getAll(),
-    getById: (id: string) => db.getById(id),
+    getAll: () => {
+        return db.getAll();
+    },
+    getById: (id: string) => {
+        return db.getById(id);
+    },
 
     add: async (record: FinancialRecord) => {
         if (shouldSkipLegacyTableOps('standalone_receipts')) {

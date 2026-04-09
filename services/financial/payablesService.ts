@@ -181,15 +181,16 @@ const loadFromSupabase = async (): Promise<Payable[]> => {
     const user = authService.getCurrentUser();
     let query = supabase
       .from('payables')
-      .select('*');
+      // Egress: usa campos nomeados (evita colunas desnecessárias) + cap de 500 registros
+      .select(PAYABLES_SELECT_FIELDS)
+      .order('due_date', { ascending: false })
+      .limit(500);
 
     if (user?.companyId) {
       query = query.eq('company_id', user.companyId);
     }
 
-    const data = await supabaseWithRetry(() =>
-      query.order('due_date', { ascending: true })
-    );
+    const data = await supabaseWithRetry(() => query);
 
     if (data) {
       const mapped = (data as any[]).map(mapFromDb);

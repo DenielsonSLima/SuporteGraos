@@ -24,7 +24,7 @@ class ReportsCache {
   }
 
   // 🔍 Obter dados com cache
-  private getCached<T>(key: string, fetcher: () => T): T {
+  private async getCached<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
     const cached = this.cache.get(key);
     const now = Date.now();
 
@@ -32,48 +32,48 @@ class ReportsCache {
       return cached.data;
     }
 
-    const freshData = fetcher();
+    const freshData = await fetcher();
     this.cache.set(key, { data: freshData, timestamp: now });
     return freshData;
   }
 
   // 📦 Purchases
-  getAllPurchases() {
-    return this.getCached('purchases:all', () => purchaseService.getAll());
+  async getAllPurchases() {
+    return this.getCached('purchases:all', () => purchaseService.loadFromSupabase());
   }
 
   // 💰 Sales
-  getAllSales() {
-    return this.getCached('sales:all', () => salesService.getAll());
+  async getAllSales() {
+    return this.getCached('sales:all', () => salesService.loadFromSupabase());
   }
 
   // 🚛 Loadings
-  getAllLoadings() {
-    return this.getCached('loadings:all', () => loadingService.getAll());
+  async getAllLoadings() {
+    return this.getCached('loadings:all', () => loadingService.loadFromSupabase());
   }
 
   // 💳 Financial - Payables
-  getPayables() {
+  async getPayables() {
     return this.getCached('financial:payables', () => 
       financialIntegrationService.getPayables()
     );
   }
 
   // 💵 Financial - Receivables
-  getReceivables() {
+  async getReceivables() {
     return this.getCached('financial:receivables', () => 
       financialIntegrationService.getReceivables()
     );
   }
 
   // 🏦 Loans (canônico via loansService)
-  getAllLoans() {
+  async getAllLoans() {
     return this.getCached('loans:all', () => loansService.getAll());
   }
 
   // 👥 Partners
-  getAllPartners() {
-    return this.getCached('partners:all', () => partnerService.getAll());
+  async getAllPartners() {
+    return this.getCached('partners:all', () => partnerService.loadFromSupabase());
   }
 
   // 🔄 Invalidar todo cache

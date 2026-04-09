@@ -67,7 +67,13 @@ export function useAddShareholder() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: Omit<Shareholder, 'id'>) => shareholderService.add(data),
-    onSuccess: () => { void qc.invalidateQueries({ queryKey: QUERY_KEYS.SHAREHOLDERS }); },
+    onSuccess: () => { 
+      void Promise.all([
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.SHAREHOLDERS }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
+      ]);
+    },
   });
 }
 
@@ -75,7 +81,13 @@ export function useUpdateShareholder() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: Shareholder) => shareholderService.update(data),
-    onSuccess: () => { void qc.invalidateQueries({ queryKey: QUERY_KEYS.SHAREHOLDERS }); },
+    onSuccess: () => { 
+      void Promise.all([
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.SHAREHOLDERS }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
+      ]);
+    },
   });
 }
 
@@ -83,7 +95,13 @@ export function useDeleteShareholder() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => shareholderService.delete(id),
-    onSuccess: () => { void qc.invalidateQueries({ queryKey: QUERY_KEYS.SHAREHOLDERS }); },
+    onSuccess: () => { 
+      void Promise.all([
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.SHAREHOLDERS }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
+      ]);
+    },
   });
 }
 
@@ -93,11 +111,15 @@ export function useShareholderTransaction() {
     mutationFn: (params: { shareholderId: string; transaction: any }) =>
       shareholderService.addTransaction(params.shareholderId, params.transaction),
     onSuccess: (_, variables) => { 
-        void qc.invalidateQueries({ queryKey: QUERY_KEYS.SHAREHOLDERS }); 
-        void qc.invalidateQueries({ queryKey: QUERY_KEYS.SHAREHOLDER_DETAILS(variables.shareholderId) });
-        void qc.invalidateQueries({ queryKey: QUERY_KEYS.SHAREHOLDER_TOTALS(variables.shareholderId) });
-        void qc.invalidateQueries({ queryKey: QUERY_KEYS.BANK_ACCOUNTS });
-        void qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_TRANSACTIONS });
+        void Promise.all([
+          qc.invalidateQueries({ queryKey: QUERY_KEYS.SHAREHOLDERS }), 
+          qc.invalidateQueries({ queryKey: QUERY_KEYS.SHAREHOLDER_DETAILS(variables.shareholderId) }),
+          qc.invalidateQueries({ queryKey: QUERY_KEYS.SHAREHOLDER_TOTALS(variables.shareholderId) }),
+          qc.invalidateQueries({ queryKey: QUERY_KEYS.BANK_ACCOUNTS }),
+          qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_TRANSACTIONS }),
+          qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
+          qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
+        ]);
     },
   });
 }
@@ -108,11 +130,15 @@ export function useUpdateShareholderTransaction() {
     mutationFn: (params: { shareholderId: string; transaction: any }) =>
       shareholderService.updateTransaction(params.shareholderId, params.transaction),
     onSuccess: (_, variables) => { 
-        void qc.invalidateQueries({ queryKey: QUERY_KEYS.SHAREHOLDERS }); 
-        void qc.invalidateQueries({ queryKey: QUERY_KEYS.SHAREHOLDER_DETAILS(variables.shareholderId) });
-        void qc.invalidateQueries({ queryKey: QUERY_KEYS.SHAREHOLDER_TOTALS(variables.shareholderId) });
-        void qc.invalidateQueries({ queryKey: QUERY_KEYS.BANK_ACCOUNTS });
-        void qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_TRANSACTIONS });
+        void Promise.all([
+          qc.invalidateQueries({ queryKey: QUERY_KEYS.SHAREHOLDERS }), 
+          qc.invalidateQueries({ queryKey: QUERY_KEYS.SHAREHOLDER_DETAILS(variables.shareholderId) }),
+          qc.invalidateQueries({ queryKey: QUERY_KEYS.SHAREHOLDER_TOTALS(variables.shareholderId) }),
+          qc.invalidateQueries({ queryKey: QUERY_KEYS.BANK_ACCOUNTS }),
+          qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_TRANSACTIONS }),
+          qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
+          qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
+        ]);
     },
   });
 }
@@ -123,12 +149,15 @@ export function useDeleteShareholderTransaction() {
     mutationFn: (params: { shareholderId: string; transactionId: string }) =>
       shareholderService.deleteTransaction(params.shareholderId, params.transactionId),
     onSuccess: (_, variables) => { 
-        void qc.invalidateQueries({ queryKey: QUERY_KEYS.SHAREHOLDERS }); 
-        void qc.invalidateQueries({ queryKey: QUERY_KEYS.SHAREHOLDER_DETAILS(variables.shareholderId) });
-        void qc.invalidateQueries({ queryKey: QUERY_KEYS.SHAREHOLDER_TOTALS(variables.shareholderId) });
-        // Invalida também o banco para refletir o estorno
-        void qc.invalidateQueries({ queryKey: QUERY_KEYS.BANK_ACCOUNTS });
-        void qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_TRANSACTIONS });
+        void Promise.all([
+          qc.invalidateQueries({ queryKey: QUERY_KEYS.SHAREHOLDERS }), 
+          qc.invalidateQueries({ queryKey: QUERY_KEYS.SHAREHOLDER_DETAILS(variables.shareholderId) }),
+          qc.invalidateQueries({ queryKey: QUERY_KEYS.SHAREHOLDER_TOTALS(variables.shareholderId) }),
+          qc.invalidateQueries({ queryKey: QUERY_KEYS.BANK_ACCOUNTS }),
+          qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_TRANSACTIONS }),
+          qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
+          qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
+        ]);
     },
   });
 }

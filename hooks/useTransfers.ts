@@ -58,9 +58,13 @@ export function useCreateTransfer() {
       transferDate?: string;
     }) => transfersService.transfer(params),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: QUERY_KEYS.TRANSFERS });
-      void qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS });
-      void qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_TRANSACTIONS });
+      void Promise.all([
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.TRANSFERS }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_TRANSACTIONS }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
+      ]);
     },
   });
 }
@@ -77,9 +81,13 @@ export function useUpdateTransfer() {
       transferDate?: string;
     }) => transfersService.update(params.id, params),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: QUERY_KEYS.TRANSFERS });
-      void qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS });
-      void qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_TRANSACTIONS });
+      void Promise.all([
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.TRANSFERS }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_TRANSACTIONS }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
+      ]);
     },
   });
 }
@@ -89,9 +97,13 @@ export function useDeleteTransfer() {
   return useMutation({
     mutationFn: (id: string) => transfersService.delete(id),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: QUERY_KEYS.TRANSFERS });
-      void qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS });
-      void qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_TRANSACTIONS });
+      void Promise.all([
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.TRANSFERS }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_TRANSACTIONS }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
+      ]);
     },
   });
 }

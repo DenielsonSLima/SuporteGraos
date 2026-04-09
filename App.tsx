@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, Suspense, useMemo, useCallback } from 'react';
+import { queryClient } from './lib/queryClient';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Sidebar from './components/layout/Sidebar';
 import HeaderSimple from './components/layout/HeaderSimple';
@@ -13,6 +14,7 @@ import FloatingAssistant from './components/ai/FloatingAssistant';
 import { useRealtimeResilience } from './hooks/useRealtimeResilience';
 import { usePrefetchModules } from './hooks/usePrefetchModules';
 import { useAppSessionServices } from './hooks/useAppSessionServices';
+import { loadingService } from './services/loadingService';
 
 // Lazy Load Modules
 const preloadDashboardModule = () => import('./modules/Dashboard/Dashboard');
@@ -50,6 +52,11 @@ const AppContent: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const { addToast } = useToast();
   const appSessionServices = useAppSessionServices();
+
+  // Inicializar callbacks de serviço
+  React.useEffect(() => {
+    loadingService.setToastCallback(addToast);
+  }, [addToast]);
 
   // Resiliência: invalida cache ao reconectar (online/offline + tab visibility)
   useRealtimeResilience();
@@ -323,23 +330,6 @@ const AppContent: React.FC = () => {
   );
 };
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      // Dados frescos por 1 min por padrão (hooks individuais sobrescrevem)
-      staleTime: 60_000,
-      // Garbage collect após 10 min sem uso (libera memória)
-      gcTime: 10 * 60 * 1000,
-      // Não refetch automático na janela — Realtime + useRealtimeResilience cobrem
-      refetchOnWindowFocus: false,
-      // Reconexão de rede: refetcha queries stale automaticamente
-      refetchOnReconnect: 'always',
-      // 1 retry com backoff exponencial
-      retry: 1,
-      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
-    },
-  },
-});
 
 const App: React.FC = () => {
   return (

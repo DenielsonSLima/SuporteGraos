@@ -142,7 +142,8 @@ const ReportsModule: React.FC = () => {
     'partner_receivables': { title: 'Contas a Receber por Parceiro', description: 'Títulos em aberto de cada cliente.', icon: Users },
     'partner_payables': { title: 'Contas a Pagar por Parceiro', description: 'Títulos em aberto de cada fornecedor.', icon: Users },
     'partner_balance': { title: 'Saldo por Parceiro', description: 'Balanço consolidado de recebíveis e pagáveis.', icon: Users },
-    'partner_dossier': { title: 'Dossiê Completo do Parceiro', description: 'Histórico completo de transações.', icon: Users }
+    'partner_dossier': { title: 'Dossiê Completo do Parceiro', description: 'Histórico completo de transações.', icon: Users },
+    'net_worth_evolution': { title: 'Dinâmica do Patrimônio Líquido', description: 'Evolução cronológica do saldo consolidado e projeção financeira.', icon: DollarSign }
   };
 
   // Filtragem usando metadados + info local

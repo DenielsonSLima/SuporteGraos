@@ -188,87 +188,9 @@ const persistDelete = async (id: string) => {
   }
 };
 
-const reverseTransferFinancialMovements = async (item: Transfer) => {
-  const { registerFinancialRecords } = await import('./handlers/orchestratorHelpers');
-  const txId = Math.random().toString(36).substr(2, 9);
-
-  await registerFinancialRecords({
-    txId,
-    date: item.transferDate,
-    amount: item.amount,
-    discount: 0,
-    accountId: item.fromAccountId,
-    accountName: 'Transferência (Origem)',
-    type: 'receipt',
-    recordId: item.id,
-    referenceType: 'standalone',
-    referenceId: item.id,
-    description: `Estorno transferência [TRANSFER_REV:${item.id}] retorno para origem`,
-    historyType: 'Estorno Transferência Bancária',
-    entityName: 'Transferência',
-    partnerId: '',
-    notes: `[TRANSFER_REV_IN:${item.id}]`
-  });
-
-  await registerFinancialRecords({
-    txId,
-    date: item.transferDate,
-    amount: item.amount,
-    discount: 0,
-    accountId: item.toAccountId,
-    accountName: 'Transferência (Destino)',
-    type: 'payment',
-    recordId: item.id,
-    referenceType: 'standalone',
-    referenceId: item.id,
-    description: `Estorno transferência [TRANSFER_REV:${item.id}] retirada do destino`,
-    historyType: 'Estorno Transferência Bancária',
-    entityName: 'Transferência',
-    partnerId: '',
-    notes: `[TRANSFER_REV_OUT:${item.id}]`
-  });
-};
-
-const createTransferFinancialMovements = async (item: Transfer) => {
-  const { registerFinancialRecords } = await import('./handlers/orchestratorHelpers');
-  const txId = Math.random().toString(36).substr(2, 9);
-
-  await registerFinancialRecords({
-    txId,
-    date: item.transferDate,
-    amount: item.amount,
-    discount: 0,
-    accountId: item.fromAccountId,
-    accountName: 'Transferência (Origem)',
-    type: 'payment',
-    recordId: item.id,
-    referenceType: 'standalone',
-    referenceId: item.id,
-    description: `Transferência p/ ${item.toAccountId}: ${item.description}`,
-    historyType: 'Transferência Bancária',
-    entityName: 'Transferência',
-    partnerId: '',
-    notes: `[TRANSFER_OUT:${item.id}]`
-  });
-
-  await registerFinancialRecords({
-    txId,
-    date: item.transferDate,
-    amount: item.amount,
-    discount: 0,
-    accountId: item.toAccountId,
-    accountName: 'Transferência (Destino)',
-    type: 'receipt',
-    recordId: item.id,
-    referenceType: 'standalone',
-    referenceId: item.id,
-    description: `Transferência de ${item.fromAccountId}: ${item.description}`,
-    historyType: 'Transferência Bancária',
-    entityName: 'Transferência',
-    partnerId: '',
-    notes: `[TRANSFER_IN:${item.id}]`
-  });
-};
+// As funções de criação e estorno de movimentos financeiros (registerFinancialRecords)
+// foram removidas do frontend pois agora são tratadas atomicamente pelas RPCs 
+// rpc_transfer_accounts (na criação) e rpc_ops_transfer_delete_v1 (na exclusão).
 
 // ❌ NÃO inicializar automaticamente - aguardar autenticação via supabaseInitService
 // void loadFromSupabase();
@@ -361,10 +283,11 @@ export const transfersService = {
     const item = db.getById(id);
     db.delete(id);
 
-    if (item) {
-      await reverseTransferFinancialMovements(item);
+    const { data, error } = await supabase.rpc('rpc_ops_transfer_delete_v1', { p_transfer_id: id });
+    if (error) {
+      console.error('[transfersService] Erro ao excluir transferência RPC:', error);
+      throw error;
     }
-    await persistDelete(id);
 
     try {
       const { financialTransactionService } = await import('./financialTransactionService');

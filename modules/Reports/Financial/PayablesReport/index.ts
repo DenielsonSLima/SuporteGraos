@@ -1,7 +1,7 @@
 
-import { DollarSign } from 'lucide-react';
 import { ReportModule } from '../../types';
-import { financialIntegrationService } from '../../../../services/financialIntegrationService';
+import { supabase } from '../../../../services/supabase';
+import { authService } from '../../../../services/authService';
 import Template from './Template';
 import PdfDocument from './PdfDocument';
 import DefaultFilters from '../../components/DefaultFilters';
@@ -21,33 +21,37 @@ const payablesReport: ReportModule = {
   },
   FilterComponent: DefaultFilters,
   fetchData: async ({ startDate, endDate }) => {
-    const all = await financialIntegrationService.getPayables();
-    const records = all.filter(r => {
-      // Empréstimos ativos sempre aparecem (são contratos de longo prazo)
-      const isActiveLoan = r.subType === 'loan_taken' && r.status !== 'paid';
-      if (isActiveLoan) return true;
-      
-      if (!startDate && !endDate) return true;
-      const d = new Date(r.dueDate).getTime();
-      const start = startDate ? new Date(startDate).getTime() : 0;
-      const end = endDate ? new Date(endDate).getTime() : Infinity;
-      return d >= start && d <= end;
+    const user = authService.getCurrentUser();
+    if (!user?.companyId) throw new Error('Empresa não encontrada');
+
+    // SQL-FIRST: Busca registros já filtrados por data no banco
+    const { data: result, error } = await supabase.rpc('rpc_report_financial_entries_v1', {
+      p_company_id: user.companyId,
+      p_type: 'payable',
+      p_start_date: startDate,
+      p_end_date: endDate
     });
 
-    const pendingTotal = records.reduce((acc, r) => acc + (r.remainingValue || 0), 0);
+    if (error) {
+      console.error('Erro ao buscar contas a pagar via RPC:', error);
+      throw error;
+    }
+
+    const records = result.records || [];
+    const pendingTotal = result.records.reduce((acc: number, r: any) => acc + (r.remainingValue || 0), 0);
 
     return {
       title: 'Relatório de Contas a Pagar',
       subtitle: `Vencimentos de ${startDate} até ${endDate}`,
       columns: [
-        { header: 'Vencimento', accessor: 'dueDate', format: 'date' },
+        { header: 'Vencimento', accessor: 'due_date', format: 'date' },
         { header: 'Beneficiário', accessor: 'entityName' },
         { header: 'Descrição', accessor: 'description' },
         { header: 'Categoria', accessor: 'category' },
         { header: 'Valor Original', accessor: 'originalValue', format: 'currency', align: 'right' },
         { header: 'Saldo Devedor', accessor: 'balance', format: 'currency', align: 'right' }
       ],
-      rows: records.map(r => ({ ...r, balance: r.remainingValue || 0 })),
+      rows: records.map((r: any) => ({ ...r, balance: r.remainingValue || 0, dueDate: r.due_date })),
       summary: [{ label: 'Total a Pagar', value: pendingTotal, format: 'currency' }]
     };
   },

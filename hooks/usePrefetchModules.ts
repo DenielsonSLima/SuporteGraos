@@ -63,7 +63,7 @@ export function usePrefetchModules(activeModule: ModuleId) {
             queryKey: QUERY_KEYS.LOADINGS,
             queryFn: async () => {
               const { loadingService } = await import('../services/loadingService');
-              return loadingService.getAll();
+              return loadingService.loadFromSupabase();
             },
             staleTime: STALE_TIMES.DYNAMIC,
           });

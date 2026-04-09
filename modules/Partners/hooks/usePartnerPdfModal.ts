@@ -20,9 +20,12 @@ export function usePartnerPdfModal({ isOpen, partner }: UsePartnerPdfModalParams
   useEffect(() => {
     const fetchData = async () => {
       if (isOpen && partner) {
-        const purchases = purchaseService.getAll().filter(p => p.partnerId === partner.id);
+        const [purchases, allLoadings] = await Promise.all([
+          purchaseService.loadFromSupabase().then(p => p.filter(ptr => ptr.partnerId === partner.id)),
+          loadingService.loadFromSupabase()
+        ]);
         const sales = salesService.getAll().filter(s => s.customerId === partner.id);
-        const loadings = loadingService.getAll().filter(l =>
+        const loadings = allLoadings.filter(l =>
           l.carrierId === partner.id || l.supplierName === partner.name || l.customerName === partner.name
         );
         const [payables, receivables] = await Promise.all([

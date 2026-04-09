@@ -67,10 +67,10 @@ export const resolveAccountLabel = (accountId: string) => {
  * Registra a transação financeira real + histórico geral + admin_expenses
  * de forma CONSISTENTE com descrição padronizada.
  * 
- * Refatorado para usar o Foundation v2:
- * 1. Financial Transactions (com triggers para saldo)
- * 2. Financial Links (vínculo robusto)
- * 3. Legacy compatibility (history e standalone)
+ * Refatorado para o Modelo Modular:
+ * 1. Financial Transactions (Pula se já feito via RPC no handler)
+ * 2. Financial History (Legado - para Extrato UI)
+ * 3. Standalone Records (Legado - para Dashboard antigo)
  */
 export const registerFinancialRecords = async (params: RegisterFinancialParams) => {
   const {
@@ -82,28 +82,30 @@ export const registerFinancialRecords = async (params: RegisterFinancialParams) 
 
   const isPureAdjustment = amount === 0 && discount > 0;
   const company = companyId || getCompanyId();
-
-  // 1. FINANCIAL_TRANSACTIONS — Transação real com Links Robustos
-  // No modo canônico, o RPC pay_financial_entry já cuida desta etapa.
-  // Só executa via financialTransactionService no modo LEGADO.
-  let txResult = null;
   const canonicalOps = isSqlCanonicalOpsEnabled();
 
-  if (!canonicalOps && amount > 0 && accountId) {
+  // 1. FINANCIAL_TRANSACTIONS — Transação real
+  // No modo modular, o RPC rpc_ops_financial_process_action já inseriu a transação.
+  // Só inserimos aqui se NÃO for canônico OU se for um registro 100% manual (standalone)
+  let txResult = null;
+  const isDomainHandled = ['purchase_order', 'sales_order', 'loading', 'commission'].includes(referenceType);
+
+  if ((!canonicalOps || !isDomainHandled) && amount > 0 && accountId) {
     try {
       const linkParams: TransactionLinkParams = {
         linkType: type,
-        purchaseOrderId: referenceType === 'purchase_order' ? referenceId : (recordId.startsWith('po-') ? recordId : undefined),
-        salesOrderId: referenceType === 'sales_order' ? referenceId : (recordId.startsWith('so-') ? recordId : undefined),
-        loadingId: referenceType === 'loading' ? referenceId : (recordId.startsWith('fr-') ? recordId : undefined),
+        purchaseOrderId: params.purchaseOrderId || (referenceType === 'purchase_order' ? referenceId : undefined),
+        salesOrderId: referenceType === 'sales_order' ? referenceId : undefined,
+        loadingId: referenceType === 'loading' ? referenceId : undefined,
         commissionId: referenceType === 'commission' ? referenceId : undefined,
-        standaloneId: !['purchase_order', 'sales_order', 'loading', 'commission', 'shareholder'].includes(referenceType) ? recordId : undefined,
-        shareholderTxId: params.shareholderTxId
+        standaloneId: !isDomainHandled ? recordId : undefined,
+        shareholderTxId: params.shareholderTxId,
+        metadata: params.metadata
       };
 
       txResult = await financialTransactionService.add({
         date,
-        description: `${description} [REF:${txId}]`,
+        description: `${description} [REF:${txId}] [ORIGIN:${recordId}]`,
         amount,
         type,
         bankAccountId: accountId,
@@ -111,11 +113,12 @@ export const registerFinancialRecords = async (params: RegisterFinancialParams) 
         companyId: company
       }, linkParams);
     } catch (err) {
-      throw err; // Agora é erro fatal pois o saldo depende disso
+      console.error('[registerFinancialRecords] Erro no ledger:', err);
+      throw err;
     }
   }
 
-  // 2. FINANCIAL_HISTORY — Histórico consolidado (Mantido para compatibilidade de UI)
+  // 2. FINANCIAL_HISTORY — Histórico consolidado (Mantido para compatibilidade com a página Extrato)
   if (amount > 0 && !isPureAdjustment) {
     try {
       financialHistoryService.add({
@@ -124,7 +127,7 @@ export const registerFinancialRecords = async (params: RegisterFinancialParams) 
         type: historyType,
         operation: type === 'receipt' ? 'inflow' : 'outflow',
         amount,
-        balanceBefore: 0, // Ignorado pela UI agora que usamos o saldo atômico
+        balanceBefore: 0, 
         balanceAfter: 0,
         bankAccountId: resolveAccountId(accountId),
         description,
@@ -135,15 +138,16 @@ export const registerFinancialRecords = async (params: RegisterFinancialParams) 
         companyId: company
       });
     } catch (err) {
+      // Falha não crítica
     }
   }
 
-  // 3. ADMIN_EXPENSES (standalone) — Registro de liquidação (LEGACY - Usado pelo calculo antigo de saldo)
-  // TODO: Remover após migrar dashboard/relatórios para usar financial_transactions
+  // 3. ADMIN_EXPENSES (standalone) — Registro de liquidação (LEGACY)
+  // TODO: Em breve removeremos esta inserção pois o admin_expenses deve refletir apenas OBRIGAÇÕES.
   try {
     const { standaloneRecordsService } = await import('../../standaloneRecordsService');
     await standaloneRecordsService.add({
-      id: isPureAdjustment ? `adjust-${txId}` : `hist-${txId}`,
+      id: crypto.randomUUID(),
       description: `${isPureAdjustment ? 'Abatimento' : 'Baixa'}: ${description}`,
       entityName,
       driverName,
@@ -161,8 +165,7 @@ export const registerFinancialRecords = async (params: RegisterFinancialParams) 
       notes: `${notes || ''} [ORIGIN:${recordId}] [REF:${txId}]`.trim()
     });
   } catch (err) {
-    // Não damos throw aqui pois a transação real (Step 1) já foi salva e o saldo está garantido via trigger
+    // Falha não crítica
   }
 
-  return txResult;
 };

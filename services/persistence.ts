@@ -44,13 +44,15 @@ export class Persistence<T extends { id: string }> {
     }
   }
 
-  private save() {
+  private save(silent = false) {
     try {
       if (this.useStorage) {
         // Limit check for localStorage (approx 5MB)
         localStorage.setItem(this.key, JSON.stringify(this.inMemoryData));
       }
-      this.notify();
+      if (!silent) {
+        this.notify();
+      }
     } catch (e) {
       console.warn(`[Persistence] Falha ao salvar '${this.key}' no localStorage (quota excedida?):`, e);
     }
@@ -96,9 +98,9 @@ export class Persistence<T extends { id: string }> {
     this.save();
   }
   
-  setAll(items: T[]): void {
+  setAll(items: T[], silent = false): void {
     this.inMemoryData = items;
-    this.save();
+    this.save(silent);
   }
 
   clear(): void {

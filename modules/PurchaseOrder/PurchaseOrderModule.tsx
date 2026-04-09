@@ -30,7 +30,11 @@ const PurchaseOrderModule: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'active' | 'finalized' | 'all'>('active');
   const [groupBy, setGroupBy] = useState<GroupByOption>('month');
   const [viewMode, setViewMode] = useState<'list' | 'form' | 'details'>('list');
-  const [selectedOrder, setSelectedOrder] = useState<PurchaseOrder | undefined>(undefined);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const selectedOrder = useMemo(() => 
+    orders.find(o => o.id === selectedOrderId), 
+    [orders, selectedOrderId]
+  );
   
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -55,7 +59,7 @@ const PurchaseOrderModule: React.FC = () => {
         if (e.detail?.moduleId === 'purchase_order' && e.detail?.orderId) {
             const order = getOrderById(e.detail.orderId);
             if (order) {
-                setSelectedOrder(order);
+                setSelectedOrderId(order.id);
                 setViewMode('details');
             }
         }
@@ -68,7 +72,7 @@ const PurchaseOrderModule: React.FC = () => {
       delete (window as any).__pendingOrderNav;
       const order = getOrderById(pending.orderId);
       if (order) {
-        setSelectedOrder(order);
+        setSelectedOrderId(order.id);
         setViewMode('details');
       }
     }
@@ -79,13 +83,12 @@ const PurchaseOrderModule: React.FC = () => {
   }, [getOrderById]); 
 
   const handleAddNew = () => {
-    setSelectedOrder(undefined);
+    setSelectedOrderId(null);
     setViewMode('form');
   };
 
   const handleOrderClick = (order: PurchaseOrder) => {
-    const freshOrder = getOrderById(order.id);
-    setSelectedOrder(freshOrder || order);
+    setSelectedOrderId(order.id);
     setViewMode('details');
   };
 
@@ -94,11 +97,10 @@ const PurchaseOrderModule: React.FC = () => {
     const result = await saveOrder(order, isEditing);
     if (result.success) {
       if (isEditing) {
-        setSelectedOrder(order);
+        setSelectedOrderId(order.id);
         setViewMode('details');
       } else {
         setViewMode('list');
-        setSelectedOrder(undefined);
       }
     }
   };
@@ -126,7 +128,7 @@ const PurchaseOrderModule: React.FC = () => {
       description: 'Deseja encerrar este contrato? Certifique-se que o saldo foi liquidado.',
       onConfirm: async () => {
         const updated = await finalizeOrder(order.id);
-        if (updated && viewMode === 'details') setSelectedOrder(updated);
+        if (updated && viewMode === 'details') setSelectedOrderId(updated.id);
       }
     });
   };

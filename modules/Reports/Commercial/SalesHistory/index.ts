@@ -20,32 +20,22 @@ const salesHistoryReport: ReportModule = {
     endDate: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split('T')[0],
   },
   FilterComponent: DefaultFilters, // Use the default date range filter
-  fetchData: ({ startDate, endDate }) => {
+  fetchData: async ({ startDate, endDate }) => {
+    const { authService } = await import('../../../../services/authService');
+    const { reportsService } = await import('../../../../services/reportsService');
+    const companyId = authService.getCurrentUser()?.companyId || '';
+    
     const fmt = (v: number) => new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(v);
-    const all = reportsCache.getAllSales();
-    const allLoadings = reportsCache.getAllLoadings();
+    
+    // Agora busca dados já filtrados e agregados (volumes inclusos) do servidor
+    const records = await reportsService.getSalesHistory(companyId, startDate, endDate);
 
-    const records = all.filter(s => {
-      if (!startDate && !endDate) return true;
-      const d = new Date(s.date).getTime();
-      const start = startDate ? new Date(startDate).getTime() : 0;
-      const end = endDate ? new Date(endDate).getTime() : Infinity;
-      return d >= start && d <= end;
-    });
-
-    const rows = records.map(s => {
-      const orderLoadings = allLoadings.filter(
-        (l: any) => l.salesOrderId === s.id && l.status !== 'canceled'
-      );
-      const loadedSc = orderLoadings.reduce((acc: number, l: any) => acc + (l.weightSc || 0), 0);
-      const totalSalesValue = orderLoadings.reduce((acc: number, l: any) => acc + (l.totalSalesValue || 0), 0);
-      return {
-        ...s,
-        qty: s.quantity ? `${fmt(s.quantity)} SC` : '-',
-        loaded: loadedSc > 0 ? `${fmt(loadedSc)} SC` : '-',
-        total: totalSalesValue || s.totalValue
-      };
-    });
+    const rows = records.map(s => ({
+      ...s,
+      qty: s.quantity ? `${fmt(s.quantity)} SC` : '-',
+      loaded: s.deliveredQtySc > 0 ? `${fmt(s.deliveredQtySc)} SC` : '-',
+      total: s.realizedValue || s.totalValue
+    }));
 
     const totalVal = rows.reduce((acc, r) => acc + (Number(r.total) || 0), 0);
 

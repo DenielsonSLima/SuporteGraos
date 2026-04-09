@@ -35,14 +35,15 @@ import {
   handleStandalonePayment,
 } from './financial/paymentOrchestrator';
 
-// Módulo de transferências (extraído)
 import {
   getTransfers,
   addTransfer,
   updateTransfer,
   deleteTransfer,
-  importTransfers
+  importTransfers,
+  mapTransferToRecord
 } from './financial/actions/transferActions';
+import { transfersService } from './financial/transfersService';
 import { PaymentResult, PaymentData } from './financial/handlers/orchestratorTypes';
 import type { Shareholder as ShareholderDB } from './shareholderService';
 
@@ -75,13 +76,25 @@ function mapShareholderToFinancialRecord(s: ShareholderDB): FinancialRecord {
 }
 
 export const financialActionService = {
-  getStandaloneRecords: (): FinancialRecord[] => [
-    ...standaloneRecordsService.getAll(),
-    ...creditService.getCredits(),
-    ...shareholderService.getAll().map(mapShareholderToFinancialRecord),
-    ...receiptService.getAll()
-  ],
-  getTransfers: () => getTransfers(),
+  getStandaloneRecords: async (): Promise<FinancialRecord[]> => {
+    const [admin, credits, shareholders, receipts] = await Promise.all([
+      standaloneRecordsService.loadFromSupabase(),
+      creditService.loadFromSupabase(),
+      shareholderService.loadFromSupabase(),
+      receiptService.loadFromSupabase()
+    ]);
+
+    return [
+      ...admin,
+      ...credits.filter(c => ['credit_income', 'investment'].includes(c.subType || '') && c.status !== 'cancelled'),
+      ...shareholders.map(mapShareholderToFinancialRecord),
+      ...receipts
+    ];
+  },
+  getTransfers: async (): Promise<TransferRecord[]> => {
+    const items = await transfersService.loadFromSupabase();
+    return items.map(mapTransferToRecord);
+  },
 
   processRecord: async (recordId: string, data: PaymentData, subType?: string): Promise<PaymentResult> => {
     const { userId, userName } = getLogInfo();
@@ -135,17 +148,22 @@ export const financialActionService = {
       result = await handleFreightPayment(recordId, paymentData);
     } else if (subType === 'purchase_order') {
       result = await handlePurchaseOrderPayment(recordId, paymentData);
+    } else if (subType === 'purchase_order_extra') {
+      // Despesas Extras do Pedido de Compra (não possuem entry_id, mas precisam baixar saldo)
+      // Passamos null para standalone e serviceToUpdate pois é uma movimentação avulsa vinculada ao Pedido
+      result = await handleStandalonePayment(recordId, paymentData, null, null);
     } else if (subType === 'sales_order') {
       result = await handleSalesOrderReceipt(recordId, paymentData);
     } else if (subType === 'commission') {
       result = await handleCommissionPayment(recordId, paymentData);
     } else {
       // Standalone / admin / crédito / sócio / recibo
-      let standalone: FinancialRecord | ShareholderDB | null | undefined = standaloneRecordsService.getById(recordId);
+      let standalone: FinancialRecord | ShareholderDB | null | undefined = await standaloneRecordsService.getById(recordId);
       let serviceToUpdate: { getById?: (id: string) => any;[key: string]: any } = standaloneRecordsService;
 
       if (!standalone) {
-        standalone = creditService.getCredits().find((c: any) => c.id === recordId);
+        const credits = await creditService.getCredits();
+        standalone = credits.find((c: any) => c.id === recordId);
         if (standalone) serviceToUpdate = creditService;
       }
       if (!standalone) {
@@ -153,7 +171,7 @@ export const financialActionService = {
         if (standalone) serviceToUpdate = shareholderService;
       }
       if (!standalone) {
-        standalone = receiptService.getById(recordId);
+        standalone = await receiptService.getById(recordId);
         if (standalone) serviceToUpdate = receiptService;
       }
 
@@ -185,13 +203,13 @@ export const financialActionService = {
   deleteStandaloneRecord: async (id: string) => {
     const isValidUUID = (val: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
 
-    if (standaloneRecordsService.getById(id)) {
+    if (await standaloneRecordsService.getById(id)) {
       await standaloneRecordsService.delete(id);
-    } else if (creditService.getCredits().find((c: any) => c.id === id)) {
+    } else if ((await creditService.getCredits()).find((c: any) => c.id === id)) {
       await creditService.remove(id);
     } else if (isValidUUID(id) && await shareholderService.getById(id)) {
       await shareholderService.delete(id);
-    } else if (isValidUUID(id) && receiptService.getById(id)) {
+    } else if (isValidUUID(id) && await receiptService.getById(id)) {
       await receiptService.delete(id);
     }
   },
@@ -204,13 +222,12 @@ export const financialActionService = {
   },
 
   syncDeleteFromOrigin: async (originTxId: string) => {
-    // 1. Delete from standalone (hist and adjust)
-    await standaloneRecordsService.delete(`hist-${originTxId}`);
-    await standaloneRecordsService.delete(`adjust-${originTxId}`);
+    // 1. Delete from standalone by reference (replaces hist- and adjust- legacy logic)
+    await standaloneRecordsService.deleteByRef(originTxId);
 
     // 2. Reverter transações financeiras (ledger imutável, sem delete)
     const { financialTransactionService } = await import('./financial/financialTransactionService');
-    await financialTransactionService.deleteByRef(originTxId);
+    await financialTransactionService.deleteByOrigin(originTxId);
   },
 
   addTransfer: (transfer: TransferRecord) => addTransfer(transfer),

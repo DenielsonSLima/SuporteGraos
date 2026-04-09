@@ -117,7 +117,10 @@ export const bankAccountService = {
   delete: remove,
 
   // ── Shims de compatibilidade legados (financialService, etc.) ──
-  getBankAccounts:   (): BankAccount[] => [],
+  getBankAccounts:   (): BankAccount[] => {
+    console.warn('bankAccountService.getBankAccounts() is DEPRECATED. Use useAccounts() hook or accountsService.getAll()');
+    return [];
+  },
   getById:           (_id: string): BankAccount | undefined => undefined,
   addBankAccount:    add,
   updateBankAccount: update,

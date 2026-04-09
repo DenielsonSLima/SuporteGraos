@@ -15,6 +15,7 @@
 import { useMemo } from 'react';
 import { SalesOrder } from '../types';
 import { Loading } from '../../Loadings/types';
+import { kpiService } from '../../../services/sales/kpiService';
 
 export interface SalesPerformanceStats {
   // Volumes
@@ -38,67 +39,36 @@ export interface SalesPerformanceStats {
 
 /**
  * Função pura (sem hooks) — reutilizável em contextos fora do React
- * como @react-pdf/renderer `pdf().toBlob()`.
+ * como @react-pdf/renderer.
  */
 export function calculateSalesPerformance(order: SalesOrder, loadings: Loading[]): SalesPerformanceStats {
-  const activeLoadings = loadings.filter(l => l.status !== 'canceled');
-
-  // 1. Volumes (Sacas)
-  const totalLoadedSc = order.totalWeightKgOrig ? (order.totalWeightKgOrig / 60) : activeLoadings.reduce((acc, l) => acc + l.weightSc, 0);
-  const totalDeliveredSc = order.deliveredQtySc ?? activeLoadings.reduce((acc, l) => acc + (l.unloadWeightKg ? l.unloadWeightKg / 60 : 0), 0);
-  const contractQty = order.quantity || 0;
-  const pendingQty = Math.max(0, contractQty - totalLoadedSc);
-
-  // 2. Financeiro (Custos)
-  const totalGrainCost = order.totalGrainCost ?? activeLoadings.reduce((acc, l) => acc + (l.totalPurchaseValue || 0), 0);
-  const totalFreightCost = order.totalFreightCost ?? activeLoadings.reduce((acc, l) => acc + (l.totalFreightValue || 0), 0);
-  const totalDirectInvestment = totalGrainCost + totalFreightCost;
-
-  // 3. Financeiro (Receita/Faturamento) — Peso Destino se houver, senão Origem × Preço Venda
-  const totalRevenueRealized = order.deliveredValue ?? activeLoadings.reduce((acc, l) => {
-    const weightSc = l.unloadWeightKg ? l.unloadWeightKg / 60 : l.weightSc;
-    return acc + (weightSc * (l.salesPrice || order.unitPrice || 0));
-  }, 0);
-
-  // 4. Resultado (Lucro Bruto)
-  const grossProfit = totalRevenueRealized - totalDirectInvestment;
-  const marginPercent = totalRevenueRealized > 0 ? (grossProfit / totalRevenueRealized) * 100 : 0;
-
+  const stats = kpiService.calculateOrderStats(order, loadings);
+  
   return {
-    contractQty, totalLoadedSc, totalDeliveredSc, pendingQty,
-    totalGrainCost, totalFreightCost, totalDirectInvestment,
-    totalRevenueRealized, grossProfit, marginPercent,
+    contractQty: stats.contractQty,
+    totalLoadedSc: stats.totalLoadedSc,
+    totalDeliveredSc: stats.totalDeliveredSc,
+    pendingQty: stats.pendingQty,
+    totalGrainCost: stats.totalGrainCost,
+    totalFreightCost: stats.totalFreightCost,
+    totalDirectInvestment: stats.totalDirectInvestment,
+    totalRevenueRealized: stats.totalRevenueRealized,
+    grossProfit: stats.grossProfit,
+    marginPercent: stats.marginPercent,
   };
 }
 
-/* ─────────────────────────────────────────────────────────────
- * Stats internos (PDF "internal"): métricas de auditoria / P&L
- * detalhado com despesas, comissão, quebra e lucro/sc.
- * ──────────────────────────────────────────────────────────── */
-
-export interface InternalPdfStats {
-  activeLoadings: Loading[];
-  totalWeightKgOrig: number;
-  totalWeightKgDest: number;
-  totalWeightScOrig: number;
-  totalGrainCost: number;
-  totalFreightCost: number;
-  totalRevenue: number;
-  orderExpenses: number;
-  brokerCommission: number;
-  totalInvestment: number;
-  netProfit: number;
-  marginPercent: number;
-  profitPerSc: number;
-  totalBreakageKg: number;
-  breakagePercent: number;
+/** Hook React com memoização */
+export function useSalesPerformanceStats(order: SalesOrder, loadings: Loading[]): SalesPerformanceStats {
+  return useMemo(() => calculateSalesPerformance(order, loadings), [order, loadings]);
 }
 
-/**
- * Função pura para cálculos de performance P&L detalhado
- * usada pelo PdfDocument (variant 'internal') — fora do React tree.
+/** 
+ * Mantivemos o calculateInternalPdfStats separado pois ele contém 
+ * métricas de auditoria específicas para o PDF Interno.
  */
-export function calculateInternalPdfStats(order: SalesOrder, loadings: Loading[]): InternalPdfStats {
+export function calculateInternalPdfStats(order: SalesOrder, loadings: Loading[]) {
+  // Lógica de auditoria interna...
   const safeLoadings = Array.isArray(loadings) ? loadings : [];
   const activeLoadings = safeLoadings.filter((l) => l?.status !== 'canceled');
 
@@ -136,7 +106,3 @@ export function calculateInternalPdfStats(order: SalesOrder, loadings: Loading[]
   };
 }
 
-/** Hook React com memoização — para uso em componentes React */
-export function useSalesPerformanceStats(order: SalesOrder, loadings: Loading[]): SalesPerformanceStats {
-  return useMemo(() => calculateSalesPerformance(order, loadings), [order, loadings]);
-}

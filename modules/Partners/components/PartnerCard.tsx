@@ -102,7 +102,7 @@ const PartnerCard: React.FC<Props> = ({
           {partner.name}
         </h3>
         {partner.nickname && (
-          <p className="text-xs text-blue-600 font-bold italic mt-0.5">"{partner.nickname}"</p>
+          <p className="text-xs text-blue-600 font-bold mt-0.5">"{partner.nickname}"</p>
         )}
 
         <div className="mt-4 space-y-2">

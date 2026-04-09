@@ -19,11 +19,27 @@ const LoadingWeightConferencing: React.FC<Props> = ({
 }) => {
     const labelClass = 'text-[10px] font-black text-slate-500 uppercase mb-1.5 block tracking-widest ml-1';
 
+    const formatMask = (val: number | string | undefined) => {
+        if (val === undefined || val === '') return '';
+        const num = typeof val === 'string' ? parseFloat(val) : val;
+        if (isNaN(num)) return '';
+        return new Intl.NumberFormat('pt-BR', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        }).format(num);
+    };
+
+    const handleWeightChange = (value: string, callback: (v: string) => void) => {
+        const digits = value.replace(/\D/g, '');
+        const numericValue = digits ? (parseInt(digits) / 100).toString() : '';
+        callback(numericValue);
+    };
+
     return (
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm transition-all duration-300 hover:shadow-md">
             <div className="flex items-center gap-2 mb-4">
                 <div className="p-2 bg-slate-950 text-white rounded-lg shadow-lg"><Scale size={16} /></div>
-                <h3 className="font-black text-slate-900 uppercase italic tracking-tighter text-sm">Pesagem e Conferência de Quebra</h3>
+                <h3 className="font-black text-slate-900 uppercase tracking-tighter text-sm">Pesagem e Conferência de Quebra</h3>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-5 gap-3 items-center">
@@ -33,17 +49,18 @@ const LoadingWeightConferencing: React.FC<Props> = ({
                     {isEditing ? (
                         <div className="relative mt-2">
                             <input
-                                type="number"
+                                type="text"
+                                inputMode="numeric"
                                 className="w-full bg-white border-2 border-blue-200 rounded-2xl px-5 py-4 font-black text-3xl text-slate-900 focus:outline-none focus:border-blue-500 transition-all shadow-sm"
-                                value={editForm.weightKg}
-                                onChange={e => onUpdateForm({ weightKg: parseFloat(e.target.value) })}
+                                value={formatMask(editForm.weightKg)}
+                                onChange={e => handleWeightChange(e.target.value, (v) => onUpdateForm({ weightKg: parseFloat(v) }))}
                             />
-                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400 uppercase tracking-widest">KG</span>
+                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400 uppercase tracking-widest leading-none">KG</span>
                         </div>
                     ) : (
                         <div className="flex items-baseline gap-2 mt-1">
-                            <span className="text-xl font-black text-slate-900 tracking-tighter italic">{stats.wOri.toLocaleString()}</span>
-                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">KG</span>
+                            <span className="text-xl font-black text-slate-900 tracking-tighter">{stats.wOri.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">KG</span>
                         </div>
                     )}
                 </div>
@@ -64,11 +81,14 @@ const LoadingWeightConferencing: React.FC<Props> = ({
                         <div className="flex gap-2 mt-1">
                             <div className="relative flex-1 min-w-0">
                                 <input
-                                    type="number" value={quickWeight} onChange={e => onSetQuickWeight(e.target.value)}
-                                    placeholder="Peso Destino..."
+                                    type="text" 
+                                    inputMode="numeric"
+                                    value={formatMask(quickWeight)} 
+                                    onChange={e => handleWeightChange(e.target.value, onSetQuickWeight)}
+                                    placeholder="0,00"
                                     className="w-full bg-white border-2 border-emerald-200 rounded-lg px-3 py-2 font-black text-sm text-slate-950 placeholder:text-slate-300 focus:outline-none focus:border-emerald-500 transition-all shadow-sm"
                                 />
-                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-black text-slate-400 uppercase tracking-widest">KG</span>
+                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">KG</span>
                             </div>
                             {!isEditing && (
                                 <button
@@ -83,14 +103,17 @@ const LoadingWeightConferencing: React.FC<Props> = ({
                         <>
                             <div className="flex gap-3 mb-3 h-14 mt-2">
                                 <input
-                                    type="number" value={quickWeight} onChange={e => onSetQuickWeight(e.target.value)}
+                                    type="text" 
+                                    inputMode="numeric"
+                                    value={formatMask(quickWeight)} 
+                                    onChange={e => handleWeightChange(e.target.value, onSetQuickWeight)}
                                     className="flex-1 min-w-0 bg-white border-2 border-slate-100 rounded-lg px-3 py-1.5 font-black text-base text-slate-950 focus:outline-none focus:border-emerald-500 transition-all shadow-sm"
                                 />
                                 <button onClick={onQuickWeightConfirm} className="bg-slate-950 text-white px-3 rounded-lg font-black text-[9px] uppercase tracking-widest active:scale-95 shrink-0 whitespace-nowrap border border-white/10">OK</button>
                             </div>
                             <div className="flex items-baseline gap-1.5 opacity-60">
-                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Confirmado:</span>
-                                <span className="text-sm font-black text-slate-900 tracking-tighter italic">{stats.wDest.toLocaleString()} KG</span>
+                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">Confirmado:</span>
+                                <span className="text-sm font-black text-slate-900 tracking-tighter">{stats.wDest.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} KG</span>
                             </div>
                         </>
                     )}

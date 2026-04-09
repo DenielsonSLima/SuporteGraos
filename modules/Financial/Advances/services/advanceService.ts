@@ -16,26 +16,28 @@ const getLogInfo = () => {
 
 export const advanceService = {
   
-  getAllTransactions: (): AdvanceTransaction[] => {
+  getAllTransactions: async (): Promise<AdvanceTransaction[]> => {
     const manual = manualDb.getAll();
     const purchaseAdvances: AdvanceTransaction[] = [];
-    const orders = purchaseService.getAll();
+    const orders = await purchaseService.loadFromSupabase();
 
     orders.forEach(order => {
-      order.transactions.filter(t => t.type === 'advance').forEach(t => {
-        purchaseAdvances.push({
-          id: `po-adv-${t.id}`,
-          partnerId: order.partnerId,
-          partnerName: order.partnerName,
-          type: 'given',
-          date: t.date,
-          value: t.value,
-          description: `Adiantamento Pedido ${order.number}`,
-          status: 'active',
-          accountId: t.accountId,
-          accountName: t.accountName
+      if (order.transactions) {
+        order.transactions.filter((t: any) => t.type === 'advance').forEach((t: any) => {
+          purchaseAdvances.push({
+            id: `po-adv-${t.id}`,
+            partnerId: order.partnerId,
+            partnerName: order.partnerName,
+            type: 'given',
+            date: t.date,
+            value: t.value,
+            description: `Adiantamento Pedido ${order.number}`,
+            status: 'active',
+            accountId: t.accountId,
+            accountName: t.accountName
+          });
         });
-      });
+      }
     });
 
     return [...manual, ...purchaseAdvances].sort((a, b) => 
@@ -43,10 +45,10 @@ export const advanceService = {
     );
   },
 
-  getManualTransactions: () => manualDb.getAll(),
+  getManualTransactions: async () => manualDb.getAll(),
 
-  getSummaries: (): PartnerAdvanceSummary[] => {
-    const allTransactions = advanceService.getAllTransactions();
+  getSummaries: async (): Promise<PartnerAdvanceSummary[]> => {
+    const allTransactions = await advanceService.getAllTransactions();
     const map: Record<string, PartnerAdvanceSummary> = {};
 
     allTransactions.forEach(t => {
@@ -78,8 +80,9 @@ export const advanceService = {
     })).sort((a, b) => Math.abs(b.netBalance) - Math.abs(a.netBalance));
   },
 
-  getTransactionsByPartner: (partnerId: string) => {
-    return advanceService.getAllTransactions()
+  getTransactionsByPartner: async (partnerId: string) => {
+    const all = await advanceService.getAllTransactions();
+    return all
       .filter(t => t.partnerId === partnerId)
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   },

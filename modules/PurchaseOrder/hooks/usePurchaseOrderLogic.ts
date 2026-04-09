@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { PurchaseOrder, OrderTransaction } from '../types';
 import { Loading } from '../../Loadings/types';
 import { loadingService } from '../../../services/loadingService';
@@ -13,44 +13,38 @@ import { payablesService } from '../../../services/financial/payablesService';
 import { usePurchaseOrderTransactions } from './usePurchaseOrderTransactions';
 import { useQueryClient } from '@tanstack/react-query';
 import { QUERY_KEYS } from '../../../hooks/queryKeys';
-export const usePurchaseOrderLogic = (initialOrder: PurchaseOrder, onFinalizeCallback: () => void) => {
-  const { addToast } = useToast();
-  const [currentOrder, setCurrentOrder] = useState<PurchaseOrder>(initialOrder);
-  const [loadings, setLoadings] = useState<Loading[]>([]);
-  const [isFinalizePromptOpen, setIsFinalizePromptOpen] = useState(false);
+import { expenseService } from '../../../services/purchase/expenseService';
+import { kpiService } from '../../../services/purchase/kpiService';
+import { useLoadingsByPurchaseOrder } from '../../../hooks/useLoadings';
 
-  const { data: liveTransactions = [] } = usePurchaseOrderTransactions(currentOrder.id);
+export const usePurchaseOrderLogic = (order: PurchaseOrder, onFinalizeCallback: () => void) => {
+  const { addToast } = useToast();
+  const { data: loadings = [] } = useLoadingsByPurchaseOrder(order.id);
+  const [isFinalizePromptOpen, setIsFinalizePromptOpen] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const { data: liveTransactions = [] } = usePurchaseOrderTransactions(order.id);
   const queryClient = useQueryClient();
 
-  // Function to refresh loadings and order data
-  const refreshLoadings = async (id?: string) => {
-    const orderId = id || currentOrder.id;
-    
-    // Invalidar caches via TanStack Query (AGORA AGUARDADO)
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS }),
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOADINGS }),
-      queryClient.invalidateQueries({ queryKey: ['purchase_order_transactions', orderId] }),
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_TRANSACTIONS })
-    ]);
-
-    const list = loadingService.getByPurchaseOrder(orderId);
-    setLoadings([...list]);
-    const freshOrder = purchaseService.getById(orderId);
-    if (freshOrder) setCurrentOrder(freshOrder);
+  // Function to refresh manual invalidations if needed
+  const refreshData = async () => {
+    try {
+      // ✅ OPTIMIZATION: Invalidate only specific queries related to this order 
+      // instead of global PURCHASE_ORDERS and LOADINGS lists.
+      await Promise.allSettled([
+        queryClient.invalidateQueries({ 
+          queryKey: QUERY_KEYS.PURCHASE_ORDERS, 
+          predicate: (query) => (query.queryKey[1] as any)?.id === order.id || query.queryKey.length === 1 
+        }),
+        queryClient.invalidateQueries({ queryKey: ['purchase_order_transactions', order.id] }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_TRANSACTIONS }),
+        // Invalidate loadings only for this PO
+        queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.LOADINGS, order.id] })
+      ]);
+    } catch (refreshErr) {
+      console.warn('⚠️ refreshData failed:', refreshErr);
+    }
   };
-
-  useEffect(() => {
-    refreshLoadings(initialOrder.id);
-  }, [initialOrder]);
-
-  // Atualiza automaticamente quando houver mudanças no serviço (Realtime)
-  useEffect(() => {
-    const unsubscribe = loadingService.subscribe(() => {
-      refreshLoadings();
-    });
-    return unsubscribe;
-  }, [currentOrder.id]);
 
   const activeLoadings = useMemo(() => loadings.filter(l => l.status !== 'canceled'), [loadings]);
 
@@ -59,31 +53,34 @@ export const usePurchaseOrderLogic = (initialOrder: PurchaseOrder, onFinalizeCal
     const txMap = new Map<string, OrderTransaction>();
 
     // 1. Start with metadata transactions (legacy/manual)
-    (currentOrder.transactions || []).forEach(tx => txMap.set(tx.id, tx));
+    (order.transactions || []).forEach(tx => txMap.set(tx.id, tx));
 
     // 2. Overwrite/Add with live transactions from financial module (SINGLE SOURCE OF TRUTH)
     liveTransactions.forEach(tx => {
-      // Se já existe um ID igual, o live é absoluto
-      const existingById = txMap.get(tx.id);
+      // ✅ FIX: Se a transação foi deletada manualmente (metadata filtrado), não deixamos o stale do backend re-adicionar
+      // (Isso assume que o ID é o mesmo entre as duas listas)
+      const isActuallyDeleted = order.transactions && 
+                                !order.transactions.some(mTx => mTx.id === tx.id);
+      
+      // Se era uma transação que já flutuava no metadata e sumiu de lá, ignoramos o live stale
+      if (isActuallyDeleted && tx.id.length < 30) return; 
 
       // Heurística V2: Busca por duplicidade mais permissiva
-      // Motivo: Lançamentos manuais podem ter datas ou notas levemente diferentes dos lançamentos reais do banco
       let duplicateId: string | null = null;
+      const existingById = txMap.get(tx.id);
+
       if (!existingById) {
         const txDate = new Date(tx.date).getTime();
 
         for (const [id, mTx] of txMap.entries()) {
-          // 1. O ID manual geralmente é menor e não-UUID (random string)
           const isManualId = id.length < 20 && !id.includes('-');
           if (!isManualId) continue;
 
-          // 2. Mesma natureza (pagamento/adiantamento) e valor exato
           const sameValue = Math.abs(mTx.value - tx.value) < 0.01;
           const sameType = (mTx.type === 'payment' || mTx.type === 'advance') &&
             (tx.type === 'payment' || tx.type === 'receipt' || tx.type === 'advance');
 
           if (sameValue && sameType) {
-            // 3. Janela de data de 3 dias (previne erros de fuso ou lançamentos retroativos)
             const mTxDate = new Date(mTx.date).getTime();
             const dayInMs = 24 * 60 * 60 * 1000;
             const withinWindow = Math.abs(mTxDate - txDate) <= (3 * dayInMs);
@@ -108,81 +105,55 @@ export const usePurchaseOrderLogic = (initialOrder: PurchaseOrder, onFinalizeCal
     });
 
     return Array.from(txMap.values()).sort((a, b) => b.date.localeCompare(a.date));
-  }, [currentOrder.transactions, liveTransactions]);
+  }, [order.transactions, liveTransactions]);
 
   const stats = useMemo(() => {
-    const totalPurchaseVal = currentOrder.totalPurchaseValCalc || 0;
-    const totalFreightVal = currentOrder.totalFreightValCalc || 0;
-    const totalSalesVal = currentOrder.totalSalesValCalc || 0;
+    return kpiService.calculateOrderStats(order, mergedTransactions, loadings);
+  }, [mergedTransactions, order, loadings]);
 
-    const txs = mergedTransactions;
+  // 🔄 RESTORE: Abrir prompt de finalização apenas quando o saldo TRANSITAR para zero (SKIL: UX Manual Control)
+  const initialBalanceRef = useRef<number | null>(null);
 
-    // Cálculo de abatimentos agora considera o discount_value do backend + gastos debitáveis
-    const expensesDeducted = txs
-      .filter(t => (t.type === 'expense' || t.type === 'commission') && t.deductFromPartner)
-      .reduce((acc, t) => acc + (t.value || 0), 0);
+  useEffect(() => {
+    // Registra o saldo inicial assim que os stats estiverem disponíveis
+    if (initialBalanceRef.current === null && stats.balancePartner !== undefined) {
+      initialBalanceRef.current = stats.balancePartner;
+    }
+  }, [stats.balancePartner]);
 
-    const paidValue = currentOrder.paidValue || 0;
-    const balanceValue = currentOrder.balanceValue || 0;
-    const totalDisc = currentOrder.discountValue || 0;
+  useEffect(() => {
+    const isActuallyPaid = stats.balancePartner <= 0.05 && stats.totalSettled > 0;
+    const isNotFinalized = order.status !== 'completed';
+    const wasUnpaidAtStart = initialBalanceRef.current !== null && initialBalanceRef.current > 0.05;
     
-    const totalSettled = paidValue + totalDisc + expensesDeducted;
-    
-    // O balancePartner é o saldo real vindo do banco. 
-    // AdvanceBalance é o que foi pago a mais que o total do contrato.
-    const balancePartner = balanceValue; 
-    const advanceBalance = Math.max(0, totalSettled - totalPurchaseVal);
-
-    const totalSc = currentOrder.totalSc || 0;
-    const totalKg = currentOrder.totalKg || 0;
-
-    const totalCommissionDue = currentOrder.hasBroker ? totalSc * (currentOrder.brokerCommissionPerSc || 0) : 0;
-
-    return {
-      totalPurchaseVal, totalFreightVal, totalSalesVal, totalSettled,
-      totalAbatements: totalDisc + expensesDeducted,
-      balancePartner, advanceBalance, totalSc, totalKg,
-      avgSalesPrice: totalSc > 0 ? totalSalesVal / totalSc : 0,
-      avgPurchasePrice: totalSc > 0 ? totalPurchaseVal / totalSc : 0,
-      totalCommissionDue
-    };
-  }, [activeLoadings, currentOrder]);
+    // Só abre o prompt se o pedido NÃO estava quitado quando a tela abriu
+    // e agora está quitado (transição via pagamento/ação do usuário)
+    if (isActuallyPaid && isNotFinalized && wasUnpaidAtStart && !isFinalizePromptOpen && !isProcessing) {
+      // Pequeno timeout para garantir que o toast de sucesso do pagamento apareça primeiro
+      const timer = setTimeout(() => {
+        setIsFinalizePromptOpen(true);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stats.balancePartner, order.status, isFinalizePromptOpen, isProcessing]);
 
   const actions = {
-    // Exposed refreshLoadings to the actions object
-    refreshLoadings,
+    refreshLoadings: refreshData,
     handleConfirmTransaction: async (data: any) => {
       try {
-        await financialActionService.processRecord(`po-grain-${currentOrder.id}`, data, 'purchase_order');
-
-        // ✅ FIX: Adicionar transação ao array local do pedido (para exibir no OrderFinancialCard)
-        const txValue = parseFloat(data.amount) || 0;
-        const txDiscount = parseFloat(data.discount) || 0;
-        const tx: OrderTransaction = {
-          id: Math.random().toString(36).substr(2, 9),
-          type: 'payment',
-          date: data.date,
-          value: txValue,
-          discountValue: txDiscount,
-          accountId: data.accountId,
-          accountName: data.accountName || 'Caixa',
-          notes: data.notes || ''
-        };
-        const updatedTxs = [tx, ...(currentOrder.transactions || [])];
-        const newPaidValue = (currentOrder.paidValue || 0) + txValue + txDiscount;
-        const updated = { ...currentOrder, transactions: updatedTxs, paidValue: newPaidValue, discountValue: (currentOrder.discountValue || 0) + txDiscount };
-        await purchaseService.update(updated);
-        setCurrentOrder(updated);
+        // Enviar para o Orquestrador Financeiro (O cérebro do sistema)
+        // Isso criará: financial_transactions + financial_links
+        // E o trigger DB atualizará o paid_value e status no ops_purchase_orders de forma atômica.
+        await financialActionService.processRecord(`po-grain-${order.id}`, data, 'purchase_order');
 
         SettingsCache.refreshBalances();
-        await refreshLoadings();
         addToast('success', 'Pagamento Confirmado');
 
-        // Verificar se pagamento quitou o saldo
-        const totalPurchaseVal = loadings.filter(l => l.status !== 'canceled').reduce((acc, l) => acc + (l.totalPurchaseValue || 0), 0);
-        if (totalPurchaseVal > 0 && newPaidValue >= totalPurchaseVal - 0.01) {
-          setIsFinalizePromptOpen(true);
-        }
+        // Refresh TanStack Query para carregar os novos valores calculados pelo Banco
+        await refreshData();
+
+        // ⚠️ Nota: O prompt de finalização agora será baseado no refresh dos stats vindos do banco
       } catch (err: any) {
         console.error('[PO-PAYMENT] Erro completo:', err);
         addToast('error', `Erro ao confirmar pagamento: ${err?.message || 'Erro desconhecido'}`);
@@ -190,7 +161,7 @@ export const usePurchaseOrderLogic = (initialOrder: PurchaseOrder, onFinalizeCal
     },
     handleRegisterAdvance: async (data: any) => {
       const tx: OrderTransaction = {
-        id: Math.random().toString(36).substr(2, 9),
+        id: crypto.randomUUID(),
         type: 'advance',
         date: data.date,
         value: data.value,
@@ -198,13 +169,13 @@ export const usePurchaseOrderLogic = (initialOrder: PurchaseOrder, onFinalizeCal
         accountName: data.accountName,
         notes: data.description || 'Adiantamento'
       };
-      const updated = { ...currentOrder, transactions: [tx, ...(currentOrder.transactions || [])], paidValue: (currentOrder.paidValue || 0) + data.value };
+      const updated = { ...order, transactions: [tx, ...(order.transactions || [])], paidValue: (order.paidValue || 0) + data.value };
       await purchaseService.update(updated);
 
       financialActionService.addAdminExpense({
         id: `adv-po-${tx.id}`,
-        description: `Adiantamento Pedido ${currentOrder.number}`,
-        entityName: currentOrder.partnerName,
+        description: `Adiantamento Pedido ${order.number}`,
+        entityName: order.partnerName,
         category: 'Adiantamentos',
         dueDate: data.date,
         issueDate: data.date,
@@ -215,39 +186,30 @@ export const usePurchaseOrderLogic = (initialOrder: PurchaseOrder, onFinalizeCal
       });
       SettingsCache.refreshBalances();
       ledgerService.onTransactionChange('add', tx);
-      await refreshLoadings();
+      await refreshData();
       addToast('success', 'Adiantamento Concedido');
     },
     handleAddExpense: async (data: any) => {
-      const tx = { id: Math.random().toString(36).substr(2, 9), type: 'expense' as const, ...data };
-      // 1. Atualiza transação do pedido
-      await purchaseService.update({ ...currentOrder, transactions: [tx, ...(currentOrder.transactions || [])] });
-
-      // 2. Cria movimentação financeira real (pagamento) (Legado)
-      await financialActionService.processRecord(
-        `expense-extra-${currentOrder.id}-${tx.id}`,
-        {
-          amount: tx.value,
-          discount: 0,
-          date: tx.date,
-          accountId: tx.accountId,
-          accountName: tx.accountName,
-          notes: tx.notes,
-          entityName: currentOrder.partnerName,
-          category: tx.expenseSubtypeName,
-          isExtraExpense: true,
-          deductFromPartner: tx.deductFromPartner,
-        },
-        'expense'
-      );
-
-      SettingsCache.refreshBalances();
-      ledgerService.onTransactionChange('add', tx);
-      await refreshLoadings();
+      try {
+        const updatedOrder = await expenseService.addExpense(order, data);
+        
+        // Atualizar Cache Global
+        queryClient.setQueryData(QUERY_KEYS.PURCHASE_ORDERS, (old: any[] | undefined) => 
+          old ? old.map(o => o.id === order.id ? updatedOrder : o) : [updatedOrder]
+        );
+        addToast('success', 'Despesa lançada com sucesso');
+        
+        SettingsCache.refreshBalances();
+        ledgerService.onTransactionChange('add', { type: 'expense', ...data } as any);
+        await refreshData();
+      } catch (err) {
+        console.error('Erro ao lançar despesa:', err);
+        addToast('error', 'Falha ao salvar despesa');
+      }
     },
     handleAddCommission: async (data: any) => {
-      const tx = { id: Math.random().toString(36).substr(2, 9), type: 'commission' as const, ...data };
-      const updated = { ...currentOrder, transactions: [tx, ...(currentOrder.transactions || [])] };
+      const tx = { id: crypto.randomUUID(), type: 'commission' as const, ...data };
+      const updated = { ...order, transactions: [tx, ...(order.transactions || [])] };
       await purchaseService.update(updated);
 
       if (data.partnerId && data.value && data.value > 0) {
@@ -262,11 +224,11 @@ export const usePurchaseOrderLogic = (initialOrder: PurchaseOrder, onFinalizeCal
         // 1. Legado (Dual Write)
         payablesService.add({
           id: payableId,
-          purchaseOrderId: currentOrder.id,
+          purchaseOrderId: order.id,
           partnerId: data.partnerId,
           partnerName: data.partnerName || 'Corretor',
-          description: `Comissão de Corretagem - Pedido #${currentOrder.number}`,
-          dueDate: currentOrder.date,
+          description: `Comissão de Corretagem - Pedido #${order.number}`,
+          dueDate: order.date,
           amount: data.value,
           paidAmount: data.paid || 0,
           status: (data.paid || 0) >= data.value ? 'paid' : 'pending',
@@ -279,46 +241,102 @@ export const usePurchaseOrderLogic = (initialOrder: PurchaseOrder, onFinalizeCal
 
       SettingsCache.refreshBalances();
       ledgerService.onTransactionChange('add', tx);
-      await refreshLoadings();
+      await refreshData();
     },
     // Added handleSaveNote for persistent order observations
     handleSaveNote: async (note: any) => {
-      const newNote = { ...note, id: Math.random().toString(36).substr(2, 9) };
-      const updated = { ...currentOrder, notesList: [newNote, ...(currentOrder.notesList || [])] };
+      const newNote = { ...note, id: crypto.randomUUID() };
+      const updated = { ...order, notesList: [newNote, ...(order.notesList || [])] };
       await purchaseService.update(updated);
-      await refreshLoadings();
+      await refreshData();
     },
     handleUpdateTx: async (tx: OrderTransaction) => {
-      await purchaseService.updateTransaction(currentOrder.id, tx);
+      await purchaseService.updateTransaction(order.id, tx);
       SettingsCache.refreshBalances();
       ledgerService.onTransactionChange('update', tx);
-      await refreshLoadings();
+      await refreshData();
     },
-    handleDeleteTx: async (id: string) => {
-      await purchaseService.deleteTransaction(currentOrder.id, id);
-      // Exclui também o registro financeiro correspondente (Legado)
-      financialActionService.deleteStandaloneRecord('hist-' + id);
-      await financialActionService.syncDeleteFromOrigin(id);
+    handleDeleteTx: async (txId: string) => {
+      try {
+        const tx = (order.transactions || []).find(t => t.id === txId);
+        
+        if (tx?.type === 'expense') {
+          await expenseService.deleteExpense(order, txId);
+        } else {
+          // Deleta via serviço (Links e Transações financeiras)
+          // O Trigger DB cuidará de reverter o paid_value no metadata/coluna do pedido
+          await purchaseService.deleteTransaction(order.id, txId);
+        }
 
-      SettingsCache.refreshBalances();
-      ledgerService.onTransactionChange('delete', { id });
-      await refreshLoadings();
+        addToast('success', 'Lançamento estornado com sucesso');
+        SettingsCache.refreshBalances();
+        ledgerService.onTransactionChange('delete', { id: txId } as any);
+        
+        // Sincronização final
+        await refreshData();
+      } catch (err) {
+        console.error('Erro ao estornar:', err);
+        addToast('error', 'Falha ao estornar lançamento');
+      }
     },
     handleSaveNewLoading: async (loading: Loading) => {
       loadingService.add(loading);
-      await refreshLoadings();
+      await refreshData();
     },
     handleDeleteLoading: async (loadingId: string) => {
       await loadingService.delete(loadingId);
-      await refreshLoadings();
+      await refreshData();
     },
     confirmFinalize: async () => {
-      await purchaseService.update({ ...currentOrder, status: 'completed' });
-      setIsFinalizePromptOpen(false);
-      await refreshLoadings();
-      onFinalizeCallback();
+      // ✅ HARD GUARD: Impede finalização se houver saldo devedor
+      if (stats.balancePartner > 0.05) {
+        addToast('error', 'Não é possível finalizar', 'O pedido possui saldo devedor pendente.');
+        setIsFinalizePromptOpen(false);
+        return;
+      }
+
+      setIsProcessing(true);
+      try {
+        await purchaseService.update({ ...order, status: 'completed' });
+        setIsFinalizePromptOpen(false);
+        addToast('success', 'Pedido Finalizado');
+        await refreshData();
+        onFinalizeCallback();
+      } finally {
+        setIsProcessing(false);
+      }
+    },
+    handleReopen: async () => {
+      if (isProcessing) return;
+      setIsProcessing(true);
+      try {
+        await purchaseService.update({ ...order, status: 'approved' });
+        addToast('success', 'Pedido Reaberto');
+        await refreshData();
+      } catch (err) {
+        addToast('error', 'Falha ao reabrir pedido');
+      } finally {
+        setIsProcessing(false);
+      }
+    },
+    handleCancel: async (reason?: string) => {
+      if (isProcessing) return;
+      setIsProcessing(true);
+      try {
+        const result = await purchaseService.cancel(order.id, reason);
+        if (result.success) {
+          addToast('success', 'Pedido Cancelado', 'O pedido e os lançamentos financeiros vinculados foram invalidados.');
+          await refreshData();
+        } else {
+          addToast('error', 'Erro ao cancelar', result.error);
+        }
+      } catch (err) {
+        addToast('error', 'Falha ao cancelar pedido');
+      } finally {
+        setIsProcessing(false);
+      }
     }
   };
 
-  return { currentOrder, loadings, stats, mergedTransactions, isFinalizePromptOpen, setIsFinalizePromptOpen, actions };
+  return { currentOrder: order, loadings, stats, mergedTransactions, isFinalizePromptOpen, setIsFinalizePromptOpen, isProcessing, actions };
 };

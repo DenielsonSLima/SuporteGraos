@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { X, Download, Loader2, UserCheck, ShieldCheck } from 'lucide-react';
 import { Loading } from '../../../Loadings/types';
 import { loadingService } from '../../../../services/loadingService';
+import { useLoadingsByPurchaseOrder, useLoadingsBySalesOrder } from '../../../../hooks/useLoadings';
 import { pdf } from '@react-pdf/renderer';
 import { saveAs } from 'file-saver';
 import PdfDocument from './PdfDocument';
@@ -30,12 +31,13 @@ const PdfPreviewModal: React.FC<Props> = ({ isOpen, onClose, order, variant }) =
     return (loadings || []).map(l => l.id).join(',');
   }, [loadings]);
 
+  const isSalesOrderCheck = !!(order as any).customerName;
+  const { data: purchaseLoadings = [] } = useLoadingsByPurchaseOrder(!isSalesOrderCheck ? order?.id : undefined);
+  const { data: salesLoadings = [] } = useLoadingsBySalesOrder(isSalesOrderCheck ? order?.id : undefined);
+  
   useEffect(() => {
     if (isOpen && order?.id) {
-      const isSales = !!(order as any).customerName;
-      const list = isSales
-        ? loadingService.getBySalesOrder(order.id)
-        : loadingService.getByPurchaseOrder(order.id);
+      const list = isSalesOrderCheck ? salesLoadings : purchaseLoadings;
       
       // Só atualiza se a lista for diferente (compara IDs para estabilidade)
       const currentIds = list.map(l => l.id).join(',');
@@ -44,7 +46,7 @@ const PdfPreviewModal: React.FC<Props> = ({ isOpen, onClose, order, variant }) =
         setLoadings(list);
       }
     }
-  }, [isOpen, order?.id]);
+  }, [isOpen, order?.id, purchaseLoadings, salesLoadings, isSalesOrderCheck]);
 
   useEffect(() => {
     let url: string | null = null;

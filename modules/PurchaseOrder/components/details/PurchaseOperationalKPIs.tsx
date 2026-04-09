@@ -22,7 +22,7 @@ const PurchaseOperationalKPIs: React.FC<Props> = ({ totalLoaded, totalSettled, t
                 <Scale size={16} className="text-blue-500" />
             </div>
             <h3 className="text-xl font-black text-slate-900 tracking-tighter">{currency(totalLoaded)}</h3>
-            <p className="text-[8px] text-slate-400 font-bold mt-1 uppercase italic">Dívida bruta gerada</p>
+            <p className="text-[8px] text-slate-400 font-bold mt-1 uppercase">Dívida bruta gerada</p>
         </div>
 
         {/* VALOR PAGO PRODUTOR */}
@@ -56,7 +56,7 @@ const PurchaseOperationalKPIs: React.FC<Props> = ({ totalLoaded, totalSettled, t
                 </h3>
             )}
             
-            <p className="text-[8px] text-slate-400 font-bold mt-1 uppercase italic">
+            <p className="text-[8px] text-slate-400 font-bold mt-1 uppercase">
                 {advanceBalance > 0 ? 'Valor pago a maior que o carregado' : 'Valor a liquidar na origem'}
             </p>
         </div>

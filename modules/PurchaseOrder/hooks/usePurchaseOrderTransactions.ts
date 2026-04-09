@@ -38,41 +38,54 @@ export function usePurchaseOrderTransactions(purchaseOrderId: string) {
                 }
             }
 
-            // Busca a entry relativa a este pedido (SINGLE SOURCE OF TRUTH)
-            const { data: entries } = await supabase
-                .from('financial_entries')
-                .select('id')
-                .eq('origin_id', resolvedOrderId)
-                .eq('origin_type', 'purchase_order');
+            // Busca transações VIA LINKS (Robusto para Foundation V2)
+            // Isso garante que despesas extras (sem entry_id) apareçam na UI.
+            const { data: links, error: linkError } = await supabase
+                .from('financial_links')
+                .select(`
+                    transaction_id,
+                    link_type,
+                    metadata,
+                    transaction:financial_transactions(*)
+                `)
+                .eq('purchase_order_id', resolvedOrderId)
+                .order('created_at', { ascending: false });
 
-            if (!entries || entries.length === 0) return [];
-
-            const entryIds = entries.map(e => e.id);
-
-            // Busca as transações dessas entries
-            const { data: txs } = await supabase
-                .from('financial_transactions')
-                .select('*')
-                .in('entry_id', entryIds)
-                .order('transaction_date', { ascending: false });
-
-            if (!txs) return [];
+            if (linkError || !links) return [];
 
             // Mapear para o tipo OrderTransaction esperado pela UI do Pedido de Compra
-            return txs.map((tx: any): OrderTransaction => ({
-                id: tx.id,
-                type: tx.type === 'IN' ? 'receipt' : 'payment',
-                date: tx.transaction_date,
-                value: Number(tx.amount),
-                discountValue: 0, // No metadata legacy o desconto fica no objeto, no core SQL ele é uma entry/tx separada ou abatimento na entry
-                accountId: tx.account_id || tx.bank_account_id,
-                accountName: tx.description?.split(' [')[0] || 'Caixa',
-                notes: tx.description,
-                status: 'active'
-            }));
+            return links
+                .filter(l => l.transaction) // Garante que a transação existe
+                .map((l: any): OrderTransaction => {
+                    const tx = l.transaction;
+                    const metadata = l.metadata || {};
+
+                    // ✅ Determinar tipo real: se no link for 'expense' ou se houver metadata de expense
+                    const isExpense = l.link_type === 'expense' || metadata.expenseId || 
+                                     (tx.description && (tx.description.includes('Despesa Extra') || tx.description.includes('Taxa')));
+                    const isCommission = metadata.subType === 'commission';
+                    
+                    const getType = () => {
+                        if (isCommission) return 'commission';
+                        if (isExpense) return 'expense';
+                        return tx.type === 'IN' ? 'receipt' : 'payment';
+                    };
+
+                    return {
+                        id: tx.id,
+                        type: getType(),
+                        date: tx.transaction_date,
+                        value: Number(tx.amount),
+                        discountValue: Number(metadata.discount || 0),
+                        accountId: tx.account_id,
+                        accountName: tx.description?.split(' [')[0] || 'Caixa',
+                        notes: tx.description,
+                        status: 'active',
+                        deductFromPartner: metadata.deductFromPartner ?? false
+                    };
+                });
         },
         enabled: !!purchaseOrderId,
         staleTime: 0,
-        placeholderData: keepPreviousData,
     });
 }

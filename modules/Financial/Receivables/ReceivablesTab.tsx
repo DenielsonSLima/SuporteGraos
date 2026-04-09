@@ -50,43 +50,28 @@ const ReceivablesTab: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
 
   const PAGE_SIZE = 100;
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [currentPage, setCurrentPage] = useState(1);
 
-  const { data: rawReceivables = [], isLoading: loading } = useReceivables();
+  const { data: rawReceivables = [], isLoading: loading } = useReceivables({
+    startDate: activeSubTab === 'all' ? (startDate || undefined) : undefined,
+    endDate: activeSubTab === 'all' ? (endDate || undefined) : undefined,
+    search: activeSubTab === 'all' ? (searchTerm || undefined) : undefined,
+    status: activeSubTab === 'open' ? 'open' : undefined, // Otimização extra: filtra abertos no server
+    page: currentPage - 1,
+    pageSize: PAGE_SIZE
+  });
+  
   const records = useMemo(() => rawReceivables.map(toFinancialRecord), [rawReceivables]);
 
 
 
-  const filteredRecords = useMemo(() => {
-    let result = records;
-    if (activeSubTab === 'open') {
-      result = result.filter(r => r.status !== 'paid');
-    }
+  const paginatedRecords = records;
 
-    if (activeSubTab === 'all') {
-      const searchLower = searchTerm.toLowerCase();
-      result = result.filter(r => {
-        const d = r.dueDate || r.issueDate || '';
-        if (startDate && d < startDate) return false;
-        if (endDate && d > endDate) return false;
-        if (searchTerm) {
-          return r.entityName.toLowerCase().includes(searchLower) ||
-            r.description.toLowerCase().includes(searchLower);
-        }
-        return true;
-      });
-    }
-    return result;
-  }, [records, activeSubTab, startDate, endDate, searchTerm]);
+  const hasMore = records.length >= PAGE_SIZE;
 
-  const paginatedRecords = useMemo(() => {
-    if (activeSubTab !== 'all') return filteredRecords;
-    return filteredRecords.slice(0, visibleCount);
-  }, [filteredRecords, activeSubTab, visibleCount]);
-
-  const hasMore = activeSubTab === 'all' && filteredRecords.length > visibleCount;
-
-  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [startDate, endDate, searchTerm]);
+  useEffect(() => { 
+    setCurrentPage(1); 
+  }, [startDate, endDate, searchTerm, activeSubTab]);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
@@ -156,11 +141,12 @@ const ReceivablesTab: React.FC = () => {
           {(startDate || endDate || searchTerm) && (
             <div className="px-6 py-2 flex justify-end">
               <span className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] italic">
-                Exibindo {filteredRecords.length} recebimento{filteredRecords.length !== 1 ? 's' : ''} localizado{filteredRecords.length !== 1 ? 's' : ''}
+                Resultados filtrados no servidor
               </span>
             </div>
           )}
         </div>
+
       )}
 
       {/* Record Manager */}
@@ -175,21 +161,23 @@ const ReceivablesTab: React.FC = () => {
       </div>
 
       {/* Paginação Histórico */}
-      {activeSubTab === 'all' && filteredRecords.length > 0 && (
+      {records.length > 0 && (
         <div className="flex flex-col items-center gap-3 py-10">
           <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">
-            Exibindo {paginatedRecords.length} de {filteredRecords.length} registros
+            Exibindo página {currentPage}
           </span>
           {hasMore && (
             <button
-              onClick={() => setVisibleCount(prev => prev + PAGE_SIZE)}
-              className="px-12 py-4 rounded-[1.5rem] text-[10px] font-black uppercase tracking-[0.2em] border-2 border-slate-200 text-slate-600 hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-all shadow-xl active:scale-95"
+              onClick={() => setCurrentPage(prev => prev + 1)}
+              disabled={loading}
+              className="px-12 py-4 rounded-[1.5rem] text-[10px] font-black uppercase tracking-[0.2em] border-2 border-slate-200 text-slate-600 hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-all shadow-xl active:scale-95 disabled:opacity-50"
             >
-              Carregar Mais Resultados
+              {loading ? 'Carregando...' : 'Carregar Mais Resultados'}
             </button>
           )}
         </div>
       )}
+
     </div>
   );
 };

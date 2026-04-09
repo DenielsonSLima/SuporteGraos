@@ -29,11 +29,17 @@ export class FinancialCache {
   private static cache: CachedData | null = null;
   private static readonly TTL = 10_000; // 10 segundos — alinhado com DashboardCache
 
-  private static load(): void {
+  private static async load(): Promise<void> {
+    const [payables, receivables, standaloneRecords] = await Promise.all([
+      financialIntegrationService.getPayables(),
+      financialIntegrationService.getReceivables(),
+      financialActionService.getStandaloneRecords()
+    ]);
+
     this.cache = {
-      payables: financialIntegrationService.getPayables(),
-      receivables: financialIntegrationService.getReceivables(),
-      standaloneRecords: financialActionService.getStandaloneRecords(),
+      payables,
+      receivables,
+      standaloneRecords,
       timestamp: Date.now()
     };
   }
@@ -43,18 +49,18 @@ export class FinancialCache {
     return (Date.now() - this.cache.timestamp) < this.TTL;
   }
 
-  static getPayables(): any[] {
-    if (!this.isValid()) this.load();
+  static async getPayables(): Promise<any[]> {
+    if (!this.isValid()) await this.load();
     return this.cache!.payables;
   }
 
-  static getReceivables(): any[] {
-    if (!this.isValid()) this.load();
+  static async getReceivables(): Promise<any[]> {
+    if (!this.isValid()) await this.load();
     return this.cache!.receivables;
   }
 
-  static getStandaloneRecords(): any[] {
-    if (!this.isValid()) this.load();
+  static async getStandaloneRecords(): Promise<any[]> {
+    if (!this.isValid()) await this.load();
     return this.cache!.standaloneRecords;
   }
 

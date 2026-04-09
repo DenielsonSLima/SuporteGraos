@@ -19,8 +19,8 @@ const openFreightsReport: ReportModule = {
     endDate: new Date().toISOString().split('T')[0],
   },
   FilterComponent: DefaultFilters,
-  fetchData: ({ startDate, endDate }) => {
-    const all = reportsCache.getAllLoadings();
+  fetchData: async ({ startDate, endDate }) => {
+    const all = await reportsCache.getAllLoadings();
     const records = all.filter(l => {
       const isPending = l.status !== 'completed' || (l.totalFreightValue - l.freightPaid) > 0.05;
       const matchesDate = (!startDate || l.date >= startDate) && (!endDate || l.date <= endDate);

@@ -184,7 +184,7 @@ const AdvanceForm: React.FC<Props> = ({ isOpen, onClose, onSave }) => {
                   >
                     <option value="">Selecione o parceiro...</option>
                     {[...partners].sort((a, b) => a.name.localeCompare(b.name)).map(p => (
-                      <option key={p.id} value={p.id}>{p.name} ({p.type})</option>
+                      <option key={p.id} value={p.id}>{p.name} {p.nickname ? `• ${p.nickname}` : ''} ({p.type})</option>
                     ))}
                   </select>
                   <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" size={18} />

@@ -2,7 +2,7 @@
 import React from 'react';
 import { X } from 'lucide-react';
 import { PurchaseOrder } from '../types';
-import { loadingService } from '../../../services/loadingService';
+import { useLoadingsByPurchaseOrder } from '../../../hooks/useLoadings';
 import ModalPortal from '../../../components/ui/ModalPortal';
 
 interface Props {
@@ -13,9 +13,9 @@ interface Props {
 }
 
 const OrderDeleteModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, order }) => {
-  if (!isOpen || !order) return null;
+  const { data: linkedLoadings = [] } = useLoadingsByPurchaseOrder(order?.id);
 
-  const linkedLoadings = loadingService.getByPurchaseOrder(order.id);
+  if (!isOpen || !order) return null;
   const financialCount = (order.transactions || []).length;
   const hasPaidValue = (order.paidValue || 0) > 0;
   

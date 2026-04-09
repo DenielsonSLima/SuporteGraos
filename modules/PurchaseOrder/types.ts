@@ -49,6 +49,7 @@ export interface PurchaseOrder {
   // Partner Info
   partnerId: string;
   partnerName: string;
+  partnerNickname?: string;
   partnerDocument: string; 
   partnerCity: string; 
   partnerState: string;
@@ -82,10 +83,17 @@ export interface PurchaseOrder {
   totalPurchaseValCalc?: number;
   totalFreightValCalc?: number;
   totalSalesValCalc?: number;
+  totalInTransitValCalc?: number;
   totalKg?: number;
   totalSc?: number;
 
   // Notes System
   notes?: string; 
   notesList?: OrderNote[]; 
+
+  /** Dados extras: expenses, flags de sincronização, etc */
+  metadata?: {
+    expenses?: any[];
+    [key: string]: any;
+  };
 }

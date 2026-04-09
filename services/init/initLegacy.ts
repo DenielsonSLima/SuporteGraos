@@ -48,84 +48,37 @@ const withTimeout = async <T,>(promise: Promise<T>, serviceName: string, timeout
 };
 
 export const loadLegacyData = async (stats: InitStats) => {
+  // =========================================================================
+  // IMPORTS CRÍTICOS — apenas o essencial para a UI funcionar no login.
+  // Pedidos, financeiro completo e logs são carregados sob demanda nos módulos.
+  // =========================================================================
   const [
-    transporterModule,
-    vehicleModule,
-    driverModule,
-    shareholderModule,
-    partnerAddressModule,
     partnerModule,
-    salesModule,
-    assetModule,
-    loadingModule,
-    advancesModule,
-    receivablesModule,
-    payablesModule,
-    transfersModule,
-    loansModule,
-    financialHistoryModule,
-    purchaseModule,
-    standaloneModule,
-    auditModule,
-    logModule,
-    settingsModule,
     bankAccountModule,
-    expenseCategoryModule,
-    initialBalanceModule,
-    classificationModule,
+    settingsModule,
     locationModule,
-    reconciliationModule,
-    payablesReconciliationModule,
-    creditModule,
-    loginScreenModule,
-    reportAuditModule,
-    ledgerModule,
-    financialTransactionModule,
+    expenseCategoryModule,
+    loadingModule,
+    transporterModule,
+    driverModule,
+    vehicleModule,
   ] = await Promise.all([
-    import('../transporterService'),
-    import('../vehicleService'),
-    import('../driverService'),
-    import('../shareholderService'),
-    import('../partnerAddress/index'),
     import('../partnerService'),
-    import('../salesService'),
-    import('../assetService'),
-    import('../loadingService'),
-    import('../financial/advancesService'),
-    import('../financial/receivablesService'),
-    import('../financial/payablesService'),
-    import('../financial/transfersService'),
-    import('../financial/loansService'),
-    import('../financial/financialHistoryService'),
-    import('../purchaseService'),
-    import('../standaloneRecordsService'),
-    import('../auditService'),
-    import('../logService'),
-    import('../settingsService'),
     import('../bankAccountService'),
-    import('../expenseCategoryService'),
-    import('../initialBalanceService'),
-    import('../classificationService'),
+    import('../settingsService'),
     import('../locationService'),
-    import('../receivablesReconciliationService'),
-    import('../payablesReconciliationService'),
-    import('../financial/creditService'),
-    import('../loginScreenService'),
-    import('../reportAuditService'),
-    import('../ledgerService'),
-    import('../financial/financialTransactionService'),
+    import('../expenseCategoryService'),
+    import('../loadingService'),
+    import('../transporterService'),
+    import('../driverService'),
+    import('../vehicleService'),
   ]);
 
   const criticalStartTime = performance.now();
 
-  if (typeof financialTransactionModule.financialTransactionService?.normalizeLegacyTransferTypesAndRecalculate === 'function') {
-    void withTimeout(
-      financialTransactionModule.financialTransactionService.normalizeLegacyTransferTypesAndRecalculate(),
-      'financialTransactionService.normalizeLegacyTransferTypesAndRecalculate',
-      CRITICAL_TIMEOUT_MS
-    );
-  }
-
+  // =========================================================================
+  // FASE CRÍTICA — máximo 5 serviços essenciais para os formulários funcionarem.
+  // =========================================================================
   const criticalPromises: Promise<any>[] = [];
   const addCrit = (mod: any, name: string) => {
     if (typeof mod?.loadFromSupabase === 'function') {
@@ -133,26 +86,25 @@ export const loadLegacyData = async (stats: InitStats) => {
     }
   };
 
+  // Parceiros (id+nome): necessário para selects de pedido e romaneio
   addCrit(partnerModule.partnerService, 'partnerService');
-  addCrit(purchaseModule.purchaseService, 'purchaseService');
-  addCrit(salesModule.salesService, 'salesService');
-  addCrit(loadingModule.loadingService, 'loadingService');
-  addCrit(payablesModule.payablesService, 'payablesService');
-  addCrit(receivablesModule.receivablesService, 'receivablesService');
-  addCrit(transfersModule.transfersService, 'transfersService');
-  
-  if (typeof standaloneModule.standaloneRecordsService?.initialize === 'function') {
-    criticalPromises.push(withTimeout(standaloneModule.standaloneRecordsService.initialize(), 'standaloneRecordsService', CRITICAL_TIMEOUT_MS));
-  }
-  if (typeof ledgerModule.ledgerService?.recalculateBalances === 'function') {
-    criticalPromises.push(withTimeout(ledgerModule.ledgerService.recalculateBalances(), 'ledgerService', CRITICAL_TIMEOUT_MS));
-  }
+  // Contas bancárias: necessário para formulários de pagamento
+  addCrit(bankAccountModule.bankAccountService, 'bankAccountService');
+  // Configurações: regras de negócio gerais
+  addCrit(settingsModule.settingsService, 'settingsService');
+  // UFs e cidades: necessário para selects de endereço
+  addCrit(locationModule.locationService, 'locationService');
+  // Categorias de despesas: necessário para formulários financeiros
+  addCrit(expenseCategoryModule.expenseCategoryService, 'expenseCategoryService');
 
   await Promise.allSettled(criticalPromises);
   initDiagnostics.setCriticalTime(performance.now() - criticalStartTime);
   initDiagnostics.setCriticalCompleted(true);
 
-  // Background Load
+  // =========================================================================
+  // BACKGROUND — dados operacionais de referência (tabelas pequenas).
+  // Financeiro completo, pedidos e logs são lazy-loaded pelos módulos.
+  // =========================================================================
   const runBackground = async () => {
     const bgStart = performance.now();
     const bgPromises: Promise<any>[] = [];
@@ -162,41 +114,55 @@ export const loadLegacyData = async (stats: InitStats) => {
       }
     };
 
+    // Dados de referência operacional — tabelas pequenas, essenciais nos formulários
     addBg(transporterModule.transporterService, 'transporterService');
-    addBg(vehicleModule.vehicleService, 'vehicleService');
     addBg(driverModule.driverService, 'driverService');
-    addBg(shareholderModule.shareholderService, 'shareholderService');
-    addBg(partnerAddressModule.partnerAddressService, 'partnerAddressService');
-    addBg(assetModule.assetService, 'assetService');
-    addBg(advancesModule.advancesService, 'advancesService');
-    addBg(loansModule.loansService, 'loansService');
-    addBg(financialHistoryModule.financialHistoryService, 'financialHistoryService');
-    addBg(settingsModule.settingsService, 'settingsService');
-    addBg(bankAccountModule.bankAccountService, 'bankAccountService');
-    addBg(initialBalanceModule.initialBalanceService, 'initialBalanceService');
-    addBg(expenseCategoryModule.expenseCategoryService, 'expenseCategoryService');
-    addBg(classificationModule.classificationService, 'classificationService');
-    addBg(locationModule.locationService, 'locationService');
+    addBg(vehicleModule.vehicleService, 'vehicleService');
+    // Romaneios: listagem inicial do módulo logístico
+    addBg(loadingModule.loadingService, 'loadingService');
+
+    // REMOVIDOS DO CARREGAMENTO AUTOMÁTICO (lazy — cada módulo carrega ao montar):
+    // purchaseService     → módulo PedidoCompra
+    // salesService        → módulo PedidoVenda
+    // payablesService     → módulo Financeiro/Pagar
+    // receivablesService  → módulo Financeiro/Receber
+    // transfersService    → módulo Financeiro/Transferências
+    // loansService        → módulo Financeiro/Empréstimos
+    // financialHistoryService → módulo Financeiro
+    // advancesService     → módulo Financeiro/Adiantamentos
+    // ledgerService       → dispensável no background
+    // standaloneRecordsService → dispensável no background
+    // shareholderService  → dispensável no background
+    // partnerAddressService → carregado sob demanda
+    // assetService        → carregado sob demanda
+    // creditModule        → carregado sob demanda
+    // auditModule         → logs consultados sob demanda, sem realtime
+    // logModule           → logs consultados sob demanda, sem realtime
+    // reportAuditModule   → consultado sob demanda
+    // loginScreenModule   → sem realtime necessário
+    // reconciliationModule → dispensável no background
 
     await Promise.allSettled(bgPromises);
     initDiagnostics.setBackgroundTime(performance.now() - bgStart);
 
-    // Realtime Start
+    // =========================================================================
+    // REALTIME — apenas dados de referência operacional.
+    // Pedidos e financeiro iniciam realtime dentro de cada módulo.
+    // =========================================================================
     const startRealtime = (mod: any) => {
       if (typeof mod?.startRealtime === 'function') mod.startRealtime();
     };
 
     [
-      transporterModule.transporterService, vehicleModule.vehicleService, driverModule.driverService,
-      shareholderModule.shareholderService, partnerAddressModule.partnerAddressService, partnerModule.partnerService,
-      salesModule.salesService, assetModule.assetService, loadingModule.loadingService,
-      advancesModule.advancesService, receivablesModule.receivablesService, payablesModule.payablesService,
-      transfersModule.transfersService, loansModule.loansService, financialHistoryModule.financialHistoryService,
-      purchaseModule.purchaseService, auditModule.auditService, logModule.logService,
-      settingsModule.settingsService, bankAccountModule.bankAccountService, ledgerModule.ledgerService,
-      initialBalanceModule.initialBalanceService, locationModule.locationService,
-      expenseCategoryModule.expenseCategoryService, classificationModule.classificationService,
-      creditModule.default, loginScreenModule.loginScreenService, reportAuditModule.reportAuditService
+      transporterModule.transporterService,
+      driverModule.driverService,
+      vehicleModule.vehicleService,
+      partnerModule.partnerService,
+      settingsModule.settingsService,
+      bankAccountModule.bankAccountService,
+      loadingModule.loadingService,
+      locationModule.locationService,
+      expenseCategoryModule.expenseCategoryService,
     ].forEach(startRealtime);
 
     initDiagnostics.setFullCompleted(true);

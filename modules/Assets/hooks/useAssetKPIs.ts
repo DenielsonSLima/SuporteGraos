@@ -17,7 +17,9 @@
  */
 
 import { useMemo } from 'react';
-import { useStandaloneRecords } from '../../../hooks/useFinancialActions';
+import { useQuery } from '@tanstack/react-query';
+import { assetKpiService } from '../../../services/assetKpiService';
+import { authService } from '../../../services/authService';
 import type { Asset } from '../types';
 import type { FinancialRecord } from '../../Financial/types';
 
@@ -47,45 +49,44 @@ export interface AssetDetailStats {
 
 /**
  * KPIs gerais do módulo patrimônio (lista de ativos).
- * TODO: substituir por RPC rpc_asset_kpis(company_id)
+ * Centralizado no Banco de Dados via RPC.
  */
-export function useAssetKPIs(assets: Asset[]): AssetKPIData {
-  const { data: standaloneRecords = [] } = useStandaloneRecords();
+export function useAssetKPIs(_assets: Asset[] = []): AssetKPIData {
+  const user = authService.getCurrentUser();
+  const companyId = user?.companyId || '';
 
-  return useMemo(() => {
-    const activeAssets = assets.filter(a => a.status === 'active');
-    const totalFixedValue = activeAssets.reduce((acc, a) => acc + a.acquisitionValue, 0);
+  const { data } = useQuery({
+    queryKey: ['assets', 'summary', companyId],
+    queryFn: () => assetKpiService.getSummary(companyId),
+    enabled: !!companyId,
+    staleTime: 30000, // 30 segundos
+  });
 
-    const soldAssetsWithPending = assets.filter(a => {
-      if (a.status !== 'sold') return false;
-      return standaloneRecords.some((r: FinancialRecord) => r.assetId === a.id && r.status !== 'paid');
-    });
-    const totalSoldOpen = soldAssetsWithPending.reduce((acc, a) => acc + (a.saleValue || 0), 0);
-
-    const totalPendingReceipt = standaloneRecords
-      .filter((r: FinancialRecord) => r.assetId && assets.some(a => a.id === r.assetId && a.status === 'sold'))
-      .reduce((acc: number, r: FinancialRecord) => acc + (r.remainingValue || 0), 0);
-
-    return {
-      totalFixedValue,
-      totalSoldOpen,
-      totalPendingReceipt,
-      activeCount: activeAssets.length,
-      soldCount: soldAssetsWithPending.length,
-    };
-  }, [assets, standaloneRecords]);
+  return data || {
+    totalFixedValue: 0,
+    totalSoldOpen: 0,
+    totalPendingReceipt: 0,
+    activeCount: 0,
+    soldCount: 0,
+  };
 }
 
 /**
  * Stats detalhados de um ativo específico (tela de detalhes).
- * TODO: substituir por RPC rpc_asset_detail_stats(asset_id)
+ * Centralizado no Banco de Dados via RPC.
  */
-export function useAssetDetailStats(asset: Asset, financialHistory: FinancialRecord[]): AssetDetailStats {
-  return useMemo(() => {
+export function useAssetDetailStats(asset: Asset, _financialHistory: FinancialRecord[] = []): AssetDetailStats {
+  const { data } = useQuery({
+    queryKey: ['assets', 'detail-stats', asset.id],
+    queryFn: () => assetKpiService.getDetailStats(asset.id),
+    enabled: !!asset.id,
+    staleTime: 15000,
+  });
+
+  const fallback = useMemo(() => {
     const totalSold = asset.saleValue || 0;
-    const totalReceived = financialHistory.reduce((acc, r) => acc + r.paidValue, 0);
-    const totalPending = Math.max(0, totalSold - totalReceived);
-    const progress = totalSold > 0 ? (totalReceived / totalSold) * 100 : 0;
-    return { totalSold, totalReceived, totalPending, progress };
-  }, [asset, financialHistory]);
+    return { totalSold, totalReceived: 0, totalPending: totalSold, progress: 0 };
+  }, [asset]);
+
+  return data || fallback;
 }

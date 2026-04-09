@@ -45,6 +45,15 @@ const ShareholderDetails: React.FC<Props> = ({ shareholder: initialShareholder, 
   const updateTransaction = useUpdateShareholderTransaction();
   const deleteTransaction = useDeleteShareholderTransaction();
 
+  // ✅ Hooks de Estado
+  const [editingTx, setEditingTx] = useState<ShareholderTransaction | null>(null);
+  const [deletingTx, setDeletingTx] = useState<ShareholderTransaction | null>(null);
+  const [isEditCreditOpen, setIsEditCreditOpen] = useState(false);
+  const [isEditDebitOpen, setIsEditDebitOpen] = useState(false);
+
+  // ✅ ZERO CÁLCULO FINANCEIRO NO FRONTEND — totais via RPC server-side
+  const { data: shareholderTotals } = useShareholderTotals(shareholder.id);
+
   if (isLoadingFull && !fullShareholder) {
     return (
       <div className="flex flex-col items-center justify-center p-20 text-slate-400">
@@ -53,14 +62,6 @@ const ShareholderDetails: React.FC<Props> = ({ shareholder: initialShareholder, 
       </div>
     );
   }
-  
-  // Estado para Edição
-  const [editingTx, setEditingTx] = useState<ShareholderTransaction | null>(null);
-  const [deletingTx, setDeletingTx] = useState<ShareholderTransaction | null>(null);
-  
-  // Modais de Edição
-  const [isEditCreditOpen, setIsEditCreditOpen] = useState(false);
-  const [isEditDebitOpen, setIsEditDebitOpen] = useState(false);
 
   const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
   
@@ -73,8 +74,6 @@ const ShareholderDetails: React.FC<Props> = ({ shareholder: initialShareholder, 
     return `${day}/${month}/${year}`;
   };
 
-  // ✅ ZERO CÁLCULO FINANCEIRO NO FRONTEND — totais via RPC server-side
-  const { data: shareholderTotals } = useShareholderTotals(shareholder.id);
   const totalCredits = shareholderTotals?.totalCredits ?? 0;
   const totalDebits = shareholderTotals?.totalDebits ?? 0;
 

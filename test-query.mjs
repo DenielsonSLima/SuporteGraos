@@ -1,0 +1,1 @@
+import { createClient } from '@supabase/supabase-js'; const supabase = createClient('https://vqhjbsiwzgxaozcedqcn.supabase.co', 'sb_publishable_m8MBqafWFUIhbSmhatvDYw_NWrO_E8V'); supabase.from('ops_loadings').select('*, purchase_order:ops_purchase_orders(id)').limit(1).then(res => console.log(res.error || res.data));

@@ -1,5 +1,5 @@
-
-import { generateTxId, registerFinancialRecords } from './orchestratorHelpers';
+import { supabase } from '../../supabase';
+import { generateTxId, registerFinancialRecords, resolveAccountId } from './orchestratorHelpers';
 import type { PaymentData, PaymentResult } from './orchestratorTypes';
 import { isSqlCanonicalOpsEnabled, sqlCanonicalOpsLog } from '../../sqlCanonicalOps';
 import { FinancialRecord, FinancialStatus } from '../../../modules/Financial/types';
@@ -46,67 +46,77 @@ export const handleStandalonePayment = async (
 
   // --- 2. Descrição padronizada ---
   const entityName = data.entityName || standalone?.entityName || 'Despesa';
-  const description = `Pagamento: ${standalone?.description || entityName}`;
+  const description = `${data.notes || standalone?.description || entityName}`;
 
   // --- 3. Registrar via Orquestrador (Foundation V2) ---
-  // Financial Transaction Trigger cuida do saldo.
-  // Financial Links vincula ao registro standalone.
-  await registerFinancialRecords({
-    txId,
-    date: data.date,
-    amount: transactionValue,
-    discount: discountValue,
-    accountId: data.accountId,
-    accountName: data.accountName,
-    type: 'payment',
-    recordId,
-    referenceType: standalone?.subType || 'admin',
-    referenceId: recordId,
-    description,
-    historyType: 'Despesa Administrativa',
-    entityName,
-    partnerId: data.partnerId,
-    notes: data.notes,
-    companyId: standalone?.companyId
-  });
+  // Se não houver 'entry' (ex: despesa avulsa), o orquestrador Legacy cuida do saldo via FinancialTransaction trigger.
+  // Se houver 'entry', o RPC de pagamento cuida disso.
+  
+  // Tenta encontrar a financial_entry para decidir se fazemos o registro direto ou via RPC
+  const targetOriginId = recordId;
+  const { data: entries } = await supabase
+    .from('financial_entries')
+    .select('id, type')
+    .eq('origin_id', targetOriginId);
 
-  // ✅ SINGLE LEDGER: Processar o pagamento e desconto no banco de dados via RPC
-  try {
-    const { supabase } = await import('../../supabase');
+  const entry = entries?.[0];
 
-    // Tenta encontrar a financial_entry correta:
-    // Para Standalone, origin_id = recordId
-    const targetOriginId = recordId;
+  if (entry && data.accountId) {
+    // Via RPC Modular (Atômico) - SQL-First
+    await supabase.rpc('rpc_ops_financial_process_action', {
+      p_entry_id: entry.id,
+      p_account_id: data.accountId,
+      p_amount: transactionValue,
+      p_discount: discountValue,
+      p_date: data.date,
+      p_description: description,
+      p_tx_id: txId
+    });
 
-    const { data: entries } = await supabase
-      .from('financial_entries')
-      .select('id, type')
-      .eq('origin_id', targetOriginId);
-
-    const entry = entries?.[0];
-
-    if (entry && data.accountId) {
-      if (transactionValue > 0) {
-        await supabase.rpc('pay_financial_entry', {
-          p_entry_id: entry.id,
-          p_account_id: data.accountId,
-          p_amount: transactionValue,
-          p_description: description
-        });
-      }
-
-      if (discountValue > 0) {
-        await supabase.rpc('apply_discount_financial_entry', {
-          p_entry_id: entry.id,
-          p_amount: discountValue
-        });
-      }
-
-    } else {
-    }
-  } catch (err: any) {
-    console.error('[standaloneHandler] Erro no registro avulso:', err);
-    throw err;
+    // Registramos apenas o histórico/vínculo no modo Foundation
+    // registerFinancialRecords pulará a escrita no ledger se detectar que o RPC já fez
+    await registerFinancialRecords({
+      txId,
+      date: data.date,
+      amount: transactionValue,
+      discount: discountValue,
+      accountId: data.accountId,
+      accountName: data.accountName,
+      type: 'payment',
+      recordId,
+      referenceType: standalone?.subType || 'admin',
+      referenceId: recordId,
+      description,
+      historyType: 'Despesa Administrativa',
+      entityName,
+      partnerId: data.partnerId,
+      notes: data.notes,
+      companyId: standalone?.companyId
+    });
+  } else {
+    // Via Registro Direto (Fallback/Extra)
+    await registerFinancialRecords({
+      txId,
+      date: data.date,
+      amount: transactionValue,
+      discount: discountValue,
+      accountId: resolveAccountId(data.accountId),
+      accountName: data.accountName,
+      type: 'payment',
+      recordId,
+      referenceType: standalone?.subType || 'admin',
+      referenceId: recordId,
+      description,
+      historyType: 'Despesa Extra',
+      entityName,
+      partnerId: data.partnerId,
+      notes: data.notes,
+      companyId: standalone?.companyId,
+      metadata: { 
+        deductFromPartner: (data as any).deductFromPartner 
+      },
+      purchaseOrderId: data.purchaseOrderId
+    });
   }
 
   return { success: true, txId };

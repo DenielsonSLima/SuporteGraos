@@ -64,14 +64,23 @@ const SalesOrderCard: React.FC<Props> = React.memo(({ order, onClick, onDelete, 
         <div className="flex justify-between items-start mb-4">
           <div className="flex items-center gap-2">
             <span className="font-mono text-[10px] font-black text-slate-400 bg-slate-50 px-2 py-1 rounded-lg border border-slate-100">#{order.number}</span>
+          </div>
+          <div className="flex flex-col items-end gap-1.5">
+            <div className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase border ${status.bg} ${status.color} ${status.border} shadow-sm`}>{status.label}</div>
             <span className="text-[10px] text-slate-400 font-bold uppercase flex items-center gap-1"><Calendar size={12} /> {date(order.date)}</span>
           </div>
-          <div className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase border ${status.bg} ${status.color} ${status.border} shadow-sm`}>{status.label}</div>
         </div>
 
-        <h3 className="font-black text-slate-900 text-lg leading-tight line-clamp-1 mb-4 uppercase italic tracking-tighter" title={order.customerName}>
-          {order.customerName}
-        </h3>
+        <div className="mb-4">
+          <h3 className="font-black text-slate-900 text-lg leading-tight line-clamp-1 uppercase tracking-tighter" title={order.customerName}>
+            {order.customerName}
+          </h3>
+          {order.customerNickname && (
+            <div className="text-[11px] font-bold text-emerald-600/70 uppercase tracking-wider mt-0.5 line-clamp-1">
+              {order.customerNickname}
+            </div>
+          )}
+        </div>
 
         <div className="space-y-2 mt-4">
           <div className="flex items-center gap-2 text-xs text-slate-600 font-semibold uppercase tracking-tight">

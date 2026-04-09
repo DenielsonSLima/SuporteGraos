@@ -12,6 +12,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { salesService } from '../services/salesService';
+import { salesLoader } from '../services/sales/loader';
 import { QUERY_KEYS, STALE_TIMES } from './queryKeys';
 import { SalesOrder } from '../modules/SalesOrder/types';
 import { isSqlCanonicalOpsEnabled } from '../services/sqlCanonicalOps';
@@ -25,21 +26,44 @@ import { isSqlCanonicalOpsEnabled } from '../services/sqlCanonicalOps';
 //    até o staleTime expirar (5 min).
 const _salesListeners = new Set<() => void>();
 let _salesChannel: ReturnType<typeof supabase.channel> | null = null;
+let _invalidateTimer: any = null;
 
 function ensureSalesChannel() {
   if (_salesChannel) return;
   const tableName = isSqlCanonicalOpsEnabled() ? 'ops_sales_orders' : 'sales_orders';
+  
+  // Função para notificar todos os ouvintes com DEBOUNCE
+  // ⚡ Performance: evita refetch em cascata se o banco mudar 10x por segundo
+  const notifyListeners = (collection?: string, payload?: any) => {
+    // Se a mudança for em endereços, limpamos o cache de memória
+    if (collection === 'parceiros_enderecos') {
+      const partnerId = payload?.new?.partner_id || payload?.old?.partner_id;
+      salesLoader.invalidateAddressCache(partnerId);
+    }
+
+    if (_invalidateTimer) clearTimeout(_invalidateTimer);
+    _invalidateTimer = setTimeout(() => {
+      console.log(`[useSalesOrders] Invalidação disparada via Realtime (${collection || 'venda'})`);
+      _salesListeners.forEach(cb => cb());
+    }, 800); // 800ms de "sossego" antes de recarregar
+  };
+
   _salesChannel = supabase
     .channel(`realtime:${tableName}:hook`)
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: tableName },
-      () => _salesListeners.forEach(cb => cb()),
+      () => notifyListeners(),
+    )
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'parceiros_enderecos' },
+      (payload) => notifyListeners('parceiros_enderecos', payload),
     )
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'ops_loadings' },
-      () => _salesListeners.forEach(cb => cb()),
+      () => notifyListeners(),
     )
     .on(
       'postgres_changes',
@@ -49,12 +73,12 @@ function ensureSalesChannel() {
         table: 'financial_entries',
         filter: 'origin_type=eq.sales_order'
       },
-      () => _salesListeners.forEach(cb => cb()),
+      () => notifyListeners(),
     )
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'financial_transactions' },
-      () => _salesListeners.forEach(cb => cb()),
+      () => notifyListeners(),
     )
     .subscribe();
 }
@@ -74,7 +98,7 @@ function subscribeToSalesRealtime(onInvalidate: () => void): () => void {
 
 // ─── Hook principal ─────────────────────────────────────────────────────────
 
-export function useSalesOrders() {
+export function useSalesOrders(filters?: { statuses?: string[] }) {
   const queryClient = useQueryClient();
 
   // Realtime: invalida cache quando qualquer venda muda no banco
@@ -86,9 +110,9 @@ export function useSalesOrders() {
   }, [queryClient]);
 
   return useQuery<SalesOrder[]>({
-    queryKey: QUERY_KEYS.SALES_ORDERS,
+    queryKey: filters ? [...QUERY_KEYS.SALES_ORDERS, filters] : QUERY_KEYS.SALES_ORDERS,
     // Delega ao salesService que sabe lidar com modo canônico e enriquecimento
-    queryFn: () => salesService.loadFromSupabase(),
+    queryFn: () => salesService.loadFromSupabase(2, filters),
     staleTime: 1000 * 60 * 5, // ⚡ REALTIME: O canal via useEffect já invalida; não precisa de fetch constante
     placeholderData: (prev) => prev,      // Mantém dados antigos enquanto revalida
   });
@@ -118,7 +142,11 @@ export function useAddSalesOrder() {
   return useMutation({
     mutationFn: (sale: SalesOrder) => salesService.add(sale),
     onSuccess: async () => { 
-      await qc.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS });
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
+      ]);
     },
     onError: mutationErrorHandler,
   });
@@ -129,7 +157,11 @@ export function useUpdateSalesOrder() {
   return useMutation({
     mutationFn: (sale: SalesOrder) => salesService.update(sale),
     onSuccess: async () => { 
-      await qc.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS });
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
+      ]);
     },
     onError: mutationErrorHandler,
   });
@@ -140,7 +172,11 @@ export function useDeleteSalesOrder() {
   return useMutation({
     mutationFn: (id: string) => salesService.delete(id),
     onSuccess: async () => { 
-      await qc.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS });
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
+      ]);
     },
     onError: mutationErrorHandler,
   });
@@ -152,7 +188,11 @@ export function useUpdateSalesTransaction() {
     mutationFn: (params: { orderId: string; transaction: any }) =>
       salesService.updateTransaction(params.orderId, params.transaction),
     onSuccess: async () => { 
-      await qc.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS });
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
+      ]);
     },
     onError: mutationErrorHandler,
   });
@@ -165,7 +205,11 @@ export function useDeleteSalesTransaction() {
       await salesService.deleteTransaction(params.orderId, params.txId);
     },
     onSuccess: async () => { 
-      await qc.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS });
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
+      ]);
     },
     onError: mutationErrorHandler,
   });

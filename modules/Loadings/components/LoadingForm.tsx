@@ -83,7 +83,7 @@ const LoadingForm: React.FC<Props> = ({ purchaseOrder, onSave, onClose }) => {
     return formData.carrierId || '';
   }, [formData.isClientTransport, formData.salesOrderId, formData.carrierId, activeSales]);
 
-  const { data: rawDrivers = [] } = usePartnerDrivers(fleetPartnerId);
+  const { data: rawDrivers = [], isPending: isLoadingDrivers } = usePartnerDrivers(fleetPartnerId);
   const { data: rawVehicles = [] } = usePartnerVehicles(fleetPartnerId);
   const availableDrivers = useMemo(() => rawDrivers.filter(d => d.active !== false), [rawDrivers]);
   const availableVehicles = useMemo(() => rawVehicles.filter(v => v.active !== false), [rawVehicles]);
@@ -156,7 +156,7 @@ const LoadingForm: React.FC<Props> = ({ purchaseOrder, onSave, onClose }) => {
     setIsSubmitting(true);
     try {
       await onSave({ ...formData, freightAdvances: 0, freightPaid: 0, productPaid: 0 } as Loading);
-      addToast('success', 'Carregamento Criado', `Sucesso ao registrar veículo ${formData.vehiclePlate || 'N/A'}`);
+      addToast('success', 'Carregamento Criado', `Motorista ${formData.driverName || 'N/A'} - ${formData.carrierName || 'N/A'}`);
       onClose();
     } catch (err) {
       setIsSubmitting(false);
@@ -173,8 +173,8 @@ const LoadingForm: React.FC<Props> = ({ purchaseOrder, onSave, onClose }) => {
 
   return (
     <ModalPortal>
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-xl p-4 sm:p-8 animate-in fade-in duration-500">
-        <div className="w-full max-w-6xl bg-slate-50 rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[92vh] border border-white/20 animate-in zoom-in-95 duration-500">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-xl p-4 sm:p-6 animate-in fade-in duration-500">
+        <div className="w-full max-w-5xl bg-slate-50 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh] border border-white/20 animate-in zoom-in-95 duration-500">
 
           <LoadingFormHeader
             purchaseOrder={purchaseOrder}
@@ -182,11 +182,11 @@ const LoadingForm: React.FC<Props> = ({ purchaseOrder, onSave, onClose }) => {
             onClose={onClose}
           />
 
-          <div className="flex-1 overflow-y-auto p-8 lg:p-12 scrollbar-hide">
-            <form id="loading-form" onSubmit={handleSubmit} className="space-y-10">
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+          <div className="flex-1 overflow-y-auto p-6 lg:p-8 scrollbar-hide">
+            <form id="loading-form" onSubmit={handleSubmit} className="space-y-6">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-                <div className="lg:col-span-7 space-y-10">
+                <div className="lg:col-span-7 space-y-6">
                   <LoadingFormDestination
                     formData={formData}
                     salesSearch={salesSearch}
@@ -206,14 +206,15 @@ const LoadingForm: React.FC<Props> = ({ purchaseOrder, onSave, onClose }) => {
                     availableDrivers={availableDrivers}
                     availableVehicles={availableVehicles}
                     fleetPartnerId={fleetPartnerId}
+                    isLoadingDrivers={isLoadingDrivers}
                     onSetFormData={data => setFormData(prev => ({ ...prev, ...data }))}
                     onShowQuickDriverModal={setShowQuickDriverModal}
                   />
 
-                  <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm transition-all hover:shadow-md">
-                    <label className="text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest ml-1 block">Anotações Gerais (Opcional)</label>
+                  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm transition-all hover:shadow-md">
+                    <label className="text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest ml-1 block">Anotações Gerais (Opcional)</label>
                     <textarea
-                      className="w-full rounded-2xl border-2 border-slate-100 bg-white px-5 py-4 text-slate-700 font-medium focus:border-indigo-500 focus:ring-0 outline-none transition-all placeholder:text-slate-300 text-sm h-28 resize-none"
+                      className="w-full rounded-2xl border-2 border-slate-100 bg-white px-5 py-3 text-slate-700 font-medium focus:border-indigo-500 focus:ring-0 outline-none transition-all placeholder:text-slate-300 text-sm h-24 resize-none"
                       value={formData.notes || ''}
                       onChange={e => setFormData({ ...formData, notes: e.target.value })}
                       placeholder="Observações de qualidade, avarias ou acordos específicos..."
@@ -221,7 +222,7 @@ const LoadingForm: React.FC<Props> = ({ purchaseOrder, onSave, onClose }) => {
                   </div>
                 </div>
 
-                <div className="lg:col-span-5 space-y-10">
+                <div className="lg:col-span-5 space-y-6">
                   <LoadingFormWeights
                     formData={formData}
                     onSetFormData={data => setFormData(prev => ({ ...prev, ...data }))}

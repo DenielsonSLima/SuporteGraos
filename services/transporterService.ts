@@ -44,7 +44,8 @@ const loadFromSupabase = async () => {
 
     let query = supabase
       .from('transporters')
-      .select('*');
+      // Egress: apenas campos usados pela UI (evita colunas desnecessárias)
+      .select('id, name, document, phone, email, active, company_id, created_at, updated_at');
 
     if (companyId) {
       query = query.eq('company_id', companyId);

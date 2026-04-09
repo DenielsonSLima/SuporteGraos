@@ -20,6 +20,7 @@ export interface PaymentData {
   // Asset fields
   isAsset?: boolean;
   assetName?: string;
+  purchaseOrderId?: string;
 }
 
 export interface PaymentResult {
@@ -54,4 +55,6 @@ export interface RegisterFinancialParams {
   notes?: string;
   companyId?: string;
   shareholderTxId?: string;
+  metadata?: any;
+  purchaseOrderId?: string;
 }
