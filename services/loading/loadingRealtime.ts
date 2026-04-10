@@ -4,8 +4,16 @@ import { Persistence } from '../persistence';
 import { Loading } from '../../modules/Loadings/types';
 
 let realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
+const listeners = new Set<() => void>();
 
 export const loadingRealtime = {
+  subscribe: (callback: () => void) => {
+    listeners.add(callback);
+    return () => {
+      listeners.delete(callback);
+    };
+  },
+
   start: async (companyId: string | undefined, db: Persistence<Loading>) => {
     if (realtimeChannel) return;
 
@@ -32,6 +40,9 @@ export const loadingRealtime = {
           if (mappedId) db.delete(mappedId);
           if (rec.id && rec.id !== mappedId) db.delete(rec.id);
         }
+
+        // ✅ Notificar todos os hooks (TanStack Query, etc)
+        listeners.forEach(callback => callback());
       })
       .subscribe();
   },
@@ -41,21 +52,6 @@ export const loadingRealtime = {
       supabase.removeChannel(realtimeChannel);
       realtimeChannel = null;
     }
-  },
-  
-  subscribe: (callback: () => void) => {
-    const channel = supabase.channel('ops_loadings_changes')
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'ops_loadings' 
-      }, () => {
-        callback();
-      })
-      .subscribe();
-      
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    listeners.clear();
   }
 };

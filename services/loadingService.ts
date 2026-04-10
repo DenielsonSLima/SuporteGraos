@@ -40,6 +40,10 @@ export const loadingService = {
   subscribe: (callback: (items: Loading[]) => void) => {
     return db.subscribe(callback);
   },
+  
+  subscribeRealtime: (callback: () => void) => {
+    return loadingRealtime.subscribe(callback);
+  },
 
   getAll: () => {
     return db.getAll();
@@ -60,12 +64,16 @@ export const loadingService = {
     const { companyId } = await getLogInfo();
     const data = await loadingPersistence.loadFromSupabase(companyId);
     db.setAll(data);
+    
+    // ✅ Reativar Realtime para multiusuários — agora com sistema de listeners
+    loadingService.startRealtime();
+    
     return data;
   },
 
   startRealtime: async () => {
-    // Deprecated via TanStack Query refactoring since React sets its own channel/subs
-    // Mantido como no-op para retrocompatibilidade
+    const { companyId } = await getLogInfo();
+    loadingRealtime.start(companyId, db);
   },
 
   stopRealtime: () => {

@@ -1,8 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Download, Loader2, UserCheck, ShieldCheck } from 'lucide-react';
+import { X, Download, Loader2, UserCheck, ShieldCheck, AlertCircle, RefreshCcw } from 'lucide-react';
 import { Loading } from '../../../Loadings/types';
-import { loadingService } from '../../../../services/loadingService';
 import { useLoadingsByPurchaseOrder, useLoadingsBySalesOrder } from '../../../../hooks/useLoadings';
 import { pdf } from '@react-pdf/renderer';
 import { saveAs } from 'file-saver';
@@ -21,6 +20,7 @@ interface Props {
 
 const PdfPreviewModal: React.FC<Props> = ({ isOpen, onClose, order, variant }) => {
   const [isGenerating, setIsGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [loadings, setLoadings] = useState<Loading[]>([]);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const { company, watermark, isLoaded } = useSettings();
@@ -38,8 +38,6 @@ const PdfPreviewModal: React.FC<Props> = ({ isOpen, onClose, order, variant }) =
   useEffect(() => {
     if (isOpen && order?.id) {
       const list = isSalesOrderCheck ? salesLoadings : purchaseLoadings;
-      
-      // Só atualiza se a lista for diferente (compara IDs para estabilidade)
       const currentIds = list.map(l => l.id).join(',');
       const prevIds = (loadings || []).map(l => l.id).join(',');
       if (currentIds !== prevIds) {
@@ -56,8 +54,8 @@ const PdfPreviewModal: React.FC<Props> = ({ isOpen, onClose, order, variant }) =
       // ✅ SÓ GERA SE AS CONFIGURAÇÕES ESTIVEREM CARREGADAS E O MODAL ESTIVER ABERTO
       if (isOpen && isLoaded && order?.id) {
         try {
-          // Não resetamos o showIframe aqui para evitar o "pisca-pisca" visual se for apenas uma atualização
-          // Só resetamos se o PDF ainda não existir
+          setError(null);
+          
           if (!pdfUrl) {
             setShowIframe(false);
           }
@@ -77,14 +75,16 @@ const PdfPreviewModal: React.FC<Props> = ({ isOpen, onClose, order, variant }) =
           url = URL.createObjectURL(blob);
           setPdfUrl(url);
           
-          // Se já estava mostrando, mantém. Se não, mostra após curto delay
           if (!showIframe) {
             setTimeout(() => {
               if (isMounted) setShowIframe(true);
-            }, 100);
+            }, 150);
           }
-        } catch (error) {
-          console.error("Erro ao gerar preview:", error);
+        } catch (err) {
+          console.error("Erro ao gerar preview:", err);
+          if (isMounted) {
+            setError("Falha na geração do PDF. Tente recarregar as configurações ou o sistema.");
+          }
         }
       }
     };
@@ -94,15 +94,14 @@ const PdfPreviewModal: React.FC<Props> = ({ isOpen, onClose, order, variant }) =
     return () => {
       isMounted = false;
       if (url) URL.revokeObjectURL(url);
-      // ✅ IMPORTANTE: Só resetamos o iframe se o modal realmente fechar ou o pedido mudar
     };
-  }, [isOpen, order?.id, order?.updated_at, loadingsKey, variant, isLoaded, company?.razaoSocial]);
+  }, [isOpen, order?.id, order?.updated_at, loadingsKey, variant, isLoaded, company?.razaoSocial, company?.logoUrl, watermark?.imageUrl]);
 
-  // Limpeza total apenas ao fechar o modal ou desmontar
   useEffect(() => {
     if (!isOpen) {
       setShowIframe(false);
       setPdfUrl(null);
+      setError(null);
     }
   }, [isOpen]);
 
@@ -134,7 +133,7 @@ const PdfPreviewModal: React.FC<Props> = ({ isOpen, onClose, order, variant }) =
       ).toBlob();
       saveAs(blob, filename);
     } catch (err) {
-      alert("Erro ao gerar PDF.");
+      alert("Erro ao gerar PDF para download.");
     } finally {
       setIsGenerating(false);
     }
@@ -161,7 +160,7 @@ const PdfPreviewModal: React.FC<Props> = ({ isOpen, onClose, order, variant }) =
             </div>
 
             <div className="flex gap-3">
-              <button onClick={handleDownloadPdf} disabled={isGenerating || !isLoaded} className="flex items-center gap-2 bg-white text-slate-900 px-6 py-2.5 rounded-xl font-black text-sm transition-all hover:scale-105 active:scale-95 disabled:opacity-50 shadow-lg">
+              <button onClick={handleDownloadPdf} disabled={isGenerating || !isLoaded || !!error} className="flex items-center gap-2 bg-white text-slate-900 px-6 py-2.5 rounded-xl font-black text-sm transition-all hover:scale-105 active:scale-95 disabled:opacity-50 shadow-lg">
                 {isGenerating ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
                 Baixar PDF
               </button>
@@ -174,6 +173,22 @@ const PdfPreviewModal: React.FC<Props> = ({ isOpen, onClose, order, variant }) =
               <div className="flex flex-col items-center justify-center gap-4 bg-white/50 w-full h-full rounded-lg">
                 <Loader2 size={48} className="animate-spin text-primary-600" />
                 <p className="font-bold text-slate-700">Carregando configurações da empresa...</p>
+              </div>
+            ) : error ? (
+              <div className="flex flex-col items-center justify-center gap-6 bg-white w-full h-full rounded-lg shadow-inner p-10 text-center">
+                <div className="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center">
+                  <AlertCircle size={40} />
+                </div>
+                <div className="max-w-md">
+                  <h4 className="text-xl font-black text-slate-900 mb-2 uppercase italic">Ops! Algo deu errado</h4>
+                  <p className="text-slate-600 text-sm">{error}</p>
+                </div>
+                <button 
+                  onClick={() => window.location.reload()}
+                  className="flex items-center gap-2 bg-slate-900 text-white px-8 py-3 rounded-xl font-bold hover:bg-slate-800 transition-all shadow-lg"
+                >
+                  <RefreshCcw size={18} /> Recarregar Sistema
+                </button>
               </div>
             ) : pdfUrl && showIframe ? (
               <iframe

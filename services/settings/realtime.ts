@@ -14,8 +14,17 @@ let watermarkChannel: any = null;
 
 export const startCompanyRealtime = () => {
   if (companyChannel) return;
-  companyChannel = supabase.channel('realtime:companies')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'companies' }, payload => {
+
+  const companyId = state.companyId || authService.getCurrentUser()?.companyId;
+  if (!companyId) return;
+
+  companyChannel = supabase.channel(`realtime:companies:${companyId}`)
+    .on('postgres_changes', { 
+      event: '*', 
+      schema: 'public', 
+      table: 'companies',
+      filter: `id=eq.${companyId}`
+    }, payload => {
       const record = payload.new || payload.old;
       if (record) {
         state.companyId = record.id;
@@ -28,8 +37,17 @@ export const startCompanyRealtime = () => {
 
 export const startWatermarkRealtime = () => {
   if (watermarkChannel) return;
-  watermarkChannel = supabase.channel('realtime:watermarks')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'watermarks' }, payload => {
+
+  const companyId = state.companyId || authService.getCurrentUser()?.companyId;
+  if (!companyId) return;
+
+  watermarkChannel = supabase.channel(`realtime:watermarks:${companyId}`)
+    .on('postgres_changes', { 
+      event: '*', 
+      schema: 'public', 
+      table: 'watermarks',
+      filter: `company_id=eq.${companyId}`
+    }, payload => {
       const record = payload.new || payload.old;
       if (record) {
         state.watermarkId = record.id;

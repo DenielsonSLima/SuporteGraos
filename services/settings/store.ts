@@ -23,12 +23,7 @@ export const loadLoginSettings = (): LoginScreenSettings => {
 };
 
 export const loadCompanyData = (): CompanyData => {
-  if (typeof window === 'undefined') return {} as CompanyData;
-  const stored = localStorage.getItem(COMPANY_KEY);
-  if (stored) {
-    try { return JSON.parse(stored); } catch { }
-  }
-  return {
+  const defaults: CompanyData = {
     razaoSocial: '',
     nomeFantasia: '',
     cnpj: '',
@@ -44,6 +39,17 @@ export const loadCompanyData = (): CompanyData => {
     site: '',
     logoUrl: null
   };
+
+  if (typeof window === 'undefined') return defaults;
+  
+  const stored = localStorage.getItem(COMPANY_KEY);
+  if (stored) {
+    try { 
+      const parsed = JSON.parse(stored);
+      return { ...defaults, ...parsed };
+    } catch { }
+  }
+  return defaults;
 };
 
 export const loadWatermarkSettings = (): WatermarkSettings => {
@@ -88,6 +94,7 @@ export const state = {
   watermarkSettings: loadWatermarkSettings(),
   companyId: null as string | null,
   watermarkId: null as string | null,
+  initialized: false,
   companyListeners: [] as CompanyListener[],
   watermarkListeners: [] as WatermarkListener[]
 };

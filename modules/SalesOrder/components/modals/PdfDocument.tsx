@@ -123,12 +123,16 @@ const PdfDocument: React.FC<Props> = ({ order, loadings, variant, company, water
     return (
       <Document>
         <Page size="A4" orientation="landscape" style={stylesInternal.page}>
-          {watermark.imageUrl && <Image src={watermark.imageUrl} style={stylesInternal.watermark} />}
+          {typeof watermark.imageUrl === 'string' && watermark.imageUrl.startsWith('http') && (
+            <Image src={watermark.imageUrl} style={stylesInternal.watermark} />
+          )}
 
           <View style={stylesInternal.header}>
             <View style={stylesInternal.headerLeft}>
               <View style={stylesInternal.headerLogo}>
-                {company.logoUrl && <Image src={company.logoUrl} style={stylesInternal.headerLogoImg} />}
+                {typeof company.logoUrl === 'string' && company.logoUrl.startsWith('http') && (
+                  <Image src={company.logoUrl} style={stylesInternal.headerLogoImg} />
+                )}
               </View>
               <View>
                 <Text style={stylesInternal.headerTitle}>{company.razaoSocial}</Text>
@@ -366,12 +370,16 @@ const PdfDocument: React.FC<Props> = ({ order, loadings, variant, company, water
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        {watermark.imageUrl && <Image src={watermark.imageUrl} style={styles.watermark} />}
+        {watermark.imageUrl && String(watermark.imageUrl).toLowerCase() !== 'null' && (
+          <Image src={watermark.imageUrl} style={styles.watermark} />
+        )}
 
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <View style={styles.logoBox}>
-              {company.logoUrl && <Image src={company.logoUrl} style={styles.logo} />}
+              {company.logoUrl && String(company.logoUrl).toLowerCase() !== 'null' && (
+                <Image src={company.logoUrl} style={styles.logo} />
+              )}
             </View>
             <View style={styles.companyBlock}>
               <Text style={styles.companyName}>{company.nomeFantasia}</Text>

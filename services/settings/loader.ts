@@ -12,35 +12,47 @@ import {
 
 export const fetchCompanyFromSupabase = async (): Promise<boolean> => {
   let user = authService.getCurrentUser();
-  let companyId = user?.companyId;
+  let companyId = user?.companyId || state.companyId;
+
+  console.log('[SettingsLoader] Iniciando fetch da empresa. CompanyID atual:', companyId);
 
   if (!companyId) {
     user = await authService.restoreSession();
     companyId = user?.companyId;
   }
 
-  if (!companyId) return false;
+  if (!companyId) {
+    console.warn('[SettingsLoader] CompanyID não encontrado. Abortando fetch.');
+    return false;
+  }
 
   const { data, error } = await supabase
     .from('companies')
-    .select('id, razao_social, nome_fantasia, cnpj, ie, endereco, numero, bairro, cidade, uf, cep, telefone, email, website, logo_url, login_settings')
+    .select('id, razao_social, nome_fantasia, cnpj, ie, endereco, numero, bairro, cidade, uf, cep, telefone, email, website, logo_url')
     .eq('id', companyId)
     .limit(1)
     .maybeSingle();
 
-  if (error && error.code !== 'PGRST116') throw error;
-  if (!data) return false;
+  if (error && error.code !== 'PGRST116') {
+    console.error('[SettingsLoader] Erro ao buscar empresa:', error);
+    throw error;
+  }
+  
+  if (!data) {
+    console.warn('[SettingsLoader] Nenhum dado retornado para a empresa:', companyId);
+    return false;
+  }
 
   state.companyId = data.id;
   state.companyData = mapCompanyRecord(data);
   
-  if (data.login_settings) {
-    state.loginScreenSettings = data.login_settings;
-    localStorage.setItem('settings_login', JSON.stringify(state.loginScreenSettings));
-  }
+  // O campo login_settings foi desativado temporariamente por não existir na tabela
+  // if (data.login_settings) { ... }
 
   localStorage.setItem(COMPANY_KEY, JSON.stringify(state.companyData));
+  state.initialized = true;
   notifyCompanyListeners();
+  console.log('[SettingsLoader] Dados da empresa carregados com sucesso:', data.razao_social);
   return true;
 };
 

@@ -126,12 +126,16 @@ const PdfDocument: React.FC<Props> = ({ order, loadings, variant, company, water
     return (
       <Document>
         <Page size="A4" orientation="landscape" style={stylesInternal.page}>
-          {watermark.imageUrl && <Image src={watermark.imageUrl} style={stylesInternal.watermark} />}
+          {typeof watermark.imageUrl === 'string' && watermark.imageUrl.startsWith('http') && (
+            <Image src={watermark.imageUrl} style={stylesInternal.watermark} />
+          )}
 
           <View style={stylesInternal.header}>
             <View style={stylesInternal.headerLeft}>
               <View style={stylesInternal.headerLogo}>
-                {company.logoUrl && <Image src={company.logoUrl} style={stylesInternal.headerLogoImg} />}
+                {typeof company.logoUrl === 'string' && company.logoUrl.startsWith('http') && (
+                  <Image src={company.logoUrl} style={stylesInternal.headerLogoImg} />
+                )}
               </View>
               <View>
                 <Text style={stylesInternal.headerTitle}>{company.razaoSocial}</Text>
@@ -377,12 +381,16 @@ const PdfDocument: React.FC<Props> = ({ order, loadings, variant, company, water
   return (
     <Document>
       <Page size="A4" style={stylesProducer.page}>
-        {watermark.imageUrl && <Image src={watermark.imageUrl} style={stylesProducer.watermark} />}
+        {watermark.imageUrl && String(watermark.imageUrl).toLowerCase() !== 'null' && (
+          <Image src={watermark.imageUrl} style={stylesProducer.watermark} />
+        )}
 
         <View style={stylesProducer.headerContainer}>
           <View style={stylesProducer.headerLeft}>
             <View style={stylesProducer.logoBox}>
-              {company.logoUrl && <Image src={company.logoUrl} style={stylesProducer.logo} />}
+              {company.logoUrl && String(company.logoUrl).toLowerCase() !== 'null' && (
+                <Image src={company.logoUrl} style={stylesProducer.logo} />
+              )}
             </View>
             <View style={stylesProducer.companyBlock}>
               <Text style={stylesProducer.companyName}>{company.nomeFantasia}</Text>
