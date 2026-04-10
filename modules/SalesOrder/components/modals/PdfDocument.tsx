@@ -123,14 +123,14 @@ const PdfDocument: React.FC<Props> = ({ order, loadings, variant, company, water
     return (
       <Document>
         <Page size="A4" orientation="landscape" style={stylesInternal.page}>
-          {typeof watermark.imageUrl === 'string' && watermark.imageUrl.startsWith('http') && (
+          {watermark.imageUrl && String(watermark.imageUrl).toLowerCase() !== 'null' && (
             <Image src={watermark.imageUrl} style={stylesInternal.watermark} />
           )}
 
           <View style={stylesInternal.header}>
             <View style={stylesInternal.headerLeft}>
               <View style={stylesInternal.headerLogo}>
-                {typeof company.logoUrl === 'string' && company.logoUrl.startsWith('http') && (
+                {company.logoUrl && String(company.logoUrl).toLowerCase() !== 'null' && (
                   <Image src={company.logoUrl} style={stylesInternal.headerLogoImg} />
                 )}
               </View>
@@ -138,9 +138,16 @@ const PdfDocument: React.FC<Props> = ({ order, loadings, variant, company, water
                 <Text style={stylesInternal.headerTitle}>{company.razaoSocial}</Text>
                 <Text style={stylesInternal.headerSubtitle}>Inteligencia logistica e auditoria de performance</Text>
                 <View style={stylesInternal.headerMetaRow}>
-                  <Text style={stylesInternal.headerMetaText}>Contrato venda: #{order.number}</Text>
-                  <Text style={stylesInternal.headerMetaText}>Cliente: {order.customerName || '-'}</Text>
+                  <Text style={stylesInternal.headerMetaText}>Contrato venda: #{order.number} - {order.customerName || order.partnerName || '-'}</Text>
                   <Text style={stylesInternal.headerMetaText}>Emissao: {new Date().toLocaleDateString('pt-BR')}</Text>
+                </View>
+                <View style={[stylesInternal.headerMetaRow, { marginTop: 2 }]}>
+                  {company.telefone && (
+                    <Text style={stylesInternal.headerMetaText}>CONTATO: {company.telefone}</Text>
+                  )}
+                  {company.email && (
+                    <Text style={stylesInternal.headerMetaText}>EMAIL: {company.email.toLowerCase()}</Text>
+                  )}
                 </View>
               </View>
             </View>
@@ -208,76 +215,93 @@ const PdfDocument: React.FC<Props> = ({ order, loadings, variant, company, water
 
           <View>
             <View style={stylesInternal.tableHeaderRow}>
-              <Text style={[stylesInternal.tableHeaderCell, { width: '12%' }]}>Dta/Motorista</Text>
-              <Text style={[stylesInternal.tableHeaderCell, { width: '22%' }]}>Transportadora / Origem</Text>
+              <Text style={[stylesInternal.tableHeaderCell, { width: '15%' }]}>Data / Motorista</Text>
+              <Text style={[stylesInternal.tableHeaderCell, { width: '25%' }]}>Transportadora / Destino</Text>
               <Text style={[stylesInternal.tableHeaderCell, { width: '8%', textAlign: 'right' }]}>Peso Orig.</Text>
               <Text style={[stylesInternal.tableHeaderCell, { width: '8%', textAlign: 'right' }]}>Peso Dest.</Text>
               <Text style={[stylesInternal.tableHeaderCell, { width: '8%', textAlign: 'right' }]}>Quebra kg</Text>
               <Text style={[stylesInternal.tableHeaderCell, { width: '8%', textAlign: 'right' }]}>Custo SC</Text>
               <Text style={[stylesInternal.tableHeaderCell, { width: '8%', textAlign: 'right' }]}>Venda SC</Text>
               <Text style={[stylesInternal.tableHeaderCell, { width: '10%', textAlign: 'right' }]}>Frete Total</Text>
-              <Text style={[stylesInternal.tableHeaderCell, { width: '10%', textAlign: 'right' }]}>Resultado</Text>
-              <Text style={[stylesInternal.tableHeaderCell, { width: '6%', textAlign: 'center' }]}>Status</Text>
+              <Text style={[stylesInternal.tableHeaderCell, { width: '10%', textAlign: 'right' }]}>Lucro Carga</Text>
             </View>
 
             {statsInternal.activeLoadings.map((l, idx) => {
               const rowCost = (Number(l?.totalPurchaseValue) || 0) + (Number(l?.totalFreightValue) || 0);
               const rowProfit = (Number(l?.totalSalesValue) || 0) - rowCost;
-              const breakage = l?.unloadWeightKg ? Math.max(0, (Number(l?.weightKg) || 0) - (Number(l?.unloadWeightKg) || 0)) : 0;
+              const breakage = l?.unloadWeightKg ? (Number(l?.weightKg) || 0) - (Number(l?.unloadWeightKg) || 0) : 0;
               const breakagePerc = l?.unloadWeightKg ? (breakage / (Number(l?.weightKg) || 1)) * 100 : 0;
 
               return (
                 <View key={l.id || idx} style={[stylesInternal.tableRow, idx % 2 === 0 ? undefined : stylesInternal.tableRowOdd]}>
-                  <View style={{ width: '12%' }}>
-                    <Text style={stylesInternal.tableCell}>{l.driverName || '-'}</Text>
-                    <Text style={stylesInternal.tableCellSmall}>{dateStr(l.date)}</Text>
+                  <View style={{ width: '15%' }}>
+                    <Text style={stylesInternal.tableCell}>{dateStr(l.date)}</Text>
+                    <Text style={stylesInternal.tableCellSmall}>{l.driverName || '-'}</Text>
                   </View>
-                  <View style={{ width: '22%' }}>
+                  <View style={{ width: '25%' }}>
                     <Text style={stylesInternal.tableCell}>{l.carrierName || '-'}</Text>
-                    <Text style={stylesInternal.tableCellSmall}>{l.supplierName || '-'}</Text>
+                    <Text style={stylesInternal.tableCellSmall}>{l.customerName || '-'}</Text>
                   </View>
-                  <Text style={[stylesInternal.tableCell, { width: '8%', textAlign: 'right' }]}>{num(l.weightKg, 0)}</Text>
-                  <Text style={[stylesInternal.tableCell, { width: '8%', textAlign: 'right', color: '#1d4ed8' }]}>
-                    {l.unloadWeightKg ? num(l.unloadWeightKg, 0) : 'Pendente'}
-                  </Text>
                   <View style={{ width: '8%', alignItems: 'flex-end' }}>
-                    {breakage > 0 ? (
+                    <Text style={stylesInternal.tableCell}>{num(l.weightKg, 0)}</Text>
+                    <Text style={stylesInternal.tableCellSmall}>{num(Number(l.weightKg) / 60, 2)} SC</Text>
+                  </View>
+                  <View style={{ width: '8%', alignItems: 'flex-end' }}>
+                    <Text style={[stylesInternal.tableCell, { color: '#1d4ed8' }]}>
+                      {l.unloadWeightKg ? num(l.unloadWeightKg, 0) : 'Pendente'}
+                    </Text>
+                    {l.unloadWeightKg && (
+                      <Text style={stylesInternal.tableCellSmall}>{num(Number(l.unloadWeightKg) / 60, 2)} SC</Text>
+                    )}
+                  </View>
+                  <View style={{ width: '8%', alignItems: 'flex-end' }}>
+                    {l?.unloadWeightKg ? (
                       <>
-                        <Text style={[stylesInternal.tableCell, { color: breakagePerc > 0.5 ? '#e11d48' : '#94a3b8' }]}>
-                          {num(breakage, 0)}
+                        <Text style={[
+                          stylesInternal.tableCell, 
+                          { color: breakage > 0 ? '#e11d48' : breakage < 0 ? '#059669' : '#94a3b8' }
+                        ]}>
+                          {breakage > 0 ? num(breakage, 0) : breakage < 0 ? `+${num(Math.abs(breakage), 0)}` : '0'}
                         </Text>
                         <Text style={stylesInternal.tableCellSmall}>({num(breakagePerc, 2)}%)</Text>
                       </>
                     ) : (
-                      <Text style={stylesInternal.tableCellSmall}>-</Text>
+                      <Text style={[stylesInternal.tableCell, { color: '#94a3b8' }]}>-</Text>
                     )}
                   </View>
-                  <Text style={[stylesInternal.tableCell, { width: '8%', textAlign: 'right', color: '#64748b' }]}> {currency(l.purchasePricePerSc)} </Text>
-                  <Text style={[stylesInternal.tableCell, { width: '8%', textAlign: 'right', color: '#16a34a' }]}> {currency(l.salesPrice)} </Text>
+                  <View style={{ width: '8%', alignItems: 'flex-end' }}>
+                    <Text style={[stylesInternal.tableCell, { color: '#64748b' }]}> {currency(l.purchasePricePerSc)} </Text>
+                    <Text style={stylesInternal.tableCellSmall}>{currency(l.totalPurchaseValue)}</Text>
+                  </View>
+                  <View style={{ width: '8%', alignItems: 'flex-end' }}>
+                    <Text style={[stylesInternal.tableCell, { color: '#16a34a' }]}> {currency(l.salesPrice)} </Text>
+                    <Text style={stylesInternal.tableCellSmall}>{currency(l.totalSalesValue)}</Text>
+                  </View>
                   <View style={{ width: '10%', alignItems: 'flex-end' }}>
-                    <Text style={[stylesInternal.tableCell, { color: '#475569' }]}>{currency(l.totalFreightValue)}</Text>
-                    <Text style={stylesInternal.tableCellSmall}>T: {currency(l.freightPricePerTon)}</Text>
+                    <Text style={[stylesInternal.tableCell, { color: '#475569' }]}> {currency(l.totalFreightValue)} </Text>
+                    <Text style={stylesInternal.tableCellSmall}> T: {currency(l.freightPricePerTon)} </Text>
                   </View>
                   <Text style={[stylesInternal.tableCell, { width: '10%', textAlign: 'right', color: rowProfit >= 0 ? '#16a34a' : '#e11d48' }]}>
                     {currency(rowProfit)}
-                  </Text>
-                  <Text style={[stylesInternal.tableCell, { width: '6%', textAlign: 'center', color: l.status === 'completed' ? '#16a34a' : '#2563eb' }]}>
-                    {l.status === 'completed' ? 'Finalizado' : 'Transito'}
                   </Text>
                 </View>
               );
             })}
 
             <View style={stylesInternal.tableTotalRow}>
-              <Text style={[stylesInternal.tableCell, { width: '34%', textAlign: 'right' }]}>Totais consolidados:</Text>
+              <Text style={[stylesInternal.tableCell, { width: '40%', textAlign: 'right' }]}>Totais consolidados:</Text>
               <Text style={[stylesInternal.tableCell, { width: '8%', textAlign: 'right' }]}>{num(statsInternal.totalWeightKgOrig, 0)} KG</Text>
               <Text style={[stylesInternal.tableCell, { width: '8%', textAlign: 'right', color: '#1d4ed8' }]}> {num(statsInternal.totalWeightKgDest, 0)} KG </Text>
-              <Text style={[stylesInternal.tableCell, { width: '8%', textAlign: 'right', color: '#e11d48' }]}> {num(statsInternal.totalBreakageKg, 0)} KG </Text>
+              <Text style={[
+                stylesInternal.tableCell, 
+                { width: '8%', textAlign: 'right', color: statsInternal.totalBreakageKg > 0 ? '#e11d48' : '#059669' }
+              ]}>
+                {statsInternal.totalBreakageKg > 0 ? num(statsInternal.totalBreakageKg, 0) : `+${num(Math.abs(statsInternal.totalBreakageKg), 0)}`} KG
+              </Text>
               <Text style={[stylesInternal.tableCell, { width: '8%' }]}></Text>
               <Text style={[stylesInternal.tableCell, { width: '8%' }]}></Text>
               <Text style={[stylesInternal.tableCell, { width: '10%' }]}></Text>
               <Text style={[stylesInternal.tableCell, { width: '10%', textAlign: 'right', color: statsInternal.netProfit >= 0 ? '#16a34a' : '#e11d48' }]}> {currency(statsInternal.netProfit)} </Text>
-              <Text style={[stylesInternal.tableCell, { width: '6%' }]}></Text>
             </View>
           </View>
 
@@ -387,6 +411,14 @@ const PdfDocument: React.FC<Props> = ({ order, loadings, variant, company, water
               <View style={styles.companyMetaRow}>
                 <Text style={styles.companyMetaText}>CNPJ: {company.cnpj}</Text>
                 <Text style={styles.companyMetaText}>{company.cidade}/{company.uf}</Text>
+              </View>
+              <View style={[styles.companyMetaRow, { marginTop: 2 }]}>
+                {company.telefone && (
+                  <Text style={styles.companyMetaText}>CONTATO: {company.telefone}</Text>
+                )}
+                {company.email && (
+                  <Text style={styles.companyMetaText}>EMAIL: {company.email.toLowerCase()}</Text>
+                )}
               </View>
             </View>
           </View>
