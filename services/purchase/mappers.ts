@@ -101,7 +101,7 @@ export const mapOrderFromOpsRow = (row: any): PurchaseOrder => {
     id: row?.legacy_id ?? row?.id ?? meta?.id ?? '',
     number: row?.number ?? meta?.number ?? '',
     date: row?.order_date ?? meta?.date ?? getTodayBR(),
-    status: statusFromDb(row?.status) ?? (meta?.status as OrderStatus),
+    status: statusFromDb(row?.row_status ?? row?.status) ?? (meta?.status as OrderStatus),
     consultantName: meta?.consultantName ?? '',
     partnerId: row?.partner_id ?? meta?.partnerId ?? '',
     partnerName: row?.partner_name ?? meta?.partnerName ?? 'Parceiro Não Informado',

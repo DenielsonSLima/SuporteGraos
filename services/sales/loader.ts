@@ -13,29 +13,76 @@ import { salesStore } from './store';
 // ⚡ CACHE DE ENDEREÇOS: Persiste entre chamadas para evitar buscas repetitivas
 const partnerAddressCache = new Map<string, { city: string; state: string }>();
 
+export interface SalesLoadParams {
+  retries?: number;
+  page?: number;
+  pageSize?: number;
+  searchTerm?: string;
+  startDate?: string;
+  endDate?: string;
+  shareholder?: string;
+  statuses?: string[];
+}
+
+export interface SalesLoadResult {
+  data: SalesOrder[];
+  count: number;
+}
+
 export const salesLoader = {
-  loadFromSupabase: async (retries = 2, filters?: { statuses?: string[] }): Promise<SalesOrder[]> => {
+  loadFromSupabase: async (params: SalesLoadParams = {}): Promise<SalesLoadResult> => {
+    const { 
+      retries = 2, 
+      page = 1, 
+      pageSize = 40, 
+      searchTerm, 
+      startDate, 
+      endDate, 
+      shareholder, 
+      statuses 
+    } = params;
+    
     const startTime = performance.now();
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
     
     if (isSqlCanonicalOpsEnabled()) {
       try {
         const user = authService.getCurrentUser();
         let query = supabase
           .from('vw_sales_orders_enriched')
-          .select('*');
+          .select('*', { count: 'exact' });
 
         if (user?.companyId) {
           query = query.eq('company_id', user.companyId);
         }
 
-        if (filters?.statuses && filters.statuses.length > 0) {
-          query = query.in('status', filters.statuses);
+        if (statuses && statuses.length > 0) {
+          query = query.in('status', statuses);
         }
 
-        const { data, error } = await query
+        // --- Filtros Adicionais (Server-side) ---
+        if (searchTerm) {
+          query = query.or(`number.ilike.%${searchTerm}%,customer_name.ilike.%${searchTerm}%,customer_nickname.ilike.%${searchTerm}%`);
+        }
+
+        if (startDate) {
+          query = query.gte('order_date', startDate);
+        }
+
+        if (endDate) {
+          query = query.lte('order_date', endDate);
+        }
+
+        if (shareholder) {
+          // Filtra no JSONB metadata se necessário, ou na coluna se existir no view
+          query = query.eq('metadata->>consultantName', shareholder);
+        }
+
+        const { data, error, count } = await query
           .order('order_date', { ascending: false })
-          // Egress: limita aos 300 pedidos mais recentes
-          .limit(300);
+          .range(from, to);
+          
         if (error) throw error;
 
         const fetchTime = performance.now();
@@ -45,13 +92,13 @@ export const salesLoader = {
         await salesLoader.enrichAddresses(mapped);
         
         const enrichTime = performance.now();
-        console.log(`[salesLoader] Load (Canônico): ${(fetchTime - startTime).toFixed(1)}ms | Enrich: ${(enrichTime - fetchTime).toFixed(1)}ms | Total: ${(enrichTime - startTime).toFixed(1)}ms`);
+        console.log(`[salesLoader] Load (Canônico): ${(fetchTime - startTime).toFixed(1)}ms | Page: ${page} | Total: ${count}`);
 
         salesStore.setAll(mapped);
-        return mapped;
+        return { data: mapped, count: count || 0 };
       } catch (error) {
         sqlCanonicalOpsLog('Falha ao carregar ops_sales_orders (modo canônico)', error);
-        return salesStore.get();
+        return { data: salesStore.get(), count: salesStore.get().length };
       }
     }
 
@@ -60,36 +107,43 @@ export const salesLoader = {
       const user = authService.getCurrentUser();
       let query = supabase
         .from('sales_orders')
-        .select('*');
+        .select('*', { count: 'exact' });
 
       if (user?.companyId) {
         query = query.eq('company_id', user.companyId);
       }
 
-      if (filters?.statuses && filters.statuses.length > 0) {
-        query = query.in('status', filters.statuses);
+      if (statuses && statuses.length > 0) {
+        query = query.in('status', statuses);
       }
 
-      const { data, error } = await query
-        .order('date', { ascending: false })
-        // Egress: limita aos 300 pedidos mais recentes
-        .limit(300);
+      if (searchTerm) {
+        query = query.or(`number.ilike.%${searchTerm}%,customer_name.ilike.%${searchTerm}%`);
+      }
+
+      if (startDate) query = query.gte('order_date', startDate);
+      if (endDate) query = query.lte('order_date', endDate);
+
+      const { data, error, count } = await query
+        .order('order_date', { ascending: false })
+        .range(from, to);
+        
       if (error) throw error;
 
       const mapped = (data || []).map(mapOrderFromDb);
       
       const legacyTime = performance.now();
-      console.log(`[salesLoader] Load (Legado): ${(legacyTime - startTime).toFixed(1)}ms`);
+      console.log(`[salesLoader] Load (Legado): ${(legacyTime - startTime).toFixed(1)}ms | Page: ${page}`);
 
       salesStore.setAll(mapped);
-      return mapped;
+      return { data: mapped, count: count || 0 };
     } catch (error) {
       if (retries > 0) {
         await new Promise(r => setTimeout(r, 1000));
-        return salesLoader.loadFromSupabase(retries - 1, filters);
+        return salesLoader.loadFromSupabase({ ...params, retries: retries - 1 });
       }
       sqlCanonicalOpsLog('Falha ao carregar sales_orders (modo legado)', error);
-      return salesStore.get();
+      return { data: salesStore.get(), count: salesStore.get().length };
     }
   },
 

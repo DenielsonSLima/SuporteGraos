@@ -1,4 +1,5 @@
 import { supabase } from '../../supabase';
+import { authService } from '../../authService';
 import { FinancialEntry, FinancialEntryType, EntryStatus } from './types';
 import { mapRow } from './loader';
 
@@ -8,7 +9,13 @@ import { mapRow } from './loader';
  */
 
 async function getCompanyId(): Promise<string> {
-  const { data, error } = await supabase.from('app_users').select('company_id').single();
+  const companyId = authService.getCurrentUser()?.companyId;
+  if (companyId) return companyId;
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Usuário não autenticado');
+
+  const { data, error } = await supabase.from('app_users').select('company_id').eq('auth_user_id', user.id).single();
   if (error || !data?.company_id) throw new Error('Usuário sem empresa vinculada');
   return data.company_id as string;
 }

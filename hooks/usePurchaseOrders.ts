@@ -75,7 +75,9 @@ function subscribeToPurchaseRealtime(onInvalidate: () => void): () => void {
 
 // ─── Hook principal ─────────────────────────────────────────────────────────
 
-export function usePurchaseOrders() {
+import { PurchaseLoadParams, PurchaseLoadResult } from '../services/purchase/loader';
+
+export function usePurchaseOrders(params: PurchaseLoadParams = {}) {
   const queryClient = useQueryClient();
 
   // Realtime: invalida cache quando qualquer pedido de compra muda no banco
@@ -86,11 +88,14 @@ export function usePurchaseOrders() {
     return unsub;
   }, [queryClient]);
 
-  return useQuery<PurchaseOrder[]>({
-    queryKey: QUERY_KEYS.PURCHASE_ORDERS,
+  // Se houver busca ou filtros de data, ignoramos o stale agressivo
+  const isSearching = !!(params.searchTerm || params.startDate || params.endDate || params.shareholder);
+
+  return useQuery<PurchaseLoadResult>({
+    queryKey: [...QUERY_KEYS.PURCHASE_ORDERS, params],
     // Delega ao purchaseService que sabe lidar com modo canônico e enriquecimento
-    queryFn: () => purchaseService.loadFromSupabase(),
-    staleTime: 0, // ⚡ REALTIME: Refetch imediato em qualquer mudança do banco
+    queryFn: () => purchaseService.loadFromSupabase(params),
+    staleTime: isSearching ? 0 : 1000 * 60 * 5, 
     placeholderData: (prev) => prev,      // Sem piscar ao revalidar
   });
 }
@@ -100,11 +105,12 @@ export function usePurchaseOrders() {
  * Não cria subscription própria — usa a invalidação hierárquica do PURCHASE_ORDERS.
  */
 export function usePartnerPurchaseOrders(partnerId: string) {
-  const query = usePurchaseOrders();
+  // Para parceiro, buscamos todos do parceiro (limite maior)
+  const query = usePurchaseOrders({ pageSize: 1000 }); 
 
   return {
     ...query,
-    data: query.data?.filter(o => o.partnerId === partnerId || o.brokerId === partnerId) || []
+    data: query.data?.data.filter(o => o.partnerId === partnerId || o.brokerId === partnerId) || []
   };
 }
 

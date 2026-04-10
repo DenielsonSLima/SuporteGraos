@@ -11,12 +11,15 @@
 
 import { useSalesOrders } from '../../../hooks/useSalesOrders';
 import { useShareholders } from '../../../hooks/useShareholders';
+import { SalesOrder } from '../types';
 import { salesService } from '../../../services/salesService';
 import { loadingService } from '../../../services/loadingService';
-import { SalesOrder } from '../types';
+import { SalesLoadParams } from '../../../services/sales/loader';
 
-export function useSalesOrderModule() {
-  const { data: sales = [], isLoading, isFetching } = useSalesOrders();
+export function useSalesOrderModule(params: SalesLoadParams = {}) {
+  const { data: salesResult, isLoading, isFetching } = useSalesOrders(params);
+  const sales = salesResult?.data ?? [];
+  const totalCount = salesResult?.count ?? 0;
   const { data: shareholdersRaw = [] } = useShareholders();
 
   // Mapeia sócios para formato leve (id + name)
@@ -69,6 +72,7 @@ export function useSalesOrderModule() {
   return {
     sales,
     shareholders,
+    totalCount,
     isLoading,
     isFetching,
     getOrderById,

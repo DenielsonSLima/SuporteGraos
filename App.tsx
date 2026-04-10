@@ -149,11 +149,14 @@ const AppContent: React.FC = () => {
   useEffect(() => {
     if (!currentUser) return;
 
-    const INACTIVITY_LIMIT_MS = 60 * 60 * 1000;
-    const WARNING_BEFORE_MS = 5 * 60 * 1000;
+    const INACTIVITY_LIMIT_MS = 30 * 60 * 1000; // 30 minutos
+    const WARNING_BEFORE_MS = 3 * 60 * 1000; // 3 minutos antes
     const REFRESH_PING_KEY = 'sg_refresh_ping';
+    const ACTIVITY_KEY = 'sg_last_activity';
     const REFRESH_GRACE_MS = 2000;
     const HEARTBEAT_INTERVAL_MS = 5 * 60 * 1000;
+    const CHECK_INTERVAL_MS = 30 * 1000; // Checar a cada 30s
+    
     const activityEvents: Array<keyof WindowEventMap> = [
       'mousemove',
       'mousedown',
@@ -162,23 +165,33 @@ const AppContent: React.FC = () => {
       'touchstart'
     ];
 
-    let timeoutId: number | null = null;
-    let warningTimeoutId: number | null = null;
+    let checkIntervalId: number | null = null;
     let heartbeatId: number | null = null;
     let lastHeartbeatAt = 0;
+    let hasWarned = false;
 
-    const resetTimer = () => {
-      if (timeoutId) window.clearTimeout(timeoutId);
-      if (warningTimeoutId) window.clearTimeout(warningTimeoutId);
+    const updateActivity = () => {
+      localStorage.setItem(ACTIVITY_KEY, String(Date.now()));
+      hasWarned = false; // Permite novo aviso se a inatividade voltar
+    };
 
-      warningTimeoutId = window.setTimeout(() => {
-        addToast('warning', 'Sessao vai expirar', 'Faltam 5 minutos por inatividade.');
-      }, INACTIVITY_LIMIT_MS - WARNING_BEFORE_MS);
+    const checkInactivity = () => {
+      const lastActivity = Number(localStorage.getItem(ACTIVITY_KEY) || Date.now());
+      const now = Date.now();
+      const elapsed = now - lastActivity;
 
-      timeoutId = window.setTimeout(() => {
-        console.warn('[APP] Inatividade detectada: encerrando sessao.');
+      // 1. Logout
+      if (elapsed >= INACTIVITY_LIMIT_MS) {
+        console.warn('[APP] Inatividade detectada (Resilient Check): encerrando sessao.');
         void handleLogout();
-      }, INACTIVITY_LIMIT_MS);
+        return;
+      }
+
+      // 2. Aviso (Apenas uma vez por ciclo de inatividade)
+      if (elapsed >= (INACTIVITY_LIMIT_MS - WARNING_BEFORE_MS) && !hasWarned) {
+        addToast('warning', 'Sessão vai expirar', 'O sistema será encerrado em instantes por inatividade.');
+        hasWarned = true;
+      }
     };
 
     const sendHeartbeat = () => {
@@ -191,8 +204,14 @@ const AppContent: React.FC = () => {
     };
 
     const handleActivity = () => {
-      resetTimer();
+      updateActivity();
       sendHeartbeat();
+    };
+
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === ACTIVITY_KEY) {
+        hasWarned = false; // Atividade em outra aba reseta o aviso nesta
+      }
     };
 
     const handlePageExit = () => {
@@ -205,31 +224,29 @@ const AppContent: React.FC = () => {
       }, REFRESH_GRACE_MS);
     };
 
+    // Listeners
     activityEvents.forEach((eventName) =>
       window.addEventListener(eventName, handleActivity, { passive: true })
     );
     window.addEventListener('pagehide', handlePageExit);
+    window.addEventListener('storage', handleStorageChange);
 
-    // Marca load atual para evitar logout em refresh
-    localStorage.setItem(REFRESH_PING_KEY, String(Date.now()));
-    window.setTimeout(() => {
-      const ping = localStorage.getItem(REFRESH_PING_KEY);
-      if (ping) localStorage.removeItem(REFRESH_PING_KEY);
-    }, REFRESH_GRACE_MS);
-
-    resetTimer();
-    void appSessionServices.closeStaleSessions(60);
-    sendHeartbeat();
+    // Inicialização
+    updateActivity();
+    checkIntervalId = window.setInterval(checkInactivity, CHECK_INTERVAL_MS);
     heartbeatId = window.setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
+    
+    void appSessionServices.closeStaleSessions(30); // Limpar no banco sessões com +30min idle
+    sendHeartbeat();
 
     return () => {
-      if (timeoutId) window.clearTimeout(timeoutId);
-      if (warningTimeoutId) window.clearTimeout(warningTimeoutId);
+      if (checkIntervalId) window.clearInterval(checkIntervalId);
       if (heartbeatId) window.clearInterval(heartbeatId);
       activityEvents.forEach((eventName) =>
         window.removeEventListener(eventName, handleActivity)
       );
       window.removeEventListener('pagehide', handlePageExit);
+      window.removeEventListener('storage', handleStorageChange);
     };
   }, [addToast, appSessionServices, currentUser, handleLogout]);
 

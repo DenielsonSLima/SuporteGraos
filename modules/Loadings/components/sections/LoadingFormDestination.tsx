@@ -85,6 +85,11 @@ const LoadingFormDestination: React.FC<Props> = ({
                                     >
                                         <div className="flex-1 min-w-0 pr-3">
                                             <p className="font-black text-slate-900 uppercase tracking-tight group-hover:text-indigo-700 transition-colors text-sm truncate">{sale.customerName}</p>
+                                            {sale.customerNickname && (
+                                                <p className="text-[10px] font-bold text-emerald-600/70 uppercase tracking-wider truncate mb-0.5">
+                                                    {sale.customerNickname}
+                                                </p>
+                                            )}
                                             <div className="flex items-center gap-3 mt-1">
                                                 <span className="text-[9px] font-black text-indigo-400 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100 uppercase tracking-widest leading-none shrink-0">Venda #{sale.number}</span>
                                                 <div className="flex items-center gap-1.5 text-[9px] font-black text-slate-400 uppercase tracking-widest truncate"><UserCheck size={12} className="text-indigo-300 shrink-0" /> {sale.consultantName}</div>
@@ -110,12 +115,15 @@ const LoadingFormDestination: React.FC<Props> = ({
                         </div>
                         <div>
                             <p className="text-[8px] font-black text-emerald-900 uppercase tracking-tighter leading-none mb-0.5 shadow-emerald-500">Contrato Vinculado com Sucesso</p>
-                            <p className="text-xs font-black text-emerald-700 tracking-tight">{formData.customerName} <span className="mx-2 opacity-30">|</span> Preço Venda: {currency(formData.salesPrice || 0)}</p>
+                            <p className="text-xs font-black text-emerald-700 tracking-tight">
+                                {formData.customerName} {formData.customerNickname && <span className="text-emerald-500 text-[10px]">({formData.customerNickname})</span>}
+                                <span className="mx-2 opacity-30">|</span> Preço Venda: {currency(formData.salesPrice || 0)}
+                            </p>
                         </div>
                     </div>
                     <button
                         type="button"
-                        onClick={() => { onSetFormData({ salesOrderId: '', customerName: '' }); onSetSalesSearch(''); }}
+                        onClick={() => { onSetFormData({ salesOrderId: '', customerName: '', customerNickname: '' }); onSetSalesSearch(''); }}
                         className="p-2 bg-white text-emerald-400 hover:text-rose-500 hover:bg-rose-50 transition-all rounded-lg border border-emerald-100 hover:border-rose-100 active:scale-95 shadow-sm"
                     >
                         <X size={14} />

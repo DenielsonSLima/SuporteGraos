@@ -6,10 +6,11 @@ import { PurchaseOrder } from '../../PurchaseOrder/types';
 interface Props {
     purchaseOrder: PurchaseOrder;
     customerName: string;
+    customerNickname?: string;
     onClose: () => void;
 }
 
-const LoadingFormHeader: React.FC<Props> = ({ purchaseOrder, customerName, onClose }) => {
+const LoadingFormHeader: React.FC<Props> = ({ purchaseOrder, customerName, customerNickname, onClose }) => {
     return (
         <div className="bg-slate-950 text-white px-6 py-5 flex justify-between items-center shrink-0 border-b border-white/5 shadow-2xl z-10">
             <div className="flex items-center gap-4">
@@ -24,7 +25,7 @@ const LoadingFormHeader: React.FC<Props> = ({ purchaseOrder, customerName, onClo
                         </span>
                         <ArrowRight size={12} className="text-white/20" />
                         <span className="text-[9px] font-black text-emerald-400 uppercase tracking-widest bg-emerald-400/10 px-3 py-1 rounded-lg border border-emerald-400/20">
-                            {customerName || 'Aguardando Seleção de Destino'}
+                            {customerNickname ? `${customerName} (${customerNickname})` : (customerName || 'Aguardando Seleção de Destino')}
                         </span>
                     </div>
                 </div>

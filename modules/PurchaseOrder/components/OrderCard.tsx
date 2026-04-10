@@ -54,7 +54,7 @@ const OrderCard: React.FC<Props> = React.memo(({ order, onClick, onFinalize, onD
         </div>
         <h3 className="font-black text-slate-900 text-lg leading-tight truncate uppercase tracking-tighter">{order.partnerName}</h3>
         {order.partnerNickname && (
-          <div className="text-[11px] font-bold text-emerald-600/70 uppercase tracking-wider mt-0.5 line-clamp-1">
+          <div className="text-[11px] font-bold text-blue-600 uppercase tracking-wider mt-0.5 line-clamp-1">
             {order.partnerNickname}
           </div>
         )}

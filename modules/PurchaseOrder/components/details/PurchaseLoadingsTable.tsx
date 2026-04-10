@@ -82,11 +82,11 @@ const PurchaseLoadingsTable: React.FC<Props> = ({ loadings, onViewLoading, onAdd
         <table className="w-full text-left text-sm border-collapse min-w-[1000px]">
           <thead className="bg-slate-50 border-b border-slate-200">
             <tr className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">
-              <th className="px-6 py-3 border-r border-slate-100">Vínculos Operacionais</th>
-              <th className="px-6 py-3 border-r border-slate-100 text-center">Controle Físico (Pesos)</th>
-              <th className="px-6 py-3 border-r border-slate-100 text-right">Custo Grão / Frete</th>
-              <th className="px-6 py-3 border-r border-slate-100 text-right">Receita / Spread</th>
-              <th className="px-4 py-3 text-center">Ações</th>
+              <th className="px-6 py-3 border-r border-slate-100 w-[34%]">Vínculos Operacionais</th>
+              <th className="px-6 py-3 border-r border-slate-100 text-center w-[22%]">Controle Físico (Pesos)</th>
+              <th className="px-6 py-3 border-r border-slate-100 text-right w-[22%]">Custo Grão / Frete</th>
+              <th className="px-6 py-3 border-r border-slate-100 text-right w-[16%]">Receita / Spread</th>
+              <th className="px-4 py-3 text-center w-[6%]">Ações</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200">
@@ -168,11 +168,11 @@ const PurchaseLoadingsTable: React.FC<Props> = ({ loadings, onViewLoading, onAdd
                       <td className="px-6 py-3 border-r border-slate-100">
                         <div className="flex items-center gap-3">
                            <div className="p-1.5 bg-amber-50 text-amber-600 rounded-lg"><Truck size={16}/></div>
-                           <div className="max-w-[180px]">
+                           <div className="flex-1 min-w-0">
                               <p className="text-[10px] font-black text-amber-600 uppercase leading-none">Logística / Transporte</p>
-                              <p className="font-bold text-slate-800 text-xs mt-1 truncate uppercase">{l.carrierName}</p>
+                              <p className="font-bold text-slate-800 text-[11px] mt-1 uppercase leading-tight whitespace-normal" title={l.carrierName}>{l.carrierName}</p>
                               <div className="flex items-center gap-2 mt-0.5">
-                                 <span className="text-[10px] font-black text-slate-400 bg-white border border-slate-200 px-1 rounded shadow-xs">{l.vehiclePlate}</span>
+                                 <span className="text-[9px] font-black text-slate-400 bg-white border border-slate-200 px-1 rounded shadow-xs">{l.vehiclePlate}</span>
                                  <span className="text-[9px] font-bold text-slate-500 truncate">{l.driverName}</span>
                               </div>
                            </div>
@@ -247,7 +247,12 @@ const PurchaseLoadingsTable: React.FC<Props> = ({ loadings, onViewLoading, onAdd
                            <div className="flex-1 min-w-0">
                               <p className="text-[10px] font-black text-emerald-600 uppercase leading-none">Destino / Venda</p>
                               <div className="flex items-center gap-2 mt-1">
-                                <p className="font-bold text-slate-800 text-xs truncate uppercase" title={l.customerName}>{l.customerName}</p>
+                                <div className="flex-1 min-w-0">
+                                   <p className="font-bold text-slate-800 text-[11px] line-clamp-1 uppercase leading-tight" title={l.customerName}>{l.customerName}</p>
+                                   {l.customerNickname && (
+                                      <p className="text-[10px] font-bold text-blue-600 uppercase truncate">{l.customerNickname}</p>
+                                   )}
+                                </div>
                                 <button 
                                     onClick={(e) => navigateToSales(e, l.salesOrderId)}
                                     className="flex items-center gap-1 bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-lg hover:bg-indigo-600 hover:text-white transition-all shadow-sm shrink-0"

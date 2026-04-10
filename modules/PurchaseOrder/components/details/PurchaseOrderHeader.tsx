@@ -39,12 +39,12 @@ const PurchaseOrderHeader: React.FC<Props> = ({ order }) => {
           <div className="space-y-4">
             <div>
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Razão Social / Nome</p>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-col">
                  <p className="text-xl font-black text-slate-900 uppercase tracking-tight">{order.partnerName}</p>
                  {partnerNickname && (
-                    <span className="text-sm font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 uppercase">
+                    <p className="text-sm font-bold text-blue-600 uppercase mt-0.5">
                         {partnerNickname}
-                    </span>
+                    </p>
                  )}
               </div>
             </div>

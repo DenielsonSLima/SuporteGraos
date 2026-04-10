@@ -53,10 +53,19 @@ const PartnerForm: React.FC<Props> = ({ initialData, categories, onSave, onCance
     }
   });
 
+  const [addressNotInformed, setAddressNotInformed] = useState(false);
+
   useEffect(() => {
     if (initialData) {
       if (!initialData.document || initialData.document === 'NÃO INFORMADO') {
         setDocumentNotInformed(true);
+      }
+      
+      // Se não houver endereço ou se todos os campos principais estiverem vazios
+      const hasNoAddress = !initialData.address || 
+                          (!initialData.address.street && !initialData.address.cityName);
+      if (hasNoAddress && !initialData.id) { // Apenas para novos registros ou conforme lógica prévia
+        setAddressNotInformed(true);
       }
     }
   }, [initialData]);
@@ -124,7 +133,7 @@ const PartnerForm: React.FC<Props> = ({ initialData, categories, onSave, onCance
           nickname: data.fantasia || data.nome,
           email: data.email,
           phone: data.telefone,
-          address: {
+          address: addressNotInformed ? prev.address : {
             ...prev.address,
             street: data.logradouro,
             number: data.numero,
@@ -166,8 +175,7 @@ const PartnerForm: React.FC<Props> = ({ initialData, categories, onSave, onCance
         return;
       }
 
-      // 2. Validação de Duplicidade SERVER-SIDE (SKILL §3.6 + §8: validação no banco)
-      // Substitui o antigo fetch de 1000 registros para checar no client-side.
+      // 2. Validação de Duplicidade SERVER-SIDE
       try {
         setIsCheckingDuplicate(true);
         const result = await partnersService.checkDocumentExists(formData.document, initialData?.id);
@@ -177,14 +185,27 @@ const PartnerForm: React.FC<Props> = ({ initialData, categories, onSave, onCance
         }
       } catch (err) {
         console.error('Erro ao verificar duplicidade:', err);
-        // Fail-open: em caso de erro na verificação, prossegue
       } finally {
         setIsCheckingDuplicate(false);
       }
     }
 
-    // SKILL §6.2: Toast de sucesso é responsabilidade da página (orquestradora),
-    // não do formulário. Remove toast duplicado que existia aqui.
+    // Validação de Endereço
+    if (!addressNotInformed) {
+      if (!formData.address.city) {
+        addToast('warning', 'Cidade obrigatória', 'Informe a cidade do parceiro.');
+        return;
+      }
+      if (!formData.address.state) {
+        addToast('warning', 'UF obrigatória', 'Informe o estado (UF) do parceiro.');
+        return;
+      }
+      if (!formData.address.street) {
+        addToast('warning', 'Rua obrigatória', 'Qual a rua/lougradouro do parceiro?');
+        return;
+      }
+    }
+
     onSave({
       categories: formData.categories,
       document: finalDocument,
@@ -194,7 +215,7 @@ const PartnerForm: React.FC<Props> = ({ initialData, categories, onSave, onCance
       email: formData.email,
       phone: formData.phone,
       type,
-      address: {
+      address: addressNotInformed ? null : {
         partnerId: initialData?.id,
         companyId: initialData?.companyId,
         cep: formData.address.zip,
@@ -403,11 +424,23 @@ const PartnerForm: React.FC<Props> = ({ initialData, categories, onSave, onCance
         </div>
 
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-5">
-          <h3 className="mb-4 flex items-center gap-2 font-semibold text-slate-800">
-            <MapPin size={18} className="text-slate-500" />
-            Endereço
-          </h3>
-          <div className="grid gap-4 md:grid-cols-6">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="flex items-center gap-2 font-semibold text-slate-800">
+              <MapPin size={18} className="text-slate-500" />
+              Endereço
+            </h3>
+            <label className="flex items-center gap-2 cursor-pointer bg-white px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors">
+              <input
+                type="checkbox"
+                className="rounded border-slate-300 text-primary-600 focus:ring-primary-500 w-4 h-4"
+                checked={addressNotInformed}
+                onChange={(e) => setAddressNotInformed(e.target.checked)}
+              />
+              <span className="text-xs text-slate-500 font-bold uppercase tracking-wide">Sem endereço</span>
+            </label>
+          </div>
+
+          <div className={`grid gap-4 md:grid-cols-6 transition-opacity duration-200 ${addressNotInformed ? 'opacity-40 pointer-events-none' : ''}`}>
             <div className="md:col-span-2">
               <label className="mb-1 block text-sm font-medium text-slate-500">CEP</label>
               <input
@@ -462,6 +495,7 @@ const PartnerForm: React.FC<Props> = ({ initialData, categories, onSave, onCance
                 value={formData.address.state}
                 onChange={e => updateAddress('state', e.target.value)}
                 className={`${addressInputClass} uppercase`}
+                disabled={addressNotInformed}
               />
             </div>
           </div>

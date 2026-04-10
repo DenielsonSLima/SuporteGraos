@@ -12,6 +12,7 @@ import { useToast } from '../../contexts/ToastContext';
 import { parseStringToLocalDate } from '../../utils/dateUtils';
 import { useSalesOrderModule } from './hooks/useSalesOrderModule';
 import { QUERY_KEYS } from '../../hooks/queryKeys';
+import { Pagination } from '../../components/ui/Pagination';
 
 export type SalesGroupByOption = 'month' | 'partner' | 'none';
 
@@ -19,20 +20,8 @@ const SalesOrderModule: React.FC = () => {
   const { addToast } = useToast();
   const queryClient = useQueryClient();
 
-  // Data State — via hook co-localizado (SKIL: zero service imports no TSX)
-  const { 
-    sales, 
-    shareholders, 
-    isLoading, 
-    isFetching, 
-    getOrderById, 
-    getLinkedLoadings, 
-    saveOrder, 
-    deleteOrder, 
-    finalizeOrder,
-    reopenOrder,
-    cancelOrder
-  } = useSalesOrderModule();
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 40;
 
   // UI/Filter State
   const [activeTab, setActiveTab] = useState<'active' | 'finalized' | 'all'>(() => {
@@ -51,6 +40,30 @@ const SalesOrderModule: React.FC = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [selectedShareholder, setSelectedShareholder] = useState('');
+
+  // Data State — via hook co-localizado (SKIL: zero service imports no TSX)
+  const { 
+    sales, 
+    totalCount,
+    shareholders, 
+    isLoading, 
+    isFetching, 
+    getOrderById, 
+    getLinkedLoadings, 
+    saveOrder, 
+    deleteOrder, 
+    finalizeOrder,
+    reopenOrder,
+    cancelOrder
+  } = useSalesOrderModule({
+    page: currentPage,
+    pageSize,
+    searchTerm: debouncedSearch,
+    startDate,
+    endDate,
+    shareholder: selectedShareholder,
+    statuses: activeTab === 'all' ? undefined : (activeTab === 'active' ? ['pending', 'approved', 'shipped', 'draft'] : ['delivered', 'cancelled'])
+  });
 
   // Modals
   const [actionModal, setActionModal] = useState<{
@@ -74,9 +87,17 @@ const SalesOrderModule: React.FC = () => {
 
   // Debounce for search to improve performance/responsiveness
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setCurrentPage(1); // Reset page on search
+    }, 300);
     return () => clearTimeout(timer);
   }, [searchTerm]);
+
+  // Reset page on filter or tab change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, startDate, endDate, selectedShareholder]);
 
   useEffect(() => {
     const handleNavigation = (e: any) => {
@@ -289,44 +310,12 @@ const SalesOrderModule: React.FC = () => {
     });
   };
 
-  // --- LÓGICA DE FILTRAGEM E ORDENAÇÃO ALFABÉTICA ---
-  const filteredSales = useMemo(() => {
-    return sales.filter(s => {
-      // 1. Busca Debounced
-      const search = debouncedSearch.toLowerCase();
-      const customerName = (s.customerName || '').toLowerCase();
-      const orderNumber = (s.number || '').toLowerCase();
-      const matchesSearch =
-        customerName.includes(search) ||
-        orderNumber.includes(search);
-
-      // 2. Data
-      let matchesDate = true;
-      const orderDate = s.date || '';
-      if (startDate && orderDate < startDate) matchesDate = false;
-      if (endDate && orderDate > endDate) matchesDate = false;
-
-      // 3. Sócio (Vendedor)
-      let matchesShareholder = true;
-      if (selectedShareholder && s.consultantName !== selectedShareholder) matchesShareholder = false;
-
-      // 4. Abas
-      let matchesTab = true;
-      if (activeTab === 'active') {
-        matchesTab = s.status !== 'completed' && s.status !== 'canceled';
-      } else if (activeTab === 'finalized') {
-        matchesTab = s.status === 'completed' || s.status === 'canceled';
-      }
-
-      return matchesSearch && matchesDate && matchesShareholder && matchesTab;
-    }).sort((a, b) => (a.customerName || '').localeCompare(b.customerName || '')); // ORDENAÇÃO ALFABÉTICA SOLICITADA
-  }, [sales, activeTab, debouncedSearch, startDate, endDate, selectedShareholder]);
-
+  // --- LÓGICA DE AGRUPAMENTO (DADOS JÁ FILTRADOS PELO SERVER) ---
   const groupedSales = useMemo(() => {
-    if (groupBy === 'none') return [{ title: '', orders: filteredSales }];
+    if (groupBy === 'none') return [{ title: '', orders: sales }];
 
     const groups: Record<string, SalesOrder[]> = {};
-    filteredSales.forEach(order => {
+    sales.forEach(order => {
       let key = 'Outros';
       if (groupBy === 'month') {
         const date = parseStringToLocalDate(order.date);
@@ -334,7 +323,7 @@ const SalesOrderModule: React.FC = () => {
         // Sorting hack: YYYY-MM|Title
         key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}|${key}`;
       } else if (groupBy === 'partner') {
-        key = order.customerName;
+        key = order.customerName || 'Sem Cliente';
       }
       if (!groups[key]) groups[key] = [];
       groups[key].push(order);
@@ -347,7 +336,7 @@ const SalesOrderModule: React.FC = () => {
       title: groupBy === 'month' ? key.split('|')[1] : key,
       orders
     }));
-  }, [filteredSales, groupBy]);
+  }, [sales, groupBy]);
 
   const handleClearFilters = () => {
     setSearchTerm('');
@@ -377,7 +366,7 @@ const SalesOrderModule: React.FC = () => {
       <div className="space-y-6 animate-in fade-in duration-500">
 
         {/* KPI Section */}
-        <SalesKPIs orders={filteredSales} />
+        <SalesKPIs orders={sales} />
 
         {/* Filter Bar */}
         <div className="flex flex-col gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
@@ -494,7 +483,19 @@ const SalesOrderModule: React.FC = () => {
               </div>
             </div>
           ))}
-          {filteredSales.length === 0 && !isLoading && (
+
+          {/* Paginação Real */}
+          {!isLoading && sales.length > 0 && (
+            <Pagination 
+              currentPage={currentPage}
+              totalCount={totalCount}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              isLoading={isFetching}
+            />
+          )}
+
+          {sales.length === 0 && !isLoading && (
             <div className="text-center py-20 text-slate-400 italic bg-white rounded-3xl border-2 border-dashed border-slate-100 flex flex-col items-center gap-3">
               <AlertTriangle className="text-slate-300" size={40} />
               <p>Nenhum pedido encontrado nesta visão.</p>

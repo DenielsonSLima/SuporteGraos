@@ -38,7 +38,8 @@ const SalesOrderDetails: React.FC<Props> = ({ order, onBack, onEdit, onDelete, o
   const { navigateTo } = useCrossModuleNavigation();
 
   // Invalida cache e busca dados atualizados
-  const { data: allOrders = [] } = useSalesOrders();
+  const { data: allOrdersResult } = useSalesOrders();
+  const allOrders = allOrdersResult?.data ?? [];
   const currentOrder: SalesOrder = allOrders.find(o =>
     o.id === order.id ||
     (o.legacy_id && o.legacy_id === order.id) ||

@@ -25,7 +25,6 @@ export const fetchCompanyFromSupabase = async (): Promise<boolean> => {
     .from('companies')
     .select('id, razao_social, nome_fantasia, cnpj, ie, endereco, numero, bairro, cidade, uf, cep, telefone, email, website, logo_url, login_settings')
     .eq('id', companyId)
-    .order('created_at', { ascending: true })
     .limit(1)
     .maybeSingle();
 

@@ -22,19 +22,17 @@ const ACTIVE_STATUSES = ['approved', 'pending'] as const;
  */
 export function useActiveSales() {
   const query = useSalesOrders({ 
-    statuses: ['approved', 'pending', 'draft']
+    statuses: ['approved', 'pending', 'draft'],
+    pageSize: 500 // Garante que temos todos os ativos para seleção em carregamentos
   });
 
   useEffect(() => {
-    if (query.data) {
-      console.log(`[useActiveSales] Encontrados ${query.data.length || 0} pedidos ativos.`);
-      if (query.data.length === 0) {
-        console.warn('[useActiveSales] Nenhum pedido retornado. Verifique filtros e RLS.');
-      }
+    if (query.data?.data) {
+      console.log(`[useActiveSales] Encontrados ${query.data.data.length || 0} pedidos ativos.`);
     }
   }, [query.data]);
 
-  const activeSales: SalesOrder[] = query.data ?? [];
+  const activeSales: SalesOrder[] = query.data?.data ?? [];
 
   return {
     ...query,

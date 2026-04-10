@@ -135,6 +135,7 @@ const LoadingForm: React.FC<Props> = ({ purchaseOrder, onSave, onClose }) => {
       salesOrderId: sale.id,
       salesOrderNumber: sale.number,
       customerName: sale.customerName,
+      customerNickname: sale.customerNickname,
       salesPrice: sale.unitPrice || 0
     }));
     setSalesSearch(sale.customerName);
@@ -166,6 +167,7 @@ const LoadingForm: React.FC<Props> = ({ purchaseOrder, onSave, onClose }) => {
 
   const filteredSales = activeSales.filter(s =>
     s.customerName.toLowerCase().includes(salesSearch.toLowerCase()) ||
+    (s.customerNickname?.toLowerCase().includes(salesSearch.toLowerCase())) ||
     s.number.includes(salesSearch)
   );
 
@@ -179,6 +181,7 @@ const LoadingForm: React.FC<Props> = ({ purchaseOrder, onSave, onClose }) => {
           <LoadingFormHeader
             purchaseOrder={purchaseOrder}
             customerName={formData.customerName || ''}
+            customerNickname={formData.customerNickname}
             onClose={onClose}
           />
 

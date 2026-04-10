@@ -41,5 +41,21 @@ export const loadingRealtime = {
       supabase.removeChannel(realtimeChannel);
       realtimeChannel = null;
     }
+  },
+  
+  subscribe: (callback: () => void) => {
+    const channel = supabase.channel('ops_loadings_changes')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'ops_loadings' 
+      }, () => {
+        callback();
+      })
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }
 };

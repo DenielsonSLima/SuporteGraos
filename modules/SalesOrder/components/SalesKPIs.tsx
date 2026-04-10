@@ -26,7 +26,7 @@ const SalesKPIs: React.FC<Props> = React.memo(({ orders }) => {
   );
 
   return (
-    <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-8 animate-in fade-in slide-in-from-top-4 duration-700">
+    <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-8 animate-in fade-in slide-in-from-top-4 duration-700">
       <StatCard 
         label="Faturamento Contratado" 
         value={stats.totalContractValue} 

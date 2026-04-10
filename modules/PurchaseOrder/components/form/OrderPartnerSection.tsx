@@ -125,8 +125,9 @@ const OrderPartnerSection: React.FC<Props> = ({ data, partners, onChange }) => {
               {filteredPartners.map((partner) => (
                 <li key={partner.id} onClick={() => handleSelectPartner(partner)} className="cursor-pointer px-5 py-3 hover:bg-slate-50 border-b border-slate-50 last:border-0 group transition-colors">
                   <div className="font-bold text-slate-900 uppercase">{partner.name}</div>
+                  {partner.nickname && <div className="text-[11px] font-bold text-blue-600 uppercase mb-0.5">{partner.nickname}</div>}
                   <div className="flex justify-between text-[10px] text-slate-400 font-bold mt-0.5">
-                    <span>{partner.document}{partner.nickname ? ` • ${partner.nickname}` : ''}</span>
+                    <span>{partner.document}</span>
                     <span>{partner.address?.cityName || (partner.address as any)?.city || 'N/D'}/{partner.address?.stateUf || (partner.address as any)?.state || '??'}</span>
                   </div>
                 </li>

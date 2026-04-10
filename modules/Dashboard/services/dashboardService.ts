@@ -60,9 +60,13 @@ async function getCompanyId(): Promise<string> {
   const currentUserCompanyId = authService.getCurrentUser()?.companyId;
   if (currentUserCompanyId) return currentUserCompanyId;
 
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Usuário não autenticado');
+
   const { data, error } = await supabase
     .from('app_users')
     .select('company_id')
+    .eq('auth_user_id', user.id)
     .single();
 
   if (error || !data?.company_id) {

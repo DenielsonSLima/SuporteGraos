@@ -19,7 +19,8 @@ interface Props {
 const BrokerDetails: React.FC<Props> = ({ broker, onBack }) => {
   const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(!val || Math.abs(val) < 0.005 ? 0 : val);
 
-  const { data: purchaseOrders = [], isLoading } = usePurchaseOrders();
+  const { data: purchaseOrdersResult, isLoading } = usePurchaseOrders({ pageSize: 1000 });
+  const purchaseOrders = purchaseOrdersResult?.data ?? [];
 
   // Busca pedidos vinculados a este corretor
   const relatedOrders = useMemo(() => {

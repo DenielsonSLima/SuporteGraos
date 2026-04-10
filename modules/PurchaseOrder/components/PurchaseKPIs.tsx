@@ -18,20 +18,20 @@ const PurchaseKPIs: React.FC<Props> = React.memo(({ orders, loadings: externalLo
   }, [orders, externalLoadings]);
 
   const StatCard = ({ label, value, icon: Icon, color, subtext, bgClass }: any) => (
-    <div className={`p-5 rounded-2xl border shadow-sm flex items-start justify-between hover:shadow-md transition-shadow ${bgClass || 'bg-white border-slate-200'}`}>
-      <div>
-        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{label}</p>
-        <h3 className="text-lg font-black text-slate-800 tracking-tighter leading-none">{formatMoney(value)}</h3>
-        {subtext && <p className="text-[9px] text-slate-500 font-black uppercase mt-1 tracking-tight">{subtext}</p>}
+    <div className={`p-6 rounded-3xl border shadow-sm flex items-start justify-between hover:shadow-xl hover:-translate-y-1 transition-all duration-300 ${bgClass || 'bg-white border-slate-200'}`}>
+      <div className="flex-1">
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 leading-none not-italic">{label}</p>
+        <h3 className="text-xl font-black text-slate-800 tracking-tighter leading-none">{formatMoney(value)}</h3>
+        {subtext && <p className="text-[9px] text-slate-500 font-black uppercase mt-2 tracking-tight">{subtext}</p>}
       </div>
-      <div className={`p-2.5 rounded-xl ${color} shadow-sm`}>
-        <Icon size={20} className="text-white" />
+      <div className={`p-3 rounded-2xl ${color} shadow-lg shadow-current/20 shrink-0 ml-4`}>
+        <Icon size={22} className="text-white" />
       </div>
     </div>
   );
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6 animate-in slide-in-from-top-4">
+    <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-8 animate-in fade-in slide-in-from-top-4 duration-700">
       <StatCard 
         label="Total Comprado (Contratos)" 
         value={stats.totalContractValue} 

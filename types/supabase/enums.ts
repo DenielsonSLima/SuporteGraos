@@ -16,6 +16,8 @@ export interface Enums {
     | "loan_payable"
     | "internal_credit"
   financial_movement_type: "credit" | "debit"
+  order_status: "draft" | "pending" | "approved" | "transport" | "completed" | "canceled"
+  partnership_role: "admin" | "manager" | "user"
 }
 
 export const Constants = {

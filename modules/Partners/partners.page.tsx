@@ -170,9 +170,12 @@ const PartnersPage: React.FC = () => {
       addToast('success', editingPartner ? 'Dados Atualizados' : 'Parceiro Cadastrado');
       setBalancesTick(prev => prev + 1);
       setViewMode('list');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao salvar parceiro via RPC:', error);
-      addToast('error', 'Erro no Cadastro', 'Não foi possível salvar os dados do parceiro.');
+      
+      // SKILL §6.2: Exibe mensagem de erro específica se vier do backend
+      const errorMessage = error.message || 'Não foi possível salvar os dados do parceiro.';
+      addToast('error', 'Erro no Cadastro', errorMessage);
     }
   };
 

@@ -98,7 +98,9 @@ function subscribeToSalesRealtime(onInvalidate: () => void): () => void {
 
 // ─── Hook principal ─────────────────────────────────────────────────────────
 
-export function useSalesOrders(filters?: { statuses?: string[] }) {
+import { SalesLoadParams, SalesLoadResult } from '../services/sales/loader';
+
+export function useSalesOrders(params: SalesLoadParams = {}) {
   const queryClient = useQueryClient();
 
   // Realtime: invalida cache quando qualquer venda muda no banco
@@ -109,11 +111,14 @@ export function useSalesOrders(filters?: { statuses?: string[] }) {
     return unsub;
   }, [queryClient]);
 
-  return useQuery<SalesOrder[]>({
-    queryKey: filters ? [...QUERY_KEYS.SALES_ORDERS, filters] : QUERY_KEYS.SALES_ORDERS,
+  // Se houver busca, ignoramos o cache stale agressivo para garantir frescor
+  const isSearching = !!(params.searchTerm || params.startDate || params.endDate || params.shareholder);
+
+  return useQuery<SalesLoadResult>({
+    queryKey: [...QUERY_KEYS.SALES_ORDERS, params],
     // Delega ao salesService que sabe lidar com modo canônico e enriquecimento
-    queryFn: () => salesService.loadFromSupabase(2, filters),
-    staleTime: 1000 * 60 * 5, // ⚡ REALTIME: O canal via useEffect já invalida; não precisa de fetch constante
+    queryFn: () => salesService.loadFromSupabase(params),
+    staleTime: isSearching ? 0 : 1000 * 60 * 5, 
     placeholderData: (prev) => prev,      // Mantém dados antigos enquanto revalida
   });
 }
@@ -123,11 +128,12 @@ export function useSalesOrders(filters?: { statuses?: string[] }) {
  * Não cria subscription própria — usa a invalidação hierárquica do SALES_ORDERS.
  */
 export function usePartnerSalesOrders(partnerId: string) {
-  const query = useSalesOrders();
+  // Para parceiro, buscamos todos do parceiro (limite maior ou sem limite se necessário)
+  const query = useSalesOrders({ pageSize: 1000 }); // Busca uma "página" grande do parceiro
 
   return {
     ...query,
-    data: query.data?.filter(o => o.customerId === partnerId) ?? [],
+    data: query.data?.data.filter(o => o.customerId === partnerId) ?? [],
   };
 }
 

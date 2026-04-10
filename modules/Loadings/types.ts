@@ -62,6 +62,7 @@ export interface Loading {
   salesOrderId: string;
   salesOrderNumber: string;
   customerName: string;
+  customerNickname?: string;
   salesPrice: number;
   totalSalesValue: number;
 

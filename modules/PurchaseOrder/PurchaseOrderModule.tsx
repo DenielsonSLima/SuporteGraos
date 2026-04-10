@@ -14,6 +14,7 @@ import { useToast } from '../../contexts/ToastContext';
 import { usePurchaseOrders } from '../../hooks/usePurchaseOrders';
 import { useLoadings } from '../../hooks/useLoadings';
 import { usePurchaseOrderModule } from './hooks/usePurchaseOrderModule';
+import { Pagination } from '../../components/ui/Pagination';
 
 export type GroupByOption = 'month' | 'harvest' | 'partner' | 'none';
 
@@ -21,26 +22,41 @@ const PurchaseOrderModule: React.FC = () => {
   const { addToast } = useToast();
   const { shareholders, getOrderById, handleSave: saveOrder, executeDelete: deleteOrder, finalizeOrder } = usePurchaseOrderModule({ addToast });
   
-  // Data State — Pedidos de Compra via TanStack Query (cache + realtime automático)
-  const { data: orders = [] } = usePurchaseOrders();
-  // Data State — Romaneios reativos para KPIs (evita cache com TTL de 30s)
-  const { data: loadings = [] } = useLoadings();
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 40;
 
   // UI/Filter State
   const [activeTab, setActiveTab] = useState<'active' | 'finalized' | 'all'>('active');
   const [groupBy, setGroupBy] = useState<GroupByOption>('month');
   const [viewMode, setViewMode] = useState<'list' | 'form' | 'details'>('list');
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
-  const selectedOrder = useMemo(() => 
-    orders.find(o => o.id === selectedOrderId), 
-    [orders, selectedOrderId]
-  );
   
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [selectedShareholder, setSelectedShareholder] = useState('');
+
+  // Data State — Pedidos de Compra via TanStack Query (cache + realtime automático)
+  const { data: ordersResult, isFetching, isLoading } = usePurchaseOrders({
+    page: currentPage,
+    pageSize,
+    searchTerm,
+    startDate,
+    endDate,
+    shareholder: selectedShareholder,
+    statuses: activeTab === 'all' ? undefined : (activeTab === 'active' ? ['pending', 'approved', 'transport'] : ['completed', 'canceled'])
+  });
+  const orders = ordersResult?.data ?? [];
+  const totalCount = ordersResult?.count ?? 0;
+
+  // Data State — Romaneios reativos para KPIs (evita cache com TTL de 30s)
+  const { data: loadings = [] } = useLoadings();
+
+  const selectedOrder = useMemo(() => 
+    orders.find(o => o.id === selectedOrderId), 
+    [orders, selectedOrderId]
+  );
 
   // Modals
   const [orderToDelete, setOrderToDelete] = useState<PurchaseOrder | null>(null);
@@ -133,38 +149,13 @@ const PurchaseOrderModule: React.FC = () => {
     });
   };
 
-  // --- LÓGICA DE FILTRAGEM UNIFICADA (FILTROS + ABAS) ---
-  const finalList = useMemo(() => {
-    return orders.filter(o => {
-      // 1. Filtro de Texto (Nome, Número)
-      const search = searchTerm.toLowerCase();
-      const partnerName = (o.partnerName || '').toLowerCase();
-      const orderNumber = (o.number || '').toLowerCase();
-      const matchesSearch = 
-        partnerName.includes(search) ||
-        orderNumber.includes(search);
+  // Reset page on filter or tab change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, searchTerm, startDate, endDate, selectedShareholder]);
 
-      // 2. Filtro de Data
-      let matchesDate = true;
-      const orderDate = o.date || '';
-      if (startDate && orderDate < startDate) matchesDate = false;
-      if (endDate && orderDate > endDate) matchesDate = false;
-
-      // 3. Filtro de Sócio
-      let matchesShareholder = true;
-      if (selectedShareholder && o.consultantName !== selectedShareholder) matchesShareholder = false;
-
-      // 4. Filtro de Aba (Status)
-      let matchesTab = true;
-      if (activeTab === 'active') {
-         matchesTab = ['pending', 'approved', 'transport'].includes(o.status);
-      } else if (activeTab === 'finalized') {
-         matchesTab = ['completed', 'canceled'].includes(o.status);
-      }
-
-      return matchesSearch && matchesDate && matchesShareholder && matchesTab;
-    });
-  }, [orders, searchTerm, startDate, endDate, selectedShareholder, activeTab]);
+  // --- KPI DADOS ---
+  const kpiList = useMemo(() => orders, [orders]);
 
   const handleClearFilters = () => {
       setSearchTerm('');
@@ -183,7 +174,7 @@ const PurchaseOrderModule: React.FC = () => {
       <div className="space-y-6 animate-in fade-in duration-500">
         
         {/* KPI Section - Recebe a lista JÁ FILTRADA + loadings reativos */}
-        <PurchaseKPIs orders={finalList} loadings={loadings} />
+        <PurchaseKPIs orders={orders} loadings={loadings} />
         
         {/* Filter Bar (Estilo Sales Order) */}
         <div className="flex flex-col gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
@@ -289,9 +280,36 @@ const PurchaseOrderModule: React.FC = () => {
 
         {/* Content List */}
         <div className="min-h-[400px]">
-          {activeTab === 'active' && <ActiveOrders orders={finalList} onOrderClick={handleOrderClick} onFinalize={handleFinalizeRequest} onDelete={handleDeleteRequest} groupBy={groupBy} />}
-          {activeTab === 'finalized' && <FinalizedOrders orders={finalList} onOrderClick={handleOrderClick} onDelete={handleDeleteRequest} groupBy={groupBy} />}
-          {activeTab === 'all' && <AllOrders orders={finalList} onOrderClick={handleOrderClick} onDelete={handleDeleteRequest} groupBy={groupBy} />}
+          {activeTab === 'active' && <ActiveOrders orders={orders} onOrderClick={handleOrderClick} onFinalize={handleFinalizeRequest} onDelete={handleDeleteRequest} groupBy={groupBy} />}
+          {activeTab === 'finalized' && <FinalizedOrders orders={orders} onOrderClick={handleOrderClick} onDelete={handleDeleteRequest} groupBy={groupBy} />}
+          {activeTab === 'all' && <AllOrders orders={orders} onOrderClick={handleOrderClick} onDelete={handleDeleteRequest} groupBy={groupBy} />}
+          
+          {isLoading && (
+            <div className="flex flex-col items-center justify-center py-40 gap-4">
+              <div className="w-12 h-12 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin"></div>
+              <p className="text-sm font-black text-slate-400 uppercase tracking-widest animate-pulse">Carregando Pedidos...</p>
+            </div>
+          )}
+
+          {!isLoading && orders.length > 0 && (
+            <Pagination 
+              currentPage={currentPage}
+              totalCount={totalCount}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              isLoading={isFetching}
+            />
+          )}
+
+          {!isLoading && orders.length === 0 && (
+             <div className="text-center py-20 text-slate-400 italic bg-white rounded-3xl border-2 border-dashed border-slate-100 flex flex-col items-center gap-3">
+              <AlertTriangle className="text-slate-300" size={40} />
+              <p>Nenhum pedido encontrado nesta visão.</p>
+              {hasFilters && (
+                <button onClick={handleClearFilters} className="text-blue-500 font-bold uppercase text-[10px] tracking-widest mt-2 hover:underline">Limpar Filtros</button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     );

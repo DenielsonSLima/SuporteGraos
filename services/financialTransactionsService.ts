@@ -42,26 +42,38 @@ function mapRow(row: any): FinancialTransaction {
 
 // Helper: busca company_id
 async function getCompanyId(): Promise<string> {
+  const companyId = authService.getCurrentUser()?.companyId;
+  if (companyId) return companyId;
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Usuário não autenticado');
+
   const { data, error } = await supabase
     .from('app_users')
     .select('company_id')
+    .eq('auth_user_id', user.id)
     .single();
+
   if (error || !data?.company_id)
     throw new Error('Usuário sem empresa vinculada');
+
   return data.company_id as string;
 }
 
 // Helper: busca user ID
 async function getCurrentUserId(): Promise<string | null> {
+  const user = authService.getCurrentUser();
+  if (user?.appUserId) return user.appUserId;
+
   const {
-    data: { user },
+    data: { user: authUser },
   } = await supabase.auth.getUser();
-  if (!user) return null;
+  if (!authUser) return null;
 
   const { data } = await supabase
     .from('app_users')
     .select('id')
-    .eq('auth_user_id', user.id)
+    .eq('auth_user_id', authUser.id)
     .single();
 
   return data?.id || null;

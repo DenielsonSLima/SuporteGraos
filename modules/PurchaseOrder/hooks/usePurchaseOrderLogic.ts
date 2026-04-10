@@ -16,6 +16,7 @@ import { QUERY_KEYS } from '../../../hooks/queryKeys';
 import { expenseService } from '../../../services/purchase/expenseService';
 import { kpiService } from '../../../services/purchase/kpiService';
 import { useLoadingsByPurchaseOrder } from '../../../hooks/useLoadings';
+import { usePartners } from '../../../hooks/useParceiros';
 
 export const usePurchaseOrderLogic = (order: PurchaseOrder, onFinalizeCallback: () => void) => {
   const { addToast } = useToast();
@@ -32,21 +33,35 @@ export const usePurchaseOrderLogic = (order: PurchaseOrder, onFinalizeCallback: 
       // ✅ OPTIMIZATION: Invalidate only specific queries related to this order 
       // instead of global PURCHASE_ORDERS and LOADINGS lists.
       await Promise.allSettled([
-        queryClient.invalidateQueries({ 
-          queryKey: QUERY_KEYS.PURCHASE_ORDERS, 
-          predicate: (query) => (query.queryKey[1] as any)?.id === order.id || query.queryKey.length === 1 
-        }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS }),
         queryClient.invalidateQueries({ queryKey: ['purchase_order_transactions', order.id] }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_TRANSACTIONS }),
-        // Invalidate loadings only for this PO
-        queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.LOADINGS, order.id] })
+        // Invalidate all loadings to ensure global lists and PO specific lists are fresh
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOADINGS })
       ]);
     } catch (refreshErr) {
       console.warn('⚠️ refreshData failed:', refreshErr);
     }
   };
 
-  const activeLoadings = useMemo(() => loadings.filter(l => l.status !== 'canceled'), [loadings]);
+  const { data: rawPartners = { data: [] } } = usePartners();
+  const partners = rawPartners.data || [];
+
+  const enrichedLoadings = useMemo(() => {
+    return loadings.map(l => {
+      if (l.customerNickname) return l; // Já tem, não mexe
+      
+      // Tenta achar o parceiro pelo nome para pegar o apelido
+      const partner = partners.find(p => p.name === l.customerName);
+      if (partner?.nickname) {
+        return { ...l, customerNickname: partner.nickname };
+      }
+      
+      return l;
+    });
+  }, [loadings, partners]);
+
+  const activeLoadings = useMemo(() => enrichedLoadings.filter(l => l.status !== 'canceled'), [enrichedLoadings]);
 
   // Merge transactions from metadata and live financial module
   const mergedTransactions = useMemo(() => {
@@ -280,7 +295,7 @@ export const usePurchaseOrderLogic = (order: PurchaseOrder, onFinalizeCallback: 
       }
     },
     handleSaveNewLoading: async (loading: Loading) => {
-      loadingService.add(loading);
+      await loadingService.add(loading);
       await refreshData();
     },
     handleDeleteLoading: async (loadingId: string) => {
@@ -338,5 +353,5 @@ export const usePurchaseOrderLogic = (order: PurchaseOrder, onFinalizeCallback: 
     }
   };
 
-  return { currentOrder: order, loadings, stats, mergedTransactions, isFinalizePromptOpen, setIsFinalizePromptOpen, isProcessing, actions };
+  return { currentOrder: order, loadings: enrichedLoadings, stats, mergedTransactions, isFinalizePromptOpen, setIsFinalizePromptOpen, isProcessing, actions };
 };

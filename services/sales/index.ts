@@ -16,9 +16,9 @@ export const salesService = {
   subscribe: (callback: (items: SalesOrder[]) => void) => salesStore.subscribe(callback),
 
   // Loading
-  loadFromSupabase: (retries?: number, filters?: { statuses?: string[] }) => 
-    salesLoader.loadFromSupabase(retries, filters),
-  reload: () => salesLoader.loadFromSupabase(),
+  loadFromSupabase: (params?: any) => 
+    salesLoader.loadFromSupabase(params),
+  reload: () => salesLoader.loadFromSupabase({}),
 
   // Actions
   add: (sale: SalesOrder) => salesActions.add(sale),
