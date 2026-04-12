@@ -159,7 +159,7 @@ const FreightPaymentModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, tota
                   <select required value={accountId} onChange={e => setAccountId(e.target.value)} className={`${inputClass} pl-12 appearance-none`}>
                     <option value="">Selecione o Banco...</option>
                     {bankAccounts.map(acc => (
-                      <option key={acc.id} value={acc.id}>{acc.account_name} (Saldo: {formatBRL(acc.balance)})</option>
+                      <option key={acc.id} value={acc.id}>{acc.account_name} | {acc.owner || 'Sem Dono'} (Saldo: {formatBRL(acc.balance)})</option>
                     ))}
                   </select>
                   <ArrowDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />

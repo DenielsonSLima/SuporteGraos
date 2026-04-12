@@ -163,7 +163,7 @@ const FinancialPaymentModal: React.FC<Props> = ({ record, bulkTotal, bulkCount, 
                   <option value="">Selecione o Banco...</option>
                   {bankAccounts.map(acc => (
                     <option key={acc.id} value={acc.id}>
-                      {acc.account_name} (Saldo: {formatBRL(acc.balance)})
+                      {acc.account_name} | {acc.owner || 'Sem Dono'} (Saldo: {formatBRL(acc.balance)})
                     </option>
                   ))}
                 </select>

@@ -245,7 +245,7 @@ const FinancialRecordForm: React.FC<Props> = ({ isOpen, onClose, onSave, type, i
                         <option value="">Selecione a conta...</option>
                         {accounts.map(acc => (
                           <option key={acc.id} value={acc.id}>
-                            {acc.account_name} (Saldo: {currency(acc.balance)})
+                            {acc.account_name} | {acc.owner || 'Sem Dono'} (Saldo: {currency(acc.balance)})
                           </option>
                         ))}
                       </select>
@@ -269,7 +269,7 @@ const FinancialRecordForm: React.FC<Props> = ({ isOpen, onClose, onSave, type, i
                         <option value="">Selecione a conta...</option>
                         {accounts.map(acc => (
                           <option key={acc.id} value={acc.id}>
-                            {acc.account_name} (Saldo: {currency(acc.balance)})
+                            {acc.account_name} | {acc.owner || 'Sem Dono'} (Saldo: {currency(acc.balance)})
                           </option>
                         ))}
                       </select>

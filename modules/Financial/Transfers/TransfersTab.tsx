@@ -93,9 +93,8 @@ const TransfersTab: React.FC = () => {
 
   const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
   const date = (val: string) => new Date(val).toLocaleDateString('pt-BR');
-  const getAccountLabel = (accountId: string) => {
-    const acc = accounts.find(a => a.id === accountId);
-    return acc ? acc.account_name : accountId;
+  const getAccountData = (accountId: string) => {
+    return accounts.find(a => a.id === accountId);
   };
 
   const currentMonthStr = new Date().toISOString().slice(0, 7);
@@ -179,7 +178,8 @@ const TransfersTab: React.FC = () => {
                   <div className="p-2 bg-rose-50 rounded-xl text-rose-600"><Wallet size={18} /></div>
                   <div className="overflow-hidden">
                     <p className="text-[9px] text-rose-500 font-black uppercase tracking-tighter">Origem (Saída)</p>
-                    <p className="text-sm font-black text-slate-700 truncate uppercase" title={getAccountLabel(transfer.account_from_id)}>{getAccountLabel(transfer.account_from_id)}</p>
+                    <p className="text-sm font-black text-slate-700 truncate uppercase" title={getAccountData(transfer.account_from_id)?.account_name}>{getAccountData(transfer.account_from_id)?.account_name || transfer.account_from_id}</p>
+                    <p className="text-[10px] font-bold text-slate-400 mt-0.5 truncate uppercase">{getAccountData(transfer.account_from_id)?.owner || 'Sem Dono'}</p>
                   </div>
                 </div>
 
@@ -192,7 +192,8 @@ const TransfersTab: React.FC = () => {
                   <div className="p-2 bg-emerald-50 rounded-xl text-emerald-600"><Wallet size={18} /></div>
                   <div className="overflow-hidden">
                     <p className="text-[9px] text-emerald-500 font-black uppercase tracking-tighter">Destino (Entrada)</p>
-                    <p className="text-sm font-black text-slate-700 truncate uppercase" title={getAccountLabel(transfer.account_to_id)}>{getAccountLabel(transfer.account_to_id)}</p>
+                    <p className="text-sm font-black text-slate-700 truncate uppercase" title={getAccountData(transfer.account_to_id)?.account_name}>{getAccountData(transfer.account_to_id)?.account_name || transfer.account_to_id}</p>
+                    <p className="text-[10px] font-bold text-slate-400 mt-0.5 truncate uppercase">{getAccountData(transfer.account_to_id)?.owner || 'Sem Dono'}</p>
                   </div>
                 </div>
               </div>

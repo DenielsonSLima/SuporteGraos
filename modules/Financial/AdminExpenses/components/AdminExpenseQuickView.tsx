@@ -60,7 +60,8 @@ const AdminExpenseQuickView: React.FC<Props> = ({ isOpen, onClose, record, onPay
   const isOverdue = record.status === 'overdue';
 
   const getAccountName = (id: string) => {
-    return accounts.find(a => a.id === id)?.account_name || 'Conta desconhecida';
+    const acc = accounts.find(a => a.id === id);
+    return acc ? `${acc.account_name} - ${acc.owner || 'Sem Dono'}` : 'Conta desconhecida';
   };
 
   const modalContent = (
