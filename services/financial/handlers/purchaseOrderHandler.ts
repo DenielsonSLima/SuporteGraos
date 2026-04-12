@@ -1,6 +1,6 @@
 
 import { payablesService } from '../payablesService';
-import { generateTxId, registerFinancialRecords } from './orchestratorHelpers';
+import { generateTxId, registerFinancialRecords, sanitizeRecordId, isValidUUID } from './orchestratorHelpers';
 import type { PaymentData, PaymentResult } from './orchestratorTypes';
 import { isSqlCanonicalOpsEnabled } from '../../sqlCanonicalOps';
 
@@ -21,24 +21,29 @@ export const handlePurchaseOrderPayment = async (
   let supplierName = data.entityName || 'Fornecedor';
 
   // 1. Resolução do ID do Lançamento Financeiro (entry_id)
-  // No modo modular, precisamos do ID da tabela financial_entries.
+  const sanitizedId = sanitizeRecordId(recordId);
+
   if (canonicalOpsEnabled) {
     // Busca direta via view enriquecida para garantir que temos o ID correto
-    const { data: entry } = await supabase
-      .from('vw_payables_enriched')
-      .select('id, order_id, partner_name')
-      .or(`id.eq.${recordId},order_id.eq.${recordId}`)
-      .maybeSingle();
+    // Utilizamos origin_id pois a view mapeia a origem (Pedido de Compra) ao lançamento
+    const query = supabase.from('vw_payables_enriched').select('id, origin_id, partner_name');
+    
+    // Filtro defensivo: apenas tenta comparar UUID se for um UUID válido
+    if (isValidUUID(sanitizedId)) {
+      const { data: entry } = await query
+        .or(`id.eq.${sanitizedId},origin_id.eq.${sanitizedId}`)
+        .maybeSingle();
 
-    if (entry) {
-      entryId = entry.id;
-      purchaseOrderId = entry.order_id || '';
-      supplierName = entry.partner_name || supplierName;
+      if (entry) {
+        entryId = entry.id;
+        purchaseOrderId = entry.origin_id || '';
+        supplierName = entry.partner_name || supplierName;
+      }
     }
   } else {
     // MODO LEGADO (Fallback)
     await payablesService.loadFromSupabase();
-    const payable = payablesService.getById(recordId) || payablesService.getAll().find(p => p.purchaseOrderId === recordId);
+    const payable = payablesService.getById(sanitizedId) || payablesService.getAll().find(p => p.purchaseOrderId === sanitizedId);
     if (payable) {
       entryId = payable.id;
       purchaseOrderId = payable.purchaseOrderId || '';

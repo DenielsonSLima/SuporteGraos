@@ -17,6 +17,7 @@ import {
   EntryStatus,
   FinancialFilterParams,
 } from '../services/financialEntriesService';
+import { loadingService } from '../services/loadingService';
 import { QUERY_KEYS, STALE_TIMES } from './queryKeys';
 
 // Hook principal: Contas a Pagar
@@ -24,13 +25,29 @@ export function usePayables(params?: FinancialFilterParams) {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    // Invalida apenas quando o tipo mudado é 'payable' (ou desconhecido como fallback seguro)
-    const unsub = financialEntriesService.subscribeRealtime((entryType) => {
+    // 1. Invalida apenas quando o tipo mudado é 'payable' (ou desconhecido como fallback seguro)
+    const unsubEntries = financialEntriesService.subscribeRealtime((entryType) => {
       if (!entryType || entryType === 'payable') {
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_PAYABLES });
       }
     });
-    return unsub;
+
+    // 2. Invalida quando houver mudanças em Carregamentos (Logística)
+    // Muitos títulos de frete são gerados/atualizados via Logística.
+    // Usamos debounce para evitar excesso de rede (Egress Saver).
+    let timer: NodeJS.Timeout;
+    const unsubLoadings = loadingService.subscribeRealtime(() => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_PAYABLES });
+      }, 1000); // 1s debounce
+    });
+
+    return () => {
+      unsubEntries();
+      unsubLoadings();
+      clearTimeout(timer);
+    };
   }, [queryClient]);
 
   return useQuery({
@@ -46,15 +63,32 @@ export function useReceivables(params?: FinancialFilterParams) {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    // Invalida apenas quando o tipo mudado é 'receivable' (ou desconhecido como fallback seguro)
-    const unsub = financialEntriesService.subscribeRealtime((entryType) => {
+    // 1. Invalida apenas quando o tipo mudado é 'receivable' (ou desconhecido como fallback seguro)
+    const unsubEntries = financialEntriesService.subscribeRealtime((entryType) => {
       if (!entryType || entryType === 'receivable') {
         queryClient.invalidateQueries({
           queryKey: QUERY_KEYS.FINANCIAL_RECEIVABLES,
         });
       }
     });
-    return unsub;
+
+    // 2. Invalida quando houver mudanças em Carregamentos (Logística)
+    // Títulos de receita de venda são vinculados a carregamentos.
+    let timer: NodeJS.Timeout;
+    const unsubLoadings = loadingService.subscribeRealtime(() => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        queryClient.invalidateQueries({
+          queryKey: QUERY_KEYS.FINANCIAL_RECEIVABLES,
+        });
+      }, 1000); // 1s debounce
+    });
+
+    return () => {
+      unsubEntries();
+      unsubLoadings();
+      clearTimeout(timer);
+    };
   }, [queryClient]);
 
   return useQuery({

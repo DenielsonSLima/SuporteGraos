@@ -1,4 +1,5 @@
 import { supabase } from '../../supabase';
+import { authService } from '../../authService';
 
 /**
  * FINANCIAL ENTRIES REALTIME
@@ -11,10 +12,6 @@ const listeners = new Set<(entryType: string | undefined) => void>();
 const ensureChannel = async () => {
   if (channel) return;
 
-  const { authService } = await import('../../authService');
-  const user = authService.getCurrentUser();
-  const companyId = user?.companyId;
-
   channel = supabase
     .channel('realtime:financial_entries')
     .on(
@@ -25,8 +22,14 @@ const ensureChannel = async () => {
         table: 'financial_entries',
       },
       (payload: any) => {
+        // Obter companyId do usuário atual para garantir isolamento robusto
+        const currentUser = authService.getCurrentUser();
+        const myCompanyId = currentUser?.companyId;
+
         const changedCompanyId = payload?.new?.company_id ?? payload?.old?.company_id;
-        if (!companyId || !changedCompanyId || changedCompanyId === companyId) {
+        
+        // Se não houver companyId no payload ou no usuário, ou se coincidirem, notifica
+        if (!myCompanyId || !changedCompanyId || changedCompanyId === myCompanyId) {
           const entryType: string | undefined = payload?.new?.type ?? payload?.old?.type;
           listeners.forEach(cb => cb(entryType));
         }

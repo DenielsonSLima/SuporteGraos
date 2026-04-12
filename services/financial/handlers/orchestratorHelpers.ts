@@ -29,6 +29,25 @@ export const getLogInfo = () => {
 export const getCompanyId = () => authService.getCurrentUser()?.companyId || '';
 
 // ============================================================================
+// ID SANITIZATION & VALIDATION
+// ============================================================================
+
+/**
+ * Remove prefixos comuns do frontend (po-grain-, so-, fr-, etc.) 
+ * e retorna o UUID limpo.
+ */
+export const sanitizeRecordId = (id: string): string => {
+  if (!id) return id;
+  // Patterns detectados: po-, po-grain-, so-, fr-, adv-, receipt-
+  return id.replace(/^(po-grain-|po-|so-|fr-|adv-|receipt-)/, '');
+};
+
+/** Verifica se a string é um UUID v4 válido */
+export const isValidUUID = (id: string): boolean => {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+};
+
+// ============================================================================
 // RESOLUÇÃO DE CONTA BANCÁRIA
 // ============================================================================
 

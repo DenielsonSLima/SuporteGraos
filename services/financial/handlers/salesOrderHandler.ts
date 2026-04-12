@@ -1,6 +1,6 @@
 
 import { receivablesService } from '../receivablesService';
-import { generateTxId, registerFinancialRecords } from './orchestratorHelpers';
+import { generateTxId, registerFinancialRecords, sanitizeRecordId, isValidUUID } from './orchestratorHelpers';
 import type { PaymentData, PaymentResult } from './orchestratorTypes';
 import { isSqlCanonicalOpsEnabled } from '../../sqlCanonicalOps';
 
@@ -21,23 +21,27 @@ export const handleSalesOrderReceipt = async (
   let customerName = data.entityName || 'Cliente';
 
   // 1. Resolução do ID do Lançamento Financeiro (entry_id)
+  const sanitizedId = sanitizeRecordId(recordId);
+
   if (canonicalOpsEnabled) {
     // Busca direta via view enriquecida
-    const { data: entry } = await supabase
-      .from('vw_receivables_enriched')
-      .select('id, order_id, partner_name')
-      .or(`id.eq.${recordId},order_id.eq.${recordId}`)
-      .maybeSingle();
+    const query = supabase.from('vw_receivables_enriched').select('id, sales_order_id, partner_name');
+    
+    if (isValidUUID(sanitizedId)) {
+      const { data: entry } = await query
+        .or(`id.eq.${sanitizedId},sales_order_id.eq.${sanitizedId}`)
+        .maybeSingle();
 
-    if (entry) {
-      entryId = entry.id;
-      salesOrderId = entry.order_id || '';
-      customerName = entry.partner_name || customerName;
+      if (entry) {
+        entryId = entry.id;
+        salesOrderId = entry.sales_order_id || '';
+        customerName = entry.partner_name || customerName;
+      }
     }
   } else {
     // MODO LEGADO (Fallback)
     await receivablesService.loadFromSupabase();
-    const receivable = receivablesService.getById(recordId) || receivablesService.getAll().find(r => r.salesOrderId === recordId);
+    const receivable = receivablesService.getById(sanitizedId) || receivablesService.getAll().find(r => r.salesOrderId === sanitizedId);
     if (receivable) {
       entryId = receivable.id;
       salesOrderId = receivable.salesOrderId || '';

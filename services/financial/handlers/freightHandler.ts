@@ -1,6 +1,6 @@
 
 import { payablesService } from '../payablesService';
-import { generateTxId, registerFinancialRecords } from './orchestratorHelpers';
+import { generateTxId, registerFinancialRecords, sanitizeRecordId, isValidUUID } from './orchestratorHelpers';
 import type { PaymentData, PaymentResult } from './orchestratorTypes';
 import { isSqlCanonicalOpsEnabled } from '../../sqlCanonicalOps';
 
@@ -21,24 +21,28 @@ export const handleFreightPayment = async (
   let carrierName = data.entityName || 'Transportadora/Motorista';
 
   // 1. Resolução do ID do Lançamento Financeiro (entry_id)
+  const sanitizedId = sanitizeRecordId(recordId);
+
   if (canonicalOpsEnabled) {
     // Busca direta via view enriquecida (que vincula loadings a entries)
-    const { data: entry } = await supabase
-      .from('vw_payables_enriched')
-      .select('id, origin_id, partner_name')
-      .or(`id.eq.${recordId},origin_id.eq.${recordId}`)
-      .eq('origin_type', 'freight')
-      .maybeSingle();
+    const query = supabase.from('vw_payables_enriched').select('id, origin_id, partner_name');
+    
+    if (isValidUUID(sanitizedId)) {
+      const { data: entry } = await query
+        .or(`id.eq.${sanitizedId},origin_id.eq.${sanitizedId}`)
+        .eq('origin_type', 'freight')
+        .maybeSingle();
 
-    if (entry) {
-      entryId = entry.id;
-      freightId = entry.origin_id || '';
-      carrierName = entry.partner_name || carrierName;
+      if (entry) {
+        entryId = entry.id;
+        freightId = entry.origin_id || '';
+        carrierName = entry.partner_name || carrierName;
+      }
     }
   } else {
     // MODO LEGADO (Fallback)
     await payablesService.loadFromSupabase();
-    const payable = payablesService.getById(recordId) || payablesService.getAll().find(p => p.loadingId === recordId);
+    const payable = payablesService.getById(sanitizedId) || payablesService.getAll().find(p => p.loadingId === sanitizedId);
     if (payable) {
       entryId = payable.id;
       freightId = payable.loadingId || '';
