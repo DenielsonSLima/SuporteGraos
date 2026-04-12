@@ -1,1466 +1,367 @@
 [
-  {
-    "text": "O agronegócio é a força que alimenta o mundo.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Cada grão conta uma história de trabalho e esperança.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "A terra é o nosso maior patrimônio, cuide dela.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Tecnologia e campo: a união que gera progresso.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Safra farta é fruto de planejamento e suor.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Logística eficiente é a chave para o sucesso no campo.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "O produtor rural é o herói invisível da economia.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Inovação no campo não é opção, é necessidade.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Gestão de grãos com precisão e transparência.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "O futuro do agro é hoje, com inteligência e dados.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "O sucesso é a soma de pequenos esforços repetidos.",
-    "author": "Robert Collier"
-  },
-  {
-    "text": "A persistência é o caminho do êxito.",
-    "author": "Charles Chaplin"
-  },
-  {
-    "text": "O único lugar onde o sucesso vem antes do trabalho é no dicionário.",
-    "author": "Vidal Sassoon"
-  },
-  {
-    "text": "Não espere por oportunidades, crie-as.",
-    "author": "George Bernard Shaw"
-  },
-  {
-    "text": "A gratidão transforma o que temos em suficiente.",
-    "author": "Melody Beattie"
-  },
-  {
-    "text": "Foco é dizer não para centenas de outras boas ideias.",
-    "author": "Steve Jobs"
-  },
-  {
-    "text": "Não importa o quão devagar você vá, desde que não pare.",
-    "author": "Confúcio"
-  },
-  {
-    "text": "A coragem não é a ausência de medo, mas o triunfo sobre ele.",
-    "author": "Nelson Mandela"
-  },
-  {
-    "text": "Seja grato pelo que você tem; você acabará tendo mais.",
-    "author": "Oprah Winfrey"
-  },
-  {
-    "text": "Acredite que você pode, assim você já está no meio do caminho.",
-    "author": "Theodore Roosevelt"
-  },
-  {
-    "text": "Dificuldades preparam pessoas extraordinárias.",
-    "author": "C.S. Lewis"
-  },
-  {
-    "text": "A maior glória não é nunca cair, mas levantar sempre.",
-    "author": "Nelson Mandela"
-  },
-  {
-    "text": "Tudo o que você sempre quis está do outro lado do medo.",
-    "author": "George Addair"
-  },
-  {
-    "text": "A vida é 10% o que acontece e 90% como você reage.",
-    "author": "Charles Swindoll"
-  },
-  {
-    "text": "Não conte os dias, faça os dias contarem.",
-    "author": "Muhammad Ali"
-  },
-  {
-    "text": "Sempre parece impossível até que seja feito.",
-    "author": "Nelson Mandela"
-  },
-  {
-    "text": "Acredite em si próprio e o resto virá naturalmente.",
-    "author": "Elon Musk"
-  },
-  {
-    "text": "O fracasso é o tempero que dá sabor ao sucesso.",
-    "author": "Truman Capote"
-  },
-  {
-    "text": "Grandes mentes discutem ideias.",
-    "author": "Eleanor Roosevelt"
-  },
-  {
-    "text": "Sorte é o encontro da preparação com a oportunidade.",
-    "author": "Sêneca"
-  },
-  {
-    "text": "A melhor maneira de prever o futuro é criá-lo.",
-    "author": "Peter Drucker"
-  },
-  {
-    "text": "O sucesso não é o fim, o fracasso não é fatal.",
-    "author": "Winston Churchill"
-  },
-  {
-    "text": "Pense grande, comece pequeno, aprenda rápido.",
-    "author": "Eric Ries"
-  },
-  {
-    "text": "Seja a mudança que você deseja ver no mundo.",
-    "author": "Mahatma Gandhi"
-  },
-  {
-    "text": "O segredo de progredir é começar.",
-    "author": "Mark Twain"
-  },
-  {
-    "text": "Onde há vontade, há um caminho.",
-    "author": "Provérbio"
-  },
-  {
-    "text": "A jornada de mil milhas começa com um passo.",
-    "author": "Lao Tsé"
-  },
-  {
-    "text": "A sabedoria começa na reflexão.",
-    "author": "Sócrates"
-  },
-  {
-    "text": "O trabalho duro supera o talento.",
-    "author": "Tim Notke"
-  },
-  {
-    "text": "A humildade é a chave para o aprendizado contínuo.",
-    "author": "Anônimo"
-  },
-  {
-    "text": "Paciência e persistência são a alma do sucesso.",
-    "author": "Anônimo"
-  },
-  {
-    "text": "Seja imparável em seus objetivos.",
-    "author": "Anônimo"
-  },
-  {
-    "text": "A disciplina é a liberdade de ser seu melhor.",
-    "author": "Anônimo"
-  },
-  {
-    "text": "Otimismo é a fé que conduz à realização.",
-    "author": "Helen Keller"
-  },
-  {
-    "text": "Transforme obstáculos em degraus.",
-    "author": "Anônimo"
-  },
-  {
-    "text": "A simplicidade é o último grau de sofisticação.",
-    "author": "Leonardo da Vinci"
-  },
-  {
-    "text": "Mantenha seus olhos nas estrelas e os pés no chão.",
-    "author": "Theodore Roosevelt"
-  },
-  {
-    "text": "Comece onde você está. Use o que você tem.",
-    "author": "Arthur Ashe"
-  },
-  {
-    "text": "O entusiasmo é a maior força da alma.",
-    "author": "Napoleon Hill"
-  },
-  {
-    "text": "A imaginação é mais importante que o conhecimento.",
-    "author": "Albert Einstein"
-  },
-  {
-    "text": "O agronegócio é a força que alimenta o mundo!",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Cada grão conta uma história de trabalho e esperança!",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "A terra é o nosso maior patrimônio, cuide dela!",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Tecnologia e campo: a união que gera progresso!",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Safra farta é fruto de planejamento e suor!",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Logística eficiente é a chave para o sucesso no campo!",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "O produtor rural é o herói invisível da economia!",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Inovação no campo não é opção, é necessidade!",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Gestão de grãos com precisão e transparência!",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "O futuro do agro é hoje, com inteligência e dados!",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "O sucesso é a soma de pequenos esforços repetidos!",
-    "author": "Robert Collier"
-  },
-  {
-    "text": "A persistência é o caminho do êxito!",
-    "author": "Charles Chaplin"
-  },
-  {
-    "text": "O único lugar onde o sucesso vem antes do trabalho é no dicionário!",
-    "author": "Vidal Sassoon"
-  },
-  {
-    "text": "Não espere por oportunidades, crie-as!",
-    "author": "George Bernard Shaw"
-  },
-  {
-    "text": "A gratidão transforma o que temos em suficiente!",
-    "author": "Melody Beattie"
-  },
-  {
-    "text": "Foco é dizer não para centenas de outras boas ideias!",
-    "author": "Steve Jobs"
-  },
-  {
-    "text": "Não importa o quão devagar você vá, desde que não pare!",
-    "author": "Confúcio"
-  },
-  {
-    "text": "A coragem não é a ausência de medo, mas o triunfo sobre ele!",
-    "author": "Nelson Mandela"
-  },
-  {
-    "text": "Seja grato pelo que você tem; você acabará tendo mais!",
-    "author": "Oprah Winfrey"
-  },
-  {
-    "text": "Acredite que você pode, assim você já está no meio do caminho!",
-    "author": "Theodore Roosevelt"
-  },
-  {
-    "text": "Dificuldades preparam pessoas extraordinárias!",
-    "author": "C.S. Lewis"
-  },
-  {
-    "text": "A maior glória não é nunca cair, mas levantar sempre!",
-    "author": "Nelson Mandela"
-  },
-  {
-    "text": "Tudo o que você sempre quis está do outro lado do medo!",
-    "author": "George Addair"
-  },
-  {
-    "text": "A vida é 10% o que acontece e 90% como você reage!",
-    "author": "Charles Swindoll"
-  },
-  {
-    "text": "Não conte os dias, faça os dias contarem!",
-    "author": "Muhammad Ali"
-  },
-  {
-    "text": "Sempre parece impossível até que seja feito!",
-    "author": "Nelson Mandela"
-  },
-  {
-    "text": "Acredite em si próprio e o resto virá naturalmente!",
-    "author": "Elon Musk"
-  },
-  {
-    "text": "O fracasso é o tempero que dá sabor ao sucesso!",
-    "author": "Truman Capote"
-  },
-  {
-    "text": "Grandes mentes discutem ideias!",
-    "author": "Eleanor Roosevelt"
-  },
-  {
-    "text": "Sorte é o encontro da preparação com a oportunidade!",
-    "author": "Sêneca"
-  },
-  {
-    "text": "A melhor maneira de prever o futuro é criá-lo!",
-    "author": "Peter Drucker"
-  },
-  {
-    "text": "O sucesso não é o fim, o fracasso não é fatal!",
-    "author": "Winston Churchill"
-  },
-  {
-    "text": "Pense grande, comece pequeno, aprenda rápido!",
-    "author": "Eric Ries"
-  },
-  {
-    "text": "Seja a mudança que você deseja ver no mundo!",
-    "author": "Mahatma Gandhi"
-  },
-  {
-    "text": "O segredo de progredir é começar!",
-    "author": "Mark Twain"
-  },
-  {
-    "text": "Onde há vontade, há um caminho!",
-    "author": "Provérbio"
-  },
-  {
-    "text": "A jornada de mil milhas começa com um passo!",
-    "author": "Lao Tsé"
-  },
-  {
-    "text": "A sabedoria começa na reflexão!",
-    "author": "Sócrates"
-  },
-  {
-    "text": "O trabalho duro supera o talento!",
-    "author": "Tim Notke"
-  },
-  {
-    "text": "A humildade é a chave para o aprendizado contínuo!",
-    "author": "Anônimo"
-  },
-  {
-    "text": "Paciência e persistência são a alma do sucesso!",
-    "author": "Anônimo"
-  },
-  {
-    "text": "Seja imparável em seus objetivos!",
-    "author": "Anônimo"
-  },
-  {
-    "text": "A disciplina é a liberdade de ser seu melhor!",
-    "author": "Anônimo"
-  },
-  {
-    "text": "Otimismo é a fé que conduz à realização!",
-    "author": "Helen Keller"
-  },
-  {
-    "text": "Transforme obstáculos em degraus!",
-    "author": "Anônimo"
-  },
-  {
-    "text": "A simplicidade é o último grau de sofisticação!",
-    "author": "Leonardo da Vinci"
-  },
-  {
-    "text": "Mantenha seus olhos nas estrelas e os pés no chão!",
-    "author": "Theodore Roosevelt"
-  },
-  {
-    "text": "Comece onde você está! Use o que você tem!",
-    "author": "Arthur Ashe"
-  },
-  {
-    "text": "O entusiasmo é a maior força da alma!",
-    "author": "Napoleon Hill"
-  },
-  {
-    "text": "A imaginação é mais importante que o conhecimento!",
-    "author": "Albert Einstein"
-  },
-  {
-    "text": "Lembre-se: O agronegócio é a força que alimenta o mundo.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Lembre-se: Cada grão conta uma história de trabalho e esperança.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Lembre-se: A terra é o nosso maior patrimônio, cuide dela.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Lembre-se: Tecnologia e campo: a união que gera progresso.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Lembre-se: Safra farta é fruto de planejamento e suor.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Lembre-se: Logística eficiente é a chave para o sucesso no campo.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Lembre-se: O produtor rural é o herói invisível da economia.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Lembre-se: Inovação no campo não é opção, é necessidade.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Lembre-se: Gestão de grãos com precisão e transparência.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Lembre-se: O futuro do agro é hoje, com inteligência e dados.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Lembre-se: O sucesso é a soma de pequenos esforços repetidos.",
-    "author": "Robert Collier"
-  },
-  {
-    "text": "Lembre-se: A persistência é o caminho do êxito.",
-    "author": "Charles Chaplin"
-  },
-  {
-    "text": "Lembre-se: O único lugar onde o sucesso vem antes do trabalho é no dicionário.",
-    "author": "Vidal Sassoon"
-  },
-  {
-    "text": "Lembre-se: Não espere por oportunidades, crie-as.",
-    "author": "George Bernard Shaw"
-  },
-  {
-    "text": "Lembre-se: A gratidão transforma o que temos em suficiente.",
-    "author": "Melody Beattie"
-  },
-  {
-    "text": "Lembre-se: Foco é dizer não para centenas de outras boas ideias.",
-    "author": "Steve Jobs"
-  },
-  {
-    "text": "Lembre-se: Não importa o quão devagar você vá, desde que não pare.",
-    "author": "Confúcio"
-  },
-  {
-    "text": "Lembre-se: A coragem não é a ausência de medo, mas o triunfo sobre ele.",
-    "author": "Nelson Mandela"
-  },
-  {
-    "text": "Lembre-se: Seja grato pelo que você tem; você acabará tendo mais.",
-    "author": "Oprah Winfrey"
-  },
-  {
-    "text": "Lembre-se: Acredite que você pode, assim você já está no meio do caminho.",
-    "author": "Theodore Roosevelt"
-  },
-  {
-    "text": "Lembre-se: Dificuldades preparam pessoas extraordinárias.",
-    "author": "C.S. Lewis"
-  },
-  {
-    "text": "Lembre-se: A maior glória não é nunca cair, mas levantar sempre.",
-    "author": "Nelson Mandela"
-  },
-  {
-    "text": "Lembre-se: Tudo o que você sempre quis está do outro lado do medo.",
-    "author": "George Addair"
-  },
-  {
-    "text": "Lembre-se: A vida é 10% o que acontece e 90% como você reage.",
-    "author": "Charles Swindoll"
-  },
-  {
-    "text": "Lembre-se: Não conte os dias, faça os dias contarem.",
-    "author": "Muhammad Ali"
-  },
-  {
-    "text": "Lembre-se: Sempre parece impossível até que seja feito.",
-    "author": "Nelson Mandela"
-  },
-  {
-    "text": "Lembre-se: Acredite em si próprio e o resto virá naturalmente.",
-    "author": "Elon Musk"
-  },
-  {
-    "text": "Lembre-se: O fracasso é o tempero que dá sabor ao sucesso.",
-    "author": "Truman Capote"
-  },
-  {
-    "text": "Lembre-se: Grandes mentes discutem ideias.",
-    "author": "Eleanor Roosevelt"
-  },
-  {
-    "text": "Lembre-se: Sorte é o encontro da preparação com a oportunidade.",
-    "author": "Sêneca"
-  },
-  {
-    "text": "Lembre-se: A melhor maneira de prever o futuro é criá-lo.",
-    "author": "Peter Drucker"
-  },
-  {
-    "text": "Lembre-se: O sucesso não é o fim, o fracasso não é fatal.",
-    "author": "Winston Churchill"
-  },
-  {
-    "text": "Lembre-se: Pense grande, comece pequeno, aprenda rápido.",
-    "author": "Eric Ries"
-  },
-  {
-    "text": "Lembre-se: Seja a mudança que você deseja ver no mundo.",
-    "author": "Mahatma Gandhi"
-  },
-  {
-    "text": "Lembre-se: O segredo de progredir é começar.",
-    "author": "Mark Twain"
-  },
-  {
-    "text": "Lembre-se: Onde há vontade, há um caminho.",
-    "author": "Provérbio"
-  },
-  {
-    "text": "Lembre-se: A jornada de mil milhas começa com um passo.",
-    "author": "Lao Tsé"
-  },
-  {
-    "text": "Lembre-se: A sabedoria começa na reflexão.",
-    "author": "Sócrates"
-  },
-  {
-    "text": "Lembre-se: O trabalho duro supera o talento.",
-    "author": "Tim Notke"
-  },
-  {
-    "text": "Lembre-se: A humildade é a chave para o aprendizado contínuo.",
-    "author": "Anônimo"
-  },
-  {
-    "text": "Lembre-se: Paciência e persistência são a alma do sucesso.",
-    "author": "Anônimo"
-  },
-  {
-    "text": "Lembre-se: Seja imparável em seus objetivos.",
-    "author": "Anônimo"
-  },
-  {
-    "text": "Lembre-se: A disciplina é a liberdade de ser seu melhor.",
-    "author": "Anônimo"
-  },
-  {
-    "text": "Lembre-se: Otimismo é a fé que conduz à realização.",
-    "author": "Helen Keller"
-  },
-  {
-    "text": "Lembre-se: Transforme obstáculos em degraus.",
-    "author": "Anônimo"
-  },
-  {
-    "text": "Lembre-se: A simplicidade é o último grau de sofisticação.",
-    "author": "Leonardo da Vinci"
-  },
-  {
-    "text": "Lembre-se: Mantenha seus olhos nas estrelas e os pés no chão.",
-    "author": "Theodore Roosevelt"
-  },
-  {
-    "text": "Lembre-se: Comece onde você está. Use o que você tem.",
-    "author": "Arthur Ashe"
-  },
-  {
-    "text": "Lembre-se: O entusiasmo é a maior força da alma.",
-    "author": "Napoleon Hill"
-  },
-  {
-    "text": "Lembre-se: A imaginação é mais importante que o conhecimento.",
-    "author": "Albert Einstein"
-  },
-  {
-    "text": "O agronegócio é a força que alimenta o mundo. Vamos em frente.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Cada grão conta uma história de trabalho e esperança. Vamos em frente.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "A terra é o nosso maior patrimônio, cuide dela. Vamos em frente.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Tecnologia e campo: a união que gera progresso. Vamos em frente.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Safra farta é fruto de planejamento e suor. Vamos em frente.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Logística eficiente é a chave para o sucesso no campo. Vamos em frente.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "O produtor rural é o herói invisível da economia. Vamos em frente.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Inovação no campo não é opção, é necessidade. Vamos em frente.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Gestão de grãos com precisão e transparência. Vamos em frente.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "O futuro do agro é hoje, com inteligência e dados. Vamos em frente.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "O sucesso é a soma de pequenos esforços repetidos. Vamos em frente.",
-    "author": "Robert Collier"
-  },
-  {
-    "text": "A persistência é o caminho do êxito. Vamos em frente.",
-    "author": "Charles Chaplin"
-  },
-  {
-    "text": "O único lugar onde o sucesso vem antes do trabalho é no dicionário. Vamos em frente.",
-    "author": "Vidal Sassoon"
-  },
-  {
-    "text": "Não espere por oportunidades, crie-as. Vamos em frente.",
-    "author": "George Bernard Shaw"
-  },
-  {
-    "text": "A gratidão transforma o que temos em suficiente. Vamos em frente.",
-    "author": "Melody Beattie"
-  },
-  {
-    "text": "Foco é dizer não para centenas de outras boas ideias. Vamos em frente.",
-    "author": "Steve Jobs"
-  },
-  {
-    "text": "Não importa o quão devagar você vá, desde que não pare. Vamos em frente.",
-    "author": "Confúcio"
-  },
-  {
-    "text": "A coragem não é a ausência de medo, mas o triunfo sobre ele. Vamos em frente.",
-    "author": "Nelson Mandela"
-  },
-  {
-    "text": "Seja grato pelo que você tem; você acabará tendo mais. Vamos em frente.",
-    "author": "Oprah Winfrey"
-  },
-  {
-    "text": "Acredite que você pode, assim você já está no meio do caminho. Vamos em frente.",
-    "author": "Theodore Roosevelt"
-  },
-  {
-    "text": "Dificuldades preparam pessoas extraordinárias. Vamos em frente.",
-    "author": "C.S. Lewis"
-  },
-  {
-    "text": "A maior glória não é nunca cair, mas levantar sempre. Vamos em frente.",
-    "author": "Nelson Mandela"
-  },
-  {
-    "text": "Tudo o que você sempre quis está do outro lado do medo. Vamos em frente.",
-    "author": "George Addair"
-  },
-  {
-    "text": "A vida é 10% o que acontece e 90% como você reage. Vamos em frente.",
-    "author": "Charles Swindoll"
-  },
-  {
-    "text": "Não conte os dias, faça os dias contarem. Vamos em frente.",
-    "author": "Muhammad Ali"
-  },
-  {
-    "text": "Sempre parece impossível até que seja feito. Vamos em frente.",
-    "author": "Nelson Mandela"
-  },
-  {
-    "text": "Acredite em si próprio e o resto virá naturalmente. Vamos em frente.",
-    "author": "Elon Musk"
-  },
-  {
-    "text": "O fracasso é o tempero que dá sabor ao sucesso. Vamos em frente.",
-    "author": "Truman Capote"
-  },
-  {
-    "text": "Grandes mentes discutem ideias. Vamos em frente.",
-    "author": "Eleanor Roosevelt"
-  },
-  {
-    "text": "Sorte é o encontro da preparação com a oportunidade. Vamos em frente.",
-    "author": "Sêneca"
-  },
-  {
-    "text": "A melhor maneira de prever o futuro é criá-lo. Vamos em frente.",
-    "author": "Peter Drucker"
-  },
-  {
-    "text": "O sucesso não é o fim, o fracasso não é fatal. Vamos em frente.",
-    "author": "Winston Churchill"
-  },
-  {
-    "text": "Pense grande, comece pequeno, aprenda rápido. Vamos em frente.",
-    "author": "Eric Ries"
-  },
-  {
-    "text": "Seja a mudança que você deseja ver no mundo. Vamos em frente.",
-    "author": "Mahatma Gandhi"
-  },
-  {
-    "text": "O segredo de progredir é começar. Vamos em frente.",
-    "author": "Mark Twain"
-  },
-  {
-    "text": "Onde há vontade, há um caminho. Vamos em frente.",
-    "author": "Provérbio"
-  },
-  {
-    "text": "A jornada de mil milhas começa com um passo. Vamos em frente.",
-    "author": "Lao Tsé"
-  },
-  {
-    "text": "A sabedoria começa na reflexão. Vamos em frente.",
-    "author": "Sócrates"
-  },
-  {
-    "text": "O trabalho duro supera o talento. Vamos em frente.",
-    "author": "Tim Notke"
-  },
-  {
-    "text": "A humildade é a chave para o aprendizado contínuo. Vamos em frente.",
-    "author": "Anônimo"
-  },
-  {
-    "text": "Paciência e persistência são a alma do sucesso. Vamos em frente.",
-    "author": "Anônimo"
-  },
-  {
-    "text": "Seja imparável em seus objetivos. Vamos em frente.",
-    "author": "Anônimo"
-  },
-  {
-    "text": "A disciplina é a liberdade de ser seu melhor. Vamos em frente.",
-    "author": "Anônimo"
-  },
-  {
-    "text": "Otimismo é a fé que conduz à realização. Vamos em frente.",
-    "author": "Helen Keller"
-  },
-  {
-    "text": "Transforme obstáculos em degraus. Vamos em frente.",
-    "author": "Anônimo"
-  },
-  {
-    "text": "A simplicidade é o último grau de sofisticação. Vamos em frente.",
-    "author": "Leonardo da Vinci"
-  },
-  {
-    "text": "Mantenha seus olhos nas estrelas e os pés no chão. Vamos em frente.",
-    "author": "Theodore Roosevelt"
-  },
-  {
-    "text": "Comece onde você está. Use o que você tem. Vamos em frente.",
-    "author": "Arthur Ashe"
-  },
-  {
-    "text": "O entusiasmo é a maior força da alma. Vamos em frente.",
-    "author": "Napoleon Hill"
-  },
-  {
-    "text": "A imaginação é mais importante que o conhecimento. Vamos em frente.",
-    "author": "Albert Einstein"
-  },
-  {
-    "text": "O AGRONEGÓCIO É A FORÇA QUE ALIMENTA O MUNDO.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "CADA GRÃO CONTA UMA HISTÓRIA DE TRABALHO E ESPERANÇA.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "A TERRA É O NOSSO MAIOR PATRIMÔNIO, CUIDE DELA.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "TECNOLOGIA E CAMPO: A UNIÃO QUE GERA PROGRESSO.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "SAFRA FARTA É FRUTO DE PLANEJAMENTO E SUOR.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "LOGÍSTICA EFICIENTE É A CHAVE PARA O SUCESSO NO CAMPO.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "O PRODUTOR RURAL É O HERÓI INVISÍVEL DA ECONOMIA.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "INOVAÇÃO NO CAMPO NÃO É OPÇÃO, É NECESSIDADE.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "GESTÃO DE GRÃOS COM PRECISÃO E TRANSPARÊNCIA.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "O FUTURO DO AGRO É HOJE, COM INTELIGÊNCIA E DADOS.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "O SUCESSO É A SOMA DE PEQUENOS ESFORÇOS REPETIDOS.",
-    "author": "Robert Collier"
-  },
-  {
-    "text": "A PERSISTÊNCIA É O CAMINHO DO ÊXITO.",
-    "author": "Charles Chaplin"
-  },
-  {
-    "text": "O ÚNICO LUGAR ONDE O SUCESSO VEM ANTES DO TRABALHO É NO DICIONÁRIO.",
-    "author": "Vidal Sassoon"
-  },
-  {
-    "text": "NÃO ESPERE POR OPORTUNIDADES, CRIE-AS.",
-    "author": "George Bernard Shaw"
-  },
-  {
-    "text": "A GRATIDÃO TRANSFORMA O QUE TEMOS EM SUFICIENTE.",
-    "author": "Melody Beattie"
-  },
-  {
-    "text": "FOCO É DIZER NÃO PARA CENTENAS DE OUTRAS BOAS IDEIAS.",
-    "author": "Steve Jobs"
-  },
-  {
-    "text": "NÃO IMPORTA O QUÃO DEVAGAR VOCÊ VÁ, DESDE QUE NÃO PARE.",
-    "author": "Confúcio"
-  },
-  {
-    "text": "A CORAGEM NÃO É A AUSÊNCIA DE MEDO, MAS O TRIUNFO SOBRE ELE.",
-    "author": "Nelson Mandela"
-  },
-  {
-    "text": "SEJA GRATO PELO QUE VOCÊ TEM; VOCÊ ACABARÁ TENDO MAIS.",
-    "author": "Oprah Winfrey"
-  },
-  {
-    "text": "ACREDITE QUE VOCÊ PODE, ASSIM VOCÊ JÁ ESTÁ NO MEIO DO CAMINHO.",
-    "author": "Theodore Roosevelt"
-  },
-  {
-    "text": "DIFICULDADES PREPARAM PESSOAS EXTRAORDINÁRIAS.",
-    "author": "C.S. Lewis"
-  },
-  {
-    "text": "A MAIOR GLÓRIA NÃO É NUNCA CAIR, MAS LEVANTAR SEMPRE.",
-    "author": "Nelson Mandela"
-  },
-  {
-    "text": "TUDO O QUE VOCÊ SEMPRE QUIS ESTÁ DO OUTRO LADO DO MEDO.",
-    "author": "George Addair"
-  },
-  {
-    "text": "A VIDA É 10% O QUE ACONTECE E 90% COMO VOCÊ REAGE.",
-    "author": "Charles Swindoll"
-  },
-  {
-    "text": "NÃO CONTE OS DIAS, FAÇA OS DIAS CONTAREM.",
-    "author": "Muhammad Ali"
-  },
-  {
-    "text": "SEMPRE PARECE IMPOSSÍVEL ATÉ QUE SEJA FEITO.",
-    "author": "Nelson Mandela"
-  },
-  {
-    "text": "ACREDITE EM SI PRÓPRIO E O RESTO VIRÁ NATURALMENTE.",
-    "author": "Elon Musk"
-  },
-  {
-    "text": "O FRACASSO É O TEMPERO QUE DÁ SABOR AO SUCESSO.",
-    "author": "Truman Capote"
-  },
-  {
-    "text": "GRANDES MENTES DISCUTEM IDEIAS.",
-    "author": "Eleanor Roosevelt"
-  },
-  {
-    "text": "SORTE É O ENCONTRO DA PREPARAÇÃO COM A OPORTUNIDADE.",
-    "author": "Sêneca"
-  },
-  {
-    "text": "A MELHOR MANEIRA DE PREVER O FUTURO É CRIÁ-LO.",
-    "author": "Peter Drucker"
-  },
-  {
-    "text": "O SUCESSO NÃO É O FIM, O FRACASSO NÃO É FATAL.",
-    "author": "Winston Churchill"
-  },
-  {
-    "text": "PENSE GRANDE, COMECE PEQUENO, APRENDA RÁPIDO.",
-    "author": "Eric Ries"
-  },
-  {
-    "text": "SEJA A MUDANÇA QUE VOCÊ DESEJA VER NO MUNDO.",
-    "author": "Mahatma Gandhi"
-  },
-  {
-    "text": "O SEGREDO DE PROGREDIR É COMEÇAR.",
-    "author": "Mark Twain"
-  },
-  {
-    "text": "ONDE HÁ VONTADE, HÁ UM CAMINHO.",
-    "author": "Provérbio"
-  },
-  {
-    "text": "A JORNADA DE MIL MILHAS COMEÇA COM UM PASSO.",
-    "author": "Lao Tsé"
-  },
-  {
-    "text": "A SABEDORIA COMEÇA NA REFLEXÃO.",
-    "author": "Sócrates"
-  },
-  {
-    "text": "O TRABALHO DURO SUPERA O TALENTO.",
-    "author": "Tim Notke"
-  },
-  {
-    "text": "A HUMILDADE É A CHAVE PARA O APRENDIZADO CONTÍNUO.",
-    "author": "Anônimo"
-  },
-  {
-    "text": "PACIÊNCIA E PERSISTÊNCIA SÃO A ALMA DO SUCESSO.",
-    "author": "Anônimo"
-  },
-  {
-    "text": "SEJA IMPARÁVEL EM SEUS OBJETIVOS.",
-    "author": "Anônimo"
-  },
-  {
-    "text": "A DISCIPLINA É A LIBERDADE DE SER SEU MELHOR.",
-    "author": "Anônimo"
-  },
-  {
-    "text": "OTIMISMO É A FÉ QUE CONDUZ À REALIZAÇÃO.",
-    "author": "Helen Keller"
-  },
-  {
-    "text": "TRANSFORME OBSTÁCULOS EM DEGRAUS.",
-    "author": "Anônimo"
-  },
-  {
-    "text": "A SIMPLICIDADE É O ÚLTIMO GRAU DE SOFISTICAÇÃO.",
-    "author": "Leonardo da Vinci"
-  },
-  {
-    "text": "MANTENHA SEUS OLHOS NAS ESTRELAS E OS PÉS NO CHÃO.",
-    "author": "Theodore Roosevelt"
-  },
-  {
-    "text": "COMECE ONDE VOCÊ ESTÁ. USE O QUE VOCÊ TEM.",
-    "author": "Arthur Ashe"
-  },
-  {
-    "text": "O ENTUSIASMO É A MAIOR FORÇA DA ALMA.",
-    "author": "Napoleon Hill"
-  },
-  {
-    "text": "A IMAGINAÇÃO É MAIS IMPORTANTE QUE O CONHECIMENTO.",
-    "author": "Albert Einstein"
-  },
-  {
-    "text": "Foco total: O agronegócio é a força que alimenta o mundo.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Foco total: Cada grão conta uma história de trabalho e esperança.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Foco total: A terra é o nosso maior patrimônio, cuide dela.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Foco total: Tecnologia e campo: a união que gera progresso.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Foco total: Safra farta é fruto de planejamento e suor.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Foco total: Logística eficiente é a chave para o sucesso no campo.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Foco total: O produtor rural é o herói invisível da economia.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Foco total: Inovação no campo não é opção, é necessidade.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Foco total: Gestão de grãos com precisão e transparência.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Foco total: O futuro do agro é hoje, com inteligência e dados.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Foco total: O sucesso é a soma de pequenos esforços repetidos.",
-    "author": "Robert Collier"
-  },
-  {
-    "text": "Foco total: A persistência é o caminho do êxito.",
-    "author": "Charles Chaplin"
-  },
-  {
-    "text": "Foco total: O único lugar onde o sucesso vem antes do trabalho é no dicionário.",
-    "author": "Vidal Sassoon"
-  },
-  {
-    "text": "Foco total: Não espere por oportunidades, crie-as.",
-    "author": "George Bernard Shaw"
-  },
-  {
-    "text": "Foco total: A gratidão transforma o que temos em suficiente.",
-    "author": "Melody Beattie"
-  },
-  {
-    "text": "Foco total: Foco é dizer não para centenas de outras boas ideias.",
-    "author": "Steve Jobs"
-  },
-  {
-    "text": "Foco total: Não importa o quão devagar você vá, desde que não pare.",
-    "author": "Confúcio"
-  },
-  {
-    "text": "Foco total: A coragem não é a ausência de medo, mas o triunfo sobre ele.",
-    "author": "Nelson Mandela"
-  },
-  {
-    "text": "Foco total: Seja grato pelo que você tem; você acabará tendo mais.",
-    "author": "Oprah Winfrey"
-  },
-  {
-    "text": "Foco total: Acredite que você pode, assim você já está no meio do caminho.",
-    "author": "Theodore Roosevelt"
-  },
-  {
-    "text": "Foco total: Dificuldades preparam pessoas extraordinárias.",
-    "author": "C.S. Lewis"
-  },
-  {
-    "text": "Foco total: A maior glória não é nunca cair, mas levantar sempre.",
-    "author": "Nelson Mandela"
-  },
-  {
-    "text": "Foco total: Tudo o que você sempre quis está do outro lado do medo.",
-    "author": "George Addair"
-  },
-  {
-    "text": "Foco total: A vida é 10% o que acontece e 90% como você reage.",
-    "author": "Charles Swindoll"
-  },
-  {
-    "text": "Foco total: Não conte os dias, faça os dias contarem.",
-    "author": "Muhammad Ali"
-  },
-  {
-    "text": "Foco total: Sempre parece impossível até que seja feito.",
-    "author": "Nelson Mandela"
-  },
-  {
-    "text": "Foco total: Acredite em si próprio e o resto virá naturalmente.",
-    "author": "Elon Musk"
-  },
-  {
-    "text": "Foco total: O fracasso é o tempero que dá sabor ao sucesso.",
-    "author": "Truman Capote"
-  },
-  {
-    "text": "Foco total: Grandes mentes discutem ideias.",
-    "author": "Eleanor Roosevelt"
-  },
-  {
-    "text": "Foco total: Sorte é o encontro da preparação com a oportunidade.",
-    "author": "Sêneca"
-  },
-  {
-    "text": "Foco total: A melhor maneira de prever o futuro é criá-lo.",
-    "author": "Peter Drucker"
-  },
-  {
-    "text": "Foco total: O sucesso não é o fim, o fracasso não é fatal.",
-    "author": "Winston Churchill"
-  },
-  {
-    "text": "Foco total: Pense grande, comece pequeno, aprenda rápido.",
-    "author": "Eric Ries"
-  },
-  {
-    "text": "Foco total: Seja a mudança que você deseja ver no mundo.",
-    "author": "Mahatma Gandhi"
-  },
-  {
-    "text": "Foco total: O segredo de progredir é começar.",
-    "author": "Mark Twain"
-  },
-  {
-    "text": "Foco total: Onde há vontade, há um caminho.",
-    "author": "Provérbio"
-  },
-  {
-    "text": "Foco total: A jornada de mil milhas começa com um passo.",
-    "author": "Lao Tsé"
-  },
-  {
-    "text": "Foco total: A sabedoria começa na reflexão.",
-    "author": "Sócrates"
-  },
-  {
-    "text": "Foco total: O trabalho duro supera o talento.",
-    "author": "Tim Notke"
-  },
-  {
-    "text": "Foco total: A humildade é a chave para o aprendizado contínuo.",
-    "author": "Anônimo"
-  },
-  {
-    "text": "Foco total: Paciência e persistência são a alma do sucesso.",
-    "author": "Anônimo"
-  },
-  {
-    "text": "Foco total: Seja imparável em seus objetivos.",
-    "author": "Anônimo"
-  },
-  {
-    "text": "Foco total: A disciplina é a liberdade de ser seu melhor.",
-    "author": "Anônimo"
-  },
-  {
-    "text": "Foco total: Otimismo é a fé que conduz à realização.",
-    "author": "Helen Keller"
-  },
-  {
-    "text": "Foco total: Transforme obstáculos em degraus.",
-    "author": "Anônimo"
-  },
-  {
-    "text": "Foco total: A simplicidade é o último grau de sofisticação.",
-    "author": "Leonardo da Vinci"
-  },
-  {
-    "text": "Foco total: Mantenha seus olhos nas estrelas e os pés no chão.",
-    "author": "Theodore Roosevelt"
-  },
-  {
-    "text": "Foco total: Comece onde você está. Use o que você tem.",
-    "author": "Arthur Ashe"
-  },
-  {
-    "text": "Foco total: O entusiasmo é a maior força da alma.",
-    "author": "Napoleon Hill"
-  },
-  {
-    "text": "Foco total: A imaginação é mais importante que o conhecimento.",
-    "author": "Albert Einstein"
-  },
-  {
-    "text": "O agronegócio é a força que alimenta o mundo. #Sucesso",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Cada grão conta uma história de trabalho e esperança. #Sucesso",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "A terra é o nosso maior patrimônio, cuide dela. #Sucesso",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Tecnologia e campo: a união que gera progresso. #Sucesso",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Safra farta é fruto de planejamento e suor. #Sucesso",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Logística eficiente é a chave para o sucesso no campo. #Sucesso",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "O produtor rural é o herói invisível da economia. #Sucesso",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Inovação no campo não é opção, é necessidade. #Sucesso",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Gestão de grãos com precisão e transparência. #Sucesso",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "O futuro do agro é hoje, com inteligência e dados. #Sucesso",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "O sucesso é a soma de pequenos esforços repetidos. #Sucesso",
-    "author": "Robert Collier"
-  },
-  {
-    "text": "A persistência é o caminho do êxito. #Sucesso",
-    "author": "Charles Chaplin"
-  },
-  {
-    "text": "O único lugar onde o sucesso vem antes do trabalho é no dicionário. #Sucesso",
-    "author": "Vidal Sassoon"
-  },
-  {
-    "text": "Não espere por oportunidades, crie-as. #Sucesso",
-    "author": "George Bernard Shaw"
-  },
-  {
-    "text": "A gratidão transforma o que temos em suficiente. #Sucesso",
-    "author": "Melody Beattie"
-  },
-  {
-    "text": "Foco é dizer não para centenas de outras boas ideias. #Sucesso",
-    "author": "Steve Jobs"
-  },
-  {
-    "text": "Não importa o quão devagar você vá, desde que não pare. #Sucesso",
-    "author": "Confúcio"
-  },
-  {
-    "text": "A coragem não é a ausência de medo, mas o triunfo sobre ele. #Sucesso",
-    "author": "Nelson Mandela"
-  },
-  {
-    "text": "Seja grato pelo que você tem; você acabará tendo mais. #Sucesso",
-    "author": "Oprah Winfrey"
-  },
-  {
-    "text": "Acredite que você pode, assim você já está no meio do caminho. #Sucesso",
-    "author": "Theodore Roosevelt"
-  },
-  {
-    "text": "Dificuldades preparam pessoas extraordinárias. #Sucesso",
-    "author": "C.S. Lewis"
-  },
-  {
-    "text": "A maior glória não é nunca cair, mas levantar sempre. #Sucesso",
-    "author": "Nelson Mandela"
-  },
-  {
-    "text": "Tudo o que você sempre quis está do outro lado do medo. #Sucesso",
-    "author": "George Addair"
-  },
-  {
-    "text": "A vida é 10% o que acontece e 90% como você reage. #Sucesso",
-    "author": "Charles Swindoll"
-  },
-  {
-    "text": "Não conte os dias, faça os dias contarem. #Sucesso",
-    "author": "Muhammad Ali"
-  },
-  {
-    "text": "Sempre parece impossível até que seja feito. #Sucesso",
-    "author": "Nelson Mandela"
-  },
-  {
-    "text": "Acredite em si próprio e o resto virá naturalmente. #Sucesso",
-    "author": "Elon Musk"
-  },
-  {
-    "text": "O fracasso é o tempero que dá sabor ao sucesso. #Sucesso",
-    "author": "Truman Capote"
-  },
-  {
-    "text": "Grandes mentes discutem ideias. #Sucesso",
-    "author": "Eleanor Roosevelt"
-  },
-  {
-    "text": "Sorte é o encontro da preparação com a oportunidade. #Sucesso",
-    "author": "Sêneca"
-  },
-  {
-    "text": "A melhor maneira de prever o futuro é criá-lo. #Sucesso",
-    "author": "Peter Drucker"
-  },
-  {
-    "text": "O sucesso não é o fim, o fracasso não é fatal. #Sucesso",
-    "author": "Winston Churchill"
-  },
-  {
-    "text": "Pense grande, comece pequeno, aprenda rápido. #Sucesso",
-    "author": "Eric Ries"
-  },
-  {
-    "text": "Seja a mudança que você deseja ver no mundo. #Sucesso",
-    "author": "Mahatma Gandhi"
-  },
-  {
-    "text": "O segredo de progredir é começar. #Sucesso",
-    "author": "Mark Twain"
-  },
-  {
-    "text": "Onde há vontade, há um caminho. #Sucesso",
-    "author": "Provérbio"
-  },
-  {
-    "text": "A jornada de mil milhas começa com um passo. #Sucesso",
-    "author": "Lao Tsé"
-  },
-  {
-    "text": "A sabedoria começa na reflexão. #Sucesso",
-    "author": "Sócrates"
-  },
-  {
-    "text": "O trabalho duro supera o talento. #Sucesso",
-    "author": "Tim Notke"
-  },
-  {
-    "text": "A humildade é a chave para o aprendizado contínuo. #Sucesso",
-    "author": "Anônimo"
-  },
-  {
-    "text": "Paciência e persistência são a alma do sucesso. #Sucesso",
-    "author": "Anônimo"
-  },
-  {
-    "text": "Seja imparável em seus objetivos. #Sucesso",
-    "author": "Anônimo"
-  },
-  {
-    "text": "A disciplina é a liberdade de ser seu melhor. #Sucesso",
-    "author": "Anônimo"
-  },
-  {
-    "text": "Otimismo é a fé que conduz à realização. #Sucesso",
-    "author": "Helen Keller"
-  },
-  {
-    "text": "Transforme obstáculos em degraus. #Sucesso",
-    "author": "Anônimo"
-  },
-  {
-    "text": "A simplicidade é o último grau de sofisticação. #Sucesso",
-    "author": "Leonardo da Vinci"
-  },
-  {
-    "text": "Mantenha seus olhos nas estrelas e os pés no chão. #Sucesso",
-    "author": "Theodore Roosevelt"
-  },
-  {
-    "text": "Comece onde você está. Use o que você tem. #Sucesso",
-    "author": "Arthur Ashe"
-  },
-  {
-    "text": "O entusiasmo é a maior força da alma. #Sucesso",
-    "author": "Napoleon Hill"
-  },
-  {
-    "text": "A imaginação é mais importante que o conhecimento. #Sucesso",
-    "author": "Albert Einstein"
-  },
-  {
-    "text": "O agronegócio é a força que alimenta o mundo.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Cada grão conta uma história de trabalho e esperança.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "A terra é o nosso maior patrimônio, cuide dela.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Tecnologia e campo: a união que gera progresso.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Safra farta é fruto de planejamento e suor.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Logística eficiente é a chave para o sucesso no campo.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "O produtor rural é o herói invisível da economia.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Inovação no campo não é opção, é necessidade.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "Gestão de grãos com precisão e transparência.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "O futuro do agro é hoje, com inteligência e dados.",
-    "author": "Suporte Grãos"
-  },
-  {
-    "text": "O sucesso é a soma de pequenos esforços repetidos.",
-    "author": "Robert Collier"
-  },
-  {
-    "text": "A persistência é o caminho do êxito.",
-    "author": "Charles Chaplin"
-  },
-  {
-    "text": "O único lugar onde o sucesso vem antes do trabalho é no dicionário.",
-    "author": "Vidal Sassoon"
-  },
-  {
-    "text": "Não espere por oportunidades, crie-as.",
-    "author": "George Bernard Shaw"
-  },
-  {
-    "text": "A gratidão transforma o que temos em suficiente.",
-    "author": "Melody Beattie"
-  },
-  {
-    "text": "Foco é dizer não para centenas de outras boas ideias.",
-    "author": "Steve Jobs"
-  }
+  { "text": "A sorte favorece a mente preparada.", "author": "Louis Pasteur" },
+  { "text": "O único lugar onde o sucesso vem antes do trabalho é no dicionário.", "author": "Vidal Sassoon" },
+  { "text": "A melhor maneira de prever o futuro é criá-lo.", "author": "Peter Drucker" },
+  { "text": "Não encontre defeitos, encontre soluções.", "author": "Henry Ford" },
+  { "text": "A disciplina é a ponte entre metas e realizações.", "author": "Jim Rohn" },
+  { "text": "O sucesso não é o fim, o fracasso não é fatal: o que conta é a coragem de continuar.", "author": "Winston Churchill" },
+  { "text": "A simplicidade é o último grau de sofisticação.", "author": "Leonardo da Vinci" },
+  { "text": "Qualidade significa fazer certo quando ninguém está olhando.", "author": "Henry Ford" },
+  { "text": "Pense grande e não dê ouvidos a quem diz que não pode ser feito.", "author": "Elon Musk" },
+  { "text": "Sorte é o que acontece quando a preparação encontra a oportunidade.", "author": "Sêneca" },
+  { "text": "Comece onde você está. Use o que você tem. Faça o que você pode.", "author": "Arthur Ashe" },
+  { "text": "A vida é 10% o que acontece comigo e 90% de como eu reajo a isso.", "author": "Charles Swindoll" },
+  { "text": "O entusiasmo é a maior força da alma. Conserve-o.", "author": "Napoleon Hill" },
+  { "text": "Gestão é fazer as coisas direito; liderança é fazer as coisas certas.", "author": "Peter Drucker" },
+  { "text": "Inovação distingue um líder de um seguidor.", "author": "Steve Jobs" },
+  { "text": "O segredo de progredir é começar.", "author": "Mark Twain" },
+  { "text": "A persistência é o caminho do êxito.", "author": "Charles Chaplin" },
+  { "text": "A coragem é a primeira das qualidades humanas porque garante todas as outras.", "author": "Aristóteles" },
+  { "text": "Grandes coisas não são feitas por impulso, mas por uma série de pequenas coisas trazidas juntas.", "author": "Vincent van Gogh" },
+  { "text": "Tudo o que você sempre quis está do outro lado do medo.", "author": "George Addair" },
+  { "text": "A jornada de mil milhas começa com um único passo.", "author": "Lao Tsé" },
+  { "text": "Seja a mudança que você deseja ver no mundo.", "author": "Mahatma Gandhi" },
+  { "text": "Sempre parece impossível até que seja feito.", "author": "Nelson Mandela" },
+  { "text": "Dificuldades preparam pessoas comuns para destinos extraordinários.", "author": "C.S. Lewis" },
+  { "text": "O que não nos mata, nos torna mais fortes.", "author": "Friedrich Nietzsche" },
+  { "text": "A inteligência é a capacidade de se adaptar à mudança.", "author": "Stephen Hawking" },
+  { "text": "Foco é dizer não para centenas de outras boas ideias.", "author": "Steve Jobs" },
+  { "text": "O pessimista vê dificuldade em cada oportunidade; o otimista vê oportunidade em cada dificuldade.", "author": "Winston Churchill" },
+  { "text": "Grandes mentes discutem ideias; mentes médias discutem eventos; mentes pequenas discutem pessoas.", "author": "Eleanor Roosevelt" },
+  { "text": "O risco vem de não saber o que você está fazendo.", "author": "Warren Buffett" },
+  { "text": "Nada é tão difícil que não possa ser compreendido se você dedicar tempo suficiente.", "author": "Isaac Newton" },
+  { "text": "O homem que remove uma montanha começa carregando pedras pequenas.", "author": "Provérbio Chinês" },
+  { "text": "A educação é a arma mais poderosa que você pode usar para mudar o mundo.", "author": "Nelson Mandela" },
+  { "text": "Quanto mais eu treino, mais sorte eu tenho.", "author": "Gary Player" },
+  { "text": "Se você quer ir rápido, vá sozinho. Se você quer ir longe, vá acompanhado.", "author": "Provérbio Africano" },
+  { "text": "A paciência é amarga, mas seu fruto é doce.", "author": "Jean-Jacques Rousseau" },
+  { "text": "Agir sem agir: o segredo da eficiência suprema.", "author": "Lao Tsé" },
+  { "text": "Sê mestre da tua vontade e escravo da tua consciência.", "author": "Aristóteles" },
+  { "text": "A verdade é filha do tempo, não da autoridade.", "author": "Francis Bacon" },
+  { "text": "O conhecimento é poder.", "author": "Francis Bacon" },
+  { "text": "A gratidão é a memória do coração.", "author": "Antístenes" },
+  { "text": "Não espere; o tempo nunca será 'exatamente certo'.", "author": "Napoleon Hill" },
+  { "text": "O sucesso é ir de fracasso em fracasso sem perder o entusiasmo.", "author": "Winston Churchill" },
+  { "text": "A imaginação é mais importante que o conhecimento.", "author": "Albert Einstein" },
+  { "text": "Dê-me seis horas para derrubar uma árvore e passarei as primeiras quatro afiando o machado.", "author": "Abraham Lincoln" },
+  { "text": "Seja senhor de si próprio.", "author": "Marco Aurélio" },
+  { "text": "A melhor vingança é um sucesso estrondoso.", "author": "Frank Sinatra" },
+  { "text": "Você perde 100% dos tiros que não dá.", "author": "Wayne Gretzky" },
+  { "text": "O futuro pertence àqueles que acreditam na beleza de seus sonhos.", "author": "Eleanor Roosevelt" },
+  { "text": "Acredite que você pode e você já está no meio do caminho.", "author": "Theodore Roosevelt" },
+  { "text": "O objetivo do marketing é conhecer e entender o cliente tão bem que o produto se venda sozinho.", "author": "Peter Drucker" },
+  { "text": "Não conte os dias, faça os dias contarem.", "author": "Muhammad Ali" },
+  { "text": "Se você não pode explicar de forma simples, você não entende bem o suficiente.", "author": "Albert Einstein" },
+  { "text": "A única maneira de fazer um excelente trabalho é amar o que você faz.", "author": "Steve Jobs" },
+  { "text": "O que você faz fala tão alto que não consigo ouvir o que você diz.", "author": "Ralph Waldo Emerson" },
+  { "text": "Integridade é fazer a coisa certa, mesmo quando ninguém está vendo.", "author": "C.S. Lewis" },
+  { "text": "Tudo o que se pode imaginar é real.", "author": "Pablo Picasso" },
+  { "text": "Não é a carga que te derruba, é a maneira como você a carrega.", "author": "Lou Holtz" },
+  { "text": "A perfeição não é alcançável, mas se a buscarmos, podemos atingir a excelência.", "author": "Vince Lombardi" },
+  { "text": "A dúvida é o princípio da sabedoria.", "author": "Aristóteles" },
+  { "text": "A sorte é o que acontece quando a capacidade encontra a oportunidade.", "author": "Sêneca" },
+  { "text": "Não tenha medo de desistir do bom para ir atrás do ótimo.", "author": "John D. Rockefeller" },
+  { "text": "Eu não falhei. Eu apenas encontrei 10.000 caminhos que não funcionam.", "author": "Thomas Edison" },
+  { "text": "Seja breve. O tempo é o recurso mais escasso.", "author": "Anônimo" },
+  { "text": "O sucesso é a capacidade de sobreviver a erros.", "author": "Anônimo" },
+  { "text": "Sábio é aquele que conhece os limites da própria ignorância.", "author": "Sócrates" },
+  { "text": "A vitória ama a preparação.", "author": "Latim" },
+  { "text": "Quem tem um 'porquê' enfrenta qualquer 'como'.", "author": "Viktor Frankl" },
+  { "text": "Onde há ordem, há paz.", "author": "Anônimo" },
+  { "text": "A tecnologia é apenas uma ferramenta. O foco são as pessoas.", "author": "Steve Jobs" },
+  { "text": "Eficiência é fazer as coisas de forma correta. Eficácia é fazer as coisas certas.", "author": "Peter Drucker" },
+  { "text": "A medida da inteligência é a capacidade de mudar.", "author": "Albert Einstein" },
+  { "text": "Trabalha como se tudo dependesse de ti e ora como se tudo dependesse de Deus.", "author": "Santo Agostinho" },
+  { "text": "Vencer a si próprio é a maior das vitórias.", "author": "Platão" },
+  { "text": "A excelência não é um ato, mas um hábito.", "author": "Aristóteles" },
+  { "text": "Não sou produto de minhas circunstâncias. Sou produto de minhas decisões.", "author": "Stephen Covey" },
+  { "text": "A única constante na vida é a mudança.", "author": "Heráclito" },
+  { "text": "Tempo é dinheiro.", "author": "Benjamin Franklin" },
+  { "text": "A paz vem de dentro. Não a procure à sua volta.", "author": "Buda" },
+  { "text": "A simplicidade é o máximo da sofisticação.", "author": "Leonardo da Vinci" },
+  { "text": "Mantenha o foco no que você pode controlar.", "author": "Marco Aurélio" },
+  { "text": "O custo de estar errado é menor do que o custo de não fazer nada.", "author": "Seth Godin" },
+  { "text": "Não é o que você olha que importa, é o que você vê.", "author": "Henry David Thoreau" },
+  { "text": "Se você não sabe para onde ir, qualquer caminho serve.", "author": "Lewis Carroll" },
+  { "text": "A maior riqueza é o contentamento.", "author": "Anônimo" },
+  { "text": "O silêncio é o grito mais forte.", "author": "Anônimo" },
+  { "text": "Fé é dar o primeiro passo mesmo quando você não vê a escada inteira.", "author": "Martin Luther King Jr." },
+  { "text": "A vontade de vencer é importante, mas a vontade de se preparar é vital.", "author": "Joe Paterno" },
+  { "text": "O futuro chega um dia de cada vez.", "author": "Abraham Lincoln" },
+  { "text": "Nenhum vento sopra a favor de quem não sabe para onde ir.", "author": "Sêneca" },
+  { "text": "O homem que não lê bons livros não tem vantagem sobre o homem que não sabe ler.", "author": "Mark Twain" },
+  { "text": "Grandes mentes têm propósitos, outras têm desejos.", "author": "Washington Irving" },
+  { "text": "A honra não se ganha, nunca se deve perder.", "author": "Anônimo" },
+  { "text": "Quem domina os outros é forte; quem domina a si mesmo é poderoso.", "author": "Lao Tsé" },
+  { "text": "A verdadeira sabedoria está em saber que nada se sabe.", "author": "Sócrates" },
+  { "text": "A adversidade revela o gênio, a prosperidade o oculta.", "author": "Horácio" },
+  { "text": "Nada de grande jamais foi alcançado sem entusiasmo.", "author": "Ralph Waldo Emerson" },
+  { "text": "Sucesso é gostar de si mesmo, gostar do que você faz e gostar de como você faz.", "author": "Maya Angelou" },
+  { "text": "A glória é tanto mais fugaz quanto mais fácil foi de alcançar.", "author": "Anônimo" },
+  { "text": "O olho do dono engorda o gado.", "author": "Ditado Popular" },
+  { "text": "Água mole em pedra dura tanto bate até que fura.", "author": "Ditado Popular" },
+  { "text": "Um grama de ação vale mais que uma tonelada de teoria.", "author": "Ralph Waldo Emerson" },
+  { "text": "A prudência é a mãe da segurança.", "author": "Anônimo" },
+  { "text": "O maior erro que você pode cometer é o de ficar com medo de cometer um erro.", "author": "Elbert Hubbard" },
+  { "text": "O gênio é 1% inspiração e 99% transpiração.", "author": "Thomas Edison" },
+  { "text": "Saber ouvir é quase tão importante quanto saber falar.", "author": "Anônimo" },
+  { "text": "O preço da grandeza é a responsabilidade.", "author": "Winston Churchill" },
+  { "text": "Os problemas são oportunidades disfarçadas.", "author": "Anônimo" },
+  { "text": "Um líder é um negociador de esperança.", "author": "Napoleão Bonaparte" },
+  { "text": "Se você quer ser feliz por um dia, vá pescar. Se quiser por toda a vida, ajude alguém.", "author": "Provérbio Chinês" },
+  { "text": "O único modo de evitar críticas é não dizer nada, não fazer nada e não ser nada.", "author": "Aristóteles" },
+  { "text": "A mudança é a lei da vida.", "author": "John F. Kennedy" },
+  { "text": "Não olhe para o relógio; faça o que ele faz. Continue andando.", "author": "Sam Levenson" },
+  { "text": "Para ser insubstituível, deve-se sempre ser diferente.", "author": "Coco Chanel" },
+  { "text": "A coragem é a resistência ao medo, o domínio do medo, e não a ausência do medo.", "author": "Mark Twain" },
+  { "text": "Não espere o momento perfeito. Pegue um momento e torne-o perfeito.", "author": "Anônimo" },
+  { "text": "Seus clientes mais infelizes são sua maior fonte de aprendizado.", "author": "Bill Gates" },
+  { "text": "Para ganhar, você tem que estar no jogo.", "author": "Anônimo" },
+  { "text": "A vida não é encontrar a si mesmo. A vida é criar a si mesmo.", "author": "George Bernard Shaw" },
+  { "text": "A melhor época para plantar uma árvore foi há 20 anos. A segunda melhor é agora.", "author": "Provérbio Chinês" },
+  { "text": "Mire na lua. Mesmo se você errar, você pousará entre as estrelas.", "author": "Les Brown" },
+  { "text": "Faça o que você puder, com o que você tem, onde você estiver.", "author": "Theodore Roosevelt" },
+  { "text": "Uma pessoa que nunca cometeu um erro nunca tentou nada novo.", "author": "Albert Einstein" },
+  { "text": "No meio da dificuldade encontra-se a oportunidade.", "author": "Albert Einstein" },
+  { "text": "A criatividade é a inteligência se divertindo.", "author": "Albert Einstein" },
+  { "text": "Pequenas mentes são dominadas pelo infortúnio; grandes mentes elevam-se acima dele.", "author": "Washington Irving" },
+  { "text": "Tudo o que a mente humana pode conceber e acreditar, ela pode realizar.", "author": "Napoleon Hill" },
+  { "text": "O sucesso é construído à noite. Durante o dia, você apenas faz entregas.", "author": "Anônimo" },
+  { "text": "A maior glória em viver não reside em nunca cair, mas em nos levantarmos cada vez que caímos.", "author": "Nelson Mandela" },
+  { "text": "Para ter o que você nunca teve, você deve fazer o que nunca fez.", "author": "Thomas Jefferson" },
+  { "text": "É durante os nossos momentos mais sombrios que devemos nos concentrar em ver a luz.", "author": "Aristóteles Onassis" },
+  { "text": "Mesmo que você esteja no caminho certo, você será atropelado se ficar apenas sentado lá.", "author": "Will Rogers" },
+  { "text": "Não deixe que o ontem tire muito do hoje.", "author": "Will Rogers" },
+  { "text": "Aprendi que as pessoas esquecerão o que você disse e o que você fez, mas nunca esquecerão como você as fez sentir.", "author": "Maya Angelou" },
+  { "text": "O sucesso é caminhar de erro em erro sem perda de entusiasmo.", "author": "Winston Churchill" },
+  { "text": "A única maneira de descobrir os limites do possível é ir um pouco além deles, para o impossível.", "author": "Arthur C. Clarke" },
+  { "text": "Você não pode usar a sua criatividade sem usá-la.", "author": "Maya Angelou" },
+  { "text": "Se você acha que pode, ou se acha que não pode, você está certo.", "author": "Henry Ford" },
+  { "text": "A segurança é principalmente uma superstição. A vida é uma aventura ousada ou nada.", "author": "Helen Keller" },
+  { "text": "Os obstáculos são aquelas coisas assustadoras que você vê quando tira os olhos do seu objetivo.", "author": "Henry Ford" },
+  { "text": "A única coisa que se interpõe entre você e seu objetivo é a história que você continua contando a si mesmo.", "author": "Jordan Belfort" },
+  { "text": "Não espere. O tempo nunca será o ideal.", "author": "Napoleon Hill" },
+  { "text": "A motivação é o que te faz começar. O hábito é o que te faz continuar.", "author": "Jim Ryun" },
+  { "text": "Trabalhe duro em silêncio, deixe o seu sucesso ser o seu barulho.", "author": "Frank Ocean" },
+  { "text": "A maneira de começar é parar de falar e começar a fazer.", "author": "Walt Disney" },
+  { "text": "Se você puder sonhar, você pode fazer.", "author": "Walt Disney" },
+  { "text": "O sucesso não é a chave para a felicidade. A felicidade é a chave para o sucesso.", "author": "Albert Schweitzer" },
+  { "text": "A energia e a persistência conquistam todas as coisas.", "author": "Benjamin Franklin" },
+  { "text": "Não pare quando estiver cansado. Pare quando tiver terminado.", "author": "Anônimo" },
+  { "text": "O difícil nós fazemos agora. O impossível demora um pouco mais.", "author": "David Ben-Gurion" },
+  { "text": "Não tenha medo da perfeição - você nunca a alcançará.", "author": "Salvador Dalí" },
+  { "text": "Faça cada dia seu obra-prima.", "author": "John Wooden" },
+  { "text": "A melhor maneira de começar é parar de falar e começar a agir.", "author": "Walt Disney" },
+  { "text": "Liderança é a arte de dar às pessoas uma plataforma para espalhar ideias que funcionam.", "author": "Seth Godin" },
+  { "text": "A jornada supera o destino.", "author": "Anônimo" },
+  { "text": "O ontem é fumaça, o amanhã é vento. O hoje é a vida.", "author": "Anônimo" },
+  { "text": "O único herói é aquele que faz o que pode.", "author": "Romain Rolland" },
+  { "text": "Não erramos por tentarmos coisas novas, erramos por repetirmos os mesmos erros.", "author": "Anônimo" },
+  { "text": "Um navio no porto está seguro, mas não é para isso que os navios foram feitos.", "author": "John A. Shedd" },
+  { "text": "Paciência, persistência e transpiração formam uma combinação imbatível para o sucesso.", "author": "Napoleon Hill" },
+  { "text": "Se você não valoriza o seu tempo, os outros também não o farão.", "author": "Kim Garst" },
+  { "text": "A inovação é o que distingue um líder de um seguidor.", "author": "Steve Jobs" },
+  { "text": "Não levante a sua voz, melhore o seu argumento.", "author": "Desmond Tutu" },
+  { "text": "O sucesso de amanhã depende da sua preparação hoje.", "author": "Anônimo" },
+  { "text": "Seja humilde para admitir seus erros, inteligente para aprender com eles e maduro para corrigi-los.", "author": "Anônimo" },
+  { "text": "Nada é impossível, a própria palavra diz 'eu sou possível'.", "author": "Audrey Hepburn" },
+  { "text": "O valor de uma ideia reside no seu uso.", "author": "Thomas Edison" },
+  { "text": "Tente ser um arco-íris na nuvem de alguém.", "author": "Maya Angelou" },
+  { "text": "Vença a si mesmo e o mundo será seu.", "author": "Anônimo" },
+  { "text": "A disciplina é fazer o que precisa ser feito, mesmo quando você não quer fazer.", "author": "Anônimo" },
+  { "text": "Onde há foco, a energia flui.", "author": "Tony Robbins" },
+  { "text": "A verdadeira medida de um homem não é como ele se comporta em momentos de conforto, mas onde ele se coloca em tempos de desafio.", "author": "Martin Luther King Jr." },
+  { "text": "Se você não lutar por aquilo que deseja, não lamente por aquilo que perdeu.", "author": "Anônimo" },
+  { "text": "Otimismo é a fé que leva à realização. Nada pode ser feito sem esperança e confiança.", "author": "Helen Keller" },
+  { "text": "Muitas das falhas da vida são pessoas que não perceberam o quão perto estavam do sucesso quando desistiram.", "author": "Thomas Edison" },
+  { "text": "O mundo é dos que ousam.", "author": "Anônimo" },
+  { "text": "Sua única limitação é aquela que você estabelece em sua própria mente.", "author": "Napoleon Hill" },
+  { "text": "Para alcançar grandes coisas, não devemos apenas agir, mas também sonhar; não apenas planejar, mas também acreditar.", "author": "Anatole France" },
+  { "text": "As dificuldades muitas vezes preparam pessoas comuns para um destino extraordinário.", "author": "C.S. Lewis" },
+  { "text": "Se você quer alcançar grandeza, pare de pedir permissão.", "author": "Anônimo" },
+  { "text": "Não espere por circunstâncias ideais, crie-as.", "author": "Anônimo" },
+  { "text": "Sonhe grande e ouse falhar.", "author": "Norman Vaughan" },
+  { "text": "Você não precisa ser grande para começar, mas precisa começar para ser grande.", "author": "Zig Ziglar" },
+  { "text": "Sua atitude, não sua aptidão, determinará sua altitude.", "author": "Zig Ziglar" },
+  { "text": "Gaste tempo com aqueles que te fazem ver o mundo de forma diferente.", "author": "Anônimo" },
+  { "text": "A sabedoria é o resumo do passado, mas a beleza é a promessa do futuro.", "author": "Oliver Wendell Holmes" },
+  { "text": "O sucesso consiste em ir de fracasso em fracasso sem perder o entusiasmo.", "author": "Winston Churchill" },
+  { "text": "A cada nova manhã, nasce junto uma nova oportunidade.", "author": "Anônimo" },
+  { "text": "A simplicidade é o último estágio da sofisticação.", "author": "Leonardo da Vinci" },
+  { "text": "Conhecimento sem ação é inútil.", "author": "Anônimo" },
+  { "text": "Seja maior do que os seus problemas.", "author": "Anônimo" },
+  { "text": "Sua vida não melhora por acaso, melhora por mudança.", "author": "Jim Rohn" },
+  { "text": "O sucesso não é para os preguiçosos.", "author": "Anônimo" },
+  { "text": "Faça o que você ama e o dinheiro seguirá.", "author": "Marsha Sinetar" },
+  { "text": "Trabalhe duro e seja gentil e coisas incríveis acontecerão.", "author": "Conan O'Brien" },
+  { "text": "A ação é a chave fundamental para todo o sucesso.", "author": "Pablo Picasso" },
+  { "text": "Qualquer coisa que valha a pena fazer, vale a pena fazer bem.", "author": "Philip Stanhope" },
+  { "text": "Seja apaixonado pelo que você faz.", "author": "Anônimo" },
+  { "text": "O que você ganha ao atingir seus objetivos não é tão importante quanto o que você se torna ao atingir seus objetivos.", "author": "Henry David Thoreau" },
+  { "text": "Dê o seu melhor em tudo.", "author": "Anônimo" },
+  { "text": "A vida é curta demais para ser pequena.", "author": "Benjamin Disraeli" },
+  { "text": "Sempre faça o seu melhor. O que você planta agora, você colherá mais tarde.", "author": "Og Mandino" },
+  { "text": "Procure a excelência em todas as coisas.", "author": "Anônimo" },
+  { "text": "Não deixe o que você não pode fazer interferir no que você pode fazer.", "author": "John Wooden" },
+  { "text": "Para ter sucesso, seu desejo de sucesso deve ser maior do que seu medo de falhar.", "author": "Bill Cosby" },
+  { "text": "Não tente ser um homem de sucesso, mas sim um homem de valor.", "author": "Albert Einstein" },
+  { "text": "Você nunca saberá o que pode realizar até que tente.", "author": "Anônimo" },
+  { "text": "Tudo é possível se você tiver coragem suficiente.", "author": "J.K. Rowling" },
+  { "text": "O sucesso depende do esforço.", "author": "Sófocles" },
+  { "text": "Seja gentil, pois todos que você encontra estão enfrentando uma batalha difícil.", "author": "Platão" },
+  { "text": "Acredite em si mesmo e o mundo acreditará em você.", "author": "Anônimo" },
+  { "text": "A vida é 10% experiências e 90% como você responde a elas.", "author": "Anônimo" },
+  { "text": "Transforme seus sonhos em planos.", "author": "Anônimo" },
+  { "text": "A maior aventura que você pode ter é viver a vida dos seus sonhos.", "author": "Oprah Winfrey" },
+  { "text": "Seja fiel ao seu trabalho, à sua palavra e aos seus amigos.", "author": "Henry David Thoreau" },
+  { "text": "A confiança é a base de todo sucesso.", "author": "Anônimo" },
+  { "text": "Nunca desista de algo que você não consegue passar um dia sem pensar.", "author": "Winston Churchill" },
+  { "text": "O segredo de ser feliz é aceitar onde você está na vida e fazer o melhor a cada dia.", "author": "Anônimo" },
+  { "text": "Dificuldades muitas vezes preparam pessoas comuns para um destino extraordinário.", "author": "C.S. Lewis" },
+  { "text": "Muitas coisas parecem impossíveis até serem feitas.", "author": "Nelson Mandela" },
+  { "text": "Sua determinação é o seu maior trunfo.", "author": "Anônimo" },
+  { "text": "A sabedoria vem com a experiência.", "author": "Anônimo" },
+  { "text": "Tudo o que você precisa já está dentro de você.", "author": "Anônimo" },
+  { "text": "Seja resiliente diante da adversidade.", "author": "Anônimo" },
+  { "text": "Foco nos resultados e não no esforço.", "author": "Anônimo" },
+  { "text": "A vida recompensa a coragem.", "author": "Anônimo" },
+  { "text": "Seja o capitão de sua alma.", "author": "William Ernest Henley" },
+  { "text": "Nada pode parar uma ideia cujo tempo chegou.", "author": "Victor Hugo" },
+  { "text": "Incentive os outros com o seu exemplo.", "author": "Anônimo" },
+  { "text": "Sempre procure evoluir.", "author": "Anônimo" },
+  { "text": "A persistência supera o talento.", "author": "Anônimo" },
+  { "text": "O aprendizado nunca esgota a mente.", "author": "Leonardo da Vinci" },
+  { "text": "Seja luz no mundo.", "author": "Anônimo" },
+  { "text": "Pense positivamente e coisas boas acontecerão.", "author": "Anônimo" },
+  { "text": "Sua intuição raramente falha.", "author": "Anônimo" },
+  { "text": "Cultive boas parcerias.", "author": "Anônimo" },
+  { "text": "Trabalhe de forma inteligente, não apenas dura.", "author": "Anônimo" },
+  { "text": "A vida é o que fazemos dela.", "author": "Fernando Pessoa" },
+  { "text": "Perservere até o fim.", "author": "Anônimo" },
+  { "text": "A cada desafio, uma oportunidade de crescimento.", "author": "Anônimo" },
+  { "text": "Mantenha a calma sob pressão.", "author": "Anônimo" },
+  { "text": "O bom senso é o mestre da vida.", "author": "Anônimo" },
+  { "text": "Esteja presente no agora.", "author": "Anônimo" },
+  { "text": "Planejamento é a chave da colheita.", "author": "Ditado do Campo" },
+  { "text": "Quem planta colhe.", "author": "Ditado do Campo" },
+  { "text": "A natureza não se apressa, mas tudo é realizado.", "author": "Lao Tsé" },
+  { "text": "Seja grato pela terra que te sustenta.", "author": "Anônimo" },
+  { "text": "A paciência do agricultor é a virtude da humanidade.", "author": "Anônimo" },
+  { "text": "Nada substitui o trabalho árduo.", "author": "Thomas Edison" },
+  { "text": "Para colher grãos, deve-se primeiro plantar sementes.", "author": "Anônimo" },
+  { "text": "Honre o seu legado.", "author": "Anônimo" },
+  { "text": "Transmita sabedoria às novas gerações.", "author": "Anônimo" },
+  { "text": "O progresso é impossível sem mudança.", "author": "George Bernard Shaw" },
+  { "text": "Inove no campo, prospere na cidade.", "author": "Anônimo" },
+  { "text": "A produtividade vem da organização.", "author": "Anônimo" },
+  { "text": "Use a tecnologia em seu favor.", "author": "Anônimo" },
+  { "text": "A simplicidade é o fim da sofisticação.", "author": "Leonardo da Vinci" },
+  { "text": "Foque no essencial.", "author": "Anônimo" },
+  { "text": "Mantenha a integridade comercial sempre.", "author": "Anônimo" },
+  { "text": "A palavra dada deve ser cumprida.", "author": "Anônimo" },
+  { "text": "Respeito mútuo é a base dos negócios.", "author": "Anônimo" },
+  { "text": "Crescer exige sacrifícios temporários.", "author": "Anônimo" },
+  { "text": "Seja disciplinado com seus horários.", "author": "Anônimo" },
+  { "text": "Cultive a mente como se fosse um jardim.", "author": "Anônimo" },
+  { "text": "A verdadeira riqueza é a saúde.", "author": "Ralph Waldo Emerson" },
+  { "text": "Esteja pronto para agir quando a oportunidade surgir.", "author": "Anônimo" },
+  { "text": "O valor está no detalhe.", "author": "Anônimo" },
+  { "text": "Faça bem feito de primeira.", "author": "Anônimo" },
+  { "text": "A excelência reside no hábito.", "author": "Aristóteles" },
+  { "text": "Não aceite menos que o seu melhor.", "author": "Anônimo" },
+  { "text": "Iniciativa é o diferencial.", "author": "Anônimo" },
+  { "text": "A confiança leva anos para ser construída e segundos para ser destruída.", "author": "Warren Buffett" },
+  { "text": "Não espere o aplauso para agir.", "author": "Anônimo" },
+  { "text": "Sua reputação é o seu maior ativo.", "author": "Anônimo" },
+  { "text": "Seja audaz em seus planos.", "author": "Anônimo" },
+  { "text": "Analise os riscos, mas não se paralise por eles.", "author": "Anônimo" },
+  { "text": "Conhecimento técnico é fundamental.", "author": "Anônimo" },
+  { "text": "Seja um eterno estudante do seu mercado.", "author": "Anônimo" },
+  { "text": "Otimize seus processos constantemente.", "author": "Anônimo" },
+  { "text": "O tempo é o único recurso que não se recupera.", "author": "Anônimo" },
+  { "text": "Seja objetivo em suas reuniões.", "author": "Anônimo" },
+  { "text": "Escolha bem seus parceiros de negócio.", "author": "Anônimo" },
+  { "text": "A organização financeira é o pilar da liberdade.", "author": "Anônimo" },
+  { "text": "Prepare-se para o inverno enquanto é verão.", "author": "Anônimo" },
+  { "text": "Seja prudente com seus ganhos.", "author": "Anônimo" },
+  { "text": "O investimento em si mesmo rende os melhores juros.", "author": "Benjamin Franklin" },
+  { "text": "Pense no longo prazo.", "author": "Anônimo" },
+  { "text": "Seja rigoroso com a verdade.", "author": "Anônimo" },
+  { "text": "A liderança exige coragem moral.", "author": "Anônimo" },
+  { "text": "Delegue o que não é sua competência principal.", "author": "Anônimo" },
+  { "text": "Mantenha a cabeça fria quando o coração estiver quente.", "author": "Anônimo" },
+  { "text": "A paciência vence a força.", "author": "Anônimo" },
+  { "text": "Seja o exemplo que você deseja seguir.", "author": "Anônimo" },
+  { "text": "Foque na solução, não no problema.", "author": "Anônimo" },
+  { "text": "Sua visão define o seu futuro.", "author": "Anônimo" },
+  { "text": "Trate todos com cortesia profissional.", "author": "Anônimo" },
+  { "text": "Mantenha a simplicidade mesmo quando crescer.", "author": "Anônimo" },
+  { "text": "A maior virtude é a retidão.", "author": "Anônimo" },
+  { "text": "Busque a sabedoria em todas as fontes.", "author": "Anônimo" },
+  { "text": "Seja agradecido pelas colheitas diárias.", "author": "Anônimo" },
+  { "text": "O trabalho dignifica o homem.", "author": "Anônimo" },
+  { "text": "Persista, o sucesso está logo ali.", "author": "Anônimo" },
+  { "text": "Sua força vem da sua vontade.", "author": "Anônimo" },
+  { "text": "A calma é a chave para a clareza.", "author": "Anônimo" },
+  { "text": "Nenhum desafio é grande demais para uma mente determinada.", "author": "Anônimo" },
+  { "text": "Seja imbatível em sua ética.", "author": "Anônimo" },
+  { "text": "A verdade prevalece.", "author": "Anônimo" },
+  { "text": "Siga em frente com confiança.", "author": "Anônimo" },
+  { "text": "A excelência é o nosso padrão.", "author": "Anônimo" },
+  { "text": "O amanhã começa hoje.", "author": "Anônimo" },
+  { "text": "O agronegócio é a espinha dorsal de uma nação.", "author": "George Washington" },
+  { "text": "Quem trabalha com a terra, trabalha com a vida.", "author": "Anônimo" },
+  { "text": "A estabilidade de uma nação depende da sua agricultura.", "author": "Provérbio" },
+  { "text": "Semeie hoje para colher a fartura amanhã.", "author": "Anônimo" },
+  { "text": "Honrar a terra é honrar a si mesmo.", "author": "Anônimo" },
+  { "text": "A sabedoria do campo é a sabedoria divina.", "author": "Anônimo" },
+  { "text": "O suor do rosto garante a paz na mesa.", "author": "Anônimo" },
+  { "text": "Sê constante em teus negócios.", "author": "Anônimo" },
+  { "text": "A honestidade é o único caminho para a prosperidade duradoura.", "author": "Anônimo" },
+  { "text": "Mantenha a fé e trabalhe firme.", "author": "Anônimo" },
+  { "text": "O caminho da excelência é contínuo.", "author": "Anônimo" },
+  { "text": "Seja o melhor em sua área de atuação.", "author": "Anônimo" },
+  { "text": "Otimize os recursos, maximize os lucros.", "author": "Anônimo" },
+  { "text": "Respeite o tempo de maturação de cada projeto.", "author": "Anônimo" },
+  { "text": "Seja prudente, mas não medroso.", "author": "Anônimo" },
+  { "text": "O conhecimento é a melhor semente.", "author": "Anônimo" },
+  { "text": "A inovação é o motor da colheita moderna.", "author": "Anônimo" },
+  { "text": "Faça história através do seu trabalho.", "author": "Anônimo" },
+  { "text": "Transforme o campo com inteligência.", "author": "Anônimo" },
+  { "text": "A transparência gera confiança nos negócios.", "author": "Anônimo" },
+  { "text": "Seja o porto seguro de seus parceiros.", "author": "Anônimo" },
+  { "text": "O trabalho em equipe encurta os caminhos.", "author": "Anônimo" },
+  { "text": "Busque resultados consistentes.", "author": "Anônimo" },
+  { "text": "O legado de um homem é o seu caráter.", "author": "Anônimo" },
+  { "text": "A disciplina transforma sonhos em realidade.", "author": "Anônimo" },
+  { "text": "Seja resiliente perante as safras difíceis.", "author": "Anônimo" },
+  { "text": "Otimismo pragmático é o segredo.", "author": "Anônimo" },
+  { "text": "A simplicidade nos processos traz agilidade.", "author": "Anônimo" },
+  { "text": "Cultive relacionamentos duradouros.", "author": "Anônimo" },
+  { "text": "O crescimento sustentável é o verdadeiro sucesso.", "author": "Anônimo" },
+  { "text": "Colha os frutos do seu empenho.", "author": "Anônimo" },
+  { "text": "A sabedoria técnica é o diferencial do agro.", "author": "Anônimo" },
+  { "text": "Seja profissional em cada detalhe.", "author": "Anônimo" },
+  { "text": "A clareza nos objetivos traz foco na execução.", "author": "Anônimo" },
+  { "text": "Seja um homem de palavra.", "author": "Anônimo" },
+  { "text": "O progresso exige coragem para mudar.", "author": "Anônimo" },
+  { "text": "O agronegócio é força, é vida, é futuro.", "author": "Anônimo" },
+  { "text": "Colha a vitória.", "author": "Anônimo" },
+  { "text": "O segredo do sucesso é a constância do propósito.", "author": "Benjamin Disraeli" },
+  { "text": "A melhor maneira de se preparar para o amanhã é concentrando-se em fazer o trabalho de hoje soberbamente bem.", "author": "William Osler" },
+  { "text": "Nossa maior fraqueza está em desistir. O caminho mais certo para o sucesso é sempre tentar apenas uma vez mais.", "author": "Thomas Edison" },
+  { "text": "Para ter sucesso, seu desejo de sucesso deve ser maior do que seu medo de falhar.", "author": "Bill Cosby" },
+  { "text": "Não importa o quão devagar você vá, desde que não pare.", "author": "Confúcio" },
+  { "text": "A perseverança é o trabalho duro que você faz depois de se cansar do trabalho duro que já fez.", "author": "Newt Gingrich" },
+  { "text": "O sucesso é a soma de pequenos esforços repetidos dia após dia.", "author": "Robert Collier" },
+  { "text": "Atitude é uma pequena coisa que faz uma grande diferença.", "author": "Winston Churchill" },
+  { "text": "Sempre seja a primeira versão de si mesmo, em vez de uma versão de segunda classe de outra pessoa.", "author": "Judy Garland" },
+  { "text": "A confiança em si mesmo é o primeiro segredo do sucesso.", "author": "Ralph Waldo Emerson" },
+  { "text": "O sucesso não é definitivo, o fracasso não é fatal; é a coragem de continuar que conta.", "author": "Winston Churchill" },
+  { "text": "Sua vida não melhora por acaso, melhora por mudança.", "author": "Jim Rohn" },
+  { "text": "O sucesso é o resultado da perfeição, trabalho árduo, aprendizado com o fracasso, lealdade e persistência.", "author": "Colin Powell" },
+  { "text": "A persistência é o que torna o impossível possível, o possível provável e o provável definido.", "author": "Robert Half" },
+  { "text": "Desenvolva o sucesso a partir de falhas. Desânimo e fracasso são dois dos degraus mais seguros para o sucesso.", "author": "Dale Carnegie" },
+  { "text": "O caminho para o sucesso é sempre o caminho que você está percorrendo.", "author": "Anônimo" },
+  { "text": "A excelência é um processo contínuo e não um acidente.", "author": "A.P.J. Abdul Kalam" }
 ]
