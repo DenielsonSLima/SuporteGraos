@@ -23,6 +23,7 @@ export const usePurchaseOrderLogic = (order: PurchaseOrder, onFinalizeCallback: 
   const { data: loadings = [] } = useLoadingsByPurchaseOrder(order.id);
   const [isFinalizePromptOpen, setIsFinalizePromptOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [shouldCheckCompletion, setShouldCheckCompletion] = useState(false);
 
   const { data: liveTransactions = [] } = usePurchaseOrderTransactions(order.id);
   const queryClient = useQueryClient();
@@ -137,21 +138,28 @@ export const usePurchaseOrderLogic = (order: PurchaseOrder, onFinalizeCallback: 
   }, [stats.balancePartner]);
 
   useEffect(() => {
+    if (!shouldCheckCompletion || isFinalizePromptOpen || isProcessing) return;
+
     const isActuallyPaid = stats.balancePartner <= 0.05 && stats.totalSettled > 0;
     const isNotFinalized = order.status !== 'completed';
-    const wasUnpaidAtStart = initialBalanceRef.current !== null && initialBalanceRef.current > 0.05;
     
-    // Só abre o prompt se o pedido NÃO estava quitado quando a tela abriu
-    // e agora está quitado (transição via pagamento/ação do usuário)
-    if (isActuallyPaid && isNotFinalized && wasUnpaidAtStart && !isFinalizePromptOpen && !isProcessing) {
+    // Agora o critério é: Foi solicitada a checagem (após um pagamento) 
+    // E o saldo realmente está zerado agora.
+    if (isActuallyPaid && isNotFinalized) {
       // Pequeno timeout para garantir que o toast de sucesso do pagamento apareça primeiro
       const timer = setTimeout(() => {
         setIsFinalizePromptOpen(true);
       }, 1000);
+      
+      // Reseta a flag para não repetir se o usuário fechar o modal
+      setShouldCheckCompletion(false);
       return () => clearTimeout(timer);
     }
+
+    // Se checou e não era pra finalizar (ex: pagamento parcial), também reseta a flag
+    setShouldCheckCompletion(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stats.balancePartner, order.status, isFinalizePromptOpen, isProcessing]);
+  }, [shouldCheckCompletion, stats.balancePartner, order.status, isFinalizePromptOpen, isProcessing]);
 
   const actions = {
     refreshLoadings: refreshData,
@@ -168,7 +176,8 @@ export const usePurchaseOrderLogic = (order: PurchaseOrder, onFinalizeCallback: 
         // Refresh TanStack Query para carregar os novos valores calculados pelo Banco
         await refreshData();
 
-        // ⚠️ Nota: O prompt de finalização agora será baseado no refresh dos stats vindos do banco
+        // Agenda a checagem de finalização após o refresh do banco
+        setTimeout(() => setShouldCheckCompletion(true), 1500);
       } catch (err: any) {
         console.error('[PO-PAYMENT] Erro completo:', err);
         addToast('error', `Erro ao confirmar pagamento: ${err?.message || 'Erro desconhecido'}`);
