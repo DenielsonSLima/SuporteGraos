@@ -70,6 +70,7 @@ const OrderForm: React.FC<Props> = ({ initialData, onSave, onCancel }) => {
     if (isSaving) return; // Proteção contra double-click
     if (!formData.partnerId) return alert('Selecione um parceiro/fornecedor.');
     if (!formData.consultantName) return alert('Informe o nome do consultor.');
+    if (!formData.items || formData.items.length === 0) return alert('Adicione pelo menos um item ao pedido.');
     
     setIsSaving(true);
     try {

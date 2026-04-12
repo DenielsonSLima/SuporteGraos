@@ -1,8 +1,9 @@
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Plus, Trash2, PackagePlus } from 'lucide-react';
 import { OrderItem } from '../../types';
-import { classificationService } from '../../../../services/classificationService';
+import { useProductTypes } from '../../../../hooks/useClassifications';
+import QuickProductModal from '../../../Settings/ProductTypes/components/QuickProductModal';
 
 interface Props {
   items: OrderItem[];
@@ -10,24 +11,11 @@ interface Props {
 }
 
 const OrderItemsSection: React.FC<Props> = ({ items, onChange }) => {
-  const [products, setProducts] = useState<any[]>([]);
+  const { data: products = [] } = useProductTypes();
+  const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [newItem, setNewItem] = useState<Partial<OrderItem>>({ productName: '', quantity: 0, unit: 'SC', unitPrice: 0 });
   const [displayPrice, setDisplayPrice] = useState('');
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const allProducts = await classificationService.getProductTypes();
-        setProducts(allProducts);
-        if (allProducts.length > 0) {
-          setNewItem(prev => ({ ...prev, productName: allProducts[0].name }));
-        }
-      } catch {
-        // silencioso — lista de produtos fica vazia
-      }
-    };
-    load();
-  }, []);
 
   const formatBRL = (val: number) => {
     const normalized = Math.abs(val) < 0.01 ? 0 : val;
@@ -45,6 +33,7 @@ const OrderItemsSection: React.FC<Props> = ({ items, onChange }) => {
     if (!newItem.productName) return;
     const qty = Number(newItem.quantity) || 0;
     const price = Number(newItem.unitPrice) || 0;
+    
     const generateId = () => {
       if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
       return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
@@ -62,18 +51,22 @@ const OrderItemsSection: React.FC<Props> = ({ items, onChange }) => {
       unitPrice: price,
       total: qty * price
     };
+
     const updated = [...items, item];
     onChange(updated, updated.reduce((acc, i) => acc + i.total, 0));
-    if (products.length > 0) {
-      setNewItem({ productName: products[0].name, quantity: 0, unit: 'SC', unitPrice: 0 });
-    } else {
-      setNewItem({ productName: '', quantity: 0, unit: 'SC', unitPrice: 0 });
-    }
+    
+    // Reset form
+    setNewItem({ 
+      productName: '', 
+      quantity: 0, 
+      unit: 'SC', 
+      unitPrice: 0 
+    });
     setDisplayPrice('');
   };
 
   const labelClass = 'block text-[10px] font-black text-slate-400 uppercase mb-1.5 tracking-widest ml-1';
-  const inputClass = 'w-full border-2 border-slate-200 rounded-xl bg-white text-slate-900 font-bold px-3 py-2 focus:border-blue-600 outline-none transition-all text-sm';
+  const inputClass = 'w-full border-2 border-slate-200 rounded-xl bg-white text-slate-900 font-bold px-3 py-2 focus:border-blue-600 outline-none transition-all text-sm h-11';
 
   return (
     <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm overflow-hidden">
@@ -85,10 +78,24 @@ const OrderItemsSection: React.FC<Props> = ({ items, onChange }) => {
       <div className="flex flex-col lg:flex-row gap-4 mb-8 bg-slate-50/50 p-6 rounded-[2rem] border-2 border-slate-100 shadow-inner">
         <div className="flex-1">
           <label className={labelClass}>Produto</label>
-          <select className={inputClass} value={newItem.productName} onChange={e => setNewItem({...newItem, productName: e.target.value})}>
-            <option value="">Selecione um produto</option>
-            {products.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
-          </select>
+          <div className="flex gap-2">
+            <select 
+              className={inputClass} 
+              value={newItem.productName} 
+              onChange={e => setNewItem({...newItem, productName: e.target.value})}
+            >
+              <option value="">Selecione um produto</option>
+              {products.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+            </select>
+            <button 
+              type="button"
+              onClick={() => setIsQuickAddOpen(true)}
+              title="Cadastrar novo produto"
+              className="flex items-center justify-center p-2.5 bg-white border-2 border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-200 rounded-xl transition-all shadow-sm"
+            >
+              <PackagePlus size={20} />
+            </button>
+          </div>
         </div>
 
         <div className="w-full lg:w-32">
@@ -108,30 +115,50 @@ const OrderItemsSection: React.FC<Props> = ({ items, onChange }) => {
         </div>
       </div>
 
-      <table className="w-full text-left text-sm">
-        <thead>
-          <tr className="bg-slate-50 text-[10px] font-black uppercase text-slate-400 tracking-widest border-b border-slate-100">
-            <th className="px-6 py-3">Produto</th>
-            <th className="px-6 py-3 text-center">Volume</th>
-            <th className="px-6 py-3 text-right">Preço</th>
-            <th className="px-6 py-3 text-right">Subtotal</th>
-            <th className="px-6 py-3 text-center w-10"></th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-50 font-bold text-slate-700 uppercase">
-          {items.map(item => (
-            <tr key={item.id} className="hover:bg-slate-50/50">
-              <td className="px-6 py-4 text-slate-900 font-black">{item.productName}</td>
-              <td className="px-6 py-4 text-center">{item.quantity.toLocaleString()} {item.unit}</td>
-              <td className="px-6 py-4 text-right">{formatBRL(item.unitPrice)}</td>
-              <td className="px-6 py-4 text-right font-black text-slate-900">{formatBRL(item.total)}</td>
-              <td className="px-6 py-4 text-center">
-                <button onClick={() => onChange(items.filter(i => i.id !== item.id), items.filter(i => i.id !== item.id).reduce((acc, x) => acc + x.total, 0))} className="p-1.5 text-rose-400 hover:text-rose-600 rounded-lg"><Trash2 size={16}/></button>
-              </td>
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-sm min-w-[600px]">
+          <thead>
+            <tr className="bg-slate-50 text-[10px] font-black uppercase text-slate-400 tracking-widest border-b border-slate-100">
+              <th className="px-6 py-3">Produto</th>
+              <th className="px-6 py-3 text-center">Volume</th>
+              <th className="px-6 py-3 text-right">Preço</th>
+              <th className="px-6 py-3 text-right">Subtotal</th>
+              <th className="px-6 py-3 text-center w-10"></th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="divide-y divide-slate-50 font-bold text-slate-700 uppercase">
+            {items.map(item => (
+              <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
+                <td className="px-6 py-4 text-slate-900 font-black">{item.productName}</td>
+                <td className="px-6 py-4 text-center">{item.quantity.toLocaleString()} {item.unit}</td>
+                <td className="px-6 py-4 text-right">{formatBRL(item.unitPrice)}</td>
+                <td className="px-6 py-4 text-right font-black text-slate-900">{formatBRL(item.total)}</td>
+                <td className="px-6 py-4 text-center">
+                  <button 
+                    onClick={() => onChange(items.filter(i => i.id !== item.id), items.filter(i => i.id !== item.id).reduce((acc, x) => acc + x.total, 0))} 
+                    className="p-1.5 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                  >
+                    <Trash2 size={16}/>
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {items.length === 0 && (
+              <tr>
+                <td colSpan={5} className="px-6 py-12 text-center text-slate-400 italic font-medium">
+                  Nenhum item adicionado ao pedido.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <QuickProductModal 
+        isOpen={isQuickAddOpen} 
+        onClose={() => setIsQuickAddOpen(false)}
+        onSuccess={(newName) => setNewItem(prev => ({ ...prev, productName: newName }))}
+      />
     </div>
   );
 };

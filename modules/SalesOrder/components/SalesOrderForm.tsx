@@ -6,6 +6,8 @@ import { Partner } from '../../Partners/types';
 import { PARTNER_CATEGORY_IDS } from '../../../constants';
 import { usePartners } from '../../../hooks/useParceiros';
 import { useShareholders } from '../../../hooks/useShareholders';
+import { useProductTypes } from '../../../hooks/useClassifications';
+import QuickProductModal from '../../Settings/ProductTypes/components/QuickProductModal';
 
 interface Props {
   initialData?: SalesOrder;
@@ -18,7 +20,7 @@ const SalesOrderForm: React.FC<Props> = ({ initialData, onSave, onCancel }) => {
   
   const [formData, setFormData] = useState<Partial<SalesOrder>>({
     consultantName: '',
-    productName: 'Milho em Grãos',
+    productName: '',
     quantity: 0,
     unitPrice: 0,
     totalValue: 0,
@@ -34,8 +36,10 @@ const SalesOrderForm: React.FC<Props> = ({ initialData, onSave, onCancel }) => {
   const [displayPrice, setDisplayPrice] = useState(initialData?.unitPrice ? String(initialData.unitPrice) : '');
   const { data: partnersData } = usePartners({ page: 1, pageSize: 2000, category: 'all' });
   const { data: shareholdersRaw = [] } = useShareholders();
+  const { data: products = [] } = useProductTypes();
   const [customerSearch, setCustomerSearch] = useState(initialData?.customerName || '');
   const [isSearching, setIsSearching] = useState(false);
+  const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
 
   const partners = useMemo(() => {
     return (partnersData?.data || [])
@@ -205,9 +209,28 @@ const SalesOrderForm: React.FC<Props> = ({ initialData, onSave, onCancel }) => {
              <div className="grid gap-6 md:grid-cols-3">
                 <div className="md:col-span-3">
                     <label className={labelClass}>Mercadoria</label>
-                    <div className="relative">
-                       <Package className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                       <input type="text" value={formData.productName} onChange={e => setFormData({...formData, productName: e.target.value})} className={`${inputClass} pl-12`} />
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                         <Package className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                         <select 
+                            required 
+                            value={formData.productName} 
+                            onChange={e => setFormData({...formData, productName: e.target.value})} 
+                            className={`${inputClass} pl-12 appearance-none`}
+                         >
+                             <option value="">Selecione a mercadoria...</option>
+                             {products.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+                         </select>
+                         <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" size={18} />
+                      </div>
+                      <button 
+                        type="button"
+                        onClick={() => setIsQuickAddOpen(true)}
+                        title="Cadastrar novo produto"
+                        className="flex items-center justify-center p-3 bg-white border-2 border-slate-200 text-slate-400 hover:text-emerald-600 hover:border-emerald-200 rounded-2xl transition-all shadow-sm"
+                      >
+                        <Plus size={24} />
+                      </button>
                     </div>
                 </div>
                 <div>
@@ -232,6 +255,12 @@ const SalesOrderForm: React.FC<Props> = ({ initialData, onSave, onCancel }) => {
             <button type="button" onClick={onCancel} className="px-8 py-4 border-2 border-slate-200 rounded-2xl text-slate-500 font-black uppercase text-xs tracking-widest hover:bg-slate-50 transition-all">Cancelar</button>
             <button type="submit" className="px-10 py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-emerald-200 hover:bg-emerald-700 transition-all active:scale-95">Salvar Pedido de Venda</button>
           </div>
+
+          <QuickProductModal 
+            isOpen={isQuickAddOpen} 
+            onClose={() => setIsQuickAddOpen(false)}
+            onSuccess={(newName) => setFormData(prev => ({ ...prev, productName: newName }))}
+          />
       </form>
     </div>
   );
