@@ -82,6 +82,7 @@ export const financialTransactionService = {
         if (links && links.length > 0) {
             const newLinks = links.map(link => ({
                 transaction_id: newTx.id,
+                company_id: row.company_id,
                 purchase_order_id: link.purchase_order_id,
                 sales_order_id: link.sales_order_id,
                 loading_id: link.loading_id,
@@ -142,6 +143,7 @@ export const financialTransactionService = {
                     .from('financial_links')
                     .insert({
                         transaction_id: tx.id,
+                        company_id: companyId,
                         purchase_order_id: linkData.purchaseOrderId,
                         sales_order_id: linkData.salesOrderId,
                         loading_id: linkData.loadingId,

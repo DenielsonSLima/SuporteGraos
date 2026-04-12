@@ -146,21 +146,21 @@ const CashierReportView: React.FC<Props> = ({ report, title }) => {
             <ListItem label="Patrimônio (Bens Ativos)" value={report.totalFixedAssetsValue} icon={Tractor} colorClass="bg-indigo-100 text-indigo-600" />
             <ListItem
               label="Vendas de Bens (a Receber)"
-              value={report.pendingAssetSalesReceipts}
+              value={report.assetSalesReceivable}
               icon={Car}
               colorClass="bg-teal-100 text-teal-600"
               tooltip="Parcelas pendentes de veículos, máquinas e outros bens vendidos."
             />
             <ListItem
               label="Haveres de Sócios"
-              value={report.shareholderReceivables}
+              value={report.shareholderCredits}
               icon={Users}
               colorClass="bg-violet-100 text-violet-600"
               tooltip="Valores que os sócios retiraram a mais ou devem à empresa (Saldos Negativos)."
             />
-            <ListItem label="Empréstimos Concedidos" value={report.loansGranted} icon={Landmark} colorClass="bg-blue-100 text-blue-600" />
+            <ListItem label="Empréstimos Concedidos" value={report.loanCredits} icon={Landmark} colorClass="bg-blue-100 text-blue-600" />
             <ListItem label="Mercadoria em Trânsito" value={report.merchandiseInTransitValue} icon={Truck} colorClass="bg-amber-100 text-amber-600" />
-            <ListItem label="Adiantamentos Concedidos" value={report.advancesGiven} icon={HandCoins} colorClass="bg-cyan-100 text-cyan-600" />
+            <ListItem label="Adiantamentos Concedidos" value={report.advancesCredits} icon={HandCoins} colorClass="bg-cyan-100 text-cyan-600" />
           </div>
           <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100 flex justify-between items-center">
             <span className="text-xs font-bold uppercase text-emerald-700">Total Ativos + Bens</span>
@@ -185,13 +185,13 @@ const CashierReportView: React.FC<Props> = ({ report, title }) => {
             />
             <ListItem
               label="Obrigações com Sócios"
-              value={report.shareholderPayables}
+              value={report.shareholderDebts}
               icon={Users}
               colorClass="bg-indigo-100 text-indigo-700"
               tooltip="Saldos positivos de Pro-labore/Lucros a pagar aos donos."
             />
-            <ListItem label="Empréstimos Tomados" value={report.loansTaken} icon={Landmark} colorClass="bg-slate-100 text-slate-600" />
-            <ListItem label="Adiant. de Clientes" value={report.advancesTaken} icon={PiggyBank} colorClass="bg-pink-100 text-pink-600" borderClass="border-pink-100" />
+            <ListItem label="Empréstimos Tomados" value={report.loanDebts} icon={Landmark} colorClass="bg-slate-100 text-slate-600" />
+            <ListItem label="Adiant. de Clientes" value={report.clientAdvances} icon={PiggyBank} colorClass="bg-pink-100 text-pink-600" borderClass="border-rose-100" />
           </div>
           <div className="bg-rose-50 rounded-xl p-4 border border-rose-100 flex justify-between items-center">
             <span className="text-xs font-bold uppercase text-rose-700">Total Obrigações</span>

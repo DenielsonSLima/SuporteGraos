@@ -49,18 +49,18 @@ export const cashierService = {
 
     const pendingSalesReceipts = Number(sqlData?.pendingSalesReceipts) || 0;
     const merchandiseInTransitValue = Number(sqlData?.merchandiseInTransitValue) || 0;
-    const loansGranted = Number(sqlData?.loansGranted) || 0;
-    const advancesGiven = Number(sqlData?.advancesGiven) || 0;
+    const loanCredits = Number(sqlData?.loanCredits) || 0;
+    const advancesCredits = Number(sqlData?.advancesCredits) || 0;
     const totalFixedAssetsValue = Number(sqlData?.totalFixedAssetsValue) || 0;
-    const pendingAssetSalesReceipts = Number(sqlData?.pendingAssetSalesReceipts) || 0;
-    const shareholderReceivables = Number(sqlData?.shareholderReceivables) || 0;
+    const assetSalesReceivable = Number(sqlData?.assetSalesReceivable) || 0;
+    const shareholderCredits = Number(sqlData?.shareholderCredits) || 0;
 
     const pendingPurchasePayments = Number(sqlData?.pendingPurchasePayments) || 0;
     const pendingFreightPayments = Number(sqlData?.pendingFreightPayments) || 0;
-    const loansTaken = Number(sqlData?.loansTaken) || 0;
+    const loanDebts = Number(sqlData?.loanDebts) || 0;
     const commissionsToPay = Number(sqlData?.commissionsToPay) || 0;
-    const advancesTaken = Number(sqlData?.advancesTaken) || 0;
-    const shareholderPayables = Number(sqlData?.shareholderPayables) || 0;
+    const clientAdvances = Number(sqlData?.clientAdvances) || 0;
+    const shareholderDebts = Number(sqlData?.shareholderDebts) || 0;
 
     const totalAssets = Number(sqlData?.totalAssets) || 0;
     const totalLiabilities = Number(sqlData?.totalLiabilities) || 0;
@@ -77,18 +77,18 @@ export const cashierService = {
       initialMonthBalances,
       pendingSalesReceipts,
       merchandiseInTransitValue,
-      loansGranted,
-      advancesGiven,
+      loanCredits,
+      advancesCredits,
       totalFixedAssetsValue,
-      pendingAssetSalesReceipts,
-      shareholderReceivables,
+      assetSalesReceivable,
+      shareholderCredits,
       totalAssets,
       pendingPurchasePayments,
       pendingFreightPayments,
-      loansTaken,
+      loanDebts,
       commissionsToPay,
-      advancesTaken,
-      shareholderPayables,
+      clientAdvances,
+      shareholderDebts,
       totalLiabilities,
       netBalance,
       // NOVOS CAMPOS

@@ -34,23 +34,23 @@ export interface CashierReport {
 
   pendingSalesReceipts: number;
   merchandiseInTransitValue: number;
-  loansGranted: number;
-  advancesGiven: number;
+  loanCredits: number; // Empréstimos concedidos (Ativo)
+  advancesCredits: number; // Adiantamentos concedidos (Ativo)
 
   // PATRIMÔNIO E HAVERES
   totalFixedAssetsValue: number;
-  pendingAssetSalesReceipts: number;
-  shareholderReceivables: number; // Haveres de Sócios (Saldos devedores de sócios com a empresa)
+  assetSalesReceivable: number; // Venda de bens a receber
+  shareholderCredits: number; // Haveres de Sócios (Saldos devedores de sócios com a empresa)
 
   totalAssets: number;
 
   // --- DÉBITOS E OBRIGAÇÕES (PASSIVOS) ---
   pendingPurchasePayments: number;
   pendingFreightPayments: number;
-  loansTaken: number;
+  loanDebts: number; // Empréstimos tomados (Passivo)
   commissionsToPay: number; // Comissões de corretores/terceiros
-  advancesTaken: number;
-  shareholderPayables: number; // Obrigações com Sócios (Pro-labore/Lucros a pagar)
+  clientAdvances: number; // Adiantamento de Clientes (Passivo)
+  shareholderDebts: number; // Obrigações com Sócios (Pro-labore/Lucros a pagar)
 
   totalLiabilities: number;
 

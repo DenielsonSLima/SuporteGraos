@@ -5,7 +5,7 @@
  * Interface pública mantida compatível com o código legado
  * (financialService, BankAccountsSettings, etc.).
  *
- * Tabela: public.bank_accounts
+ * Tabela: public.accounts
  * RLS: company_id = public.my_company_id() — isolamento automático por empresa.
  */
 
@@ -17,11 +17,11 @@ import { BankAccount } from '../modules/Financial/types';
 function mapRow(row: any): BankAccount {
   return {
     id:            row.id,
-    bankName:      row.bank_name      ?? '',
+    bankName:      row.account_name   ?? '',
     owner:         row.owner          ?? '',
     agency:        row.agency         ?? '',
     accountNumber: row.account_number ?? '',
-    active:        row.active         ?? true,
+    active:        row.is_active      ?? true,
   };
 }
 
@@ -29,9 +29,9 @@ function mapRow(row: any): BankAccount {
 
 async function getAll(): Promise<BankAccount[]> {
   const { data, error } = await supabase
-    .from('bank_accounts')
+    .from('accounts')
     .select('*')
-    .order('bank_name');
+    .order('account_name');
   if (error) throw error;
   return (data ?? []).map(mapRow);
 }
@@ -44,14 +44,16 @@ async function _getCompanyId(): Promise<string> {
 
 async function add(account: BankAccount): Promise<void> {
   const companyId = await _getCompanyId();
-  const { error } = await supabase.from('bank_accounts').insert({
+  const { error } = await supabase.from('accounts').insert({
     id:             account.id,
-    bank_name:      account.bankName.trim(),
+    account_name:   account.bankName.trim(),
+    account_type:   'bank',
     owner:          account.owner          ?? '',
     agency:         account.agency         ?? '',
     account_number: account.accountNumber  ?? '',
-    active:         account.active         ?? true,
+    is_active:      account.active         ?? true,
     company_id:     companyId,
+    balance:        0,
   });
   if (error) {
     if (error.code === '23505') throw new Error('Já existe uma conta cadastrada com este nome.');
@@ -61,13 +63,13 @@ async function add(account: BankAccount): Promise<void> {
 
 async function update(account: BankAccount): Promise<void> {
   const { error } = await supabase
-    .from('bank_accounts')
+    .from('accounts')
     .update({
-      bank_name:      account.bankName.trim(),
+      account_name:   account.bankName.trim(),
       owner:          account.owner          ?? '',
       agency:         account.agency         ?? '',
       account_number: account.accountNumber  ?? '',
-      active:         account.active         ?? true,
+      is_active:      account.active         ?? true,
     })
     .eq('id', account.id);
   if (error) throw error;
@@ -75,7 +77,7 @@ async function update(account: BankAccount): Promise<void> {
 
 async function remove(id: string): Promise<void> {
   const { error } = await supabase
-    .from('bank_accounts')
+    .from('accounts')
     .delete()
     .eq('id', id);
   if (error) {
@@ -94,7 +96,7 @@ const subscribeRealtime = (() => {
     if (!channel) {
       channel = supabase
         .channel('bank-accounts-changes')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'bank_accounts' }, () => listeners.forEach(fn => fn()))
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'accounts' }, () => listeners.forEach(fn => fn()))
         .subscribe();
     }
     return () => {

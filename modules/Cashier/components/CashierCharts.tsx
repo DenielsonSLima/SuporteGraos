@@ -18,20 +18,20 @@ const CashierCharts: React.FC<Props> = ({ data }) => {
     { name: 'Em Contas', value: data.totalBankBalance, color: '#3b82f6' },
     { name: 'Vendas a Receber', value: data.pendingSalesReceipts, color: '#10b981' },
     { name: 'Patrimônio', value: data.totalFixedAssetsValue, color: '#6366f1' },
-    { name: 'Vendas de Bens', value: data.pendingAssetSalesReceipts, color: '#14b8a6' },
-    { name: 'Empréstimos', value: data.loansGranted, color: '#06b6d4' },
+    { name: 'Vendas de Bens', value: data.assetSalesReceivable, color: '#14b8a6' },
+    { name: 'Empréstimos', value: data.loanCredits, color: '#06b6d4' },
     { name: 'Mercad. em Trânsito', value: data.merchandiseInTransitValue, color: '#f59e0b' },
-    { name: 'Haveres de Sócios', value: data.shareholderReceivables, color: '#eab308' },
-    { name: 'Adiant. Concedidos', value: data.advancesGiven, color: '#d97706' },
+    { name: 'Haveres de Sócios', value: data.shareholderCredits, color: '#eab308' },
+    { name: 'Adiant. Concedidos', value: data.advancesCredits, color: '#d97706' },
   ].filter(d => d.value > 0), [data]);
 
   const expenseData = useMemo(() => [
     { name: 'Fornecedores (Grãos)', value: data.pendingPurchasePayments, color: '#ef4444' },
     { name: 'Fretes a Pagar', value: data.pendingFreightPayments, color: '#f97316' },
-    { name: 'Adiant. Recebidos', value: data.advancesTaken, color: '#8b5cf6' },
-    { name: 'Empréstimos Tomados', value: data.loansTaken, color: '#ec4899' },
+    { name: 'Adiant. Recebidos', value: data.clientAdvances, color: '#8b5cf6' },
+    { name: 'Empréstimos Tomados', value: data.loanDebts, color: '#ec4899' },
     { name: 'Comissões a Pagar', value: data.commissionsToPay, color: '#f43f5e' },
-    { name: 'Obrigações com Sócios', value: data.shareholderPayables, color: '#64748b' },
+    { name: 'Obrigações com Sócios', value: data.shareholderDebts, color: '#64748b' },
   ].filter(d => d.value > 0), [data]);
 
   // Total de ativos vem pré-calculado do SQL — frontend NÃO recalcula
