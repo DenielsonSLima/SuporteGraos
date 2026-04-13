@@ -9,6 +9,7 @@ import { useAccounts } from '../../../../hooks/useAccounts';
 import { useExpenseCategories } from '../../../../hooks/useExpenseCategories';
 import { useToast } from '../../../../contexts/ToastContext';
 import ModalPortal from '../../../../components/ui/ModalPortal';
+import { formatAccountLabel } from '../../../../utils/formatters';
 
 interface Props {
   isOpen: boolean;
@@ -168,7 +169,11 @@ const TransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, type, titl
                     <Wallet className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                     <select required value={formData.accountId} onChange={e => setFormData({ ...formData, accountId: e.target.value })} className={`${inputClass} pl-12 appearance-none`}>
                       <option value="">Selecione o Banco...</option>
-                      {bankAccounts.map(acc => <option key={acc.id} value={acc.id}>{acc.account_name}</option>)}
+                      {bankAccounts.map(acc => (
+                        <option key={acc.id} value={acc.id}>
+                          {formatAccountLabel(acc.account_name, acc.owner, acc.balance)}
+                        </option>
+                      ))}
                     </select>
                     <ArrowDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
                   </div>

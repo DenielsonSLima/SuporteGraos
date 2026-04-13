@@ -6,6 +6,7 @@ import type { Account } from '../../../../services/accountsService';
 import { useAccounts } from '../../../../hooks/useAccounts';
 import ActionConfirmationModal from '../../../../components/ui/ActionConfirmationModal';
 import ModalPortal from '../../../../components/ui/ModalPortal';
+import { formatAccountLabel } from '../../../../utils/formatters';
 
 interface Props {
   isOpen: boolean;
@@ -89,7 +90,9 @@ const TransactionManagementModal: React.FC<Props> = ({ isOpen, onClose, transact
                 >
                   <option value="">Selecione a conta...</option>
                   {bankAccounts.map(acc => (
-                    <option key={acc.id} value={acc.id}>{acc.account_name}</option>
+                    <option key={acc.id} value={acc.id}>
+                      {formatAccountLabel(acc.account_name, acc.owner, acc.balance)}
+                    </option>
                   ))}
                 </select>
               </div>

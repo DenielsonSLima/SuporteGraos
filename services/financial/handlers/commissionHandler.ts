@@ -19,13 +19,14 @@ export const handleCommissionPayment = async (
   let entryId = '';
   let commissionId = '';
   let brokerName = data.entityName || 'Corretor';
+  let purchaseOrderId = '';
 
   // 1. Resolução do ID do Lançamento Financeiro (entry_id)
   if (canonicalOpsEnabled) {
     // Busca direta via view enriquecida (que vincula brokerage a entries)
     const { data: entry } = await supabase
       .from('vw_payables_enriched')
-      .select('id, origin_id, partner_name')
+      .select('id, origin_id, partner_name, purchase_order_id')
       .or(`id.eq.${recordId},origin_id.eq.${recordId}`)
       .eq('origin_type', 'commission')
       .maybeSingle();
@@ -34,6 +35,7 @@ export const handleCommissionPayment = async (
       entryId = entry.id;
       commissionId = entry.origin_id || '';
       brokerName = entry.partner_name || brokerName;
+      purchaseOrderId = entry.purchase_order_id || '';
     }
   } else {
     // MODO LEGADO (Fallback)
@@ -42,7 +44,8 @@ export const handleCommissionPayment = async (
     if (payable) {
       entryId = payable.id;
       commissionId = payable.id; // Em legado, o entry_id costuma ser o ID do payable
-      brokerName = payable.partner_name || brokerName;
+      brokerName = payable.partnerName || brokerName;
+      purchaseOrderId = payable.purchaseOrderId || '';
     }
   }
 

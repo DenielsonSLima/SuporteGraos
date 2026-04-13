@@ -47,7 +47,7 @@ export const handlePurchaseOrderPayment = async (
     if (payable) {
       entryId = payable.id;
       purchaseOrderId = payable.purchaseOrderId || '';
-      supplierName = payable.partner_name || supplierName;
+      supplierName = payable.partnerName || supplierName;
     }
   }
 

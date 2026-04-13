@@ -5,6 +5,7 @@ import { useAccounts } from '../../../../hooks/useAccounts';
 import { getLocalDateString } from '../../../../utils/dateUtils';
 import { useToast } from '../../../../contexts/ToastContext';
 import ModalPortal from '../../../../components/ui/ModalPortal';
+import { formatAccountLabel } from '../../../../utils/formatters';
 
 interface Props {
   isOpen: boolean;
@@ -146,7 +147,7 @@ const ExpenseModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, vehiclePlat
                   <option value="">Selecione o Banco...</option>
                   {bankAccounts.map(acc => (
                     <option key={acc.id} value={acc.id}>
-                      {acc.account_name} (Saldo: {formatBRL(acc.balance)})
+                      {formatAccountLabel(acc.account_name, acc.owner, acc.balance)}
                     </option>
                   ))}
                 </select>

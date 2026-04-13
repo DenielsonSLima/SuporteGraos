@@ -6,6 +6,7 @@ import { useAccounts } from '../../../../hooks/useAccounts';
 import { useToast } from '../../../../contexts/ToastContext';
 import { LoanTransaction } from '../../types';
 import ModalPortal from '../../../../components/ui/ModalPortal';
+import { formatAccountLabel } from '../../../../utils/formatters';
 
 interface Props {
   isOpen: boolean;
@@ -178,7 +179,7 @@ const LoanTransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, loanTy
                                          <option value="">Selecione a conta ativa...</option>
                                          {bankAccounts.map(acc => (
                                             <option key={acc.id} value={acc.id}>
-                                               {acc.account_name} (Saldo: {currency(acc.balance || 0)})
+                                               {formatAccountLabel(acc.account_name, acc.owner, acc.balance)}
                                             </option>
                                          ))}
                                    </select>

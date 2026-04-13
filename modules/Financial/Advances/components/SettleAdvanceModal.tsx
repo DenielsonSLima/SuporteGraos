@@ -4,6 +4,7 @@ import { X, Save, Calendar, DollarSign, Wallet, FileText, ChevronDown } from 'lu
 import ModalPortal from '../../../../components/ui/ModalPortal';
 import { useAccounts } from '../../../../hooks/useAccounts';
 import { useToast } from '../../../../contexts/ToastContext';
+import { formatAccountLabel } from '../../../../utils/formatters';
 import { AdvanceTransaction } from '../types';
 
 interface Props {
@@ -158,7 +159,7 @@ const SettleAdvanceModal: React.FC<Props> = ({ isOpen, onClose, onSave, advance 
                     >
                         <option value="">Selecione a conta bancária...</option>
                         {bankAccounts.map(acc => (
-                          <option key={acc.id} value={acc.id}>{acc.account_name} (Saldo: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(acc.balance)})</option>
+                          <option key={acc.id} value={acc.id}>{formatAccountLabel(acc.account_name, acc.owner, acc.balance)}</option>
                         ))}
                     </select>
                     <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" size={18} />

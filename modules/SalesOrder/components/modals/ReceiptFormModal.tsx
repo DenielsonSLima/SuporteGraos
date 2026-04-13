@@ -4,7 +4,7 @@ import type { Account } from '../../../../services/accountsService';
 import { useAccounts } from '../../../../hooks/useAccounts';
 import { useToast } from '../../../../contexts/ToastContext';
 import ModalPortal from '../../../../components/ui/ModalPortal';
-import { formatCurrency } from '../../../../utils/formatters';
+import { formatCurrency, formatAccountLabel } from '../../../../utils/formatters';
 
 interface ReceiptData {
   date: string;
@@ -144,7 +144,7 @@ const ReceiptFormModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, totalPe
                   <select required value={accountId} onChange={e => setAccountId(e.target.value)} className={`${inputClass} pl-12 appearance-none`}>
                     <option value="">Selecione...</option>
                     {bankAccounts.map(acc => (
-                      <option key={acc.id} value={acc.id}>{acc.account_name} (Saldo: {formatCurrency(acc.balance)})</option>
+                      <option key={acc.id} value={acc.id}>{formatAccountLabel(acc.account_name, acc.owner, acc.balance)}</option>
                     ))}
                   </select>
                   <ArrowDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />

@@ -83,3 +83,14 @@ export const formatDate = (date: string | Date): string => {
 export const formatDateTime = (date: string | Date): string => {
   return new Date(date).toLocaleString('pt-BR');
 };
+
+/**
+ * 🏦 Formatador Central de Contas Bancárias
+ * Padroniza a exibição em todos os Dropdowns do sistema.
+ * Formato: BANCO | DONO (R$ 0,00) - TUDO MAIÚSCULO
+ */
+export const formatAccountLabel = (name: string, owner: string | undefined | null, balance: number): string => {
+  const formattedBalance = formatCurrency(balance);
+  const label = `${name} | ${owner || '-'} (${formattedBalance})`;
+  return label.toUpperCase();
+};

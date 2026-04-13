@@ -8,6 +8,7 @@ import { useAccounts } from '../../../../hooks/useAccounts';
 import { useExpenseCategories } from '../../../../hooks/useExpenseCategories';
 import { FinancialRecord } from '../../types';
 import { useToast } from '../../../../contexts/ToastContext';
+import { formatAccountLabel } from '../../../../utils/formatters';
 
 interface Props {
   isOpen: boolean;
@@ -336,7 +337,7 @@ const InstallmentExpenseForm: React.FC<Props> = ({ isOpen, onClose, onSave, onUp
                           <option value="">Selecione a conta bancária...</option>
                           {bankAccounts.map(acc => (
                             <option key={acc.id} value={acc.id}>
-                              {acc.account_name} | {acc.owner || 'Sem Dono'} (Saldo: {formatBRL(acc.balance)})
+                              {formatAccountLabel(acc.account_name, acc.owner, acc.balance)}
                             </option>
                           ))}
                       </select>

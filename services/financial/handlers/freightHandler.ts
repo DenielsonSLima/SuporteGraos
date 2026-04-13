@@ -46,7 +46,7 @@ export const handleFreightPayment = async (
     if (payable) {
       entryId = payable.id;
       freightId = payable.loadingId || '';
-      carrierName = payable.partner_name || carrierName;
+      carrierName = payable.partnerName || carrierName;
     }
   }
 
@@ -83,7 +83,7 @@ export const handleFreightPayment = async (
     type: 'payment',
     recordId: entryId,
     referenceType: 'loading',
-    referenceId: loadingId || recordId,
+    referenceId: freightId || recordId,
     description,
     historyType: 'Pagamento Frete',
     entityName: carrierName,

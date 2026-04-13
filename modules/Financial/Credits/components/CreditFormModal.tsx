@@ -8,6 +8,7 @@ import type { Account } from '../../../../services/accountsService';
 import { useAccounts } from '../../../../hooks/useAccounts';
 import { getLocalDateString } from '../../../../utils/dateUtils';
 import { useToast } from '../../../../contexts/ToastContext';
+import { formatAccountLabel } from '../../../../utils/formatters';
 
 interface Props {
   isOpen: boolean;
@@ -191,7 +192,7 @@ const CreditFormModal: React.FC<Props> = ({ isOpen, onClose, onSubmit, initialDa
                     <option value="">Selecione uma conta...</option>
                     {bankAccounts.map(account => (
                       <option key={account.id} value={account.id}>
-                        {account.account_name} (Saldo: {formatBRL(account.balance || 0)})
+                        {formatAccountLabel(account.account_name, account.owner, account.balance)}
                       </option>
                     ))}
                   </select>

@@ -12,7 +12,7 @@ import {
 import { Loading } from '../../types';
 import { freightService } from '../../../../services/loadings/freightService';
 import { loadingKpiService } from '../../../../services/loadings/loadingKpiService';
-import { formatCurrency } from '../../../../utils/formatters';
+import { formatCurrency, formatAccountLabel } from '../../../../utils/formatters';
 import { useToast } from '../../../../contexts/ToastContext';
 import { useAccounts } from '../../../../hooks/useAccounts';
 import { accountsService } from '../../../../services/accountsService';
@@ -194,7 +194,7 @@ export function FreightPaymentModal({ loading, isOpen, onClose, onSuccess, trans
                 <option value="">Selecione a conta</option>
                 {accounts.map((acc: any) => (
                   <option key={acc.id} value={acc.id}>
-                    {acc.account_name} - R$ {(acc.balance || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    {formatAccountLabel(acc.account_name, acc.owner, acc.balance)}
                   </option>
                 ))}
               </select>

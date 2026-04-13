@@ -4,6 +4,7 @@ import { X, Save, Calendar, DollarSign, FileText, Tag, User, ArrowRight, Wallet 
 import type { Account } from '../../../../services/accountsService';
 import { useAccounts } from '../../../../hooks/useAccounts';
 import ModalPortal from '../../../../components/ui/ModalPortal';
+import { formatAccountLabel } from '../../../../utils/formatters';
 
 interface Props {
   isOpen: boolean;
@@ -245,7 +246,7 @@ const FinancialRecordForm: React.FC<Props> = ({ isOpen, onClose, onSave, type, i
                         <option value="">Selecione a conta...</option>
                         {accounts.map(acc => (
                           <option key={acc.id} value={acc.id}>
-                            {acc.account_name} | {acc.owner || 'Sem Dono'} (Saldo: {currency(acc.balance)})
+                            {formatAccountLabel(acc.account_name, acc.owner, acc.balance)}
                           </option>
                         ))}
                       </select>
@@ -269,7 +270,7 @@ const FinancialRecordForm: React.FC<Props> = ({ isOpen, onClose, onSave, type, i
                         <option value="">Selecione a conta...</option>
                         {accounts.map(acc => (
                           <option key={acc.id} value={acc.id}>
-                            {acc.account_name} | {acc.owner || 'Sem Dono'} (Saldo: {currency(acc.balance)})
+                            {formatAccountLabel(acc.account_name, acc.owner, acc.balance)}
                           </option>
                         ))}
                       </select>
