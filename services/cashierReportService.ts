@@ -33,6 +33,7 @@ export interface CashierReportPayload {
   monthPaidTotal?: number;
   monthDirectDiff?: number;
   monthOperationalSpread?: number;
+  monthFreightPendingTotal?: number;
   creditsReceivedDetails?: any;
   expenseDistribution?: any;
   revenueDistribution?: any;
@@ -121,6 +122,7 @@ export const cashierReportService = {
       monthRefusedTotal: report.monthRefusedTotal || 0,
       monthDirectDiff: report.monthDirectDiff || 0,
       monthOperationalSpread: report.monthOperationalSpread || 0,
+      monthFreightPendingTotal: report.monthFreightPendingTotal || 0,
       
       // Distribuições e Detalhes
       expenseDistribution: report.expenseDistribution || { purchases: 0, freight: 0, expenses: 0, others: 0 },

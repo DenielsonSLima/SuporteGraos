@@ -68,23 +68,23 @@ const CashierSummaryCards: React.FC<Props> = ({ data }) => {
           </div>
         </div>
 
-        {/* Linha 1: Core de Compras e Vendas */}
+        {/* Linha 1: Visão Estratégica (4 Cards) */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <StatItem label="Valor Comprado" value={data.monthPurchasedTotal} icon={ShoppingCart} color="text-slate-500" sub="PO's registradas" />
+          <StatItem label="Fretes em Aberto" value={data.monthFreightPendingTotal} icon={Truck} color="text-orange-500" sub="Pendente acumulado" />
           <StatItem label="Valor Vendido" value={data.monthSoldTotal} icon={TrendingUp} color="text-primary-600" sub="Cargas (unloaded/completed)" />
-          <StatItem label="Res. Operacional" value={data.monthOperationalSpread} icon={TrendingUp} color="text-emerald-600" sub="Spread (Vendido - Comprado)" />
           
-          <div className="p-4 bg-slate-900 rounded-xl flex flex-col justify-between text-white shadow-lg">
+          <div className="p-4 bg-slate-900 rounded-xl flex flex-col justify-between text-white shadow-lg overflow-hidden border border-slate-800">
             <div>
               <div className="flex items-center gap-2 mb-2 text-slate-400">
-                <MinusCircle size={14} />
-                <span className="text-[10px] font-black uppercase tracking-wider">Gap Financeiro</span>
+                <TrendingUp size={14} className="text-emerald-400" />
+                <span className="text-[10px] font-black uppercase tracking-wider">Lucro Real (Cenário)</span>
               </div>
-              <div className={`text-lg font-black leading-none ${data.monthDirectDiff >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                {currency(data.monthDirectDiff)}
+              <div className="text-lg font-black leading-none text-emerald-400">
+                {currency(data.monthOperationalSpread)}
               </div>
             </div>
-            <p className="text-[9px] text-slate-500 mt-2 font-medium italic leading-tight">Recebido - Pago</p>
+            <p className="text-[9px] text-slate-500 mt-2 font-medium italic leading-tight">Vendido - (Comprado + Fretes)</p>
           </div>
         </div>
 

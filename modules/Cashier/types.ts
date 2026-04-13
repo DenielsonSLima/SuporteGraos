@@ -67,8 +67,9 @@ export interface CashierReport {
   monthExpensesPaidTotal: number;
   monthPaidTotal: number;
   monthDirectDiff: number;
-  monthOperationalSpread: number;
-  creditsReceivedDetails: {
+  monthOperationalSpread?: number;
+  monthFreightPendingTotal?: number;
+  creditsReceivedDetails?: {
     sales_order: number;
     loan: number;
     others: number;

@@ -101,6 +101,7 @@ export const cashierService = {
       monthPaidTotal: Number(sqlData?.monthPaidTotal) || 0,
       monthDirectDiff: Number(sqlData?.monthDirectDiff) || 0,
       monthOperationalSpread: Number(sqlData?.monthOperationalSpread) || 0,
+      monthFreightPendingTotal: Number(sqlData?.monthFreightPendingTotal) || 0,
       creditsReceivedDetails: sqlData?.creditsReceivedDetails || { sales_order: 0, loan: 0, others: 0 },
       expenseDistribution: sqlData?.expenseDistribution || { purchases: 0, freight: 0, expenses: 0, others: 0 },
       revenueDistribution: sqlData?.revenueDistribution || { opening_receivables: 0, future_receivables: 0 },
