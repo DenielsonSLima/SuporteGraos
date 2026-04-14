@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Search, Bell, Menu, HelpCircle, ShoppingCart, Truck, AlertTriangle, ChevronRight, X, User, DollarSign, LayoutGrid, FileText, Loader2 } from 'lucide-react';
+import { Search, Bell, Menu, HelpCircle, ShoppingCart, Truck, AlertTriangle, ChevronRight, X, User, DollarSign, LayoutGrid, FileText, Loader2, Package, Users, Calculator, Briefcase } from 'lucide-react';
 import { ModuleId } from '../../types';
 import { useNotification } from '../../contexts/NotificationContext';
 import { searchService, SearchResult } from '../../services/searchService';
+import { ConnectionStatus } from '../ui/ConnectionStatus';
 
 interface HeaderProps {
   toggleSidebar: () => void;
@@ -88,6 +89,10 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar, title, onNavigate }) => 
           case 'loading': return Truck;
           case 'financial': return FileText;
           case 'menu': return LayoutGrid;
+          case 'product': return Package;
+          case 'client': return Users;
+          case 'tax': return Calculator;
+          case 'asset': return Briefcase;
           default: return Search;
       }
   };
@@ -153,6 +158,8 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar, title, onNavigate }) => 
         </div>
         
         <div className="flex items-center gap-x-4 lg:gap-x-6">
+          <ConnectionStatus />
+          
           {/* 🔧 Botões alinhados verticalmente */}
           <button 
             type="button" 

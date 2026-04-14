@@ -14,6 +14,8 @@ import { useSalesOrderModule } from './hooks/useSalesOrderModule';
 import { QUERY_KEYS } from '../../hooks/queryKeys';
 import { Pagination } from '../../components/ui/Pagination';
 
+import { ModuleSkeleton } from '../../components/ui/LoadingSkeleton';
+
 export type SalesGroupByOption = 'month' | 'partner' | 'none';
 
 const SalesOrderModule: React.FC = () => {
@@ -22,6 +24,11 @@ const SalesOrderModule: React.FC = () => {
 
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 40;
+
+  // ... (keeping existing state and logic)
+
+  // renderContent change below
+
 
   // UI/Filter State
   const [activeTab, setActiveTab] = useState<'active' | 'finalized' | 'all'>(() => {
@@ -504,12 +511,7 @@ const SalesOrderModule: React.FC = () => {
               )}
             </div>
           )}
-          {isLoading && (
-            <div className="flex flex-col items-center justify-center py-40 gap-4">
-              <div className="w-12 h-12 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin"></div>
-              <p className="text-sm font-black text-slate-400 uppercase tracking-widest animate-pulse">Carregando Pedidos...</p>
-            </div>
-          )}
+          {isLoading && <ModuleSkeleton />}
         </div>
       </div>
     );

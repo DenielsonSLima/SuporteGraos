@@ -15,12 +15,15 @@ import { usePurchaseOrders } from '../../hooks/usePurchaseOrders';
 import { useLoadings } from '../../hooks/useLoadings';
 import { usePurchaseOrderModule } from './hooks/usePurchaseOrderModule';
 import { Pagination } from '../../components/ui/Pagination';
+import { ModuleSkeleton } from '../../components/ui/LoadingSkeleton';
 
 export type GroupByOption = 'month' | 'harvest' | 'partner' | 'none';
 
 const PurchaseOrderModule: React.FC = () => {
   const { addToast } = useToast();
+
   const { shareholders, getOrderById, handleSave: saveOrder, executeDelete: deleteOrder, finalizeOrder } = usePurchaseOrderModule({ addToast });
+
   
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 40;
@@ -290,12 +293,7 @@ const PurchaseOrderModule: React.FC = () => {
           {activeTab === 'finalized' && <FinalizedOrders orders={orders} onOrderClick={handleOrderClick} onDelete={handleDeleteRequest} groupBy={groupBy} />}
           {activeTab === 'all' && <AllOrders orders={orders} onOrderClick={handleOrderClick} onDelete={handleDeleteRequest} groupBy={groupBy} />}
           
-          {isLoading && (
-            <div className="flex flex-col items-center justify-center py-40 gap-4">
-              <div className="w-12 h-12 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin"></div>
-              <p className="text-sm font-black text-slate-400 uppercase tracking-widest animate-pulse">Carregando Pedidos...</p>
-            </div>
-          )}
+          {isLoading && <ModuleSkeleton />}
 
           {!isLoading && orders.length > 0 && (
             <Pagination 

@@ -13,6 +13,8 @@ import { useCarriers } from '../../hooks/useCarriers';
 import { useQueryClient } from '@tanstack/react-query';
 import { QUERY_KEYS } from '../../hooks/queryKeys';
 
+import { ModuleSkeleton } from '../../components/ui/LoadingSkeleton';
+
 const LogisticsModule: React.FC = () => {
   const queryClient = useQueryClient();
   // useFreights: cálculos (balance, financial_status, breakage) vêm da VIEW do banco
@@ -75,36 +77,7 @@ const LogisticsModule: React.FC = () => {
   const loading = freightsLoading || carriersLoading;
 
   if (loading) {
-    return (
-      <div className="space-y-6 animate-pulse">
-        {/* KPI Skeletons */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="bg-slate-100 h-24 rounded-2xl border border-slate-200" />
-          ))}
-        </div>
-
-        {/* Search/Filter Skeleton */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm h-32" />
-
-        {/* Tab Skeleton */}
-        <div className="flex space-x-8 border-b border-slate-200">
-          {[...Array(3)].map((_, i) => (
-            <div key={i} className="h-10 w-24 bg-slate-100 rounded-t-lg" />
-          ))}
-        </div>
-
-        {/* Table Skeleton */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-6">
-          <div className="space-y-4">
-            <div className="h-10 bg-slate-900 rounded-lg w-full mb-6" />
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="h-8 bg-slate-50 rounded w-full" />
-            ))}
-          </div>
-        </div>
-      </div>
-    );
+    return <ModuleSkeleton />;
   }
 
   const findLoadingById = (id: string) => rawLoadings.find((l: any) => l.id === id) || null;
