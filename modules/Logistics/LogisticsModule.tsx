@@ -53,7 +53,11 @@ const LogisticsModule: React.FC = () => {
   const kpiFreights = useMemo(() => {
     return freights.filter(f => {
       const search = searchTerm.toLowerCase();
-      const matchesSearch = !searchTerm || f.carrierName.toLowerCase().includes(search) || f.driverName.toLowerCase().includes(search) || f.vehiclePlate.toLowerCase().includes(search) || f.orderNumber.toLowerCase().includes(search);
+      const matchesSearch = !searchTerm || 
+        (f.carrierName || '').toLowerCase().includes(search) || 
+        (f.driverName || '').toLowerCase().includes(search) || 
+        (f.vehiclePlate || '').toLowerCase().includes(search) || 
+        (f.orderNumber || '').toLowerCase().includes(search);
       const matchesCarrier = !carrierFilter || f.carrierName === carrierFilter;
       const matchesDate = (!startDate || f.date >= startDate) && (!endDate || f.date <= endDate);
       return matchesSearch && matchesCarrier && matchesDate;

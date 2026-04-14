@@ -86,9 +86,15 @@ const PurchaseOrderModule: React.FC = () => {
     const pending = (window as any).__pendingOrderNav;
     if (pending && pending.moduleId === 'purchase_order' && pending.orderId) {
       delete (window as any).__pendingOrderNav;
+      
+      // Tentativa 1: Cache síncrono
       const order = getOrderById(pending.orderId);
       if (order) {
         setSelectedOrderId(order.id);
+        setViewMode('details');
+      } else {
+        // Tentativa 2: Delegar para o componente OrderDetails lidar com o ID
+        setSelectedOrderId(pending.orderId);
         setViewMode('details');
       }
     }

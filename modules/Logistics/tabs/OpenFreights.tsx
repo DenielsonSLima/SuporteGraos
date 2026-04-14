@@ -16,7 +16,14 @@ const OpenFreights: React.FC<Props> = ({ freights, onFreightClick }) => {
   
   const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
   const number = (val: number) => new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 }).format(val);
-  const dateStr = (val: string) => new Date(val).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+  const dateStr = (val: string) => {
+    if (!val) return '-';
+    try {
+      return new Date(val).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    } catch {
+      return '-';
+    }
+  };
 
   // 1. Filtragem Inicial: Apenas o que ainda tem pendência (operacional OU financeira)
   const activeFreights = useMemo(() => 
@@ -164,9 +171,9 @@ const OpenFreights: React.FC<Props> = ({ freights, onFreightClick }) => {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1.5 text-slate-600">
-                         <span className="font-bold">{f.supplierName.split(' ')[0]}</span>
+                         <span className="font-bold">{(f.supplierName || 'Fornecedor').split(' ')[0]}</span>
                          <ArrowRight size={10} className="text-slate-300" />
-                         <span className="font-bold">{f.destinationCity}</span>
+                         <span className="font-bold">{f.destinationCity || 'Destino'}</span>
                       </div>
                     </td>
                     <td className="px-4 py-3 text-right font-bold text-slate-900">{number(f.weight)}</td>

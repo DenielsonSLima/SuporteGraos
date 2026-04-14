@@ -9,6 +9,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { PurchaseOrder } from '../types';
 import { purchaseService } from '../../../services/purchaseService';
 import { loadingService } from '../../../services/loadingService';
+import { authService } from '../../../services/authService';
 import { useShareholders } from '../../../hooks/useShareholders';
 import { QUERY_KEYS } from '../../../hooks/queryKeys';
 
@@ -30,12 +31,16 @@ export function usePurchaseOrderModule({ addToast }: UsePurchaseOrderModuleOptio
 
   // ─── Inicialização de serviços legados ──────────────────
   useEffect(() => {
-    loadingService.startRealtime();
-    purchaseService.startRealtime('active'); // Assume active company for now or pass context
-    void loadingService.loadFromSupabase();
+    const user = authService.getCurrentUser();
+    const activeCompanyId = user?.companyId;
+
+    if (activeCompanyId) {
+      loadingService.startRealtime();
+      purchaseService.startRealtime(activeCompanyId);
+      void loadingService.loadFromSupabase();
+    }
 
     const unsubscribeLoadings = loadingService.subscribe(() => {
-      // ✅ SKIL Gap 7: LoadingCache removido — re-render via setLoadingVersion é suficiente
       setLoadingVersion(v => v + 1);
     });
 
