@@ -162,9 +162,42 @@ const CashierReportView: React.FC<Props> = ({ report, title }) => {
             <ListItem label="Mercadoria em Trânsito" value={report.merchandiseInTransitValue} icon={Truck} colorClass="bg-amber-100 text-amber-600" />
             <ListItem label="Adiantamentos Concedidos" value={report.advancesCredits} icon={HandCoins} colorClass="bg-cyan-100 text-cyan-600" />
           </div>
-          <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100 flex justify-between items-center">
-            <span className="text-xs font-bold uppercase text-emerald-700">Total Ativos + Bens</span>
-            <span className="text-xl font-bold text-emerald-700">{currency(report.totalAssets)}</span>
+          <div className="mt-8 bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-lg transform hover:scale-[1.02] transition-transform duration-300">
+            <div className="p-5 bg-slate-50/50 space-y-4">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <div className="w-2 h-2 rounded-full bg-blue-500 ring-4 ring-blue-100"></div>
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Saldos Bancários</span>
+                </div>
+                <span className="text-base font-black text-slate-700">{currency(report.totalBankBalance)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <div className="w-2 h-2 rounded-full bg-slate-300 ring-4 ring-slate-100"></div>
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Outros Ativos & Bens</span>
+                </div>
+                <span className="text-base font-black text-slate-700">{currency(report.totalAssets - report.totalBankBalance)}</span>
+              </div>
+            </div>
+            
+            <div className="bg-gradient-to-br from-emerald-600 to-emerald-700 p-6 text-white flex justify-between items-center relative overflow-hidden">
+              {/* Efeitos Visuais de Fundo */}
+              <div className="absolute top-0 right-0 w-48 h-48 bg-white/10 rounded-full -mr-20 -mt-20 blur-3xl"></div>
+              <div className="absolute bottom-0 left-0 w-24 h-24 bg-emerald-400/20 rounded-full -ml-10 -mb-10 blur-2xl"></div>
+              
+              <div className="relative z-10">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-[10px] font-black uppercase tracking-[0.25em] text-emerald-100/90">Total Geral de Ativos</span>
+                </div>
+                <p className="text-[9px] text-emerald-200/70 font-bold uppercase tracking-wider">A soma de tudo que a empresa possui</p>
+              </div>
+              
+              <div className="relative z-10 text-right">
+                <div className="text-2xl sm:text-3xl font-black tracking-tighter drop-shadow-sm">
+                  {currency(report.totalAssets)}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 

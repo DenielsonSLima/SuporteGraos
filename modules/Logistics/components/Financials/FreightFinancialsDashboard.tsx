@@ -3,7 +3,7 @@ import React, { useMemo } from 'react';
 import { Freight } from '../../types';
 import { DollarSign } from 'lucide-react';
 import CarrierCard from './CarrierCard';
-import { advanceService } from '../../../Financial/Advances/services/advanceService';
+import { useAdvanceSummaries } from '../../../../hooks/useAdvances';
 
 interface Props {
   freights: Freight[];
@@ -20,9 +20,10 @@ interface CarrierGroup {
 
 const FreightFinancialsDashboard: React.FC<Props> = ({ freights, onSelectCarrier }) => {
   
+  const { data: advanceSummaries = [] } = useAdvanceSummaries();
+  
   const carrierGroups = useMemo(() => {
     const groups: Record<string, CarrierGroup> = {};
-    const advanceSummaries = advanceService.getSummaries();
     
     freights.forEach(f => {
       if (f.balanceValue > 0.05 || f.advanceValue > 0 || f.financialStatus !== 'paid') {
@@ -45,7 +46,7 @@ const FreightFinancialsDashboard: React.FC<Props> = ({ freights, onSelectCarrier
     });
 
     return Object.values(groups).sort((a, b) => b.totalBalance - a.totalBalance);
-  }, [freights]);
+  }, [freights, advanceSummaries]);
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">

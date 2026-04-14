@@ -8,6 +8,7 @@ import { advanceService } from '../../../Financial/Advances/services/advanceServ
 import { BankAccount } from '../../../Financial/types';
 import { useToast } from '../../../../contexts/ToastContext';
 import { formatAccountLabel } from '../../../../utils/formatters';
+import { useAdvanceSummaries } from '../../../../hooks/useAdvances';
 
 interface Props {
   isOpen: boolean;
@@ -45,10 +46,12 @@ const FreightPaymentModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, tota
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(normalized);
   };
 
+  const { data: advanceSummaries = [] } = useAdvanceSummaries();
+
   useEffect(() => {
     if (isOpen) {
-      if (recordDescription) {
-        const summary = advanceService.getSummaries().find(s => recordDescription.includes(s.partnerName));
+      if (recordDescription && advanceSummaries.length > 0) {
+        const summary = advanceSummaries.find(s => recordDescription.includes(s.partnerName));
         if (summary && summary.netBalance > 0) setAvailableCredit(summary.netBalance);
         else setAvailableCredit(0);
       }
@@ -68,7 +71,7 @@ const FreightPaymentModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, tota
         setUseAdvanceBalance(false);
       }
     }
-  }, [isOpen, totalPending, initialData, recordDescription]);
+  }, [isOpen, totalPending, initialData, recordDescription, advanceSummaries]);
 
   if (!isOpen) return null;
 

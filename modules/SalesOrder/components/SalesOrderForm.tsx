@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Save, X, Calendar, User, Search, Package, TrendingUp, ChevronDown, CheckCircle2, Calculator, MapPin, FileText } from 'lucide-react';
+import { Save, X, Calendar, User, Search, Package, TrendingUp, ChevronDown, CheckCircle2, Calculator, MapPin, FileText, Plus } from 'lucide-react';
 import { SalesOrder } from '../types';
 import { Partner } from '../../Partners/types';
 import { PARTNER_CATEGORY_IDS } from '../../../constants';

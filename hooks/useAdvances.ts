@@ -6,6 +6,7 @@
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { advancesService } from '../services/advancesService';
+import { advanceService } from '../modules/Financial/Advances/services/advanceService';
 import { QUERY_KEYS, STALE_TIMES } from './queryKeys';
 
 export function useAdvances() {
@@ -52,6 +53,15 @@ export function useOpenAdvances() {
   return useQuery({
     queryKey: [...QUERY_KEYS.ADVANCES, 'open'],
     queryFn: () => advancesService.getOpen(),
+    staleTime: STALE_TIMES.DYNAMIC,
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useAdvanceSummaries() {
+  return useQuery({
+    queryKey: [...QUERY_KEYS.ADVANCES, 'summaries'],
+    queryFn: () => advanceService.getSummaries(),
     staleTime: STALE_TIMES.DYNAMIC,
     placeholderData: keepPreviousData,
   });

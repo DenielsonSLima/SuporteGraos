@@ -60,39 +60,28 @@ export const cashierReportService = {
   fetchCurrentMonthReport: async (): Promise<CashierReportPayload> => {
     const companyId = await getCompanyId();
 
-    // 1. Chamada para rpc_dashboard_data (KPIs estruturais)
-    const { data: dashData, error: dashError } = await supabase.rpc('rpc_dashboard_data', { 
+    // Chamada para a nova RPC Mestre Consolidadora (Ultra-Modular)
+    const { data: report, error } = await supabase.rpc('rpc_get_caixa_consolidated_report', { 
       p_company_id: companyId 
     });
 
-    if (dashError) {
-      console.error('Erro ao buscar rpc_dashboard_data:', dashError);
+    if (error) {
+      console.error('Erro ao buscar rpc_get_caixa_consolidated_report:', error);
+      throw error;
     }
 
-    // 2. Chamada para rpc_cashier_report (Fonte da Verdade para o Caixa)
-    const { data: cashierData, error: cashierError } = await supabase.rpc('rpc_cashier_report', { 
-      p_company_id: companyId 
-    });
-
-    if (cashierError) {
-      console.error('Erro ao buscar rpc_cashier_report:', cashierError);
-    }
-
-    const report = cashierData || {};
-    const financial = dashData?.financial || {};
-
-    // 3. Montagem do Payload (Mapeamento de 1 para 1 com o SQL)
+    // Mapeamento direto de 1 para 1 com o SQL modular
     return {
       // Totais Principais
-      totalBankBalance: report.totalBankBalance ?? financial.totalBankBalance ?? 0,
-      totalLiabilities: report.totalLiabilities ?? financial.totalLiabilities ?? 0,
-      totalAssets: report.totalAssets ?? financial.totalAssets ?? 0,
-      netBalance: report.netBalance ?? financial.netWorth ?? 0,
+      totalBankBalance: report.totalBankBalance || 0,
+      totalLiabilities: report.totalLiabilities || 0,
+      totalAssets: report.totalAssets || 0,
+      netBalance: report.netBalance || 0,
       
-      pendingSalesReceipts: report.pendingSalesReceipts ?? financial.pendingSalesReceipts ?? 0,
-      merchandiseInTransitValue: report.merchandiseInTransitValue ?? financial.merchandiseInTransitValue ?? 0,
-      pendingPurchasePayments: report.pendingPurchasePayments ?? financial.pendingPurchasePayments ?? 0,
-      pendingFreightPayments: report.pendingFreightPayments ?? financial.pendingFreightPayments ?? 0,
+      pendingSalesReceipts: report.pendingSalesReceipts || 0,
+      merchandiseInTransitValue: report.merchandiseInTransitValue || 0,
+      pendingPurchasePayments: report.pendingPurchasePayments || 0,
+      pendingFreightPayments: report.pendingFreightPayments || 0,
 
       // Detalhamento Bancário e Saldos Iniciais
       bankBalances: report.bankBalances || [],
@@ -101,14 +90,14 @@ export const cashierReportService = {
       totalInitialMonthBalance: report.totalInitialMonthBalance || 0,
       initialMonthBalances: report.initialMonthBalances || [],
       
-      // Ativos e Passivos (Calculados no SQL)
-      loansTaken: report.loansTaken || 0,
-      loansGranted: report.loansGranted || 0,
+      // Ativos e Passivos (Calculados individualmente no SQL)
+      loanDebts: report.loansTaken || 0,
+      loanCredits: report.loansGranted || 0,
       totalFixedAssetsValue: report.totalFixedAssetsValue || 0,
-      shareholderReceivables: report.shareholderReceivables || 0,
-      shareholderPayables: report.shareholderPayables || 0,
-      advancesGiven: report.advancesGiven || 0,
-      advancesTaken: report.advancesTaken || 0,
+      shareholderCredits: report.shareholderReceivables || 0,
+      shareholderDebts: report.shareholderPayables || 0,
+      advancesCredits: report.advancesGiven || 0,
+      clientAdvances: report.advancesTaken || 0,
       pendingAssetSalesReceipts: report.pendingAssetSalesReceipts || 0,
       commissionsToPay: report.commissionsToPay || 0,
       

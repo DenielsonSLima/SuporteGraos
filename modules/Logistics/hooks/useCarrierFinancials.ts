@@ -7,6 +7,7 @@ import { useLoadings } from '../../../hooks/useLoadings';
 import { useQueryClient } from '@tanstack/react-query';
 import { QUERY_KEYS } from '../../../hooks/queryKeys';
 import { useToast } from '../../../contexts/ToastContext';
+import { useAdvanceSummaries } from '../../../hooks/useAdvances';
 
 export const useCarrierFinancials = (carrierName: string, allFreights: Freight[], onRefreshParent: () => void) => {
   const { addToast } = useToast();
@@ -18,11 +19,13 @@ export const useCarrierFinancials = (carrierName: string, allFreights: Freight[]
     return allFreights.filter(f => f.carrierName === carrierName && (f.balanceValue > 0.05 || f.financialStatus !== 'paid'));
   }, [allFreights, carrierName]);
 
+  const { data: advanceSummaries = [] } = useAdvanceSummaries();
+
   // Busca saldo global
   const globalCredit = useMemo(() => {
-     const summary = advanceService.getSummaries().find(s => s.partnerName === carrierName);
+     const summary = advanceSummaries.find(s => s.partnerName === carrierName);
      return summary && summary.netBalance > 0 ? summary.netBalance : 0;
-  }, [carrierName]);
+  }, [carrierName, advanceSummaries]);
 
   const totals = useMemo(() => {
     // Backend Cérebro: Não usamos mais .reduce() complexo para cálculos financeiros.

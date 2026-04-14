@@ -7,6 +7,7 @@ import { useLoadings } from '../../../hooks/useLoadings';
 import { useQueryClient } from '@tanstack/react-query';
 import { QUERY_KEYS } from '../../../hooks/queryKeys';
 import { useToast } from '../../../contexts/ToastContext';
+import { useAdvanceSummaries } from '../../../hooks/useAdvances';
 
 export interface CarrierGroup {
   name: string;
@@ -25,12 +26,11 @@ export const useFreightFinancials = (freights: Freight[], onRefresh: () => void)
   const { data: loadings = [] } = useLoadings();
   const queryClient = useQueryClient();
 
+  const { data: advanceSummaries = [] } = useAdvanceSummaries();
+
   // Agrupamento por Transportadora
   const carrierGroups = useMemo(() => {
     const groups: Record<string, CarrierGroup> = {};
-
-    // 1. Busca saldos de adiantamentos globais
-    const advanceSummaries = advanceService.getSummaries();
 
     freights.forEach(f => {
       // Inclui fretes com saldo devedor OU adiantamentos realizados OU status não pago
@@ -60,7 +60,7 @@ export const useFreightFinancials = (freights: Freight[], onRefresh: () => void)
     // Por enquanto, focamos em quem tem frete.
 
     return Object.values(groups).sort((a, b) => b.totalBalance - a.totalBalance);
-  }, [freights]);
+  }, [freights, advanceSummaries]);
 
   // Total Selecionado para Pagamento
   const totalSelectedToPay = useMemo(() => {
