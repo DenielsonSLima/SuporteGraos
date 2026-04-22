@@ -62,12 +62,21 @@ const QuickPaymentViewModal: React.FC<Props> = ({ isOpen, onClose, record, onAdd
     const handleDelete = async () => {
         if (!pendingDeleteId) return;
         try {
-            await financialTransactionService.delete(pendingDeleteId);
+            // Usa RPC atômica que cascateia: saldo banco + entry + pedido/venda/frete
+            const { supabase } = await import('../../../../services/supabase');
+            const { data: result, error: rpcError } = await supabase.rpc('rpc_ops_financial_void_transaction', {
+                p_transaction_id: pendingDeleteId
+            });
+            
+            if (rpcError) throw new Error(rpcError.message);
+            if (result && !result.success) throw new Error(result.error || 'Erro no estorno');
+
             addToast('success', `${actionLabel} estornado com sucesso!`);
             fetchHistory();
             onRefresh();
-        } catch (error) {
-            addToast('error', `Erro ao realizar estorno de ${actionLabel.toLowerCase()}`);
+        } catch (error: any) {
+            console.error('[QuickPaymentView] Erro ao estornar:', error);
+            addToast('error', `Erro ao realizar estorno de ${actionLabel.toLowerCase()}: ${error?.message || ''}`);
         } finally {
             setPendingDeleteId(null);
         }
