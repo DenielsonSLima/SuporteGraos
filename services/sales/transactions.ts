@@ -61,37 +61,75 @@ export const salesTransactions = {
   },
 
   deleteTransaction: async (orderId: string, txId: string, persistFn: (order: SalesOrder) => Promise<any>) => {
-    const order = salesStore.get().find(o => o.id === orderId);
-    if (!order) return;
+    try {
+      const order = salesStore.get().find(o => o.id === orderId);
+      if (!order) return;
 
-    const { removeFinancialTransaction } = await import('../financial/paymentOrchestrator');
-    await removeFinancialTransaction(txId);
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(txId);
 
-    const newTxs = (order.transactions || []).filter(t => t.id !== txId);
-    
-    // ✅ RECALCULAR VALORES FINANCEIROS (paidValue / balanceValue)
-    // Isso garante que o dashboard e o card de detalhes atualizem imediatamente após o estorno.
-    const newPaidValue = newTxs.filter(t => t.type === 'receipt').reduce((acc, t) => acc + (t.value || 0), 0);
-    const newBalanceValue = Math.max(0, (order.totalValue || 0) - newPaidValue);
+      // 1. ESTORNO ATÔMICO VIA RPC (Cascata completa: saldo banco + entry + pedido)
+      if (isUUID) {
+        // txId já é UUID real → RPC direto
+        const { data: result, error: rpcError } = await supabase.rpc('rpc_ops_financial_void_transaction', {
+          p_transaction_id: txId
+        });
+        if (rpcError) throw new Error(rpcError.message);
+        if (result && !result.success) throw new Error(result.error || 'Erro no estorno atômico');
+      } else {
+        // txId é ID de metadata → buscar a transação real pelo financial_links
+        const { data: links } = await supabase
+          .from('financial_links')
+          .select('transaction_id')
+          .eq('sales_order_id', orderId)
+          .not('transaction_id', 'is', null);
 
-    const updated = { 
-      ...order, 
-      transactions: newTxs,
-      paidValue: newPaidValue,
-      balanceValue: newBalanceValue
-    };
-    
-    salesStore.update(updated);
+        if (links && links.length > 0) {
+          for (const link of links) {
+            await supabase.rpc('rpc_ops_financial_void_transaction', {
+              p_transaction_id: link.transaction_id
+            });
+          }
+        }
+      }
 
-    // ✅ PERSISTÊNCIA UNIFICADA
-    if (isSqlCanonicalOpsEnabled()) {
-      await salesCanonical.upsert(updated);
-    } else {
-      await persistFn(updated);
+      // 2. Atualização de Memória e Metadata
+      const newTxs = (order.transactions || []).filter(t => t.id !== txId);
+      
+      // ✅ RECALCULAR VALORES FINANCEIROS (paidValue / balanceValue)
+      const newPaidValue = newTxs.filter(t => t.type === 'receipt').reduce((acc, t) => acc + (t.value || 0), 0);
+      const newBalanceValue = Math.max(0, (order.totalValue || 0) - newPaidValue);
+
+      const updated = { 
+        ...order, 
+        transactions: newTxs,
+        paidValue: newPaidValue,
+        balanceValue: newBalanceValue
+      };
+      
+      salesStore.update(updated);
+
+      // 3. PERSISTÊNCIA UNIFICADA
+      if (isSqlCanonicalOpsEnabled()) {
+        await salesCanonical.upsert(updated);
+      } else {
+        await persistFn(updated);
+      }
+
+      // 4. INVALIDAÇÃO DE CACHES (TanStack)
+      const { queryClient } = await import('../../lib/queryClient');
+      const { QUERY_KEYS } = await import('../../hooks/queryKeys');
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_TRANSACTIONS });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS });
+
+      const { userId, userName } = await getLogInfo();
+      logService.addLog({ userId, userName, action: 'delete', module: 'Financeiro', description: `Estornou recebimento da Venda ${order.number}`, entityId: orderId });
+
+      return { success: true };
+    } catch (error: any) {
+      console.error('[SALES-DELETE] Erro ao estornar:', error);
+      return { success: false, error: error.message || 'Erro inesperado' };
     }
-
-    const { userId, userName } = await getLogInfo();
-    logService.addLog({ userId, userName, action: 'delete', module: 'Financeiro', description: `Estornou recebimento da Venda ${order.number}`, entityId: orderId });
   },
 
   cleanupFinancials: async (saleId: string) => {

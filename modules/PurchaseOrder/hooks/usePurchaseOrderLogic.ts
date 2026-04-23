@@ -17,8 +17,19 @@ import { expenseService } from '../../../services/purchase/expenseService';
 import { kpiService } from '../../../services/purchase/kpiService';
 import { useLoadingsByPurchaseOrder } from '../../../hooks/useLoadings';
 import { usePartners } from '../../../hooks/useParceiros';
+import { usePurchaseOrder } from '../../../hooks/usePurchaseOrders';
 
-export const usePurchaseOrderLogic = (order: PurchaseOrder, onFinalizeCallback: () => void) => {
+export const usePurchaseOrderLogic = (initialOrder: PurchaseOrder, onFinalizeCallback: () => void) => {
+  const { data: fetchedOrder } = usePurchaseOrder(initialOrder.id);
+  const order = fetchedOrder || initialOrder;
+
+  // Auditoria Defensiva: Detectar desvios entre cache/prop e banco real
+  useEffect(() => {
+    if (fetchedOrder && Math.abs((initialOrder.paidValue || 0) - (fetchedOrder.paidValue || 0)) > 0.1) {
+      console.warn(`[AUDIT] Desvio detectado no Pedido ${initialOrder.number}: Prop=${initialOrder.paidValue} vs DB=${fetchedOrder.paidValue}. Usando valor do Banco.`);
+    }
+  }, [fetchedOrder, initialOrder]);
+
   const { addToast } = useToast();
   const { data: loadings = [] } = useLoadingsByPurchaseOrder(order.id);
   const [isFinalizePromptOpen, setIsFinalizePromptOpen] = useState(false);

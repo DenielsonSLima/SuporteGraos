@@ -72,6 +72,7 @@ const LoadingForm: React.FC<Props> = ({ purchaseOrder, onSave, onClose }) => {
     salesOrderId: '',
     salesPrice: 0,
     totalSalesValue: 0,
+    extraExpenses: [],
     status: 'in_transit',
     isClientTransport: false
   });
@@ -156,7 +157,23 @@ const LoadingForm: React.FC<Props> = ({ purchaseOrder, onSave, onClose }) => {
 
     setIsSubmitting(true);
     try {
-      await onSave({ ...formData, freightAdvances: 0, freightPaid: 0, productPaid: 0 } as Loading);
+      const loadingData: Loading = {
+        ...formData,
+        id: formData.id || generateUUID(),
+        date: formData.date || getLocalDate(),
+        weightKg: formData.weightKg || 0,
+        weightTon: (formData.weightKg || 0) / 1000,
+        weightSc: (formData.weightKg || 0) / 60,
+        totalPurchaseValue: formData.totalPurchaseValue || 0,
+        totalSalesValue: formData.totalSalesValue || 0,
+        totalFreightValue: formData.totalFreightValue || 0,
+        freightAdvances: 0,
+        freightPaid: 0,
+        productPaid: 0,
+        extraExpenses: formData.extraExpenses || []
+      } as Loading;
+
+      await onSave(loadingData);
       addToast('success', 'Carregamento Criado', `Motorista ${formData.driverName || 'N/A'} - ${formData.carrierName || 'N/A'}`);
       onClose();
     } catch (err) {

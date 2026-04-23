@@ -15,6 +15,7 @@ import { purchaseService } from '../services/purchaseService';
 import { QUERY_KEYS, STALE_TIMES } from './queryKeys';
 import { PurchaseOrder } from '../modules/PurchaseOrder/types';
 import { isSqlCanonicalOpsEnabled } from '../services/sqlCanonicalOps';
+import { mapOrderFromDb, mapOrderFromOpsRow } from '../services/purchase/mappers';
 
 // ─── Canal realtime singleton com múltiplos ouvintes ────────────────────────
 // Garante que apenas 1 canal WebSocket fica aberto, mesmo que o hook seja
@@ -112,6 +113,31 @@ export function usePartnerPurchaseOrders(partnerId: string) {
     ...query,
     data: query.data?.data.filter(o => o.partnerId === partnerId || o.brokerId === partnerId) || []
   };
+}
+
+/**
+ * Hook para buscar um único pedido de compra por ID.
+ * Garante que temos a versão mais recente do banco (SQL-First).
+ */
+export function usePurchaseOrder(orderId: string) {
+  const isCanonical = isSqlCanonicalOpsEnabled();
+  const tableName = isCanonical ? 'vw_purchase_orders_enriched' : 'ops_purchase_orders';
+
+  return useQuery<PurchaseOrder | null>({
+    queryKey: [QUERY_KEYS.PURCHASE_ORDERS, 'detail', orderId],
+    queryFn: async () => {
+      if (!orderId) return null;
+      const { data, error } = await supabase
+        .from(tableName)
+        .select('*')
+        .eq('id', orderId)
+        .maybeSingle();
+
+      if (error || !data) return null;
+      return isCanonical ? mapOrderFromOpsRow(data) : mapOrderFromDb(data);
+    },
+    staleTime: 1000 * 10, // 10s stale time for details is safe
+  });
 }
 
 // ─── Mutations ────────────────────────────────────────────────

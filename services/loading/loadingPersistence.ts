@@ -75,7 +75,7 @@ export const loadingPersistence = {
         if (poRow?.id) row.purchase_order_id = poRow.id;
       }
 
-      const { error } = await supabase.from('ops_loadings').upsert(row, { onConflict: 'legacy_id' });
+      const { error } = await supabase.from('ops_loadings').upsert(row, { onConflict: 'company_id,legacy_id' });
       return !error;
     } catch (err) {
       return false;
