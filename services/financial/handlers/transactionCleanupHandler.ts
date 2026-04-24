@@ -45,5 +45,9 @@ export const handleTransactionVoid = async (
     await financialHistoryService.delete(historyEntry.id);
   }
 
+  // 3. Invalidação Global de Cache
+  const { invalidateFinancialCache } = await import('../../financialCache');
+  invalidateFinancialCache();
+
   return { success: true };
 };

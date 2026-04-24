@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { TrendingUp, Layers, Filter, Calendar, X, Search } from 'lucide-react';
 import UnifiedReceivableManager from './components/UnifiedReceivableManager';
+import FinancialKPIs from '../components/FinancialKPIs';
 import { FinancialRecord } from '../types';
 import { useReceivables } from '../../../hooks/useFinancialEntries';
 import type { EnrichedReceivableEntry } from '../../../services/financialEntriesService';
@@ -32,7 +33,7 @@ const toFinancialRecord = (entry: EnrichedReceivableEntry): FinancialRecord => {
     deductionsAmount: entry.deductions_amount,
     netAmount: entry.net_amount,
     status,
-    subType: 'sales_order',
+    subType: (entry.origin_type === 'sales_order' || entry.origin_type === 'sales_order_loading') ? 'sales_order' : 'admin',
     weightKg: entry.loading_weight_kg,
     totalTon: entry.loading_weight_ton,
     totalSc: entry.loading_weight_sc,
@@ -61,7 +62,11 @@ const ReceivablesTab: React.FC = () => {
     pageSize: PAGE_SIZE
   });
   
-  const records = useMemo(() => rawReceivables.map(toFinancialRecord), [rawReceivables]);
+  const records = useMemo(() => {
+    return rawReceivables
+      .filter(entry => entry.total_amount > 0 || entry.remaining_amount > 0)
+      .map(toFinancialRecord);
+  }, [rawReceivables]);
 
 
 
@@ -75,6 +80,8 @@ const ReceivablesTab: React.FC = () => {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
+      <FinancialKPIs type="receivable" />
+
       {/* Premium Sub-navigation */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
         <div className="flex gap-2 p-1.5 bg-slate-100/80 backdrop-blur-md rounded-2xl border border-slate-200/50 shadow-inner w-full sm:w-fit">

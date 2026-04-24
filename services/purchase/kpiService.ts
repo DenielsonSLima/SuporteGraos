@@ -56,6 +56,11 @@ export const kpiService = {
 
     const totalCommissionDue = order.hasBroker ? totalSc * (Number(order.brokerCommissionPerSc) || 0) : 0;
 
+    // 4. Trânsito Síncrono (Reflexo imediato da auditoria logística)
+    const activeLoadings = loadings.filter(l => l.status !== 'canceled');
+    const transitLoadings = activeLoadings.filter(l => !l.unloadWeightKg && l.status !== 'unloaded');
+    const totalTransitValue = transitLoadings.reduce((acc, l) => acc + (Number(l.totalPurchaseValue) || 0), 0);
+
     return {
       totalPurchaseVal,
       totalFreightVal,
@@ -68,7 +73,8 @@ export const kpiService = {
       totalKg,
       avgSalesPrice: totalSc > 0 ? totalSalesVal / totalSc : 0,
       avgPurchasePrice: totalSc > 0 ? totalPurchaseVal / totalSc : 0,
-      totalCommissionDue
+      totalCommissionDue,
+      totalTransitValue
     };
   },
 

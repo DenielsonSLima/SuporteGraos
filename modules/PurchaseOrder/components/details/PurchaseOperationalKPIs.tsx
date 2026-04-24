@@ -7,22 +7,33 @@ interface Props {
   totalSettled: number;
   totalPending: number;
   totalAbatements: number;
-  advanceBalance?: number; // Prop nova
+  advanceBalance?: number;
+  totalTransitValue?: number; // Prop nova
 }
 
-const PurchaseOperationalKPIs: React.FC<Props> = ({ totalLoaded, totalSettled, totalPending, totalAbatements, advanceBalance = 0 }) => {
+const PurchaseOperationalKPIs: React.FC<Props> = ({ totalLoaded, totalSettled, totalPending, totalAbatements, advanceBalance = 0, totalTransitValue = 0 }) => {
   const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
         {/* TOTAL CARREGADO */}
-        <div className="bg-white p-5 rounded-2xl border-l-4 border-l-blue-600 shadow-sm hover:shadow-md transition-shadow">
+        <div className="bg-white p-5 rounded-2xl border-l-4 border-l-slate-800 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex justify-between items-start mb-2">
                 <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">Total Carregado</span>
-                <Scale size={16} className="text-blue-500" />
+                <Scale size={16} className="text-slate-500" />
             </div>
             <h3 className="text-xl font-black text-slate-900 tracking-tighter">{currency(totalLoaded)}</h3>
             <p className="text-[8px] text-slate-400 font-bold mt-1 uppercase">Dívida bruta gerada</p>
+        </div>
+
+        {/* MERCADORIA EM TRÂNSITO */}
+        <div className="bg-blue-50/50 p-5 rounded-2xl border-l-4 border-l-blue-600 shadow-sm hover:shadow-md transition-shadow border border-blue-100">
+            <div className="flex justify-between items-start mb-2">
+                <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest leading-none">Mercadoria em Trânsito</span>
+                <Scale size={16} className="text-blue-500" />
+            </div>
+            <h3 className="text-xl font-black text-blue-800 tracking-tighter">{currency(totalTransitValue)}</h3>
+            <p className="text-[8px] text-blue-400 font-bold mt-1 uppercase">Valor em transporte</p>
         </div>
 
         {/* VALOR PAGO PRODUTOR */}

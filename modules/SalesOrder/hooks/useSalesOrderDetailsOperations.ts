@@ -21,14 +21,17 @@ export function useSalesOrderDetailsOperations() {
   const queryClient = useQueryClient();
 
   const refreshData = async (orderId?: string) => {
-    // 🚀 OTIMIZAÇÃO: Invalidação granular (SKIL: Performance First)
-    const filters = orderId ? { queryKey: [QUERY_KEYS.SALES_ORDERS, orderId] } : { queryKey: QUERY_KEYS.SALES_ORDERS };
-    
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: filters.queryKey } as any),
+    // 🚀 FORÇAR REFETCH (SKIL: Zero Lag UI)
+    // Usamos refetchQueries({ type: 'active' }) para garantir que o que está na tela atualize IMEDIATAMENTE.
+    await Promise.allSettled([
+      queryClient.refetchQueries({ queryKey: [QUERY_KEYS.SALES_ORDERS, orderId], type: 'active' }),
+      queryClient.refetchQueries({ queryKey: QUERY_KEYS.SALES_ORDERS, type: 'active' }),
+      queryClient.refetchQueries({ queryKey: ['sales_order_transactions', orderId], type: 'active' }),
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS }),
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOADINGS }),
-      queryClient.invalidateQueries({ queryKey: ['sales_order_transactions', orderId] }),
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS })
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS }),
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT }),
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_ENTRIES })
     ]);
   };
 

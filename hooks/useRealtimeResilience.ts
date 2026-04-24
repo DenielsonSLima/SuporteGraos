@@ -58,15 +58,41 @@ export function useRealtimeResilience() {
       }, 1000);
     };
 
+    // ─── Invalidação Global via Evento ────────────────────
+    const handleInvalidate = (event: any) => {
+      const { queryKey, queryKeys } = event.detail || {};
+      const keysToInvalidate = queryKeys || (queryKey ? [queryKey] : []);
+      
+      if (keysToInvalidate.length > 0) {
+        console.log(`[REALTIME-RESILIENCE] Invalidação solicitada para:`, keysToInvalidate);
+        
+        keysToInvalidate.forEach((key: any) => {
+          // Refetch imediato de queries ativas para feedback visual instantâneo
+          const isDashboard = Array.isArray(key) ? key.includes('dashboard') : key === 'dashboard';
+          
+          queryClient.refetchQueries({ 
+            queryKey: key, 
+            type: isDashboard ? 'all' : 'active', // Dashboard refetch mesmo se estiver em background
+            exact: false 
+          });
+          
+          // Invalidação das demais para garantir consistência futura
+          queryClient.invalidateQueries({ queryKey: key, exact: false });
+        });
+      }
+    };
+
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('app:invalidate-query', handleInvalidate);
 
     return () => {
       if (debounceHandle) clearTimeout(debounceHandle);
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('app:invalidate-query', handleInvalidate);
     };
   }, [queryClient]);
 }

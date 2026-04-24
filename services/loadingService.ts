@@ -15,9 +15,9 @@ import { freightExpenseService } from './freightExpenseService';
 // Modular Services
 import { loadingPersistence } from './loading/loadingPersistence';
 import { loadingRealtime } from './loading/loadingRealtime';
-import { isSqlCanonicalOpsEnabled } from './sqlCanonicalOps';
 import { Persistence } from './persistence';
 import { supabase } from './supabase';
+import { QUERY_KEYS } from '../hooks/queryKeys';
 
 const db = new Persistence<Loading>('ops_loadings', [], { useStorage: false });
 
@@ -90,8 +90,23 @@ export const loadingService = {
       throw new Error('Falha ao inserir no Supabase');
     }
 
+    // ✅ MOTOR FINANCEIRO ULTRA-MODULAR: Sincronização Atômica via Banco de Dados
+    // rpc_ops_loading_sync_financial_v3 foi removido pois o banco agora usa rpc_ops_purchase_rebuild_financial_v1 via triggers
+
     db.add(loading); // Optimistic update
     invalidateDashboardCache();
+    
+    // Forçar atualização do Caixa e Financeiro (TanStack Query)
+    const { queryClient } = await import('../lib/queryClient');
+    queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.CASHIER_CURRENT] });
+    queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.FINANCIAL_ENTRIES] });
+    queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.FINANCIAL_SUMMARY] });
+    queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.PURCHASE_STATS] });
+    queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.SALES_STATS] });
+    queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.FREIGHTS] });
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS });
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS });
+
     logService.addLog({ userId, userName, action: 'create', module: 'Logística', description: `Carregamento: ${loading.vehiclePlate}`, entityId: loading.id });
     void auditService.logAction('create', 'Logística', `Carregamento criado: ${loading.vehiclePlate}`, { entityType: 'Loading', entityId: loading.id });
   },
@@ -103,7 +118,21 @@ export const loadingService = {
     const success = await loadingPersistence.persistLoading(updatedLoading, companyId);
     if (!success) throw new Error('Falha ao atualizar no Supabase');
 
+    // ✅ MOTOR FINANCEIRO ULTRA-MODULAR: Ressincronização via Banco de Dados
+
     db.update(updatedLoading);
+    
+    // Forçar atualização do Caixa e Financeiro (TanStack Query)
+    const { queryClient } = await import('../lib/queryClient');
+    queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.CASHIER_CURRENT] });
+    queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.FINANCIAL_ENTRIES] });
+    queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.FINANCIAL_SUMMARY] });
+    queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.PURCHASE_STATS] });
+    queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.SALES_STATS] });
+    queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.FREIGHTS] });
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS });
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS });
+
     logService.addLog({ userId, userName, action: 'update', module: 'Logística', description: `Atualizou carregamento ${updatedLoading.vehiclePlate}`, entityId: updatedLoading.id });
     void auditService.logAction('update', 'Logística', `Carregamento atualizado: ${updatedLoading.vehiclePlate}`, { entityType: 'Loading', entityId: updatedLoading.id });
   },
@@ -134,6 +163,13 @@ export const loadingService = {
     db.delete(id);
     invalidateDashboardCache();
     DashboardCache.clearAll();
+
+    // 🟢 Invalidação TanStack Query (Atômica)
+    const { queryClient } = await import('../lib/queryClient');
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS });
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS });
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOADINGS });
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_ENTRIES });
   },
 
   reload: () => {

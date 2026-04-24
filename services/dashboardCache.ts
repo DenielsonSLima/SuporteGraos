@@ -148,5 +148,7 @@ if (typeof window !== 'undefined') {
 export const invalidateDashboardCache = () => {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event('data:updated'));
+    // 🟢 Invalidação TanStack Query (Dashboard)
+    window.dispatchEvent(new CustomEvent('app:invalidate-query', { detail: { queryKey: ['dashboard'] } }));
   }
 };

@@ -120,8 +120,18 @@ export function usePartnerPurchaseOrders(partnerId: string) {
  * Garante que temos a versão mais recente do banco (SQL-First).
  */
 export function usePurchaseOrder(orderId: string) {
+  const queryClient = useQueryClient();
   const isCanonical = isSqlCanonicalOpsEnabled();
   const tableName = isCanonical ? 'vw_purchase_orders_enriched' : 'ops_purchase_orders';
+
+  // Realtime: invalida este pedido específico se houver mudanças
+  useEffect(() => {
+    if (!orderId) return;
+    const unsub = subscribeToPurchaseRealtime(() => {
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.PURCHASE_ORDERS, 'detail', orderId] });
+    });
+    return unsub;
+  }, [queryClient, orderId]);
 
   return useQuery<PurchaseOrder | null>({
     queryKey: [QUERY_KEYS.PURCHASE_ORDERS, 'detail', orderId],
@@ -136,7 +146,7 @@ export function usePurchaseOrder(orderId: string) {
       if (error || !data) return null;
       return isCanonical ? mapOrderFromOpsRow(data) : mapOrderFromDb(data);
     },
-    staleTime: 1000 * 10, // 10s stale time for details is safe
+    staleTime: 1000 * 5, // 5s stale time for details
   });
 }
 

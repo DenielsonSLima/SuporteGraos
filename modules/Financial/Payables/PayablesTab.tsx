@@ -1,7 +1,7 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { ShoppingCart, Truck, Percent, Layers, Calendar, X, Search } from 'lucide-react';
 import UnifiedPayableManager from './components/UnifiedPayableManager';
+import FinancialKPIs from '../components/FinancialKPIs';
 import { FinancialRecord } from '../types';
 import { usePayables } from '../../../hooks/useFinancialEntries';
 import type { EnrichedPayableEntry } from '../../../services/financialEntriesService';
@@ -15,12 +15,12 @@ const toFinancialRecord = (entry: EnrichedPayableEntry): FinancialRecord => {
       : entry.status === 'overdue' ? 'overdue'
         : 'pending';
 
-  const subType = origin === 'purchase_order' ? 'purchase_order'
+  const subType = (origin === 'purchase_order' || origin === 'purchase_order_loading') ? 'purchase_order'
     : origin === 'commission' ? 'commission'
       : origin === 'expense' ? 'admin'
         : origin === 'loan' ? 'loan_taken'
-          : origin === 'freight' ? 'freight'
-            : 'freight';
+          : (origin === 'freight' || origin === 'freight_loading') ? 'freight'
+            : 'admin';
 
   const partnerName = entry.partner_name;
   let description = partnerName;
@@ -98,16 +98,9 @@ const PayablesTab: React.FC = () => {
   });
   
   const records = useMemo(() => {
-    const mapped = rawPayables.map(toFinancialRecord);
-    console.log('[PayablesTab] Log:', {
-      rawTotal: rawPayables.length,
-      mappedTotal: mapped.length,
-      purchaseCount: mapped.filter(r => r.subType === 'purchase_order').length,
-      freightCount: mapped.filter(r => r.subType === 'freight').length,
-      commissionCount: mapped.filter(r => r.subType === 'commission').length,
-      records: mapped
-    });
-    return mapped;
+    return rawPayables
+      .filter(entry => entry.total_amount > 0 || entry.remaining_amount > 0) // Oculta títulos "fantasmas" zerados
+      .map(toFinancialRecord);
   }, [rawPayables]);
 
   const allPurchases = useMemo(() => records.filter(r => r.subType === 'purchase_order'), [records]);
@@ -126,6 +119,8 @@ const PayablesTab: React.FC = () => {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
+      <FinancialKPIs type="payable" />
+      
       {/* Premium Sub-navigation */}
       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6">
         <div className="flex flex-wrap gap-2 p-1.5 bg-slate-100/80 backdrop-blur-md rounded-2xl border border-slate-200/50 shadow-inner w-full xl:w-fit">

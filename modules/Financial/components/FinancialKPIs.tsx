@@ -1,18 +1,23 @@
+
 import React from 'react';
-import { DollarSign, Truck, Clock, CheckCircle2 } from 'lucide-react';
+import { DollarSign, Clock, AlertCircle, Calendar } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../../services/supabase';
 import { formatMoney } from '../../../utils/formatters';
 import { useCurrentUser } from '../../../hooks/useCurrentUser';
 import { QUERY_KEYS } from '../../../hooks/queryKeys';
 
-const PurchaseKPIs: React.FC = React.memo(() => {
+interface Props {
+  type: 'payable' | 'receivable';
+}
+
+const FinancialKPIs: React.FC<Props> = ({ type }) => {
   const currentUser = useCurrentUser();
 
   const { data: stats, isLoading } = useQuery({
-    queryKey: [...QUERY_KEYS.PURCHASE_STATS, currentUser?.companyId],
+    queryKey: [...QUERY_KEYS.FINANCIAL_SUMMARY, currentUser?.companyId],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('rpc_get_purchase_order_stats_v3', {
+      const { data, error } = await supabase.rpc('rpc_get_financial_summary_v3', {
         p_company_id: currentUser?.companyId
       });
       if (error) throw error;
@@ -20,6 +25,8 @@ const PurchaseKPIs: React.FC = React.memo(() => {
     },
     enabled: !!currentUser?.companyId
   });
+
+  const currentStats = stats ? stats[type] : null;
 
   const StatCard = ({ label, value, icon: Icon, color, subtext, bgClass, loading }: any) => (
     <div className={`p-6 rounded-3xl border shadow-sm flex items-start justify-between hover:shadow-xl hover:-translate-y-1 transition-all duration-300 ${bgClass || 'bg-white border-slate-200'}`}>
@@ -39,43 +46,34 @@ const PurchaseKPIs: React.FC = React.memo(() => {
   );
 
   return (
-    <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-8 animate-in fade-in slide-in-from-top-4 duration-700">
+    <div className="grid gap-6 sm:grid-cols-1 lg:grid-cols-3 mb-8 animate-in fade-in slide-in-from-top-4 duration-700">
       <StatCard 
-        label="Total Comprado (Contratos)" 
-        value={stats?.totalPurchased || 0} 
+        label={`Total a ${type === 'payable' ? 'Pagar' : 'Receber'}`}
+        value={currentStats?.total || 0} 
         icon={DollarSign} 
-        color="bg-slate-700"
-        subtext="Pedidos listados"
+        color={type === 'payable' ? 'bg-rose-600' : 'bg-emerald-600'}
+        subtext="Saldo total pendente"
         loading={isLoading}
       />
       <StatCard 
-        label="Valor Total Pago" 
-        value={stats?.totalPaid || 0} 
-        icon={CheckCircle2} 
-        color="bg-emerald-500"
-        subtext="Liquidado aos Fornecedores"
+        label="Vence Hoje" 
+        value={currentStats?.today || 0} 
+        icon={Calendar} 
+        color="bg-amber-500"
+        subtext="Compromissos do dia"
         loading={isLoading}
       />
       <StatCard 
-        label="Valor Pendente (Dívida)" 
-        value={stats?.totalDebt || 0} 
-        icon={Clock} 
-        color="bg-rose-600"
-        subtext="Sobre Carga Retirada"
-        bgClass="bg-white border-rose-100"
-        loading={isLoading}
-      />
-      <StatCard 
-        label="Mercadoria em Trânsito" 
-        value={stats?.totalTransit || 0} 
-        icon={Truck} 
-        color="bg-blue-600"
-        subtext="Valor em transporte"
-        bgClass="bg-blue-50 border-blue-100"
+        label="Atrasado" 
+        value={currentStats?.overdue || 0} 
+        icon={AlertCircle} 
+        color="bg-rose-700"
+        subtext="Títulos vencidos"
+        bgClass={currentStats?.overdue > 0 ? 'bg-rose-50 border-rose-100' : 'bg-white border-slate-200'}
         loading={isLoading}
       />
     </div>
   );
-});
+};
 
-export default PurchaseKPIs;
+export default FinancialKPIs;

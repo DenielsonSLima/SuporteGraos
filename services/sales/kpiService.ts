@@ -73,12 +73,17 @@ export const kpiService = {
       ? (totalReceived / totalRevenueRealized) * 100 
       : (totalContractValue > 0 ? (totalReceived / totalContractValue) * 100 : 0);
 
+    // 6. Carga em Trânsito (Síncrono com os romaneios da auditoria)
+    const transitLoadings = activeLoadings.filter(l => !l.unloadWeightKg && l.status !== 'unloaded');
+    const totalTransitValue = transitLoadings.reduce((acc, l) => acc + (Number(l.totalSalesValue) || 0), 0);
+
     return {
       contractQty, totalLoadedSc, totalDeliveredSc, pendingQty,
       totalGrainCost, totalFreightCost, totalDirectInvestment,
       totalRevenueRealized, totalContractValue,
       grossProfit, marginPercent,
-      totalReceived, totalPending, receivedPercent
+      totalReceived, totalPending, receivedPercent,
+      totalTransitValue
     };
   },
 

@@ -29,18 +29,21 @@ export function DeleteFreightPaymentModal({ loading, transaction, isOpen, onClos
   const handleDelete = async () => {
     try {
       setIsDeleting(true);
-      await freightService.deleteFreightPayment(loading, transaction.id);
+      const result = await freightService.deleteFreightPayment(loading, transaction.id);
       
       addToast('success', 'Pagamento de frete estornado com sucesso!');
       
-      // Simula atualização local para UX imediata
-      const updatedLoading = {
-        ...loading,
-        transactions: (loading.transactions || []).filter(t => t.id !== transaction.id),
-        freightPaid: Math.max(0, (loading.freightPaid || 0) - (transaction.value || 0))
-      };
-      
-      onSuccess(updatedLoading);
+      // ✅ Usamos o objeto retornado pelo serviço (Truth from DB) em vez de simulação local
+      if (result?.updatedLoading) {
+        onSuccess(result.updatedLoading);
+      } else {
+        // Fallback apenas se o serviço falhar em retornar o objeto
+        onSuccess({
+          ...loading,
+          transactions: (loading.transactions || []).filter(t => t.id !== transaction.id),
+          freightPaid: Math.max(0, (loading.freightPaid || 0) - (transaction.value || 0))
+        });
+      }
       onClose();
     } catch (error: any) {
       addToast('error', 'Erro ao estornar pagamento', error.message);

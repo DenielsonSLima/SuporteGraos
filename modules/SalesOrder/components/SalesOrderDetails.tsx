@@ -124,7 +124,7 @@ const SalesOrderDetails: React.FC<Props> = ({ order, onBack, onEdit, onDelete, o
 
       {/* 3. Cards de Resumo Financeiro (KPIs) */}
       <SalesOrderKPIGrid 
-        transitValue={Number(currentOrder.transitValue) || 0}
+        transitValue={stats.totalTransitValue}
         totalRevenueRealized={stats.totalRevenueRealized}
         totalReceived={stats.totalReceived}
         totalPending={stats.totalPending}

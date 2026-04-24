@@ -9,20 +9,18 @@
  * ✅ Substitui os .reduce() de LogisticsKPIs, OpenFreights, AllFreights
  */
 
-import { useEffect, useMemo } from 'react';
-import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { useMemo } from 'react';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { QUERY_KEYS, STALE_TIMES } from './queryKeys';
 import { fetchLogisticsKPIs, LogisticsKPIFilters } from '../services/logisticsKpiService';
-import { loadingService } from '../services/loadingService';
+import { useCurrentUser } from './useCurrentUser';
 
 /**
  * Retorna KPIs agregados de logística com cálculos no banco.
- * Invalida quando loadings mudam (realtime).
  */
 export function useLogisticsKPIs(filters: LogisticsKPIFilters = {}) {
-  const queryClient = useQueryClient();
+  const currentUser = useCurrentUser();
 
-  // Memoiza filtros para estabilidade da queryKey
   const stableFilters = useMemo(() => ({
     carrierName: filters.carrierName || '',
     startDate: filters.startDate || '',
@@ -30,11 +28,10 @@ export function useLogisticsKPIs(filters: LogisticsKPIFilters = {}) {
     searchTerm: filters.searchTerm || '',
   }), [filters.carrierName, filters.startDate, filters.endDate, filters.searchTerm]);
 
-  // A invalidação agora é gerenciada globalmente pelo Realtime Sync do Supabase
-
   return useQuery({
-    queryKey: [...QUERY_KEYS.FREIGHTS, 'kpis', stableFilters],
-    queryFn: () => fetchLogisticsKPIs(stableFilters),
+    queryKey: [...QUERY_KEYS.FREIGHTS, 'kpis', currentUser?.companyId, stableFilters],
+    queryFn: () => fetchLogisticsKPIs(currentUser?.companyId!, stableFilters),
+    enabled: !!currentUser?.companyId,
     staleTime: STALE_TIMES.DYNAMIC,
     placeholderData: keepPreviousData,
   });

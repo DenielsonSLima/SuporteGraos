@@ -175,7 +175,8 @@ const OrderDetails: React.FC<Props> = ({ order, onBack, onEdit, onDelete, onFina
         totalSettled={stats.totalSettled}
         totalPending={stats.balancePartner}
         totalAbatements={stats.totalAbatements}
-        advanceBalance={stats.advanceBalance} // PASSA O SALDO DE ADIANTAMENTO
+        advanceBalance={stats.advanceBalance}
+        totalTransitValue={stats.totalTransitValue}
       />
 
       <PurchaseProfitabilityKPIs

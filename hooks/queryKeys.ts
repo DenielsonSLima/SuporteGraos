@@ -93,6 +93,9 @@ export const QUERY_KEYS = {
 
   // ─── Dashboard ──────────────────────────────────────────
   DASHBOARD: ['dashboard'] as const,
+  PURCHASE_STATS: ['purchase-global-stats'] as const,
+  SALES_STATS: ['sales-global-stats'] as const,
+  FINANCIAL_SUMMARY: ['financial-summary'] as const,
 
   // ─── Reports (lazy loaded) ──────────────────────────────
   REPORTS: ['reports'] as const,

@@ -29,8 +29,11 @@ export interface LogisticsKPIFilters {
  * Busca KPIs agregados da VIEW v_logistics_freights via RPC.
  * Todos os SUM/COUNT são computados no PostgreSQL.
  */
-export async function fetchLogisticsKPIs(filters: LogisticsKPIFilters = {}): Promise<LogisticsKPIs> {
-  const { data, error } = await supabase.rpc('rpc_logistics_kpi_totals', {
+export async function fetchLogisticsKPIs(companyId: string, filters: LogisticsKPIFilters = {}): Promise<LogisticsKPIs> {
+  if (!companyId) throw new Error('Company ID is required for Logistics KPIs');
+
+  const { data, error } = await supabase.rpc('rpc_logistics_kpi_totals_v3', {
+    p_company_id: companyId,
     p_carrier_name: filters.carrierName || null,
     p_start_date: filters.startDate || null,
     p_end_date: filters.endDate || null,
@@ -42,8 +45,7 @@ export async function fetchLogisticsKPIs(filters: LogisticsKPIFilters = {}): Pro
     throw error;
   }
 
-  // RPC retorna array com 1 row
-  const row = Array.isArray(data) ? data[0] : data;
+  const row = data; // A RPC v3 já retorna o objeto JSON pronto
 
   return {
     totalFreightValue: Number(row?.total_freight_value ?? 0),

@@ -42,14 +42,16 @@ export const usePurchaseOrderLogic = (initialOrder: PurchaseOrder, onFinalizeCal
   // Function to refresh manual invalidations if needed
   const refreshData = async () => {
     try {
-      // ✅ OPTIMIZATION: Invalidate only specific queries related to this order 
-      // instead of global PURCHASE_ORDERS and LOADINGS lists.
+      // ✅ FORCE REFETCH: Forçamos o recarregamento imediato de tudo que está na tela
+      // Isso elimina a percepção de "delay" após deletar/confirmar.
       await Promise.allSettled([
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS }),
-        queryClient.invalidateQueries({ queryKey: ['purchase_order_transactions', order.id] }),
+        queryClient.refetchQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS, type: 'active' }),
+        queryClient.refetchQueries({ queryKey: ['purchase_order_transactions', order.id], type: 'active' }),
+        queryClient.refetchQueries({ queryKey: [QUERY_KEYS.PURCHASE_ORDERS, 'detail', order.id], type: 'active' }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_TRANSACTIONS }),
-        // Invalidate all loadings to ensure global lists and PO specific lists are fresh
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOADINGS })
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOADINGS }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
       ]);
     } catch (refreshErr) {
       console.warn('⚠️ refreshData failed:', refreshErr);

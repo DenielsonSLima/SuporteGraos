@@ -1,0 +1,1459 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plano Definitivo DB — Suporte Grãos ERP</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap');
+
+  :root {
+    --bg: #0a0c0f;
+    --surface: #111418;
+    --surface2: #181c22;
+    --border: #1e2430;
+    --border2: #252d3a;
+    --accent: #00e5a0;
+    --accent2: #0ea5e9;
+    --warn: #f59e0b;
+    --danger: #ef4444;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --muted2: #94a3b8;
+    --green: #10b981;
+    --purple: #a855f7;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    background: linear-gradient(135deg, #0a0c0f 0%, #0f1a1a 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 40px 60px 32px;
+    position: relative;
+    overflow: hidden;
+  }
+  .header::before {
+    content: '';
+    position: absolute;
+    top: -60px; right: -60px;
+    width: 300px; height: 300px;
+    background: radial-gradient(circle, rgba(0,229,160,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .badge {
+    display: inline-block;
+    background: rgba(0,229,160,0.1);
+    border: 1px solid rgba(0,229,160,0.3);
+    color: var(--accent);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    padding: 4px 12px;
+    border-radius: 4px;
+    margin-bottom: 16px;
+  }
+  h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: 32px;
+    font-weight: 800;
+    color: #fff;
+    line-height: 1.2;
+    margin-bottom: 8px;
+  }
+  .header-sub {
+    color: var(--muted2);
+    font-size: 15px;
+  }
+  .header-meta {
+    margin-top: 20px;
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+  .meta-pill {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    padding: 6px 14px;
+    font-size: 12px;
+    color: var(--muted2);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .meta-pill span { color: var(--accent); font-weight: 600; }
+
+  /* ── LAYOUT ── */
+  .container { max-width: 1100px; margin: 0 auto; padding: 48px 40px; }
+
+  /* ── SECTIONS ── */
+  .section { margin-bottom: 56px; }
+  .section-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  h3 {
+    font-family: 'Syne', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+    margin: 24px 0 10px;
+  }
+  p { color: var(--muted2); margin-bottom: 12px; line-height: 1.7; }
+
+  /* ── PROBLEMA CARDS ── */
+  .problem-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .problem-card {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-left: 3px solid var(--danger);
+    border-radius: 8px;
+    padding: 16px 18px;
+  }
+  .problem-card.warn { border-left-color: var(--warn); }
+  .problem-card .module {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--danger);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .problem-card.warn .module { color: var(--warn); }
+  .problem-card .title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+  .problem-card .desc {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+  .problem-card .values {
+    margin-top: 8px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+  }
+  .val-wrong { color: var(--danger); text-decoration: line-through; }
+  .val-right { color: var(--green); }
+  .arr { color: var(--muted); }
+
+  /* ── ROOT CAUSE ── */
+  .root-cause {
+    background: rgba(239,68,68,0.05);
+    border: 1px solid rgba(239,68,68,0.2);
+    border-radius: 10px;
+    padding: 24px;
+    margin-bottom: 24px;
+  }
+  .root-cause .title {
+    font-family: 'Syne', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--danger);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .root-cause p { color: var(--muted2); margin: 0; font-size: 13px; }
+
+  /* ── ARCHITECTURE DIAGRAM ── */
+  .arch-diagram {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 28px;
+    margin-bottom: 24px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+  }
+  .arch-row { display: flex; gap: 8px; align-items: center; margin: 6px 0; }
+  .arch-box {
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .box-frontend { background: rgba(14,165,233,0.1); border: 1px solid rgba(14,165,233,0.3); color: var(--accent2); }
+  .box-rpc { background: rgba(0,229,160,0.1); border: 1px solid rgba(0,229,160,0.3); color: var(--accent); }
+  .box-view { background: rgba(168,85,247,0.1); border: 1px solid rgba(168,85,247,0.3); color: var(--purple); }
+  .box-table { background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3); color: var(--warn); }
+  .box-trigger { background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.25); color: var(--green); }
+  .arch-arrow { color: var(--muted); }
+  .arch-label { color: var(--muted); font-size: 10px; }
+
+  /* ── CODE BLOCKS ── */
+  .code-block {
+    background: #070a0d;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    margin: 14px 0;
+    overflow-x: auto;
+    position: relative;
+  }
+  .code-block .lang-tag {
+    position: absolute;
+    top: 8px; right: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  pre {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    line-height: 1.7;
+    white-space: pre;
+    color: #a9b1d6;
+    tab-size: 2;
+  }
+  .kw { color: #bb9af7; }
+  .fn { color: #7aa2f7; }
+  .str { color: #9ece6a; }
+  .cm { color: #565f89; font-style: italic; }
+  .ty { color: #2ac3de; }
+  .op { color: #89ddff; }
+  .num { color: #ff9e64; }
+  .acc { color: var(--accent); }
+
+  /* ── TABLE SCHEMA ── */
+  .schema-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0;
+    font-size: 12px;
+  }
+  .schema-table th {
+    background: var(--surface2);
+    color: var(--muted2);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 8px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--border2);
+  }
+  .schema-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  .schema-table tr:last-child td { border-bottom: none; }
+  .schema-table .col-name {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--accent2);
+    font-weight: 600;
+  }
+  .schema-table .col-type {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--warn);
+    font-size: 11px;
+  }
+  .schema-table .col-desc { color: var(--muted2); }
+  .tag-pk { background: rgba(239,68,68,0.15); color: var(--danger); border-radius: 3px; padding: 1px 5px; font-size: 10px; font-family: 'JetBrains Mono', monospace; }
+  .tag-fk { background: rgba(14,165,233,0.12); color: var(--accent2); border-radius: 3px; padding: 1px 5px; font-size: 10px; font-family: 'JetBrains Mono', monospace; }
+  .tag-calc { background: rgba(168,85,247,0.12); color: var(--purple); border-radius: 3px; padding: 1px 5px; font-size: 10px; font-family: 'JetBrains Mono', monospace; }
+  .tag-auto { background: rgba(16,185,129,0.12); color: var(--green); border-radius: 3px; padding: 1px 5px; font-size: 10px; font-family: 'JetBrains Mono', monospace; }
+
+  /* ── INVALIDATION MAP ── */
+  .inv-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    margin: 14px 0;
+  }
+  .inv-table th {
+    background: var(--surface2);
+    color: var(--muted2);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 8px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--border2);
+  }
+  .inv-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  .inv-table tr:last-child td { border-bottom: none; }
+  .inv-table .rpc-name { font-family: 'JetBrains Mono', monospace; color: var(--accent); font-weight: 600; }
+  .inv-table .query-keys { display: flex; flex-wrap: wrap; gap: 4px; }
+  .qkey {
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--muted2);
+  }
+
+  /* ── STEP CARDS ── */
+  .steps { display: flex; flex-direction: column; gap: 12px; }
+  .step-card {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    padding: 16px 20px;
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+  }
+  .step-num {
+    background: var(--accent);
+    color: #000;
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    font-size: 13px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .step-content .step-title {
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 4px;
+    font-size: 14px;
+  }
+  .step-content .step-desc { color: var(--muted); font-size: 12px; line-height: 1.5; }
+  .step-content .step-time {
+    display: inline-block;
+    margin-top: 6px;
+    background: rgba(0,229,160,0.08);
+    border: 1px solid rgba(0,229,160,0.2);
+    color: var(--accent);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+
+  /* ── RULE CARDS ── */
+  .rules { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 16px 0; }
+  .rule-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .rule-card.good { border-left: 3px solid var(--green); }
+  .rule-card.bad { border-left: 3px solid var(--danger); }
+  .rule-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .rule-card.good .rule-title { color: var(--green); }
+  .rule-card.bad .rule-title { color: var(--danger); }
+  .rule-item { font-size: 12px; color: var(--muted2); margin: 4px 0; padding-left: 12px; position: relative; }
+  .rule-item::before { content: '·'; position: absolute; left: 0; }
+
+  /* ── CALLOUT ── */
+  .callout {
+    background: rgba(0,229,160,0.04);
+    border: 1px solid rgba(0,229,160,0.2);
+    border-left: 3px solid var(--accent);
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin: 16px 0;
+    font-size: 13px;
+    color: var(--muted2);
+  }
+  .callout strong { color: var(--accent); }
+
+  /* ── SEPARATOR ── */
+  .sep { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+
+  /* ── FOOTER ── */
+  .footer {
+    border-top: 1px solid var(--border);
+    padding: 24px 60px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: var(--muted);
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  @media (max-width: 700px) {
+    .header { padding: 28px 24px 24px; }
+    .container { padding: 32px 20px; }
+    .rules { grid-template-columns: 1fr; }
+    .footer { padding: 20px 24px; flex-direction: column; gap: 8px; }
+    h1 { font-size: 24px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="badge">SUPORTE GRÃOS ERP · PLANO DEFINITIVO</div>
+  <h1>Arquitetura Database-First<br>Single Source of Truth</h1>
+  <p class="header-sub">Diagnóstico completo + RPCs atômicos + Views SQL + Mapa de Invalidação TanStack Query</p>
+  <div class="header-meta">
+    <div class="meta-pill">Stack: <span>Next.js 14 + Supabase + TypeScript</span></div>
+    <div class="meta-pill">Versão: <span>v3.0 — Definitiva</span></div>
+    <div class="meta-pill">Data: <span>22/04/2026</span></div>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- ══════════════════════════════════════════════
+       SEÇÃO 1: DIAGNÓSTICO
+  ══════════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-label">01 · Diagnóstico</div>
+    <h2>O que está errado hoje</h2>
+    <p>Análise das 8 capturas de tela enviadas. Os valores inconsistentes entre módulos confirmam o problema central.</p>
+
+    <div class="problem-grid">
+      <div class="problem-card">
+        <div class="module">🔴 Ped. Compra · Resumo</div>
+        <div class="title">Total Comprado mostra R$0,00</div>
+        <div class="desc">Existe 1 pedido ativo (#PC-2026-644) de milho com 1.166,7 SC. O card de "Total Comprado (Contratos)" deveria refletir R$70.000,00.</div>
+        <div class="values">
+          <span class="val-wrong">R$0,00</span>
+          <span class="arr">→</span>
+          <span class="val-right">R$70.000,00</span>
+        </div>
+      </div>
+      <div class="problem-card">
+        <div class="module">🔴 Financeiro · Fornecedores</div>
+        <div class="title">Dívida consolidada ARMAZEM ROCHA = R$0,00</div>
+        <div class="desc">O pedido PC-2026-644 gerou R$70.000,00 de contas a pagar. A aba Fornecedores do Financeiro mostra R$0,00 e valor original R$0,00.</div>
+        <div class="values">
+          <span class="val-wrong">R$0,00</span>
+          <span class="arr">→</span>
+          <span class="val-right">R$70.000,00</span>
+        </div>
+      </div>
+      <div class="problem-card">
+        <div class="module">🔴 Ped. Venda · Performance</div>
+        <div class="title">Custo Grão, Custo Frete e Lucro = R$0,00</div>
+        <div class="desc">Com 1 romaneio ativo (70.000 KG @ R$60/SC + frete R$8.400), todos os custos aparecem zerados. Lucro Bruto incorreto.</div>
+        <div class="values">
+          <span class="val-wrong">R$0,00</span>
+          <span class="arr">→</span>
+          <span class="val-right">Custo: R$78.400 · Lucro: R$3.266,67</span>
+        </div>
+      </div>
+      <div class="problem-card warn">
+        <div class="module">🟡 Caixa · Posição</div>
+        <div class="title">Dados corretos mas origem incerta</div>
+        <div class="desc">Patrimônio Líquido R$3.266,67 (correto), Ativos R$81.666,67 (correto), Passivos R$78.400,00 (correto). Mas se o romaneio mudar, o Caixa pode dessincronizar.</div>
+      </div>
+      <div class="problem-card warn">
+        <div class="module">🟡 Financeiro · Aba Fretes</div>
+        <div class="title">Frete R$8.400,00 criado mas sem título formal</div>
+        <div class="desc">O romaneio registrou "Dívida R$8.400,00" mas o módulo Contas a Pagar não tem título de frete vinculado ao PC-2026-644.</div>
+      </div>
+      <div class="problem-card">
+        <div class="module">🔴 Início · Dashboard</div>
+        <div class="title">Contas a Receber = R$0,00 (ok), mas Em Trânsito pode dessincronizar</div>
+        <div class="desc">R$81.666,67 em trânsito está correto agora, mas foi calculado como? Se for calculado no frontend com query separada, qualquer mudança no romaneio pode não propagar.</div>
+      </div>
+    </div>
+
+    <div class="root-cause">
+      <div class="title">⚠ Causa Raiz — Por que "ajusta um, quebra outro"</div>
+      <p>
+        Cada módulo faz suas próprias queries e cálculos no frontend de forma <strong>independente e inconsistente</strong>. 
+        Quando você muda a lógica de um módulo, os outros módulos continuam calculando do jeito antigo. 
+        Não existe uma <strong>fonte única de verdade (single source of truth)</strong> no banco. 
+        Os totais de cada tela são calculados de formas diferentes para os mesmos dados. 
+        A solução definitiva é mover <strong>100% dos cálculos para o PostgreSQL</strong> via Views SQL e RPCs, 
+        e o frontend apenas <strong>lê e exibe</strong> — nunca calcula.
+      </p>
+    </div>
+  </div>
+
+  <hr class="sep">
+
+  <!-- ══════════════════════════════════════════════
+       SEÇÃO 2: PRINCÍPIOS
+  ══════════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-label">02 · Princípios</div>
+    <h2>As regras que nunca podem ser quebradas</h2>
+
+    <div class="rules">
+      <div class="rule-card good">
+        <div class="rule-title">✅ Frontend DEVE</div>
+        <div class="rule-item">Chamar RPCs para toda escrita</div>
+        <div class="rule-item">Ler dados de Views (nunca de tabelas raw)</div>
+        <div class="rule-item">Invalidar queryKeys exatas após cada mutação</div>
+        <div class="rule-item">Tratar loading e erro de cada query separadamente</div>
+        <div class="rule-item">Passar IDs e valores brutos para o RPC</div>
+      </div>
+      <div class="rule-card bad">
+        <div class="rule-title">❌ Frontend NUNCA</div>
+        <div class="rule-item">Calcular totais, médias, saldos</div>
+        <div class="rule-item">Fazer múltiplas queries e somar no JS</div>
+        <div class="rule-item">Inserir em tabelas diretamente (sem RPC)</div>
+        <div class="rule-item">Gerar títulos financeiros no frontend</div>
+        <div class="rule-item">Calcular "Contas a Pagar" ou "Resultado" localmente</div>
+      </div>
+      <div class="rule-card good">
+        <div class="rule-title">✅ Banco DEVE</div>
+        <div class="rule-item">Calcular 100% dos totais em Views SQL</div>
+        <div class="rule-item">Gerar títulos financeiros via Triggers</div>
+        <div class="rule-item">Garantir integridade via FOREIGN KEYS + transactions</div>
+        <div class="rule-item">Retornar todos os dados necessários por tela em 1 RPC</div>
+        <div class="rule-item">Validar regras de negócio (ex: não pagar mais que o total)</div>
+      </div>
+      <div class="rule-card bad">
+        <div class="rule-title">❌ Banco NUNCA</div>
+        <div class="rule-item">Armazenar campos calculados em tabelas (sem trigger de sync)</div>
+        <div class="rule-item">Permitir delete em cascata sem verificação de saldo</div>
+        <div class="rule-item">Ter RPCs sem transações (BEGIN/COMMIT)</div>
+        <div class="rule-item">Ter Views sem índices nas colunas de JOIN</div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="sep">
+
+  <!-- ══════════════════════════════════════════════
+       SEÇÃO 3: ARQUITETURA
+  ══════════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-label">03 · Arquitetura</div>
+    <h2>Fluxo de dados definitivo</h2>
+
+    <div class="arch-diagram">
+      <div style="color: var(--muted); font-size: 11px; margin-bottom: 16px; letter-spacing: 0.05em;">CAMADA DE LEITURA (frontend → view → dados)</div>
+      <div class="arch-row">
+        <div class="arch-box box-frontend">Componente React</div>
+        <div class="arch-arrow">──useQuery──▶</div>
+        <div class="arch-box box-rpc">supabase.rpc('get_*')</div>
+        <div class="arch-arrow">──▶</div>
+        <div class="arch-box box-view">VIEW SQL</div>
+        <div class="arch-arrow">──JOIN──▶</div>
+        <div class="arch-box box-table">Tabelas Base</div>
+      </div>
+
+      <div style="color: var(--muted); font-size: 11px; margin: 20px 0 16px; letter-spacing: 0.05em;">CAMADA DE ESCRITA (frontend → rpc → transação → trigger)</div>
+      <div class="arch-row">
+        <div class="arch-box box-frontend">Componente React</div>
+        <div class="arch-arrow">──useMutation──▶</div>
+        <div class="arch-box box-rpc">supabase.rpc('criar_*')</div>
+        <div class="arch-arrow">──BEGIN──▶</div>
+        <div class="arch-box box-table">INSERT/UPDATE</div>
+        <div class="arch-arrow">──▶</div>
+        <div class="arch-box box-trigger">TRIGGER → títulos</div>
+      </div>
+
+      <div style="margin-top: 16px; display: flex; gap: 12px; flex-wrap: wrap;">
+        <div class="arch-label">■ <span style="color:var(--accent2)">Frontend</span>: lê e exibe</div>
+        <div class="arch-label">■ <span style="color:var(--accent)">RPCs</span>: toda escrita passa por aqui</div>
+        <div class="arch-label">■ <span style="color:var(--purple)">Views</span>: cálculos centralizados</div>
+        <div class="arch-label">■ <span style="color:var(--warn)">Tabelas</span>: dados brutos apenas</div>
+        <div class="arch-label">■ <span style="color:var(--green)">Triggers</span>: geração automática de títulos</div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="sep">
+
+  <!-- ══════════════════════════════════════════════
+       SEÇÃO 4: TABELAS
+  ══════════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-label">04 · Schema</div>
+    <h2>Estrutura das tabelas (fonte de verdade)</h2>
+
+    <div class="callout">
+      <strong>Regra de ouro:</strong> Tabelas armazenam apenas dados brutos. NENHUM campo calculado em tabela sem trigger de sync. Todos os totais vivem em Views.
+    </div>
+
+    <h3>pedidos_compra</h3>
+    <table class="schema-table">
+      <thead><tr><th>Coluna</th><th>Tipo</th><th>Tags</th><th>Descrição</th></tr></thead>
+      <tbody>
+        <tr><td class="col-name">id</td><td class="col-type">uuid</td><td><span class="tag-pk">PK</span></td><td class="col-desc">Gerado por gen_random_uuid()</td></tr>
+        <tr><td class="col-name">numero</td><td class="col-type">text</td><td></td><td class="col-desc">Ex: PC-2026-644 (gerado por sequência no banco)</td></tr>
+        <tr><td class="col-name">parceiro_id</td><td class="col-type">uuid</td><td><span class="tag-fk">FK→parceiros</span></td><td class="col-desc">Fornecedor (produtor)</td></tr>
+        <tr><td class="col-name">socio_id</td><td class="col-type">uuid</td><td><span class="tag-fk">FK→socios</span></td><td class="col-desc">Sócio comprador responsável</td></tr>
+        <tr><td class="col-name">produto</td><td class="col-type">text</td><td></td><td class="col-desc">Ex: "MILHO EM GRÃOS"</td></tr>
+        <tr><td class="col-name">data_pedido</td><td class="col-type">date</td><td></td><td class="col-desc">Data do contrato</td></tr>
+        <tr><td class="col-name">qtd_contrato_sc</td><td class="col-type">numeric(12,4)</td><td></td><td class="col-desc">Quantidade contratada em sacas</td></tr>
+        <tr><td class="col-name">preco_sc</td><td class="col-type">numeric(10,4)</td><td></td><td class="col-desc">Preço por saca em R$</td></tr>
+        <tr><td class="col-name">status</td><td class="col-type">text</td><td></td><td class="col-desc">'aberto' | 'parcial' | 'finalizado' | 'cancelado'</td></tr>
+        <tr><td class="col-name">created_at</td><td class="col-type">timestamptz</td><td><span class="tag-auto">AUTO</span></td><td class="col-desc">now()</td></tr>
+      </tbody>
+    </table>
+
+    <h3>pedidos_venda</h3>
+    <table class="schema-table">
+      <thead><tr><th>Coluna</th><th>Tipo</th><th>Tags</th><th>Descrição</th></tr></thead>
+      <tbody>
+        <tr><td class="col-name">id</td><td class="col-type">uuid</td><td><span class="tag-pk">PK</span></td><td class="col-desc">Gerado por gen_random_uuid()</td></tr>
+        <tr><td class="col-name">numero</td><td class="col-type">text</td><td></td><td class="col-desc">Ex: PV-2026-7856</td></tr>
+        <tr><td class="col-name">parceiro_id</td><td class="col-type">uuid</td><td><span class="tag-fk">FK→parceiros</span></td><td class="col-desc">Comprador final</td></tr>
+        <tr><td class="col-name">socio_id</td><td class="col-type">uuid</td><td><span class="tag-fk">FK→socios</span></td><td class="col-desc">Sócio vendedor responsável</td></tr>
+        <tr><td class="col-name">produto</td><td class="col-type">text</td><td></td><td class="col-desc">Ex: "MILHO EM GRÃOS"</td></tr>
+        <tr><td class="col-name">data_pedido</td><td class="col-type">date</td><td></td><td class="col-desc">Data do contrato</td></tr>
+        <tr><td class="col-name">qtd_contrato_sc</td><td class="col-type">numeric(12,4)</td><td></td><td class="col-desc">Quantidade contratada em sacas</td></tr>
+        <tr><td class="col-name">preco_sc</td><td class="col-type">numeric(10,4)</td><td></td><td class="col-desc">Preço por saca em R$</td></tr>
+        <tr><td class="col-name">status</td><td class="col-type">text</td><td></td><td class="col-desc">'pendente' | 'parcial' | 'finalizado' | 'cancelado'</td></tr>
+        <tr><td class="col-name">created_at</td><td class="col-type">timestamptz</td><td><span class="tag-auto">AUTO</span></td><td class="col-desc">now()</td></tr>
+      </tbody>
+    </table>
+
+    <h3>romaneios</h3>
+    <table class="schema-table">
+      <thead><tr><th>Coluna</th><th>Tipo</th><th>Tags</th><th>Descrição</th></tr></thead>
+      <tbody>
+        <tr><td class="col-name">id</td><td class="col-type">uuid</td><td><span class="tag-pk">PK</span></td><td class="col-desc">Identificador único</td></tr>
+        <tr><td class="col-name">pedido_compra_id</td><td class="col-type">uuid</td><td><span class="tag-fk">FK→pedidos_compra</span></td><td class="col-desc">Origem da carga</td></tr>
+        <tr><td class="col-name">pedido_venda_id</td><td class="col-type">uuid</td><td><span class="tag-fk">FK→pedidos_venda</span></td><td class="col-desc">Destino da carga</td></tr>
+        <tr><td class="col-name">logistica_id</td><td class="col-type">uuid</td><td><span class="tag-fk">FK→logistica</span></td><td class="col-desc">Transportadora/viagem</td></tr>
+        <tr><td class="col-name">data_carga</td><td class="col-type">date</td><td></td><td class="col-desc">Data do carregamento</td></tr>
+        <tr><td class="col-name">peso_origem_kg</td><td class="col-type">numeric(12,3)</td><td></td><td class="col-desc">Peso na saída (balança origem)</td></tr>
+        <tr><td class="col-name">peso_destino_kg</td><td class="col-type">numeric(12,3)</td><td></td><td class="col-desc">Peso na chegada (balança destino) — NULL enquanto em trânsito</td></tr>
+        <tr><td class="col-name">kg_por_sc</td><td class="col-type">numeric(8,4)</td><td></td><td class="col-desc">Fator de conversão (ex: 60 kg/sc para milho)</td></tr>
+        <tr><td class="col-name">status</td><td class="col-type">text</td><td></td><td class="col-desc">'em_transito' | 'entregue' | 'cancelado'</td></tr>
+        <tr><td class="col-name">nf_numero</td><td class="col-type">text</td><td></td><td class="col-desc">Número da nota fiscal</td></tr>
+        <tr><td class="col-name">created_at</td><td class="col-type">timestamptz</td><td><span class="tag-auto">AUTO</span></td><td class="col-desc">now()</td></tr>
+      </tbody>
+    </table>
+
+    <h3>logistica</h3>
+    <table class="schema-table">
+      <thead><tr><th>Coluna</th><th>Tipo</th><th>Tags</th><th>Descrição</th></tr></thead>
+      <tbody>
+        <tr><td class="col-name">id</td><td class="col-type">uuid</td><td><span class="tag-pk">PK</span></td><td class="col-desc"></td></tr>
+        <tr><td class="col-name">transportadora_id</td><td class="col-type">uuid</td><td><span class="tag-fk">FK→parceiros</span></td><td class="col-desc">Empresa de transporte</td></tr>
+        <tr><td class="col-name">motorista_nome</td><td class="col-type">text</td><td></td><td class="col-desc">Nome do motorista</td></tr>
+        <tr><td class="col-name">placa_veiculo</td><td class="col-type">text</td><td></td><td class="col-desc">Placa do veículo</td></tr>
+        <tr><td class="col-name">custo_frete_total</td><td class="col-type">numeric(12,2)</td><td></td><td class="col-desc">Valor total do frete (R$)</td></tr>
+        <tr><td class="col-name">tipo_cobranca</td><td class="col-type">text</td><td></td><td class="col-desc">'fixo' | 'por_tonelada' | 'por_saca'</td></tr>
+        <tr><td class="col-name">quem_paga_frete</td><td class="col-type">text</td><td></td><td class="col-desc">'empresa' | 'produtor' — define em qual conta a pagar vai</td></tr>
+      </tbody>
+    </table>
+
+    <h3>titulos_pagar</h3>
+    <table class="schema-table">
+      <thead><tr><th>Coluna</th><th>Tipo</th><th>Tags</th><th>Descrição</th></tr></thead>
+      <tbody>
+        <tr><td class="col-name">id</td><td class="col-type">uuid</td><td><span class="tag-pk">PK</span></td><td class="col-desc"></td></tr>
+        <tr><td class="col-name">tipo</td><td class="col-type">text</td><td></td><td class="col-desc">'fornecedor_grao' | 'frete' | 'despesa' | 'comissao'</td></tr>
+        <tr><td class="col-name">parceiro_id</td><td class="col-type">uuid</td><td><span class="tag-fk">FK→parceiros</span></td><td class="col-desc">Quem vai receber</td></tr>
+        <tr><td class="col-name">pedido_compra_id</td><td class="col-type">uuid</td><td><span class="tag-fk">FK nullable</span></td><td class="col-desc">Vínculo com pedido de compra</td></tr>
+        <tr><td class="col-name">romaneio_id</td><td class="col-type">uuid</td><td><span class="tag-fk">FK nullable</span></td><td class="col-desc">Vínculo com romaneio (para fretes)</td></tr>
+        <tr><td class="col-name">valor_original</td><td class="col-type">numeric(12,2)</td><td></td><td class="col-desc">Valor total do título</td></tr>
+        <tr><td class="col-name">valor_pago</td><td class="col-type">numeric(12,2)</td><td><span class="tag-auto">AUTO=0</span></td><td class="col-desc">Soma dos pagamentos realizados</td></tr>
+        <tr><td class="col-name">status</td><td class="col-type">text</td><td><span class="tag-auto">AUTO</span></td><td class="col-desc">'aberto' | 'parcial' | 'quitado' — calculado por trigger</td></tr>
+        <tr><td class="col-name">data_vencimento</td><td class="col-type">date</td><td></td><td class="col-desc">Data de vencimento</td></tr>
+        <tr><td class="col-name">descricao</td><td class="col-type">text</td><td></td><td class="col-desc">Texto descritivo auto-gerado</td></tr>
+        <tr><td class="col-name">created_at</td><td class="col-type">timestamptz</td><td><span class="tag-auto">AUTO</span></td><td class="col-desc">now()</td></tr>
+      </tbody>
+    </table>
+
+    <h3>pagamentos_titulos_pagar</h3>
+    <table class="schema-table">
+      <thead><tr><th>Coluna</th><th>Tipo</th><th>Tags</th><th>Descrição</th></tr></thead>
+      <tbody>
+        <tr><td class="col-name">id</td><td class="col-type">uuid</td><td><span class="tag-pk">PK</span></td><td class="col-desc"></td></tr>
+        <tr><td class="col-name">titulo_id</td><td class="col-type">uuid</td><td><span class="tag-fk">FK→titulos_pagar</span></td><td class="col-desc">Título sendo pago</td></tr>
+        <tr><td class="col-name">valor</td><td class="col-type">numeric(12,2)</td><td></td><td class="col-desc">Valor do pagamento</td></tr>
+        <tr><td class="col-name">tipo</td><td class="col-type">text</td><td></td><td class="col-desc">'adiantamento' | 'liquidacao_parcial' | 'liquidacao_total'</td></tr>
+        <tr><td class="col-name">data_pagamento</td><td class="col-type">date</td><td></td><td class="col-desc">Data efetiva do pagamento</td></tr>
+        <tr><td class="col-name">conta_bancaria_id</td><td class="col-type">uuid</td><td><span class="tag-fk">FK nullable</span></td><td class="col-desc">Conta de saída</td></tr>
+        <tr><td class="col-name">observacao</td><td class="col-type">text</td><td></td><td class="col-desc">Comprovante, obs etc.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>titulos_receber</h3>
+    <table class="schema-table">
+      <thead><tr><th>Coluna</th><th>Tipo</th><th>Tags</th><th>Descrição</th></tr></thead>
+      <tbody>
+        <tr><td class="col-name">id</td><td class="col-type">uuid</td><td><span class="tag-pk">PK</span></td><td class="col-desc"></td></tr>
+        <tr><td class="col-name">tipo</td><td class="col-type">text</td><td></td><td class="col-desc">'venda_grao' | 'adiantamento_cliente'</td></tr>
+        <tr><td class="col-name">parceiro_id</td><td class="col-type">uuid</td><td><span class="tag-fk">FK→parceiros</span></td><td class="col-desc">Quem vai pagar</td></tr>
+        <tr><td class="col-name">pedido_venda_id</td><td class="col-type">uuid</td><td><span class="tag-fk">FK→pedidos_venda</span></td><td class="col-desc">Pedido de venda vinculado</td></tr>
+        <tr><td class="col-name">romaneio_id</td><td class="col-type">uuid</td><td><span class="tag-fk">FK nullable</span></td><td class="col-desc">Romaneio gerador (quando confirmado peso destino)</td></tr>
+        <tr><td class="col-name">valor_original</td><td class="col-type">numeric(12,2)</td><td></td><td class="col-desc">Valor a receber</td></tr>
+        <tr><td class="col-name">valor_recebido</td><td class="col-type">numeric(12,2)</td><td><span class="tag-auto">AUTO=0</span></td><td class="col-desc">Soma dos recebimentos</td></tr>
+        <tr><td class="col-name">status</td><td class="col-type">text</td><td><span class="tag-auto">AUTO</span></td><td class="col-desc">'aberto' | 'parcial' | 'quitado'</td></tr>
+        <tr><td class="col-name">data_vencimento</td><td class="col-type">date</td><td></td><td class="col-desc">Data prevista de recebimento</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <hr class="sep">
+
+  <!-- ══════════════════════════════════════════════
+       SEÇÃO 5: VIEWS SQL
+  ══════════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-label">05 · Views SQL</div>
+    <h2>Cálculos centralizados — uma vez, para todos os módulos</h2>
+
+    <div class="callout">
+      <strong>Regra:</strong> Se dois módulos precisam do mesmo número, ambos leem da mesma View. Nunca duplicar lógica de cálculo.
+    </div>
+
+    <h3>VIEW: v_resumo_pedido_compra</h3>
+    <p>Usada pelo módulo Ped. Compra (cards de totais, lista, detalhe) e pelo Financeiro (dívida do fornecedor).</p>
+    <div class="code-block">
+      <div class="lang-tag">SQL</div>
+      <pre><span class="kw">CREATE OR REPLACE VIEW</span> <span class="acc">v_resumo_pedido_compra</span> <span class="kw">AS</span>
+<span class="kw">SELECT</span>
+  pc.id,
+  pc.numero,
+  pc.parceiro_id,
+  par.nome                                          <span class="kw">AS</span> parceiro_nome,
+  par.nome_fantasia                                 <span class="kw">AS</span> parceiro_fantasia,
+  pc.socio_id,
+  pc.produto,
+  pc.data_pedido,
+  pc.preco_sc,
+  pc.qtd_contrato_sc,
+  pc.status,
+
+  <span class="cm">-- Físico: sacas já carregadas (soma dos romaneios)</span>
+  <span class="fn">COALESCE</span>(<span class="fn">SUM</span>(r.peso_origem_kg) / <span class="fn">NULLIF</span>(pc.<span class="fn">AVG</span>_kg_por_sc, <span class="num">0</span>), <span class="num">0</span>) 
+                                                    <span class="kw">AS</span> qtd_carregada_sc,
+  <span class="fn">COALESCE</span>(<span class="fn">SUM</span>(r.peso_origem_kg), <span class="num">0</span>)               <span class="kw">AS</span> peso_carregado_kg,
+
+  <span class="cm">-- Físico: sacas entregues (peso destino confirmado)</span>
+  <span class="fn">COALESCE</span>(<span class="fn">SUM</span>(r.peso_destino_kg) / <span class="fn">NULLIF</span>(<span class="num">60</span>, <span class="num">0</span>), <span class="num">0</span>) 
+                                                    <span class="kw">AS</span> qtd_entregue_sc,
+
+  <span class="cm">-- Saldo físico a carregar</span>
+  pc.qtd_contrato_sc - 
+    <span class="fn">COALESCE</span>(<span class="fn">SUM</span>(r.peso_origem_kg) / <span class="num">60</span>, <span class="num">0</span>)         <span class="kw">AS</span> saldo_carregar_sc,
+
+  <span class="cm">-- Financeiro: valor total do contrato</span>
+  pc.qtd_contrato_sc * pc.preco_sc                 <span class="kw">AS</span> valor_contrato,
+
+  <span class="cm">-- Dívida: soma de títulos a pagar para este pedido</span>
+  <span class="fn">COALESCE</span>(tp_agg.valor_original_total, <span class="num">0</span>)          <span class="kw">AS</span> valor_divida_total,
+  <span class="fn">COALESCE</span>(tp_agg.valor_pago_total, <span class="num">0</span>)              <span class="kw">AS</span> valor_pago_total,
+  <span class="fn">COALESCE</span>(tp_agg.valor_original_total, <span class="num">0</span>) - 
+    <span class="fn">COALESCE</span>(tp_agg.valor_pago_total, <span class="num">0</span>)             <span class="kw">AS</span> saldo_pendente,
+
+  <span class="cm">-- Mercadoria em trânsito (carregado mas não entregue)</span>
+  <span class="fn">COALESCE</span>(transito.valor_transito, <span class="num">0</span>)              <span class="kw">AS</span> valor_em_transito
+
+<span class="kw">FROM</span> pedidos_compra pc
+<span class="kw">LEFT JOIN</span> parceiros par <span class="kw">ON</span> par.id = pc.parceiro_id
+<span class="kw">LEFT JOIN</span> romaneios r <span class="kw">ON</span> r.pedido_compra_id = pc.id 
+  <span class="kw">AND</span> r.status != <span class="str">'cancelado'</span>
+
+<span class="cm">-- Agrega títulos a pagar deste pedido</span>
+<span class="kw">LEFT JOIN LATERAL</span> (
+  <span class="kw">SELECT</span>
+    <span class="fn">SUM</span>(tp.valor_original) <span class="kw">AS</span> valor_original_total,
+    <span class="fn">SUM</span>(tp.valor_pago)     <span class="kw">AS</span> valor_pago_total
+  <span class="kw">FROM</span> titulos_pagar tp
+  <span class="kw">WHERE</span> tp.pedido_compra_id = pc.id
+    <span class="kw">AND</span> tp.tipo = <span class="str">'fornecedor_grao'</span>
+) tp_agg <span class="kw">ON TRUE</span>
+
+<span class="cm">-- Valor em trânsito = romaneios em_transito * preço venda</span>
+<span class="kw">LEFT JOIN LATERAL</span> (
+  <span class="kw">SELECT</span>
+    <span class="fn">SUM</span>((r2.peso_origem_kg / r2.kg_por_sc) * pv.preco_sc) <span class="kw">AS</span> valor_transito
+  <span class="kw">FROM</span> romaneios r2
+  <span class="kw">JOIN</span> pedidos_venda pv <span class="kw">ON</span> pv.id = r2.pedido_venda_id
+  <span class="kw">WHERE</span> r2.pedido_compra_id = pc.id
+    <span class="kw">AND</span> r2.status = <span class="str">'em_transito'</span>
+) transito <span class="kw">ON TRUE</span>
+
+<span class="kw">GROUP BY</span> pc.id, par.nome, par.nome_fantasia, tp_agg.valor_original_total, 
+         tp_agg.valor_pago_total, transito.valor_transito;</pre>
+    </div>
+
+    <h3>VIEW: v_resumo_pedido_venda</h3>
+    <p>Usada pelo módulo Ped. Venda (cards, lista, performance do produto).</p>
+    <div class="code-block">
+      <div class="lang-tag">SQL</div>
+      <pre><span class="kw">CREATE OR REPLACE VIEW</span> <span class="acc">v_resumo_pedido_venda</span> <span class="kw">AS</span>
+<span class="kw">SELECT</span>
+  pv.id,
+  pv.numero,
+  pv.parceiro_id,
+  par.nome                                          <span class="kw">AS</span> parceiro_nome,
+  pv.produto,
+  pv.data_pedido,
+  pv.preco_sc,
+  pv.qtd_contrato_sc,
+  pv.status,
+
+  <span class="cm">-- Quantidade carregada (romaneios vinculados)</span>
+  <span class="fn">COALESCE</span>(<span class="fn">SUM</span>(r.peso_origem_kg) / <span class="num">60</span>, <span class="num">0</span>)         <span class="kw">AS</span> qtd_carregada_sc,
+
+  <span class="cm">-- Quantidade entregue (peso destino confirmado)</span>
+  <span class="fn">COALESCE</span>(<span class="fn">SUM</span>(r.peso_destino_kg) / <span class="num">60</span>, <span class="num">0</span>)        <span class="kw">AS</span> qtd_entregue_sc,
+
+  <span class="cm">-- Valor de faturamento contratado</span>
+  pv.qtd_contrato_sc * pv.preco_sc                 <span class="kw">AS</span> faturamento_contratado,
+
+  <span class="cm">-- Faturamento real (ref. peso destino)</span>
+  <span class="fn">COALESCE</span>(
+    <span class="fn">SUM</span>(r.peso_destino_kg / <span class="num">60</span> * pv.preco_sc)
+    <span class="kw">FILTER</span> (<span class="kw">WHERE</span> r.peso_destino_kg <span class="kw">IS NOT NULL</span>), <span class="num">0</span>
+  )                                                 <span class="kw">AS</span> faturamento_real,
+
+  <span class="cm">-- Custo grão (pelo peso origem carregado)</span>
+  <span class="fn">COALESCE</span>(
+    <span class="fn">SUM</span>((r.peso_origem_kg / r.kg_por_sc) * pc.preco_sc), <span class="num">0</span>
+  )                                                 <span class="kw">AS</span> custo_grao_total,
+
+  <span class="cm">-- Custo frete (logística vinculada)</span>
+  <span class="fn">COALESCE</span>(<span class="fn">SUM</span>(l.custo_frete_total), <span class="num">0</span>)            <span class="kw">AS</span> custo_frete_total,
+
+  <span class="cm">-- Total custos</span>
+  <span class="fn">COALESCE</span>(<span class="fn">SUM</span>((r.peso_origem_kg / r.kg_por_sc) * pc.preco_sc), <span class="num">0</span>) +
+    <span class="fn">COALESCE</span>(<span class="fn">SUM</span>(l.custo_frete_total), <span class="num">0</span>)          <span class="kw">AS</span> custo_total,
+
+  <span class="cm">-- Lucro bruto projetado (ref. peso origem)</span>
+  (<span class="fn">COALESCE</span>(<span class="fn">SUM</span>(r.peso_origem_kg / r.kg_por_sc * pv.preco_sc), <span class="num">0</span>)) -
+  (<span class="fn">COALESCE</span>(<span class="fn">SUM</span>((r.peso_origem_kg / r.kg_por_sc) * pc.preco_sc), <span class="num">0</span>)) -
+  (<span class="fn">COALESCE</span>(<span class="fn">SUM</span>(l.custo_frete_total), <span class="num">0</span>))           <span class="kw">AS</span> lucro_bruto,
+
+  <span class="cm">-- Saldo a receber (título a receber pendente)</span>
+  <span class="fn">COALESCE</span>(tr_agg.saldo_receber, <span class="num">0</span>)                  <span class="kw">AS</span> saldo_receber,
+
+  <span class="cm">-- Carga em trânsito (valor ref. preço venda)</span>
+  <span class="fn">COALESCE</span>(
+    <span class="fn">SUM</span>(r.peso_origem_kg / <span class="num">60</span> * pv.preco_sc)
+    <span class="kw">FILTER</span> (<span class="kw">WHERE</span> r.status = <span class="str">'em_transito'</span>), <span class="num">0</span>
+  )                                                 <span class="kw">AS</span> carga_em_transito
+
+<span class="kw">FROM</span> pedidos_venda pv
+<span class="kw">LEFT JOIN</span> parceiros par <span class="kw">ON</span> par.id = pv.parceiro_id
+<span class="kw">LEFT JOIN</span> romaneios r <span class="kw">ON</span> r.pedido_venda_id = pv.id 
+  <span class="kw">AND</span> r.status != <span class="str">'cancelado'</span>
+<span class="kw">LEFT JOIN</span> logistica l <span class="kw">ON</span> l.id = r.logistica_id
+<span class="kw">LEFT JOIN</span> pedidos_compra pc <span class="kw">ON</span> pc.id = r.pedido_compra_id
+<span class="kw">LEFT JOIN LATERAL</span> (
+  <span class="kw">SELECT</span> <span class="fn">SUM</span>(tr.valor_original - tr.valor_recebido) <span class="kw">AS</span> saldo_receber
+  <span class="kw">FROM</span> titulos_receber tr
+  <span class="kw">WHERE</span> tr.pedido_venda_id = pv.id <span class="kw">AND</span> tr.status != <span class="str">'quitado'</span>
+) tr_agg <span class="kw">ON TRUE</span>
+
+<span class="kw">GROUP BY</span> pv.id, par.nome, tr_agg.saldo_receber;</pre>
+    </div>
+
+    <h3>VIEW: v_posicao_caixa</h3>
+    <p>Usada pelo Caixa, Dashboard e Financeiro. Esta é a fonte única de todos os saldos patrimoniais.</p>
+    <div class="code-block">
+      <div class="lang-tag">SQL</div>
+      <pre><span class="kw">CREATE OR REPLACE VIEW</span> <span class="acc">v_posicao_caixa</span> <span class="kw">AS</span>
+<span class="kw">SELECT</span>
+  <span class="cm">-- ATIVOS</span>
+  <span class="fn">COALESCE</span>(saldos_banco.total, <span class="num">0</span>)                  <span class="kw">AS</span> saldo_disponivel,
+  <span class="fn">COALESCE</span>(transito.valor, <span class="num">0</span>)                      <span class="kw">AS</span> mercadoria_em_transito,
+  <span class="fn">COALESCE</span>(a_receber.valor, <span class="num">0</span>)                     <span class="kw">AS</span> contas_a_receber,
+  <span class="fn">COALESCE</span>(patrimonio.valor, <span class="num">0</span>)                    <span class="kw">AS</span> patrimonio_bens,
+
+  <span class="fn">COALESCE</span>(saldos_banco.total, <span class="num">0</span>) +
+  <span class="fn">COALESCE</span>(transito.valor, <span class="num">0</span>) +
+  <span class="fn">COALESCE</span>(a_receber.valor, <span class="num">0</span>) +
+  <span class="fn">COALESCE</span>(patrimonio.valor, <span class="num">0</span>)                    <span class="kw">AS</span> total_ativos,
+
+  <span class="cm">-- PASSIVOS</span>
+  <span class="fn">COALESCE</span>(a_pagar_fornecedores.valor, <span class="num">0</span>)          <span class="kw">AS</span> fornecedores_graos,
+  <span class="fn">COALESCE</span>(a_pagar_fretes.valor, <span class="num">0</span>)               <span class="kw">AS</span> fretes_a_pagar,
+  <span class="fn">COALESCE</span>(a_pagar_outros.valor, <span class="num">0</span>)               <span class="kw">AS</span> outros_a_pagar,
+
+  <span class="fn">COALESCE</span>(a_pagar_fornecedores.valor, <span class="num">0</span>) +
+  <span class="fn">COALESCE</span>(a_pagar_fretes.valor, <span class="num">0</span>) +
+  <span class="fn">COALESCE</span>(a_pagar_outros.valor, <span class="num">0</span>)               <span class="kw">AS</span> total_passivos,
+
+  <span class="cm">-- PATRIMÔNIO LÍQUIDO</span>
+  (
+    <span class="fn">COALESCE</span>(saldos_banco.total, <span class="num">0</span>) +
+    <span class="fn">COALESCE</span>(transito.valor, <span class="num">0</span>) +
+    <span class="fn">COALESCE</span>(a_receber.valor, <span class="num">0</span>) +
+    <span class="fn">COALESCE</span>(patrimonio.valor, <span class="num">0</span>)
+  ) - (
+    <span class="fn">COALESCE</span>(a_pagar_fornecedores.valor, <span class="num">0</span>) +
+    <span class="fn">COALESCE</span>(a_pagar_fretes.valor, <span class="num">0</span>) +
+    <span class="fn">COALESCE</span>(a_pagar_outros.valor, <span class="num">0</span>)
+  )                                                 <span class="kw">AS</span> patrimonio_liquido
+
+<span class="kw">FROM</span>
+  (<span class="kw">SELECT</span> <span class="fn">SUM</span>(saldo_atual) <span class="kw">AS</span> total <span class="kw">FROM</span> contas_bancarias) saldos_banco,
+
+  (<span class="kw">SELECT</span> <span class="fn">SUM</span>(r.peso_origem_kg / r.kg_por_sc * pv.preco_sc) <span class="kw">AS</span> valor
+   <span class="kw">FROM</span> romaneios r
+   <span class="kw">JOIN</span> pedidos_venda pv <span class="kw">ON</span> pv.id = r.pedido_venda_id
+   <span class="kw">WHERE</span> r.status = <span class="str">'em_transito'</span>) transito,
+
+  (<span class="kw">SELECT</span> <span class="fn">SUM</span>(valor_original - valor_recebido) <span class="kw">AS</span> valor
+   <span class="kw">FROM</span> titulos_receber <span class="kw">WHERE</span> status != <span class="str">'quitado'</span>) a_receber,
+
+  (<span class="kw">SELECT</span> <span class="fn">COALESCE</span>(<span class="fn">SUM</span>(valor_atual), <span class="num">0</span>) <span class="kw">AS</span> valor 
+   <span class="kw">FROM</span> patrimonio_bens <span class="kw">WHERE</span> status = <span class="str">'ativo'</span>) patrimonio,
+
+  (<span class="kw">SELECT</span> <span class="fn">SUM</span>(valor_original - valor_pago) <span class="kw">AS</span> valor
+   <span class="kw">FROM</span> titulos_pagar <span class="kw">WHERE</span> tipo = <span class="str">'fornecedor_grao'</span> 
+   <span class="kw">AND</span> status != <span class="str">'quitado'</span>) a_pagar_fornecedores,
+
+  (<span class="kw">SELECT</span> <span class="fn">SUM</span>(valor_original - valor_pago) <span class="kw">AS</span> valor
+   <span class="kw">FROM</span> titulos_pagar <span class="kw">WHERE</span> tipo = <span class="str">'frete'</span> 
+   <span class="kw">AND</span> status != <span class="str">'quitado'</span>) a_pagar_fretes,
+
+  (<span class="kw">SELECT</span> <span class="fn">SUM</span>(valor_original - valor_pago) <span class="kw">AS</span> valor
+   <span class="kw">FROM</span> titulos_pagar <span class="kw">WHERE</span> tipo <span class="kw">NOT IN</span> (<span class="str">'fornecedor_grao'</span>, <span class="str">'frete'</span>) 
+   <span class="kw">AND</span> status != <span class="str">'quitado'</span>) a_pagar_outros;</pre>
+    </div>
+  </div>
+
+  <hr class="sep">
+
+  <!-- ══════════════════════════════════════════════
+       SEÇÃO 6: RPCs
+  ══════════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-label">06 · RPCs Atômicos</div>
+    <h2>Toda escrita passa por aqui — com transação</h2>
+
+    <h3>RPC: criar_romaneio (o mais crítico)</h3>
+    <p>Cria o romaneio E automaticamente gera os títulos a pagar (fornecedor + frete) em uma única transação. Se qualquer parte falhar, tudo faz rollback.</p>
+    <div class="code-block">
+      <div class="lang-tag">SQL</div>
+      <pre><span class="kw">CREATE OR REPLACE FUNCTION</span> <span class="acc">criar_romaneio</span>(
+  p_pedido_compra_id  <span class="ty">uuid</span>,
+  p_pedido_venda_id   <span class="ty">uuid</span>,
+  p_transportadora_id <span class="ty">uuid</span>,
+  p_motorista_nome    <span class="ty">text</span>,
+  p_placa_veiculo     <span class="ty">text</span>,
+  p_data_carga        <span class="ty">date</span>,
+  p_peso_origem_kg    <span class="ty">numeric</span>,
+  p_custo_frete_total <span class="ty">numeric</span>,
+  p_quem_paga_frete   <span class="ty">text</span>,  <span class="cm">-- 'empresa' | 'produtor'</span>
+  p_kg_por_sc         <span class="ty">numeric</span> <span class="kw">DEFAULT</span> <span class="num">60</span>
+) <span class="kw">RETURNS</span> <span class="ty">json</span> <span class="kw">AS</span> $$
+<span class="kw">DECLARE</span>
+  v_logistica_id    <span class="ty">uuid</span>;
+  v_romaneio_id     <span class="ty">uuid</span>;
+  v_pc              <span class="kw">RECORD</span>;
+  v_qtd_sc          <span class="ty">numeric</span>;
+  v_valor_grao      <span class="ty">numeric</span>;
+  v_titulo_forn_id  <span class="ty">uuid</span>;
+  v_titulo_frete_id <span class="ty">uuid</span>;
+<span class="kw">BEGIN</span>
+
+  <span class="cm">-- 1. Busca dados do pedido de compra</span>
+  <span class="kw">SELECT</span> * <span class="kw">INTO</span> v_pc <span class="kw">FROM</span> pedidos_compra <span class="kw">WHERE</span> id = p_pedido_compra_id;
+  <span class="kw">IF NOT FOUND THEN</span>
+    <span class="kw">RAISE EXCEPTION</span> <span class="str">'Pedido de compra não encontrado'</span>;
+  <span class="kw">END IF</span>;
+
+  <span class="cm">-- 2. Calcula sacas e valor</span>
+  v_qtd_sc     := p_peso_origem_kg / p_kg_por_sc;
+  v_valor_grao := v_qtd_sc * v_pc.preco_sc;
+
+  <span class="cm">-- 3. Cria registro de logística</span>
+  <span class="kw">INSERT INTO</span> logistica (
+    transportadora_id, motorista_nome, placa_veiculo,
+    custo_frete_total, quem_paga_frete
+  ) <span class="kw">VALUES</span> (
+    p_transportadora_id, p_motorista_nome, p_placa_veiculo,
+    p_custo_frete_total, p_quem_paga_frete
+  ) <span class="kw">RETURNING</span> id <span class="kw">INTO</span> v_logistica_id;
+
+  <span class="cm">-- 4. Cria o romaneio</span>
+  <span class="kw">INSERT INTO</span> romaneios (
+    pedido_compra_id, pedido_venda_id, logistica_id,
+    data_carga, peso_origem_kg, kg_por_sc, status
+  ) <span class="kw">VALUES</span> (
+    p_pedido_compra_id, p_pedido_venda_id, v_logistica_id,
+    p_data_carga, p_peso_origem_kg, p_kg_por_sc, <span class="str">'em_transito'</span>
+  ) <span class="kw">RETURNING</span> id <span class="kw">INTO</span> v_romaneio_id;
+
+  <span class="cm">-- 5. Gera título a pagar para o fornecedor (grão)</span>
+  <span class="kw">INSERT INTO</span> titulos_pagar (
+    tipo, parceiro_id, pedido_compra_id, romaneio_id,
+    valor_original, valor_pago, status, data_vencimento, descricao
+  ) <span class="kw">VALUES</span> (
+    <span class="str">'fornecedor_grao'</span>,
+    v_pc.parceiro_id,
+    p_pedido_compra_id,
+    v_romaneio_id,
+    v_valor_grao,
+    <span class="num">0</span>,
+    <span class="str">'aberto'</span>,
+    <span class="fn">CURRENT_DATE</span> + <span class="kw">INTERVAL</span> <span class="str">'30 days'</span>,
+    <span class="str">'Grão - '</span> || v_pc.produto || <span class="str">' - ROM:'</span> || v_romaneio_id
+  ) <span class="kw">RETURNING</span> id <span class="kw">INTO</span> v_titulo_forn_id;
+
+  <span class="cm">-- 6. Gera título a pagar para o frete (se empresa paga)</span>
+  <span class="kw">IF</span> p_quem_paga_frete = <span class="str">'empresa'</span> <span class="kw">AND</span> p_custo_frete_total > <span class="num">0</span> <span class="kw">THEN</span>
+    <span class="kw">INSERT INTO</span> titulos_pagar (
+      tipo, parceiro_id, pedido_compra_id, romaneio_id,
+      valor_original, valor_pago, status, data_vencimento, descricao
+    ) <span class="kw">VALUES</span> (
+      <span class="str">'frete'</span>,
+      p_transportadora_id,
+      p_pedido_compra_id,
+      v_romaneio_id,
+      p_custo_frete_total,
+      <span class="num">0</span>,
+      <span class="str">'aberto'</span>,
+      <span class="fn">CURRENT_DATE</span> + <span class="kw">INTERVAL</span> <span class="str">'15 days'</span>,
+      <span class="str">'Frete - ROM:'</span> || v_romaneio_id
+    ) <span class="kw">RETURNING</span> id <span class="kw">INTO</span> v_titulo_frete_id;
+  <span class="kw">END IF</span>;
+
+  <span class="cm">-- 7. Retorna resultado</span>
+  <span class="kw">RETURN</span> <span class="fn">json_build_object</span>(
+    <span class="str">'success'</span>, <span class="kw">true</span>,
+    <span class="str">'romaneio_id'</span>, v_romaneio_id,
+    <span class="str">'logistica_id'</span>, v_logistica_id,
+    <span class="str">'titulo_fornecedor_id'</span>, v_titulo_forn_id,
+    <span class="str">'titulo_frete_id'</span>, v_titulo_frete_id,
+    <span class="str">'valor_grao'</span>, v_valor_grao,
+    <span class="str">'qtd_sc'</span>, v_qtd_sc
+  );
+
+<span class="kw">EXCEPTION WHEN OTHERS THEN</span>
+  <span class="kw">RAISE EXCEPTION</span> <span class="str">'criar_romaneio falhou: %'</span>, <span class="fn">SQLERRM</span>;
+<span class="kw">END</span>;
+$$ <span class="kw">LANGUAGE</span> plpgsql <span class="kw">SECURITY DEFINER</span>;</pre>
+    </div>
+
+    <h3>RPC: confirmar_peso_destino</h3>
+    <p>Confirma a entrega — atualiza o romaneio com o peso real de destino e gera o título a receber automaticamente.</p>
+    <div class="code-block">
+      <div class="lang-tag">SQL</div>
+      <pre><span class="kw">CREATE OR REPLACE FUNCTION</span> <span class="acc">confirmar_peso_destino</span>(
+  p_romaneio_id    <span class="ty">uuid</span>,
+  p_peso_destino_kg <span class="ty">numeric</span>
+) <span class="kw">RETURNS</span> <span class="ty">json</span> <span class="kw">AS</span> $$
+<span class="kw">DECLARE</span>
+  v_rom     <span class="kw">RECORD</span>;
+  v_pv      <span class="kw">RECORD</span>;
+  v_qtd_sc  <span class="ty">numeric</span>;
+  v_valor   <span class="ty">numeric</span>;
+<span class="kw">BEGIN</span>
+  <span class="kw">SELECT</span> r.*, l.custo_frete_total
+  <span class="kw">INTO</span> v_rom
+  <span class="kw">FROM</span> romaneios r
+  <span class="kw">JOIN</span> logistica l <span class="kw">ON</span> l.id = r.logistica_id
+  <span class="kw">WHERE</span> r.id = p_romaneio_id;
+
+  <span class="kw">SELECT</span> * <span class="kw">INTO</span> v_pv <span class="kw">FROM</span> pedidos_venda <span class="kw">WHERE</span> id = v_rom.pedido_venda_id;
+
+  v_qtd_sc := p_peso_destino_kg / v_rom.kg_por_sc;
+  v_valor   := v_qtd_sc * v_pv.preco_sc;
+
+  <span class="cm">-- Atualiza romaneio com peso destino e muda status</span>
+  <span class="kw">UPDATE</span> romaneios
+  <span class="kw">SET</span> peso_destino_kg = p_peso_destino_kg,
+      status          = <span class="str">'entregue'</span>
+  <span class="kw">WHERE</span> id = p_romaneio_id;
+
+  <span class="cm">-- Gera título a receber do comprador</span>
+  <span class="kw">INSERT INTO</span> titulos_receber (
+    tipo, parceiro_id, pedido_venda_id, romaneio_id,
+    valor_original, valor_recebido, status, data_vencimento, descricao
+  ) <span class="kw">VALUES</span> (
+    <span class="str">'venda_grao'</span>,
+    v_pv.parceiro_id,
+    v_rom.pedido_venda_id,
+    p_romaneio_id,
+    v_valor, <span class="num">0</span>, <span class="str">'aberto'</span>,
+    <span class="fn">CURRENT_DATE</span> + <span class="kw">INTERVAL</span> <span class="str">'30 days'</span>,
+    <span class="str">'Venda grão - ROM:'</span> || p_romaneio_id
+  );
+
+  <span class="kw">RETURN</span> <span class="fn">json_build_object</span>(
+    <span class="str">'success'</span>, <span class="kw">true</span>,
+    <span class="str">'qtd_sc_destino'</span>, v_qtd_sc,
+    <span class="str">'valor_a_receber'</span>, v_valor
+  );
+<span class="kw">END</span>;
+$$ <span class="kw">LANGUAGE</span> plpgsql <span class="kw">SECURITY DEFINER</span>;</pre>
+    </div>
+
+    <h3>RPC: lancar_pagamento_titulo</h3>
+    <p>Único RPC para todos os pagamentos (fornecedor e frete). Atualiza valor_pago e status automaticamente.</p>
+    <div class="code-block">
+      <div class="lang-tag">SQL</div>
+      <pre><span class="kw">CREATE OR REPLACE FUNCTION</span> <span class="acc">lancar_pagamento_titulo</span>(
+  p_titulo_id         <span class="ty">uuid</span>,
+  p_valor             <span class="ty">numeric</span>,
+  p_data_pagamento    <span class="ty">date</span>,
+  p_tipo              <span class="ty">text</span>,  <span class="cm">-- 'adiantamento' | 'liquidacao_parcial' | 'liquidacao_total'</span>
+  p_conta_bancaria_id <span class="ty">uuid</span>  <span class="op">DEFAULT NULL</span>,
+  p_observacao        <span class="ty">text</span>  <span class="op">DEFAULT NULL</span>
+) <span class="kw">RETURNS</span> <span class="ty">json</span> <span class="kw">AS</span> $$
+<span class="kw">DECLARE</span>
+  v_titulo  <span class="kw">RECORD</span>;
+  v_novo_pago <span class="ty">numeric</span>;
+  v_status    <span class="ty">text</span>;
+<span class="kw">BEGIN</span>
+  <span class="kw">SELECT</span> * <span class="kw">INTO</span> v_titulo 
+  <span class="kw">FROM</span> titulos_pagar <span class="kw">WHERE</span> id = p_titulo_id <span class="kw">FOR UPDATE</span>;
+
+  <span class="kw">IF</span> v_titulo.status = <span class="str">'quitado'</span> <span class="kw">THEN</span>
+    <span class="kw">RAISE EXCEPTION</span> <span class="str">'Título já está quitado'</span>;
+  <span class="kw">END IF</span>;
+
+  v_novo_pago := v_titulo.valor_pago + p_valor;
+
+  <span class="kw">IF</span> v_novo_pago > v_titulo.valor_original <span class="kw">THEN</span>
+    <span class="kw">RAISE EXCEPTION</span> <span class="str">'Pagamento excede valor original do título'</span>;
+  <span class="kw">END IF</span>;
+
+  v_status := <span class="kw">CASE</span>
+    <span class="kw">WHEN</span> v_novo_pago >= v_titulo.valor_original <span class="kw">THEN</span> <span class="str">'quitado'</span>
+    <span class="kw">WHEN</span> v_novo_pago > <span class="num">0</span>                        <span class="kw">THEN</span> <span class="str">'parcial'</span>
+    <span class="kw">ELSE</span> <span class="str">'aberto'</span>
+  <span class="kw">END</span>;
+
+  <span class="cm">-- Atualiza o título</span>
+  <span class="kw">UPDATE</span> titulos_pagar
+  <span class="kw">SET</span> valor_pago = v_novo_pago,
+      status     = v_status
+  <span class="kw">WHERE</span> id = p_titulo_id;
+
+  <span class="cm">-- Registra o movimento</span>
+  <span class="kw">INSERT INTO</span> pagamentos_titulos_pagar (
+    titulo_id, valor, tipo, data_pagamento, 
+    conta_bancaria_id, observacao
+  ) <span class="kw">VALUES</span> (
+    p_titulo_id, p_valor, p_tipo, p_data_pagamento,
+    p_conta_bancaria_id, p_observacao
+  );
+
+  <span class="cm">-- Debita conta bancária se informada</span>
+  <span class="kw">IF</span> p_conta_bancaria_id <span class="kw">IS NOT NULL</span> <span class="kw">THEN</span>
+    <span class="kw">UPDATE</span> contas_bancarias
+    <span class="kw">SET</span> saldo_atual = saldo_atual - p_valor
+    <span class="kw">WHERE</span> id = p_conta_bancaria_id;
+  <span class="kw">END IF</span>;
+
+  <span class="kw">RETURN</span> <span class="fn">json_build_object</span>(
+    <span class="str">'success'</span>, <span class="kw">true</span>,
+    <span class="str">'novo_status'</span>, v_status,
+    <span class="str">'valor_pago_total'</span>, v_novo_pago,
+    <span class="str">'saldo_restante'</span>, v_titulo.valor_original - v_novo_pago
+  );
+<span class="kw">END</span>;
+$$ <span class="kw">LANGUAGE</span> plpgsql <span class="kw">SECURITY DEFINER</span>;</pre>
+    </div>
+  </div>
+
+  <hr class="sep">
+
+  <!-- ══════════════════════════════════════════════
+       SEÇÃO 7: TANSTACK QUERY
+  ══════════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-label">07 · TanStack Query</div>
+    <h2>Mapa de invalidação — o que invalidar após cada RPC</h2>
+
+    <p>Cada mutação no frontend deve chamar <code style="background:var(--surface2);padding:2px 6px;border-radius:3px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent)">queryClient.invalidateQueries()</code> para as keys exatas abaixo.</p>
+
+    <table class="inv-table">
+      <thead>
+        <tr>
+          <th>RPC chamado</th>
+          <th>QueryKeys a invalidar</th>
+          <th>Por que</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="rpc-name">criar_pedido_compra</td>
+          <td><div class="query-keys">
+            <span class="qkey">['pedidos_compra']</span>
+            <span class="qkey">['dashboard']</span>
+          </div></td>
+          <td style="color:var(--muted);font-size:12px">Novo pedido aparece na lista e pode afetar totais do dashboard</td>
+        </tr>
+        <tr>
+          <td class="rpc-name">criar_romaneio</td>
+          <td><div class="query-keys">
+            <span class="qkey">['romaneios']</span>
+            <span class="qkey">['pedidos_compra', id]</span>
+            <span class="qkey">['pedidos_venda', id]</span>
+            <span class="qkey">['titulos_pagar']</span>
+            <span class="qkey">['caixa']</span>
+            <span class="qkey">['dashboard']</span>
+          </div></td>
+          <td style="color:var(--muted);font-size:12px">Cria romaneio + 2 títulos a pagar + muda saldo em trânsito</td>
+        </tr>
+        <tr>
+          <td class="rpc-name">confirmar_peso_destino</td>
+          <td><div class="query-keys">
+            <span class="qkey">['romaneios', id]</span>
+            <span class="qkey">['pedidos_venda', id]</span>
+            <span class="qkey">['titulos_receber']</span>
+            <span class="qkey">['caixa']</span>
+            <span class="qkey">['dashboard']</span>
+          </div></td>
+          <td style="color:var(--muted);font-size:12px">Romaneio vira 'entregue', sai do trânsito, gera título a receber</td>
+        </tr>
+        <tr>
+          <td class="rpc-name">lancar_pagamento_titulo (fornecedor)</td>
+          <td><div class="query-keys">
+            <span class="qkey">['titulos_pagar', titulo_id]</span>
+            <span class="qkey">['titulos_pagar']</span>
+            <span class="qkey">['pedidos_compra', pc_id]</span>
+            <span class="qkey">['caixa']</span>
+            <span class="qkey">['dashboard']</span>
+            <span class="qkey">['contas_bancarias']</span>
+          </div></td>
+          <td style="color:var(--muted);font-size:12px">Reduz passivo + debita conta bancária + muda saldo disponível</td>
+        </tr>
+        <tr>
+          <td class="rpc-name">lancar_pagamento_titulo (frete)</td>
+          <td><div class="query-keys">
+            <span class="qkey">['titulos_pagar', titulo_id]</span>
+            <span class="qkey">['titulos_pagar']</span>
+            <span class="qkey">['romaneios', rom_id]</span>
+            <span class="qkey">['caixa']</span>
+            <span class="qkey">['dashboard']</span>
+            <span class="qkey">['contas_bancarias']</span>
+          </div></td>
+          <td style="color:var(--muted);font-size:12px">Quita frete, muda passivo de fretes</td>
+        </tr>
+        <tr>
+          <td class="rpc-name">lancar_recebimento_venda</td>
+          <td><div class="query-keys">
+            <span class="qkey">['titulos_receber', titulo_id]</span>
+            <span class="qkey">['titulos_receber']</span>
+            <span class="qkey">['pedidos_venda', pv_id]</span>
+            <span class="qkey">['caixa']</span>
+            <span class="qkey">['dashboard']</span>
+            <span class="qkey">['contas_bancarias']</span>
+          </div></td>
+          <td style="color:var(--muted);font-size:12px">Aumenta saldo disponível + reduz contas a receber</td>
+        </tr>
+        <tr>
+          <td class="rpc-name">criar_pedido_venda</td>
+          <td><div class="query-keys">
+            <span class="qkey">['pedidos_venda']</span>
+            <span class="qkey">['dashboard']</span>
+          </div></td>
+          <td style="color:var(--muted);font-size:12px">Novo contrato de venda</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Padrão de implementação no frontend</h3>
+    <div class="code-block">
+      <div class="lang-tag">TypeScript · React</div>
+      <pre><span class="cm">// hooks/use-criar-romaneio.ts</span>
+<span class="kw">export function</span> <span class="fn">useCriarRomaneio</span>() {
+  <span class="kw">const</span> queryClient = <span class="fn">useQueryClient</span>()
+
+  <span class="kw">return</span> <span class="fn">useMutation</span>({
+    mutationFn: <span class="kw">async</span> (data: CriarRomaneioInput) => {
+      <span class="kw">const</span> { data: result, error } = <span class="kw">await</span> supabase
+        .<span class="fn">rpc</span>(<span class="str">'criar_romaneio'</span>, {
+          p_pedido_compra_id:  data.pedidoCompraId,
+          p_pedido_venda_id:   data.pedidoVendaId,
+          p_transportadora_id: data.transportadoraId,
+          p_motorista_nome:    data.motoristaNome,
+          p_placa_veiculo:     data.placaVeiculo,
+          p_data_carga:        data.dataCarga,
+          p_peso_origem_kg:    data.pesoOrigemKg,
+          p_custo_frete_total: data.custoFrete,
+          p_quem_paga_frete:   data.quemPagaFrete,
+        })
+
+      <span class="kw">if</span> (error) <span class="kw">throw</span> error
+      <span class="kw">return</span> result
+    },
+
+    <span class="cm">// Invalida TUDO que foi afetado por esta operação</span>
+    onSuccess: (_, variables) => {
+      queryClient.<span class="fn">invalidateQueries</span>({ queryKey: [<span class="str">'romaneios'</span>] })
+      queryClient.<span class="fn">invalidateQueries</span>({ queryKey: [<span class="str">'pedidos_compra'</span>, variables.pedidoCompraId] })
+      queryClient.<span class="fn">invalidateQueries</span>({ queryKey: [<span class="str">'pedidos_venda'</span>, variables.pedidoVendaId] })
+      queryClient.<span class="fn">invalidateQueries</span>({ queryKey: [<span class="str">'titulos_pagar'</span>] })
+      queryClient.<span class="fn">invalidateQueries</span>({ queryKey: [<span class="str">'caixa'</span>] })
+      queryClient.<span class="fn">invalidateQueries</span>({ queryKey: [<span class="str">'dashboard'</span>] })
+    },
+  })
+}
+
+<span class="cm">// Leitura: sempre da View, nunca calcular no componente</span>
+<span class="kw">export function</span> <span class="fn">usePedidoCompraDetalhe</span>(id: string) {
+  <span class="kw">return</span> <span class="fn">useQuery</span>({
+    queryKey: [<span class="str">'pedidos_compra'</span>, id],
+    queryFn: <span class="kw">async</span> () => {
+      <span class="kw">const</span> { data, error } = <span class="kw">await</span> supabase
+        .<span class="fn">from</span>(<span class="str">'v_resumo_pedido_compra'</span>)  <span class="cm">// ← lê da VIEW</span>
+        .<span class="fn">select</span>(<span class="str">'*'</span>)
+        .<span class="fn">eq</span>(<span class="str">'id'</span>, id)
+        .<span class="fn">single</span>()
+      <span class="kw">if</span> (error) <span class="kw">throw</span> error
+      <span class="kw">return</span> data
+    },
+  })
+}
+
+<span class="cm">// ❌ NUNCA FAÇA ISSO no componente:</span>
+<span class="cm">// const total = pedido.preco_sc * pedido.qtd_contrato_sc  ← cálculo no frontend</span>
+<span class="cm">// ✅ CORRETO: v_resumo_pedido_compra.valor_contrato já está calculado</span></pre>
+    </div>
+  </div>
+
+  <hr class="sep">
+
+  <!-- ══════════════════════════════════════════════
+       SEÇÃO 8: ORDEM DE IMPLEMENTAÇÃO
+  ══════════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-label">08 · Ordem de Implementação</div>
+    <h2>Como migrar sem quebrar nada</h2>
+
+    <div class="callout">
+      <strong>Estratégia:</strong> Construir as Views e RPCs em paralelo com o código atual. Migrar módulo por módulo, sempre validando que os números batem antes de remover a lógica antiga do frontend.
+    </div>
+
+    <div class="steps">
+      <div class="step-card">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <div class="step-title">Criar as tabelas auxiliares que faltam</div>
+          <div class="step-desc">Verificar se <code>titulos_pagar</code>, <code>titulos_receber</code>, <code>pagamentos_titulos_pagar</code> existem com a estrutura correta. Criar migrations do zero se necessário. <strong>NÃO apagar dados existentes.</strong></div>
+          <span class="step-time">~2h</span>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <div class="step-title">Migrar dados históricos para a nova estrutura</div>
+          <div class="step-desc">Rodar um script SQL que gera os <code>titulos_pagar</code> retroativos para todos os romaneios existentes que não têm título vinculado. Esse é o passo que vai corrigir o Financeiro → Fornecedores que mostrava R$0,00.</div>
+          <span class="step-time">~3h</span>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <div class="step-title">Criar as Views SQL</div>
+          <div class="step-desc">Criar <code>v_resumo_pedido_compra</code>, <code>v_resumo_pedido_venda</code>, <code>v_posicao_caixa</code> e <code>v_dashboard</code>. Testar cada View com os dados existentes e validar que os números batem com o que a tela mostra hoje.</div>
+          <span class="step-time">~4h</span>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <div class="step-title">Criar os RPCs atômicos</div>
+          <div class="step-desc">Criar <code>criar_romaneio</code>, <code>confirmar_peso_destino</code>, <code>lancar_pagamento_titulo</code>, <code>lancar_recebimento_venda</code>. Testar cada RPC isoladamente via Supabase Dashboard SQL Editor.</div>
+          <span class="step-time">~6h</span>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">5</div>
+        <div class="step-content">
+          <div class="step-title">Migrar módulo Caixa primeiro</div>
+          <div class="step-desc">O Caixa é o mais simples pois é só leitura — trocar para ler de <code>v_posicao_caixa</code> via uma única query. Validar que os números batem. <strong>Primeiro módulo a ficar 100% correto.</strong></div>
+          <span class="step-time">~2h</span>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">6</div>
+        <div class="step-content">
+          <div class="step-title">Migrar Ped. Compra (leitura)</div>
+          <div class="step-desc">Trocar as queries do módulo Ped. Compra para ler de <code>v_resumo_pedido_compra</code>. Cards de totais, lista e detalhe passam a usar os campos da View. Verificar: "Total Comprado" passa a mostrar o valor correto.</div>
+          <span class="step-time">~3h</span>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">7</div>
+        <div class="step-content">
+          <div class="step-title">Migrar Ped. Venda (leitura + performance)</div>
+          <div class="step-desc">Trocar queries para <code>v_resumo_pedido_venda</code>. A seção "Performance do Produto" passa a mostrar Custo Grão, Custo Frete e Lucro Bruto corretos vindos da View, não calculados no frontend.</div>
+          <span class="step-time">~3h</span>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">8</div>
+        <div class="step-content">
+          <div class="step-title">Migrar Financeiro (Contas a Pagar e Receber)</div>
+          <div class="step-desc">Módulo Financeiro passa a ler de <code>titulos_pagar</code> e <code>titulos_receber</code> (estas são tabelas normalizadas, não Views). Dívida Consolidada do ARMAZEM ROCHA vai aparecer corretamente porque agora existem os títulos.</div>
+          <span class="step-time">~4h</span>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">9</div>
+        <div class="step-content">
+          <div class="step-title">Migrar escritas para RPCs + invalidação TanStack</div>
+          <div class="step-desc">Trocar todos os INSERTs diretos (romaneio, pagamento, recebimento) para chamar os RPCs. Implementar o mapa de invalidação de queryKeys. A partir deste ponto: alterar qualquer dado propaga automaticamente para todos os módulos.</div>
+          <span class="step-time">~6h</span>
+        </div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">10</div>
+        <div class="step-content">
+          <div class="step-title">Validação final e remoção do código antigo</div>
+          <div class="step-desc">Testar o fluxo completo: criar pedido compra → criar romaneio → verificar Financeiro → pagar → verificar Caixa → confirmar entrega → verificar Contas a Receber → receber → verificar Dashboard. Remover todo código de cálculo do frontend.</div>
+          <span class="step-time">~4h</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  <div>Suporte Grãos ERP · Plano Definitivo v3.0</div>
+  <div>Dailabs · 22/04/2026</div>
+</div>
+
+</body>
+</html>

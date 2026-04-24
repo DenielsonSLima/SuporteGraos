@@ -16,7 +16,7 @@ interface Props {
  * KPIs de Logística — SKIL §5.4: agregações primárias via RPC (SUM no banco).
  * Fallback: quando a RPC falha ou retorna zeros, computa a partir dos freights.
  */
-const LogisticsKPIs: React.FC<Props> = ({ filters = {}, freights = [] }) => {
+const LogisticsKPIs: React.FC<Props> = ({ filters = {} }) => {
   const currency = (val: number) => new Intl.NumberFormat('pt-BR', { 
     style: 'currency', 
     currency: 'BRL',
@@ -25,38 +25,15 @@ const LogisticsKPIs: React.FC<Props> = ({ filters = {}, freights = [] }) => {
   }).format(Math.abs(val) < 0.005 ? 0 : val);
   const number = (val: number) => new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 }).format(val);
 
-  const { data: stats } = useLogisticsKPIs(filters);
-
-  // Fallback local: computa KPIs dos freights quando a RPC não retorna dados
-  const localKpis = useMemo(() => {
-    if (!freights.length) return null;
-    return {
-      totalFreightValue: freights.reduce((acc, f) => acc + f.totalFreight, 0),
-      totalPaid: freights.reduce((acc, f) => acc + f.paidValue, 0),
-      totalPending: freights.reduce((acc, f) => acc + f.balanceValue, 0),
-      totalVolumeTon: freights.reduce((acc, f) => acc + (f.weight / 1000), 0),
-      activeCount: freights.filter(f => f.status !== 'completed' && f.status !== 'canceled').length,
-      count: freights.length,
-    };
-  }, [freights]);
-
-  // Verifica se a RPC retornou dados válidos (não-zero)
-  const rpcHasData = stats && (
-    (stats.totalFreightValue ?? 0) > 0 ||
-    (stats.totalPaid ?? 0) > 0 ||
-    (stats.totalPending ?? 0) > 0 ||
-    (stats.totalCount ?? 0) > 0
-  );
-
-  const source = rpcHasData ? stats! : localKpis;
+  const { data: stats, isLoading } = useLogisticsKPIs(filters);
 
   const kpis = {
-    totalFreightValue: source?.totalFreightValue ?? 0,
-    totalPaid: source?.totalPaid ?? 0,
-    totalPending: source?.totalPending ?? 0,
-    totalVolumeTon: source?.totalVolumeTon ?? 0,
-    activeCount: source?.activeCount ?? 0,
-    count: (rpcHasData ? stats?.totalCount : localKpis?.count) ?? 0,
+    totalFreightValue: stats?.totalFreightValue ?? 0,
+    totalPaid: stats?.totalPaid ?? 0,
+    totalPending: stats?.totalPending ?? 0,
+    totalVolumeTon: stats?.totalVolumeTon ?? 0,
+    activeCount: stats?.activeCount ?? 0,
+    count: stats?.totalCount ?? 0,
   };
 
   const StatCard = ({ label, value, icon: Icon, color, subtext, bgClass }: any) => (

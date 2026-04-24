@@ -211,8 +211,9 @@ export const dashboardService = {
         const invalidate = () => {
           if (debounceTimer) clearTimeout(debounceTimer);
           debounceTimer = setTimeout(() => {
+            pendingDashboardPromise = null; // Libera o "bloqueio" de promessa pendente
             listeners.forEach((fn) => fn());
-          }, 500); // ⚡ Debounce de 500ms para evitar spam de refresh
+          }, 100); // ⚡ Reduzido para 100ms para resposta quase instantânea
         };
 
         channel = supabase

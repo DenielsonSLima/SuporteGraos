@@ -78,5 +78,11 @@ if (typeof window !== 'undefined') {
 export const invalidateFinancialCache = () => {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event('financial:updated'));
+    // 🟢 MASTER SWITCH: Invalida queries do TanStack Query em todo o sistema (Consolidado)
+    window.dispatchEvent(new CustomEvent('app:invalidate-query', { 
+      detail: { 
+        queryKeys: ['financial', 'cashier', 'dashboard', 'purchase_orders', 'sales_orders', 'loadings'] 
+      } 
+    }));
   }
 };

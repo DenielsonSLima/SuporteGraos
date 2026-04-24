@@ -80,19 +80,25 @@ export function FreightPaymentModal({ loading, isOpen, onClose, onSuccess, trans
     try {
       setIsSubmitting(true);
       
+      let result;
       if (transaction) {
         // Modo Edição
-        await freightService.updateFreightPayment(loading, transaction.id, formData);
+        result = await freightService.updateFreightPayment(loading, transaction.id, formData);
         addToast('success', 'Lançamento atualizado com sucesso!');
       } else {
         // Modo Novo
-        await freightService.addFreightPayment(loading, formData);
+        result = await freightService.addFreightPayment(loading, formData);
         addToast('success', 'Pagamento de frete registrado com sucesso!');
       }
       
-      // Para fins de UX, como o onUpdate (onSuccess) recarrega os dados via mutação do componente pai,
-      // passamos o loading atualizado (ou apenas sinalizamos sucesso)
-      onSuccess(loading); 
+      // Para fins de UX, passamos o loading atualizado retornado pelo serviço.
+      // Isso é CRÍTICO para evitar que o componente pai (LoadingManagement)
+      // sobrescreva o banco com dados stale através do onUpdate.
+      if (result?.updatedLoading) {
+        onSuccess(result.updatedLoading);
+      } else {
+        onSuccess(loading);
+      }
       onClose();
     } catch (error: any) {
       addToast('error', 'Erro ao processar operação', error.message);

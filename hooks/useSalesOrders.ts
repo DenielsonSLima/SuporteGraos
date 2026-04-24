@@ -107,6 +107,7 @@ export function useSalesOrders(params: SalesLoadParams = {}) {
   useEffect(() => {
     const unsub = subscribeToSalesRealtime(() => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SALES_STATS });
     });
     return unsub;
   }, [queryClient]);
@@ -150,6 +151,7 @@ export function useAddSalesOrder() {
     onSuccess: async () => { 
       await Promise.all([
         qc.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.SALES_STATS }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
       ]);
@@ -165,6 +167,7 @@ export function useUpdateSalesOrder() {
     onSuccess: async () => { 
       await Promise.all([
         qc.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.SALES_STATS }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
       ]);
@@ -180,6 +183,7 @@ export function useDeleteSalesOrder() {
     onSuccess: async () => { 
       await Promise.all([
         qc.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.SALES_STATS }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
       ]);
@@ -196,6 +200,7 @@ export function useUpdateSalesTransaction() {
     onSuccess: async () => { 
       await Promise.all([
         qc.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.SALES_STATS }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
       ]);
@@ -213,10 +218,46 @@ export function useDeleteSalesTransaction() {
     onSuccess: async () => { 
       await Promise.all([
         qc.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.SALES_STATS }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
       ]);
     },
     onError: mutationErrorHandler,
+  });
+}
+
+/**
+ * Hook para buscar um único pedido de venda por ID.
+ * Garante que temos a versão mais recente do banco (SQL-First).
+ */
+export function useSalesOrder(orderId: string) {
+  const queryClient = useQueryClient();
+  const isCanonical = isSqlCanonicalOpsEnabled();
+  const tableName = isCanonical ? 'vw_sales_orders_enriched' : 'ops_sales_orders';
+
+  // Realtime: invalida este pedido específico se houver mudanças
+  useEffect(() => {
+    if (!orderId) return;
+    const unsub = subscribeToSalesRealtime(() => {
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.SALES_ORDERS, orderId] });
+    });
+    return unsub;
+  }, [queryClient, orderId]);
+
+  return useQuery<SalesOrder | null>({
+    queryKey: [QUERY_KEYS.SALES_ORDERS, orderId],
+    queryFn: async () => {
+      if (!orderId) return null;
+      const { data, error } = await supabase
+        .from(tableName)
+        .select('*')
+        .eq('id', orderId)
+        .maybeSingle();
+
+      if (error || !data) return null;
+      return data as SalesOrder;
+    },
+    staleTime: 1000 * 5, // 5s stale time for details
   });
 }

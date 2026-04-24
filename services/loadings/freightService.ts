@@ -8,6 +8,7 @@
 
 import { financialActionService } from '../financialActionService';
 import { loadingPersistence } from '../loading/loadingPersistence';
+import { invalidateFinancialCache } from '../financialCache';
 import { Loading, LoadingExtraExpense } from '../../modules/Loadings/types';
 import { generateUUID } from '../loading/loadingMapper';
 import { PaymentData } from '../financial/handlers/orchestratorTypes';
@@ -70,7 +71,10 @@ export const freightService = {
     // Persiste atualização no Supabase para sincronização
     await loadingPersistence.persistLoading(updatedLoading, loading.companyId);
     
-    return { success: true, txId };
+    // 🟢 MASTER SWITCH: Força atualização de todos os dashboards e listas financeiras
+    invalidateFinancialCache();
+    
+    return { success: true, txId, updatedLoading };
   },
 
   /**
@@ -118,7 +122,10 @@ export const freightService = {
     // Persiste no banco de dados Supabase
     await loadingPersistence.persistLoading(updatedLoading, loading.companyId);
 
-    return { success: true };
+    // 🟢 MASTER SWITCH: Força atualização de todos os dashboards e listas financeiras
+    invalidateFinancialCache();
+
+    return { success: true, updatedLoading };
   },
 
   /**

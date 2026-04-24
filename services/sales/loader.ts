@@ -211,6 +211,19 @@ export const salesLoader = {
     } else {
       partnerAddressCache.clear();
     }
+  },
+
+  /**
+   * Carrega estatísticas globais de vendas via RPC.
+   * Utilizado pelos KPIs de Faturamento Contratado.
+   */
+  loadStats: async (companyId: string) => {
+    if (!companyId) return null;
+    const { data, error } = await supabase.rpc('rpc_get_sales_order_stats_v3', {
+      p_company_id: companyId
+    });
+    if (error) throw error;
+    return data;
   }
 };
 

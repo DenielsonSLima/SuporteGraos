@@ -39,7 +39,8 @@ export const salesService = {
 
   // Utility
   importData: (data: SalesOrder[]) => {
-    // Implementação simplificada para importação, se necessário
     salesStore.setAll(data);
-  }
+  },
+
+  getStats: (companyId: string) => salesLoader.loadStats(companyId)
 };

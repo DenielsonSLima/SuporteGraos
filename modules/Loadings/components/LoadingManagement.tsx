@@ -227,12 +227,16 @@ const LoadingManagement: React.FC<Props> = ({ loading, onClose, onUpdate, origin
               />
             </>
           ) : (
-            <div className="animate-in fade-in duration-500">
               <LoadingFinancialTab
                 loading={editForm}
-                onUpdate={(up) => { setEditForm(up); updateLoadingMut.mutate(up); onUpdate(up); }}
+                onUpdate={(up) => { 
+                  setEditForm(up); 
+                  // ✅ Removida a mutação redundante (updateLoadingMut.mutate).
+                  // O freightService já persiste no banco. Chamar aqui causava 
+                  // race conditions e podia sobrescrever dados novos com estado stale.
+                  onUpdate(up); 
+                }}
               />
-            </div>
           )}
         </div>
       </div>
