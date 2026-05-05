@@ -129,8 +129,9 @@ export const financialTransactionService = {
                     amount: transaction.amount,
                     type: normalizedType,
                     account_id: transaction.bankAccountId,
+                    entry_id: transaction.financialRecordId, // ✅ CRITICAL: Link to parent entry
                     company_id: companyId,
-                    created_by: user?.id
+                    created_by: user?.appUserId || null 
                 })
                 .select()
                 .single();

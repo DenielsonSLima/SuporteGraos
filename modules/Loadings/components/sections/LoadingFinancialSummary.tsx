@@ -2,6 +2,7 @@
 import React from 'react';
 import { ShoppingBag, TrendingUp, DollarSign, Calculator } from 'lucide-react';
 import { Loading } from '../../types';
+import { formatCurrencyMask, parseCurrencyInput } from '../../../../utils/formatters';
 
 interface Props {
     editForm: Loading;
@@ -20,18 +21,8 @@ const LoadingFinancialSummary: React.FC<Props> = ({
     const labelClass = 'text-[10px] font-black text-slate-500 uppercase mb-1 block tracking-widest';
     const inputClass = 'w-full border-2 border-slate-200 bg-white px-3 py-1.5 text-slate-900 font-black focus:outline-none focus:border-blue-500 rounded-xl text-sm transition-all';
 
-    const formatMask = (val: number | undefined) => {
-        if (val === undefined || isNaN(val)) return '';
-        return new Intl.NumberFormat('pt-BR', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-        }).format(val);
-    };
-
     const handleMaskChange = (value: string, field: keyof Loading) => {
-        const digits = value.replace(/\D/g, '');
-        const numericValue = digits ? parseInt(digits) / 100 : 0;
-        onUpdateForm({ [field]: numericValue });
+        onUpdateForm({ [field]: parseCurrencyInput(value) });
     };
 
     return (
@@ -90,7 +81,7 @@ const LoadingFinancialSummary: React.FC<Props> = ({
                                         type="text" 
                                         inputMode="numeric"
                                         className={`${inputClass} !bg-slate-900 !text-white !border-slate-800 !py-1 !px-2 !text-xs text-right`} 
-                                        value={formatMask(editForm.freightPricePerTon)} 
+                                        value={formatCurrencyMask(editForm.freightPricePerTon)} 
                                         onChange={e => handleMaskChange(e.target.value, 'freightPricePerTon')} 
                                     />
                                 ) : (

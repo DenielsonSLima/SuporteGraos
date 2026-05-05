@@ -7,7 +7,8 @@ import { useAccounts } from '../../../../hooks/useAccounts';
 import { useToast } from '../../../../contexts/ToastContext';
 import { Partner } from '../../../Partners/types';
 import ModalPortal from '../../../../components/ui/ModalPortal';
-import { formatAccountLabel } from '../../../../utils/formatters';
+import SearchableSelect from '../../../../components/ui/SearchableSelect';
+import { formatAccountLabel, formatCurrencyMask, parseCurrencyInput } from '../../../../utils/formatters';
 
 interface Props {
   isOpen: boolean;
@@ -25,8 +26,10 @@ const AdvanceForm: React.FC<Props> = ({ isOpen, onClose, onSave }) => {
   const [accountId, setAccountId] = useState('');
   const [displayValue, setDisplayValue] = useState('');
   const [numericValue, setNumericValue] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
-  const { data: allAccounts = [] } = useAccounts();
+  const { data: allAccountsData } = useAccounts();
+  const allAccounts = allAccountsData || [];
   const accounts = useMemo(() => 
     allAccounts
       .filter(a => 
@@ -40,6 +43,21 @@ const AdvanceForm: React.FC<Props> = ({ isOpen, onClose, onSave }) => {
     [allAccounts]
   );
   const [partners, setPartners] = useState<Partner[]>([]);
+
+  const sortedPartners = useMemo(() => 
+    [...partners].sort((a, b) => a.name.localeCompare(b.name)),
+    [partners]
+  );
+
+  const partnerOptions = useMemo(() => 
+    sortedPartners.map(p => ({
+      id: p.id,
+      label: p.name,
+      sublabel: `${p.nickname || ''}${p.document ? ` • ${p.document}` : ''}`.trim() || undefined,
+      category: p.type
+    })),
+    [sortedPartners]
+  );
 
   useEffect(() => {
     if (isOpen) {
@@ -68,26 +86,16 @@ const AdvanceForm: React.FC<Props> = ({ isOpen, onClose, onSave }) => {
     return unsubscribe;
   }, [isOpen]);
 
-  if (!isOpen) return null;
-
   const handleValueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const rawValue = e.target.value.replace(/\D/g, '');
-    const amount = Number(rawValue) / 100;
-    
+    const amount = parseCurrencyInput(e.target.value);
     setNumericValue(amount);
-    setDisplayValue(new Intl.NumberFormat('pt-BR', {
-        style: 'currency',
-        currency: 'BRL'
-    }).format(amount));
+    setDisplayValue(formatCurrencyMask(amount));
   };
-
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
 
-    const sortedPartners = [...partners].sort((a, b) => a.name.localeCompare(b.name));
     const partner = sortedPartners.find(p => p.id === partnerId);
     
     if (!partner) {
@@ -127,6 +135,8 @@ const AdvanceForm: React.FC<Props> = ({ isOpen, onClose, onSave }) => {
 
   const inputClass = 'block w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 focus:border-slate-800 focus:outline-none transition-all placeholder:text-slate-300 font-bold shadow-sm';
   const labelClass = 'block mb-2 text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1';
+
+  if (!isOpen) return null;
 
   return (
     <ModalPortal>
@@ -186,21 +196,13 @@ const AdvanceForm: React.FC<Props> = ({ isOpen, onClose, onSave }) => {
 
               <div>
                 <label className={labelClass}>Parceiro Beneficiário</label>
-                <div className="relative">
-                  <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" size={18} />
-                  <select 
-                    required 
-                    className={`${inputClass} pl-12 appearance-none`}
-                    value={partnerId}
-                    onChange={e => setPartnerId(e.target.value)}
-                  >
-                    <option value="">Selecione o parceiro...</option>
-                    {[...partners].sort((a, b) => a.name.localeCompare(b.name)).map(p => (
-                      <option key={p.id} value={p.id}>{p.name} {p.nickname ? `• ${p.nickname}` : ''} ({p.type})</option>
-                    ))}
-                  </select>
-                  <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" size={18} />
-                </div>
+                <SearchableSelect
+                  options={partnerOptions}
+                  value={partnerId}
+                  onChange={setPartnerId}
+                  placeholder="Selecione o parceiro..."
+                  icon={<User size={18} />}
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-4">

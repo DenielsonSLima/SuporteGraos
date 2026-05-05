@@ -7,7 +7,7 @@ import { getLocalDateString } from '../../../../utils/dateUtils';
 import type { Shareholder } from '../../../../services/shareholderService';
 import { useToast } from '../../../../contexts/ToastContext';
 import ModalPortal from '../../../../components/ui/ModalPortal';
-import { formatAccountLabel } from '../../../../utils/formatters';
+import { formatAccountLabel, formatCurrencyMask, parseCurrencyInput } from '../../../../utils/formatters';
 
 interface Props {
   isOpen: boolean;
@@ -27,7 +27,7 @@ const ShareholderCreditModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, s
   
   const [selectedShareholderId, setSelectedShareholderId] = useState('');
   const [date, setDate] = useState(getLocalDateString());
-  const [value, setValue] = useState('');
+  const [value, setValue] = useState(0);
   const [description, setDescription] = useState('Pro-labore Mensal');
   const [payImmediately, setPayImmediately] = useState(false);
   const [accountId, setAccountId] = useState('');
@@ -43,12 +43,12 @@ const ShareholderCreditModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, s
     if (isOpen) {
       if (initialData) {
         setDate(initialData.date?.split('T')[0] || getLocalDateString());
-        setValue(initialData.value.toString());
+        setValue(initialData.value);
         setDescription(initialData.description);
         setPayImmediately(false);
       } else {
         setDate(getLocalDateString());
-        setValue('');
+        setValue(0);
         setDescription('Pro-labore Mensal');
         setPayImmediately(false);
         setAccountId('');
@@ -71,7 +71,7 @@ const ShareholderCreditModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, s
       : selectedShareholderId;
 
     if (!finalId) return addToast('warning', 'Sócio Obrigatório');
-    const val = parseFloat(value);
+    const val = value;
     if (!val || val <= 0) return addToast('warning', 'Valor Inválido');
     if (payImmediately && !accountId) return addToast('warning', 'Conta Obrigatória');
 
@@ -116,7 +116,7 @@ const ShareholderCreditModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, s
           )}
           <div className="grid grid-cols-2 gap-4">
             <div><label className={labelClass}>Data Ref.</label><input type="date" required value={date} onChange={e => setDate(e.target.value)} className={inputClass} /></div>
-            <div><label className={labelClass}>Valor</label><div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-black">R$</span><input type="number" step="0.01" required value={value} onChange={e => setValue(e.target.value)} className={`${inputClass} pl-9 text-lg text-emerald-700`} placeholder="0,00" /></div></div>
+            <div><label className={labelClass}>Valor</label><div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-black text-xs">R$</span><input type="text" inputMode="numeric" required value={formatCurrencyMask(value)} onChange={e => setValue(parseCurrencyInput(e.target.value))} className={`${inputClass} pl-9 text-lg text-emerald-700 text-right`} placeholder="0,00" /></div></div>
           </div>
           <div><label className={labelClass}>Histórico</label><textarea rows={2} required value={description} onChange={e => setDescription(e.target.value)} className={`${inputClass} pl-10 h-20 py-3 resize-none font-bold italic`} placeholder="Motivo..." /></div>
           {!initialData && (

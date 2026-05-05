@@ -41,6 +41,8 @@ export function mapTransactionRow(row: ShareholderTransactionDB): ShareholderTra
     type: row.type as 'credit' | 'debit',
     value: Number(row.value),
     description: row.description ?? '',
-    accountId: row.account_name ?? undefined,
+    accountId: row.bank_account_id || row.account_name || undefined,
+    bankAccountId: row.bank_account_id || undefined,
+    accountName: row.account_name || undefined,
   };
 }

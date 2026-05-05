@@ -12,7 +12,7 @@ import {
 import { Loading } from '../../types';
 import { freightService } from '../../../../services/loadings/freightService';
 import { loadingKpiService } from '../../../../services/loadings/loadingKpiService';
-import { formatCurrency, formatAccountLabel } from '../../../../utils/formatters';
+import { formatCurrency, formatAccountLabel, formatCurrencyMask, parseCurrencyInput } from '../../../../utils/formatters';
 import { useToast } from '../../../../contexts/ToastContext';
 import { useAccounts } from '../../../../hooks/useAccounts';
 import { accountsService } from '../../../../services/accountsService';
@@ -44,21 +44,8 @@ export function FreightPaymentModal({ loading, isOpen, onClose, onSuccess, trans
     notes: transaction ? (transaction.notes || '').replace(/\s*\[REF:.*\]$/, '') : ''
   });
 
-  // Mascaramento de Moeda (Padrão Brasileiro 0.000,00)
-  const formatCurrencyMask = (val: number | undefined) => {
-    if (val === undefined || isNaN(val)) return '0,00';
-    return new Intl.NumberFormat('pt-BR', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(val);
-  };
-
   const handleCurrencyChange = (value: string, field: 'amount' | 'discount') => {
-    // Remove tudo que não é dígito
-    const digits = value.replace(/\D/g, '');
-    // Transforma em centavos (ex: "123456" -> 1234.56)
-    const numericValue = digits ? parseInt(digits) / 100 : 0;
-    setFormData(prev => ({ ...prev, [field]: numericValue }));
+    setFormData(prev => ({ ...prev, [field]: parseCurrencyInput(value) }));
   };
 
   const handleAccountChange = (e: React.ChangeEvent<HTMLSelectElement>) => {

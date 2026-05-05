@@ -293,7 +293,8 @@ const PartnersPage: React.FC = () => {
         <AllPartnersPdfModal
           isOpen={isAllPartnersPdfOpen}
           onClose={() => setIsAllPartnersPdfOpen(false)}
-          partners={partners}
+          searchTerm={debouncedSearch}
+          category={activeTab}
           balances={partnerBalances}
         />
       )}

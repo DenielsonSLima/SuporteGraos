@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Plus, Search, TrendingUp, Filter, Layers, Calendar, X } from 'lucide-react';
-import { useCredits, useCreateCredit, useUpdateCredit, useDeleteCredit } from '../../../hooks/useCredits';
+import { useCredits, useCreateCredit, useUpdateCredit, useDeleteCredit, useCreditSummary } from '../../../hooks/useCredits';
 import CreditList from './components/CreditList';
 import CreditFormModal from './components/CreditFormModal';
 import ModalPortal from '../../../components/ui/ModalPortal';
@@ -28,13 +28,18 @@ const CreditsTab: React.FC = () => {
   const createCreditMutation = useCreateCredit();
   const updateCreditMutation = useUpdateCredit();
   const deleteCreditMutation = useDeleteCredit();
-
+  
   // Mês Atual helpers
   const today = new Date();
   const currentYear = today.getFullYear();
   const currentMonth = today.getMonth() + 1;
   const startOfMonthStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`;
   const endOfMonthStr = new Date(currentYear, currentMonth, 0).toISOString().split('T')[0];
+
+  const { data: totalFromRPC } = useCreditSummary(
+    activeSubTab === 'current_month' ? startOfMonthStr : startDate,
+    activeSubTab === 'current_month' ? endOfMonthStr : endDate
+  );
 
   const filteredCredits = useMemo(() => {
     let result = credits;
@@ -73,8 +78,12 @@ const CreditsTab: React.FC = () => {
   useEffect(() => { setVisibleCount(PAGE_SIZE); }, [startDate, endDate, searchTerm, activeSubTab]);
 
   const totalCreditsValue = useMemo(() => {
+    // Se temos o valor do RPC, usamos ele (verdade do banco)
+    if (totalFromRPC !== undefined) return totalFromRPC;
+    
+    // Fallback para filtros complexos de busca se necessário
     return filteredCredits.reduce((acc, c) => acc + (c.originalValue || 0), 0);
-  }, [filteredCredits]);
+  }, [filteredCredits, totalFromRPC]);
 
   const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
 
@@ -88,6 +97,7 @@ const CreditsTab: React.FC = () => {
             description: data.description,
             amount: data.value,
             date: data.date,
+            accountId: data.accountId,
           },
         });
         addToast('success', 'Crédito atualizado com sucesso!');

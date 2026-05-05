@@ -73,6 +73,8 @@ export const handleStandalonePayment = async (
       p_tx_id: txId
     });
 
+    const txType = standalone?.category === 'income' ? 'receipt' : 'payment';
+
     // Registramos apenas o histórico/vínculo no modo Foundation
     // registerFinancialRecords pulará a escrita no ledger se detectar que o RPC já fez
     await registerFinancialRecords({
@@ -82,12 +84,12 @@ export const handleStandalonePayment = async (
       discount: discountValue,
       accountId: data.accountId,
       accountName: data.accountName,
-      type: 'payment',
+      type: txType,
       recordId,
       referenceType: standalone?.subType || 'admin',
       referenceId: recordId,
       description,
-      historyType: 'Despesa Administrativa',
+      historyType: standalone?.category === 'income' ? 'Crédito Avulso' : 'Despesa Administrativa',
       entityName,
       partnerId: data.partnerId,
       notes: data.notes,
@@ -95,6 +97,8 @@ export const handleStandalonePayment = async (
     });
   } else {
     // Via Registro Direto (Fallback/Extra)
+    const txType = standalone?.category === 'income' ? 'receipt' : 'payment';
+
     await registerFinancialRecords({
       txId,
       date: data.date,
@@ -102,12 +106,12 @@ export const handleStandalonePayment = async (
       discount: discountValue,
       accountId: resolveAccountId(data.accountId),
       accountName: data.accountName,
-      type: 'payment',
+      type: txType,
       recordId,
       referenceType: standalone?.subType || 'admin',
       referenceId: recordId,
       description,
-      historyType: 'Despesa Extra',
+      historyType: standalone?.category === 'income' ? 'Crédito Avulso' : 'Despesa Extra',
       entityName,
       partnerId: data.partnerId,
       notes: data.notes,

@@ -71,3 +71,27 @@ export function useCashierHistory() {
     placeholderData: keepPreviousData,
   });
 }
+
+/**
+ * Hook para buscar estatísticas modulares (Compras, Fretes, Despesas, etc.)
+ * Atualiza em tempo real.
+ */
+export function useCashierModularStats(referenceDate?: string) {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const invalidate = () => {
+      queryClient.invalidateQueries({ queryKey: ['cashier_modular_stats', referenceDate] });
+    };
+
+    const unsub = cashierService.subscribeRealtime(invalidate);
+    return unsub;
+  }, [queryClient, referenceDate]);
+
+  return useQuery({
+    queryKey: ['cashier_modular_stats', referenceDate],
+    queryFn: () => cashierService.getModularStats(referenceDate),
+    staleTime: 5000,
+    placeholderData: keepPreviousData,
+  });
+}

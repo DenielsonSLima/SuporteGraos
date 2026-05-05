@@ -57,7 +57,8 @@ const ShareholdersTab: React.FC = () => {
           type: 'debit',
           value: data.amount,
           description: data.notes || 'Pagamento / Retirada de Saldo',
-          accountId: data.accountId
+          bankAccountId: data.accountId,
+          accountName: data.accountName
         }
       });
 
@@ -82,20 +83,36 @@ const ShareholdersTab: React.FC = () => {
 
   const handleConfirmCredit = async (data: { shareholderId: string; date: string; value: number; description: string; payImmediately?: boolean; accountId?: string; accountName?: string }) => {
     try {
+      // 1. Lança o CRÉDITO (Aumenta o saldo do sócio)
+      // Note: Não enviamos accountId aqui para o crédito não ser interpretado como "Aporte" (Entrada de dinheiro)
       await addTransaction.mutateAsync({
         shareholderId: data.shareholderId,
         transaction: {
           date: data.date,
           type: 'credit',
           value: data.value,
-          description: data.description,
-          accountId: data.payImmediately && data.accountId ? data.accountId : undefined
+          description: data.description
         }
       });
 
+      // 2. Se for pagamento imediato, lança o DÉBITO (Diminui o saldo + Saída do Banco)
+      if (data.payImmediately && data.accountId) {
+        await addTransaction.mutateAsync({
+          shareholderId: data.shareholderId,
+          transaction: {
+            date: data.date,
+            type: 'debit',
+            value: data.value,
+            description: `[LIQUIDAÇÃO] ${data.description}`,
+            bankAccountId: data.accountId,
+            accountName: data.accountName
+          }
+        });
+      }
+
       setIsCreditModalOpen(false);
       refreshData();
-      addToast('success', 'Crédito Lançado', data.payImmediately ? 'Valor lançado e baixado do caixa.' : 'Saldo pendente atualizado.');
+      addToast('success', 'Crédito Lançado', data.payImmediately ? 'Valor creditado e pago imediatamente.' : 'Saldo pendente atualizado.');
     } catch (err: any) {
       console.error('[ShareholdersTab] Erro ao lançar crédito:', err);
       addToast('error', 'Erro ao Lançar Crédito', err?.message || 'Tente novamente.');
@@ -125,7 +142,8 @@ const ShareholdersTab: React.FC = () => {
           type: type === 'payment' ? 'debit' : 'credit',
           value: data.value,
           description: data.description,
-          accountId: type === 'payment' && data.accountId ? data.accountId : undefined
+          bankAccountId: type === 'payment' && data.accountId ? data.accountId : undefined,
+          accountName: type === 'payment' && data.accountName ? data.accountName : undefined
         }
       });
 
@@ -180,6 +198,7 @@ const ShareholdersTab: React.FC = () => {
               dueDate: new Date().toISOString().split('T')[0],
               issueDate: new Date().toISOString().split('T')[0],
               originalValue: selectedShareholder.financial.currentBalance > 0 ? selectedShareholder.financial.currentBalance : 0,
+              remainingValue: selectedShareholder.financial.currentBalance > 0 ? selectedShareholder.financial.currentBalance : 0,
               paidValue: 0,
               status: 'pending',
               subType: 'shareholder'
@@ -269,6 +288,7 @@ const ShareholdersTab: React.FC = () => {
             dueDate: new Date().toISOString().split('T')[0],
             issueDate: new Date().toISOString().split('T')[0],
             originalValue: selectedShareholder.financial.currentBalance > 0 ? selectedShareholder.financial.currentBalance : 0,
+            remainingValue: selectedShareholder.financial.currentBalance > 0 ? selectedShareholder.financial.currentBalance : 0,
             paidValue: 0,
             status: 'pending',
             subType: 'shareholder'

@@ -89,16 +89,20 @@ const PayablesTab: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [accumulatedPayables, setAccumulatedPayables] = useState<EnrichedPayableEntry[]>([]);
 
-  const { data: rawPayables = [], isLoading: loading } = usePayables({
+  const queryParams = useMemo(() => ({
     startDate: startDate || undefined,
     endDate: endDate || undefined,
     search: searchTerm || undefined,
     page: currentPage - 1,
     pageSize: PAGE_SIZE
-  });
+  }), [startDate, endDate, searchTerm, currentPage]);
+
+  const { data: rawPayables, isLoading: loading } = usePayables(queryParams);
   
   // Bug 8 Fix: Acúmulo de dados para Infinite Scroll manual
   useEffect(() => {
+    if (!rawPayables) return;
+    
     if (currentPage === 1) {
       setAccumulatedPayables(rawPayables);
     } else {

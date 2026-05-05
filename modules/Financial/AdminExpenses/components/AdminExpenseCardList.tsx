@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { FinancialRecord } from '../../types';
-import { DollarSign, Calendar, User, Tag, Clock, CheckCircle2, AlertCircle, ChevronRight, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
+import { DollarSign, Calendar, User, Tag, Clock, CheckCircle2, AlertCircle, ChevronRight, MoreHorizontal, Edit, Trash2, Landmark } from 'lucide-react';
 import { getCategoryIcon } from '../../../../services/expenseCategoryService';
 
 interface Props {
@@ -33,7 +33,7 @@ const AdminExpenseCardList: React.FC<Props> = ({ records, onSelect, onEdit, onDe
   const sortedRecords = [...records].sort((a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime());
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 p-1">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 p-1">
       {sortedRecords.map((record) => {
         const status = getStatusInfo(record.status);
         const StatusIcon = status.icon;
@@ -49,18 +49,20 @@ const AdminExpenseCardList: React.FC<Props> = ({ records, onSelect, onEdit, onDe
             onClick={() => onSelect(record)}
             className="group relative bg-white rounded-[2rem] border-2 border-slate-100 p-6 transition-all hover:border-slate-300 hover:shadow-xl hover:shadow-slate-200/50 cursor-pointer overflow-hidden"
           >
-            {/* Status Badge */}
-            <div className={`absolute top-6 right-6 flex items-center gap-1.5 px-3 py-1 rounded-full border ${status.color}`}>
-               <StatusIcon size={12} className="stroke-[3]" />
-               <span className="text-[10px] font-black uppercase tracking-widest">{status.label}</span>
+            {/* Status Badge - Top Left */}
+            <div className="mb-4">
+              <div className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full border ${status.color}`}>
+                <StatusIcon size={10} className="stroke-[3]" />
+                <span className="text-[9px] font-black uppercase tracking-widest">{status.label}</span>
+              </div>
             </div>
 
-            {/* Header: Category & Icon */}
-            <div className="flex items-center gap-4 mb-6">
-              <div className="p-3 bg-slate-50 rounded-2xl text-slate-400 group-hover:bg-slate-900 group-hover:text-white transition-colors">
+            {/* Header: Icon, Category/Description */}
+            <div className="flex items-start gap-4 mb-6">
+              <div className="p-3 bg-slate-50 rounded-2xl text-slate-400 group-hover:bg-slate-900 group-hover:text-white transition-colors shrink-0">
                 <Icon size={20} />
               </div>
-              <div>
+              <div className="flex-1 min-w-0">
                 <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest leading-none block mb-1">
                   {record.category}
                 </span>
@@ -69,7 +71,7 @@ const AdminExpenseCardList: React.FC<Props> = ({ records, onSelect, onEdit, onDe
             </div>
 
             {/* Main Info */}
-            <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-5 mb-6">
               <div className="flex flex-col">
                 <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1.5 flex items-center gap-1">
                   <Calendar size={10} /> Vencimento
@@ -82,11 +84,25 @@ const AdminExpenseCardList: React.FC<Props> = ({ records, onSelect, onEdit, onDe
                 </span>
                 <span className="text-lg font-black text-slate-900 leading-none">{currency(record.originalValue)}</span>
               </div>
+              <div className="flex flex-col">
+                <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1.5 flex items-center gap-1">
+                  <Clock size={10} /> Lançamento
+                </span>
+                <span className="text-[11px] font-bold text-slate-500">{date(record.issueDate)}</span>
+              </div>
+              {record.bankAccount && (
+                <div className="flex flex-col items-end">
+                  <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1.5 flex items-center gap-1">
+                    <Landmark size={10} /> Conta Saída
+                  </span>
+                  <span className="text-[11px] font-bold text-slate-600 truncate max-w-full">{record.bankAccount}</span>
+                </div>
+              )}
             </div>
 
             {/* Entity/Provider */}
             <div className="pt-5 border-t border-slate-100 flex items-center justify-between">
-              <div className="flex items-center gap-2 max-w-[60%]">
+              <div className="flex items-center gap-2 max-w-[50%]">
                 <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center">
                   <User size={12} className="text-slate-400" />
                 </div>

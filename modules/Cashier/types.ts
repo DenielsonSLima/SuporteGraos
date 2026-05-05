@@ -85,3 +85,22 @@ export interface CashierReport {
     future_receivables: number;
   };
 }
+
+export interface CategoryStats {
+  total_mes: number;
+  pago_mes: number;
+  pendente_global: number;
+}
+
+export interface CashierModularStats {
+  compras: CategoryStats;
+  fretes: CategoryStats;
+  comissoes: CategoryStats;
+  despesas_fixas: CategoryStats;
+  despesas_variaveis: CategoryStats;
+  despesas_administrativas: CategoryStats;
+  emprestimos_tomados: CategoryStats;
+  emprestimos_cedidos: CategoryStats;
+  socios: CategoryStats;
+  receitas: CategoryStats;
+}

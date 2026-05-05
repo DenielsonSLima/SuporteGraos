@@ -74,6 +74,23 @@ export const formatInteger = (value: number | null | undefined): string => {
 };
 
 /**
+ * 😷 Funções de Máscara para Inputs (Centavos Automáticos)
+ */
+
+export const formatCurrencyMask = (val: number | undefined | null): string => {
+  if (val === undefined || val === null || isNaN(val)) return '0,00';
+  return new Intl.NumberFormat('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(val);
+};
+
+export const parseCurrencyInput = (value: string): number => {
+  const digits = value.replace(/\D/g, '');
+  return digits ? parseInt(digits) / 100 : 0;
+};
+
+/**
  * Formatador de datas
  */
 export const formatDate = (date: string | Date): string => {

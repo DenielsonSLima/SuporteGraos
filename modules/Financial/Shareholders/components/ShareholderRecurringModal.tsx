@@ -73,13 +73,16 @@ const ShareholderRecurringModal: React.FC<Props> = ({ isOpen, onClose, onConfirm
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Valor do Crédito (Mensal)</label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">R$</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-black text-xs">R$</span>
                 <input 
-                  type="number" step="0.01" 
-                  value={amount}
-                  onChange={e => setAmount(e.target.value)}
+                  type="text" inputMode="numeric"
+                  value={new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(amount) || 0)}
+                  onChange={e => {
+                    const digits = e.target.value.replace(/\D/g, '');
+                    setAmount((Number(digits) / 100).toString());
+                  }}
                   disabled={!active}
-                  className="w-full pl-9 pr-3 py-3 border-2 border-slate-200 rounded-xl bg-white focus:border-indigo-500 focus:outline-none font-black text-lg text-indigo-900 disabled:bg-slate-50 disabled:text-slate-400"
+                  className="w-full pl-9 pr-3 py-3 border-2 border-slate-200 rounded-xl bg-white focus:border-indigo-500 focus:outline-none font-black text-lg text-indigo-900 disabled:bg-slate-50 disabled:text-slate-400 text-right"
                   placeholder="0,00"
                 />
               </div>

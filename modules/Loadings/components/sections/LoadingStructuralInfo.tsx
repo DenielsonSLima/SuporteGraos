@@ -2,6 +2,7 @@
 import React from 'react';
 import { Truck, ShoppingBag, ArrowRightLeft, MapPin } from 'lucide-react';
 import { Loading } from '../../types';
+import { formatCurrencyMask, parseCurrencyInput } from '../../../../utils/formatters';
 
 interface Props {
     editForm: Loading;
@@ -40,7 +41,13 @@ const LoadingStructuralInfo: React.FC<Props> = ({
                         <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 shadow-inner">
                             <span className={labelClass}>Preço Compra (R$/SC)</span>
                             {isEditing ? (
-                                <input type="number" step="0.01" className={inputClass} value={editForm.purchasePricePerSc} onChange={e => onUpdateForm({ purchasePricePerSc: parseFloat(e.target.value) })} />
+                                <input 
+                                    type="text" 
+                                    inputMode="numeric" 
+                                    className={`${inputClass} text-right`} 
+                                    value={formatCurrencyMask(editForm.purchasePricePerSc)} 
+                                    onChange={e => onUpdateForm({ purchasePricePerSc: parseCurrencyInput(e.target.value) })} 
+                                />
                             ) : (
                                 <p className="font-black text-slate-800 text-base tracking-tighter">{currency(editForm.purchasePricePerSc)}</p>
                             )}
@@ -113,7 +120,13 @@ const LoadingStructuralInfo: React.FC<Props> = ({
                             </div>
                             <div>
                                 <label className={labelClass}>Preço Venda (R$/SC)</label>
-                                <input type="number" step="0.01" className={inputClass} value={editForm.salesPrice} onChange={e => onUpdateForm({ salesPrice: parseFloat(e.target.value) })} />
+                                <input 
+                                    type="text" 
+                                    inputMode="numeric" 
+                                    className={`${inputClass} text-right`} 
+                                    value={formatCurrencyMask(editForm.salesPrice)} 
+                                    onChange={e => onUpdateForm({ salesPrice: parseCurrencyInput(e.target.value) })} 
+                                />
                             </div>
                             {isQuickRedirecting && !isEditing && (
                                 <button onClick={onConfirmRedirect} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-xl font-black text-[10px] uppercase shadow-md flex items-center justify-center gap-2 transition-all active:scale-95">
@@ -156,11 +169,12 @@ const LoadingStructuralInfo: React.FC<Props> = ({
                                 <div className="relative">
                                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-black text-indigo-400">R$</span>
                                     <input
-                                        type="number" step="0.01"
-                                        className="bg-white border-2 border-indigo-600/20 rounded-2xl pl-11 pr-4 py-3 font-black text-2xl text-slate-950 focus:outline-none focus:border-indigo-500 transition-all w-56 shadow-2xl"
+                                        type="text" 
+                                        inputMode="numeric"
+                                        className="bg-white border-2 border-indigo-600/20 rounded-2xl pl-11 pr-4 py-3 font-black text-2xl text-slate-950 focus:outline-none focus:border-indigo-500 transition-all w-56 shadow-2xl text-right"
                                         placeholder="0,00"
-                                        value={editForm.redirectDisplacementValue || ''}
-                                        onChange={e => onUpdateForm({ redirectDisplacementValue: parseFloat(e.target.value) || 0 })}
+                                        value={formatCurrencyMask(editForm.redirectDisplacementValue)}
+                                        onChange={e => onUpdateForm({ redirectDisplacementValue: parseCurrencyInput(e.target.value) })}
                                     />
                                 </div>
                             </div>

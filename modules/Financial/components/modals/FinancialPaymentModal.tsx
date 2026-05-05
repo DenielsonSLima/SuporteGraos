@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { X, DollarSign, Calendar, Wallet, FileText, CheckCircle2, ArrowDown, MinusCircle, Calculator, TrendingUp } from 'lucide-react';
+import { X, DollarSign, Calendar, Wallet, FileText, CheckCircle2, ArrowDown, MinusCircle, Calculator, TrendingUp, RefreshCw } from 'lucide-react';
 import ModalPortal from '../../../../components/ui/ModalPortal';
 import { FinancialRecord } from '../../types';
 import type { Account } from '../../../../services/accountsService';
@@ -27,7 +27,7 @@ interface Props {
   bulkCount?: number;
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (data: PaymentData) => void;
+  onConfirm: (data: PaymentData) => Promise<void> | void;
   initialData?: any;
 }
 
@@ -49,6 +49,7 @@ const FinancialPaymentModal: React.FC<Props> = ({ record, bulkTotal, bulkCount, 
   const [date, setDate] = useState(getLocalDateString());
   const [accountId, setAccountId] = useState('');
   const [notes, setNotes] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const debtTotal = bulkTotal || (record ? (record.remainingValue || 0) : 0);
   const isReceipt = record?.subType === 'sales_order' || record?.subType === 'receipt' || record?.category === 'Venda de Ativo';
@@ -89,23 +90,31 @@ const FinancialPaymentModal: React.FC<Props> = ({ record, bulkTotal, bulkCount, 
     setDisplayDiscount(formatBRL(num));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (numericAmount <= 0 && numericDiscount <= 0) return addToast('warning', 'Atenção', 'Informe um valor.');
     if (numericAmount > 0 && !accountId) return addToast('warning', 'Conta Obrigatória', 'Selecione uma conta bancária.');
 
-    const selectedAccount = bankAccounts.find(a => a.id === accountId);
-    onConfirm({
-      date,
-      amount: numericAmount,
-      discount: numericDiscount,
-      accountId: accountId || 'discount_virtual',
-      accountName: selectedAccount?.account_name || 'ABATIMENTO',
-      notes,
-      isAsset: false,
-      assetName: '',
-      entityName: record?.entityName
-    });
+    setIsSubmitting(true);
+    try {
+      const selectedAccount = bankAccounts.find(a => a.id === accountId);
+      await onConfirm({
+        date,
+        amount: numericAmount,
+        discount: numericDiscount,
+        accountId: accountId || 'discount_virtual',
+        accountName: selectedAccount?.account_name || 'ABATIMENTO',
+        notes,
+        isAsset: false,
+        assetName: '',
+        entityName: record?.entityName
+      });
+    } catch (err) {
+      console.error('[FinancialPaymentModal] Submission error:', err);
+      // isSubmitting stays false on error so user can retry
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const labelClass = 'block text-[10px] font-black text-slate-400 uppercase mb-1.5 tracking-widest ml-1';
@@ -172,9 +181,20 @@ const FinancialPaymentModal: React.FC<Props> = ({ record, bulkTotal, bulkCount, 
             </div>
 
             <div className="pt-4 flex justify-end gap-3">
-              <button type="button" onClick={onClose} className="px-8 py-4 border-2 border-slate-100 rounded-2xl text-slate-500 font-black text-xs uppercase tracking-widest hover:bg-slate-50 transition-all">Cancelar</button>
-              <button type="submit" className={`px-10 py-4 rounded-2xl text-white font-black shadow-xl flex items-center justify-center gap-3 text-xs uppercase tracking-widest transition-all active:scale-95 ${isReceipt ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200' : 'bg-rose-600 hover:bg-rose-700 shadow-rose-200'}`}>
-                Efetivar Baixa Financeira
+              <button type="button" onClick={onClose} disabled={isSubmitting} className="px-8 py-4 border-2 border-slate-100 rounded-2xl text-slate-500 font-black text-xs uppercase tracking-widest hover:bg-slate-50 transition-all disabled:opacity-50">Cancelar</button>
+              <button 
+                type="submit" 
+                disabled={isSubmitting}
+                className={`px-10 py-4 rounded-2xl text-white font-black shadow-xl flex items-center justify-center gap-3 text-xs uppercase tracking-widest transition-all active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed ${isReceipt ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200' : 'bg-rose-600 hover:bg-rose-700 shadow-rose-200'}`}
+              >
+                {isSubmitting ? (
+                  <>
+                    <RefreshCw className="animate-spin" size={16} />
+                    Processando...
+                  </>
+                ) : (
+                  'Efetivar Baixa Financeira'
+                )}
               </button>
             </div>
           </form>

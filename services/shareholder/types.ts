@@ -4,7 +4,9 @@ export interface ShareholderTransaction {
   type: 'credit' | 'debit'; // Credit = Pro Labore, Debit = Withdrawal
   value: number;
   description: string;
-  accountId?: string; // If debit, which bank account paid it
+  accountId?: string; // ID da conta bancária (se houver reflexo financeiro)
+  bankAccountId?: string; // UUID da conta bancária (persistência)
+  accountName?: string; // Nome legível da conta bancária
 }
 
 export interface ShareholderRecurrence {

@@ -45,7 +45,8 @@ function toAdvanceTransaction(adv: Advance, partners: Partner[]): AdvanceTransac
 const AdvancesTab: React.FC = () => {
   const { addToast } = useToast();
   const { data: advances = [] } = useAdvances();
-  const { data: partnersResult } = usePartners({ page: 1, pageSize: 2000 });
+  const partnersParams = useMemo(() => ({ page: 1, pageSize: 2000 }), []);
+  const { data: partnersResult } = usePartners(partnersParams);
   const partners: Partner[] = partnersResult?.data || [];
   const { handleSaveAdvance, handleConfirmSettle } = useAdvancesOperations({ addToast });
 

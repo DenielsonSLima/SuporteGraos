@@ -86,31 +86,20 @@ export const addTransaction = async (shareholderId: string, tx: Omit<Shareholder
   const { data: profile } = await supabase.from('app_users').select('company_id').eq('auth_user_id', authUser.id).single();
   if (!profile?.company_id) throw new Error('Usuário sem empresa vinculada');
 
-  const { data: txRow, error: txErr } = await supabase.from('shareholder_transactions').insert({
-    company_id: profile.company_id,
-    shareholder_id: shareholderId,
-    date: tx.date,
-    type: tx.type,
-    value: tx.value,
-    description: tx.description || '',
-    account_name: tx.accountId ?? null,
-  }).select().single();
+  const { data, error } = await supabase.rpc('rpc_ops_shareholder_transaction_add_v2', {
+    p_company_id: profile.company_id,
+    p_shareholder_id: shareholderId,
+    p_date: tx.date,
+    p_type: tx.type,
+    p_value: tx.value,
+    p_description: tx.description || '',
+    p_bank_account_id: tx.bankAccountId || tx.accountId || null,
+    p_account_name: tx.accountName || null
+  });
 
-  if (txErr) throw new Error(`Erro ao registrar transação: ${txErr.message}`);
+  if (error) throw new Error(`Erro ao registrar transação: ${error.message}`);
+  if (!data?.success) throw new Error(data?.error || 'Erro desconhecido ao processar transação');
 
-  if (tx.accountId) {
-    try {
-      const { handleShareholderPayment, resolveAccountLabel } = await import('../financial/paymentOrchestrator');
-      const shareholder = db.getById(shareholderId);
-      await handleShareholderPayment(shareholderId, {
-        date: tx.date, amount: tx.value, discount: 0,
-        accountId: tx.accountId, accountName: resolveAccountLabel(tx.accountId),
-        entityName: shareholder?.name || 'Sócio', notes: tx.description
-      }, tx.type, (txRow as any).id);
-    } catch (err) { console.warn('Sync gap:', err); }
-  }
-
-  await _recalcBalance(shareholderId);
   await loadFromSupabase();
   invalidateDashboardCache();
 };
@@ -123,22 +112,24 @@ export const updateTransaction = async (shareholderId: string, tx: ShareholderTr
   
   const { error } = await supabase.from('shareholder_transactions').update({
     date: tx.date, type: tx.type, value: tx.value,
-    description: tx.description || '', account_name: tx.accountId ?? null,
+    description: tx.description || '', 
+    account_name: tx.accountName || null,
+    bank_account_id: tx.bankAccountId || tx.accountId || null,
   }).eq('id', tx.id);
   
   if (error) throw error;
 
-  if (tx.accountId) {
+  const targetAccountId = tx.bankAccountId || tx.accountId;
+  if (targetAccountId) {
     const { handleShareholderPayment, resolveAccountLabel } = await import('../financial/paymentOrchestrator');
     const shareholder = db.getById(shareholderId);
     await handleShareholderPayment(shareholderId, {
       date: tx.date, amount: tx.value, discount: 0,
-      accountId: tx.accountId, accountName: resolveAccountLabel(tx.accountId),
+      accountId: targetAccountId, accountName: tx.accountName || resolveAccountLabel(targetAccountId),
       entityName: shareholder?.name || 'Sócio', notes: `(Editado) ${tx.description}`
     }, tx.type, tx.id);
   }
 
-  await _recalcBalance(shareholderId);
   await loadFromSupabase();
   invalidateDashboardCache();
 };
@@ -150,7 +141,6 @@ export const deleteTransaction = async (shareholderId: string, txId: string): Pr
   const { error } = await supabase.from('shareholder_transactions').delete().eq('id', txId);
   if (error) throw error;
 
-  await _recalcBalance(shareholderId);
   await loadFromSupabase();
   invalidateDashboardCache();
 };

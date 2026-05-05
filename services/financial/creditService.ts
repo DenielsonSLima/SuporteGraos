@@ -185,7 +185,7 @@ export const loadFromSupabase = async (): Promise<FinancialRecord[]> => {
         .from('financial_entries')
         .select('*')
         .eq('origin_type', 'credit')
-        .neq('status', 'cancelled')
+        .not('status', 'in', '("cancelled", "reversed")')
         .order('created_date', { ascending: false });
 
       if (error) {
@@ -524,7 +524,7 @@ export const remove = async (id: string): Promise<boolean> => {
       await supabase.from('financial_entries')
         .update({ status: 'reversed', description: `[ESTORNO] ${id}` })
         .eq('origin_id', id)
-        .eq('origin_type', 'loan');
+        .eq('origin_type', 'credit');
     } catch (err) {
     }
 
@@ -611,7 +611,10 @@ export const calculateTotalValue = (
  */
 export const getCredits = (): FinancialRecord[] => {
   const all = db.getAll() || [];
-  return all.filter(c => ['credit_income', 'investment'].includes(c.subType || '') && c.status !== 'cancelled');
+  return all.filter(c => 
+    ['credit_income', 'investment'].includes(c.subType || '') && 
+    !['cancelled', 'reversed'].includes(c.status || '')
+  );
 };
 
 /**

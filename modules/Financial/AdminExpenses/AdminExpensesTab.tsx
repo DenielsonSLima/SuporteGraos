@@ -1,7 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
 import { Plus, Search, Filter, Calendar, Tag, Layers } from 'lucide-react';
-import AdminExpenseGroupedList from './components/AdminExpenseGroupedList';
 import AdminExpenseCardList from './components/AdminExpenseCardList';
 import AdminExpenseQuickView from './components/AdminExpenseQuickView';
 import InstallmentExpenseForm from './components/InstallmentExpenseForm';
@@ -15,6 +14,7 @@ import ActionConfirmationModal from '../../../components/ui/ActionConfirmationMo
 import { useToast } from '../../../contexts/ToastContext';
 import type { ExpenseCategory } from '../../../services/expenseCategoryService';
 import { useAdminExpenseOperations } from './hooks/useAdminExpenseOperations';
+import { useBankAccounts } from '../../../hooks/useBankAccounts';
 
 // Lookup: subcategory_id → { name, type, parentId }
 function buildCategoryLookup(cats: ExpenseCategory[]): Map<string, { name: string; type: string; parentId: string }> {
@@ -31,7 +31,11 @@ function buildCategoryLookup(cats: ExpenseCategory[]): Map<string, { name: strin
 }
 
 // Adapter: AdminExpense (DB) → FinancialRecord (UI)
-function toFinancialRecord(exp: AdminExpense, catLookup: Map<string, { name: string; type: string; parentId: string }>): FinancialRecord {
+function toFinancialRecord(
+  exp: AdminExpense, 
+  catLookup: Map<string, { name: string; type: string; parentId: string }>,
+  bankMap: Map<string, string>
+): FinancialRecord {
   const catInfo = catLookup.get(exp.category_id);
   
   // Tenta recuperar o nome da subcategoria da descrição se estiver no formato "Subcategoria: Descrição"
@@ -63,6 +67,7 @@ function toFinancialRecord(exp: AdminExpense, catLookup: Map<string, { name: str
     remainingValue: exp.status === 'paid' ? 0 : exp.amount,
     status: exp.status === 'open' ? 'pending' : exp.status === 'paid' ? 'paid' : 'pending',
     subType: 'admin',
+    bankAccount: exp.account_id ? bankMap.get(exp.account_id) : undefined,
     notes: '',
   };
 }
@@ -71,10 +76,18 @@ const AdminExpensesTab: React.FC = () => {
   const { addToast } = useToast();
   const { data: adminExpenses = [] } = useAdminExpenses();
   const { data: expenseCategories = [] } = useExpenseCategories();
+  const { data: bankAccounts = [] } = useBankAccounts();
   const { createExpense, payExpense, deleteExpense, updateExpense, reversePayment, refreshData } = useAdminExpenseOperations();
 
   const catLookup = useMemo(() => buildCategoryLookup(expenseCategories), [expenseCategories]);
-  const records = useMemo(() => adminExpenses.map(e => toFinancialRecord(e, catLookup)), [adminExpenses, catLookup]);
+  
+  const bankMap = useMemo(() => {
+    const map = new Map<string, string>();
+    bankAccounts.forEach(b => map.set(b.id, b.bankName));
+    return map;
+  }, [bankAccounts]);
+
+  const records = useMemo(() => adminExpenses.map(e => toFinancialRecord(e, catLookup, bankMap)), [adminExpenses, catLookup, bankMap]);
 
   const categories = useMemo(() => {
     return expenseCategories
@@ -268,8 +281,46 @@ const AdminExpensesTab: React.FC = () => {
     const total = filteredRecords.reduce((acc, r) => acc + r.originalValue, 0);
     const paid = filteredRecords.reduce((acc, r) => acc + r.paidValue, 0);
     const pending = total - paid;
-    return { total, paid, pending };
-  }, [filteredRecords]);
+
+    // Totais por tipo
+    const fixed = filteredRecords
+      .filter(r => (categoryTypeMap.get(r.category) || 'custom') === 'fixed')
+      .reduce((acc, r) => acc + r.originalValue, 0);
+    
+    const administrative = filteredRecords
+      .filter(r => (categoryTypeMap.get(r.category) || 'custom') === 'administrative')
+      .reduce((acc, r) => acc + r.originalValue, 0);
+    
+    const variable = filteredRecords
+      .filter(r => (categoryTypeMap.get(r.category) || 'custom') === 'variable')
+      .reduce((acc, r) => acc + r.originalValue, 0);
+
+    return { total, paid, pending, fixed, administrative, variable };
+  }, [filteredRecords, categoryTypeMap]);
+
+  const groupedRecords = useMemo(() => {
+    const groups: Record<string, { title: string; type: string; total: number; records: FinancialRecord[] }> = {
+      fixed: { title: 'Despesas Fixas', type: 'fixed', total: 0, records: [] },
+      administrative: { title: 'Despesas Administrativas', type: 'administrative', total: 0, records: [] },
+      variable: { title: 'Despesas Variáveis', type: 'variable', total: 0, records: [] },
+      custom: { title: 'Outras Despesas', type: 'custom', total: 0, records: [] }
+    };
+
+    filteredRecords.forEach(r => {
+      const type = categoryTypeMap.get(r.category) || 'custom';
+      if (groups[type]) {
+        groups[type].records.push(r);
+        groups[type].total += r.originalValue;
+      } else {
+        groups['custom'].records.push(r);
+        groups['custom'].total += r.originalValue;
+      }
+    });
+
+    return Object.values(groups).filter(g => g.records.length > 0);
+  }, [filteredRecords, categoryTypeMap]);
+
+  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -388,14 +439,40 @@ const AdminExpensesTab: React.FC = () => {
       </div>
 
       {/* CONTENT AREA */}
-      <div>
-        <AdminExpenseCardList
-          records={filteredRecords}
-          onSelect={handleOpenQuickView}
-          onPay={handleOpenPayment}
-          onEdit={handleEditRecord}
-          onDelete={handleDeleteRecord}
-        />
+      <div className="space-y-12">
+        {groupedRecords.map(group => (
+          <div key={group.type} className="space-y-6">
+            <div className="flex items-center gap-4">
+              <div className={`h-8 w-1.5 rounded-full ${
+                group.type === 'fixed' ? 'bg-blue-600' : 
+                group.type === 'administrative' ? 'bg-slate-600' : 
+                group.type === 'variable' ? 'bg-amber-600' : 'bg-slate-400'
+              }`} />
+              <div className="flex flex-col">
+                <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">{group.title}</h2>
+                <span className="text-sm font-bold text-slate-500">Total desta categoria: {currency(group.total)}</span>
+              </div>
+            </div>
+            
+            <AdminExpenseCardList
+              records={group.records}
+              onSelect={handleOpenQuickView}
+              onPay={handleOpenPayment}
+              onEdit={handleEditRecord}
+              onDelete={handleDeleteRecord}
+            />
+          </div>
+        ))}
+
+        {groupedRecords.length === 0 && (
+          <div className="text-center py-20 bg-slate-50 rounded-[3rem] border-2 border-dashed border-slate-200">
+            <div className="p-4 bg-white rounded-2xl shadow-sm inline-block mb-4 text-slate-300">
+              <Layers size={40} />
+            </div>
+            <h3 className="text-lg font-bold text-slate-800">Nenhuma despesa encontrada</h3>
+            <p className="text-slate-500 text-sm">Tente ajustar seus filtros para encontrar o que procura.</p>
+          </div>
+        )}
       </div>
 
       <AdminExpenseQuickView

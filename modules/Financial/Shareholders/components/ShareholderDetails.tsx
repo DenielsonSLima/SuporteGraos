@@ -117,7 +117,8 @@ const ShareholderDetails: React.FC<Props> = ({ shareholder: initialShareholder, 
             date: data.date,
             value: data.amount,
             description: data.notes || editingTx.description,
-            accountId: data.accountId
+            bankAccountId: data.accountId,
+            accountName: data.accountName
         }
     });
 
@@ -298,10 +299,10 @@ const ShareholderDetails: React.FC<Props> = ({ shareholder: initialShareholder, 
                         <td className="px-6 py-4 font-medium text-slate-700">
                           <div className="flex flex-col gap-1">
                             <span>{t.description}</span>
-                            {t.accountId && (
+                            {t.accountName && (
                               <span className="text-[10px] font-normal text-slate-400 flex items-center gap-1">
                                 <Landmark size={10} />
-                                Conta: {t.accountId}
+                                Conta: {t.accountName}
                               </span>
                             )}
                           </div>
@@ -355,7 +356,7 @@ const ShareholderDetails: React.FC<Props> = ({ shareholder: initialShareholder, 
              initialData={{ // Adaptando para o modal genérico
                  date: editingTx.date,
                  value: editingTx.value,
-                 accountId: editingTx.accountId,
+                 accountId: editingTx.bankAccountId || editingTx.accountId,
                  notes: editingTx.description
              }}
           />

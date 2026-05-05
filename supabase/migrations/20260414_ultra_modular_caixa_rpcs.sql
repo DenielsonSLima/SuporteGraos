@@ -52,8 +52,9 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE OR REPLACE FUNCTION public.rpc_calc_caixa_shareholder_credits(p_company_id uuid)
 RETURNS numeric AS $$
 BEGIN
+  -- HAVERES: Empresa tem a receber do sócio (Saldo Negativo)
   RETURN COALESCE((
-    SELECT SUM(CASE WHEN current_balance > 0 THEN current_balance ELSE 0 END) 
+    SELECT SUM(CASE WHEN current_balance < 0 THEN ABS(current_balance) ELSE 0 END) 
     FROM public.shareholders 
     WHERE company_id = p_company_id
   ), 0);
@@ -155,8 +156,9 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE OR REPLACE FUNCTION public.rpc_calc_caixa_shareholder_debts(p_company_id uuid)
 RETURNS numeric AS $$
 BEGIN
+  -- OBRIGAÇÕES: Empresa deve ao sócio (Saldo Positivo)
   RETURN COALESCE((
-    SELECT SUM(CASE WHEN current_balance < 0 THEN ABS(current_balance) ELSE 0 END) 
+    SELECT SUM(CASE WHEN current_balance > 0 THEN current_balance ELSE 0 END) 
     FROM public.shareholders 
     WHERE company_id = p_company_id
   ), 0);

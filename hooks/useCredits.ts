@@ -42,6 +42,29 @@ export const useCredits = () => {
   });
 };
 
+export const useCreditSummary = (startDate?: string, endDate?: string) => {
+  return useQuery({
+    queryKey: ['credits', 'summary', startDate, endDate],
+    queryFn: async () => {
+      const { data: companyId } = await supabase.rpc('get_my_company_id');
+      
+      // Se não houver datas, usa o mês atual como padrão
+      const today = new Date();
+      const start = startDate || new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+      const end = endDate || new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0];
+
+      const { data, error } = await supabase.rpc('rpc_get_standalone_credits_total', {
+        p_company_id: companyId,
+        p_start_date: start,
+        p_end_date: end
+      });
+      if (error) throw error;
+      return Number(data || 0);
+    },
+    staleTime: STALE_TIMES.DYNAMIC,
+  });
+};
+
 interface CreateCreditParams {
   description: string;
   amount: number;
@@ -99,6 +122,7 @@ export const useCreateCredit = () => {
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CREDITS }),
+        queryClient.invalidateQueries({ queryKey: ['credits', 'summary'] }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.TOTAL_BALANCE }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT }),
@@ -113,12 +137,13 @@ export const useUpdateCredit = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: { description: string; amount: number; date: string } }) => {
+    mutationFn: async ({ id, data }: { id: string; data: { description: string; amount: number; date: string; accountId?: string } }) => {
       const result = await creditService.update(id, {
         description: data.description,
         originalValue: data.amount,
         dueDate: data.date,
         issueDate: data.date,
+        bankAccount: data.accountId,
       });
       if (!result) throw new Error('Falha ao atualizar crédito');
       return result;
@@ -126,6 +151,7 @@ export const useUpdateCredit = () => {
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CREDITS }),
+        queryClient.invalidateQueries({ queryKey: ['credits', 'summary'] }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.TOTAL_BALANCE }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT }),

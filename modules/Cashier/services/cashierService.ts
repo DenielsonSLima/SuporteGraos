@@ -10,7 +10,7 @@
  *      services de persistência enquanto não são migrados para SQL.
  */
 
-import { CashierReport, BankBalance, AccountInitialBalance } from '../types';
+import { CashierReport, BankBalance, AccountInitialBalance, CashierModularStats } from '../types';
 import { cashierReportService } from '../../../services/cashierReportService';
 import { historyService, snapshotService } from './cashier-history';
 import { supabase } from '../../../services/supabase';
@@ -106,6 +106,25 @@ export const cashierService = {
       expenseDistribution: sqlData?.expenseDistribution || { purchases: 0, freight: 0, expenses: 0, others: 0 },
       revenueDistribution: sqlData?.revenueDistribution || { opening_receivables: 0, future_receivables: 0 },
     };
+  },
+
+  /**
+   * Estatísticas modulares por categoria (Compras, Fretes, Despesas, etc.)
+   * ASYNC — RPC server-side.
+   */
+  getModularStats: async (referenceDate?: string): Promise<CashierModularStats> => {
+    const { data: company_id } = await supabase.rpc('get_my_company_id');
+    const { data, error } = await supabase.rpc('rpc_get_caixa_modular_stats', { 
+      p_company_id: company_id,
+      p_reference_date: referenceDate || new Date().toISOString().split('T')[0]
+    });
+
+    if (error) {
+      console.error('[getModularStats] Error:', error);
+      throw error;
+    }
+
+    return data as CashierModularStats;
   },
 
   getHistory: async (): Promise<CashierReport[]> => {

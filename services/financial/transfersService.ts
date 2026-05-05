@@ -42,7 +42,7 @@ const mapToDb = (item: Transfer) => ({
   description: item.description,
   notes: item.notes || null,
   company_id: item.companyId || authService.getCurrentUser()?.companyId || null,
-  created_by: authService.getCurrentUser()?.id || null
+  created_by: authService.getCurrentUser()?.appUserId || null
 });
 
 const mapFromDb = (row: any): Transfer => ({
@@ -225,7 +225,7 @@ export const transfersService = {
       p_transfer_date: item.transferDate,
       p_description: item.description,
       p_notes: item.notes || null,
-      p_created_by: user.id
+      p_created_by: user.appUserId || null
     });
 
     if (error) {
