@@ -73,8 +73,10 @@ export const handleFreightPayment = async (
   }
 
   // 4. Registro de Histórico (Compatibilidade de UI)
+  const realTxId = (result as any)?.transaction_id || txId;
+
   await registerFinancialRecords({
-    txId,
+    txId: realTxId,
     date: data.date,
     amount: data.amount,
     discount: data.discount || 0,
@@ -91,5 +93,5 @@ export const handleFreightPayment = async (
     notes: data.notes
   });
 
-  return { success: true, txId };
+  return { success: true, txId: realTxId };
 };

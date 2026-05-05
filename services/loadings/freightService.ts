@@ -50,9 +50,12 @@ export const freightService = {
 
     if (!result.success) throw new Error('Falha ao processar pagamento no financeiro');
 
+    // ✅ Usar o ID real gerado pelo banco/RPC (Truth from DB)
+    const realTxId = result.txId || txId;
+
     // 2. Atualizar Carregamento Local
     const newTx = {
-      id: txId,
+      id: realTxId,
       date: data.date,
       value: data.amount,
       discountValue: data.discount || 0,
@@ -65,7 +68,7 @@ export const freightService = {
     const updatedLoading = {
       ...loading,
       freightPaid: (loading.freightPaid || 0) + data.amount,
-      transactions: [newTx, ...(loading.transactions || []).filter(t => t.id !== txId)]
+      transactions: [newTx, ...(loading.transactions || []).filter(t => t.id !== txId && t.id !== realTxId)]
     };
 
     // Persiste atualização no Supabase para sincronização

@@ -225,9 +225,19 @@ export const financialActionService = {
     // 1. Delete from standalone by reference (replaces hist- and adjust- legacy logic)
     await standaloneRecordsService.deleteByRef(originTxId);
 
-    // 2. Reverter transações financeiras (ledger imutável, sem delete)
-    const { financialTransactionService } = await import('./financial/financialTransactionService');
-    await financialTransactionService.deleteByOrigin(originTxId);
+    // 2. Reverter transações financeiras (usando orquestrador para garantir cascade em OPS)
+    const { removeFinancialTransaction } = await import('./financial/paymentOrchestrator');
+    
+    // Tenta primeiro como UUID real
+    const isValidUUID = (val: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+    
+    if (isValidUUID(originTxId)) {
+      await removeFinancialTransaction(originTxId);
+    } else {
+      // Fallback para delete por origem (legado)
+      const { financialTransactionService } = await import('./financial/financialTransactionService');
+      await financialTransactionService.deleteByOrigin(originTxId);
+    }
   },
 
   addTransfer: (transfer: TransferRecord) => addTransfer(transfer),

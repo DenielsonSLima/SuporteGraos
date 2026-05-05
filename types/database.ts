@@ -12,12 +12,12 @@ export type Loan = Tables<'loans'>;
 export type Shareholder = Tables<'shareholders'>;
 export type ShareholderTransaction = Tables<'shareholder_transactions'>;
 
-export type PurchaseOrder = Tables<'purchase_orders'>;
-export type SalesOrder = Tables<'sales_orders'>;
-export type Loading = Tables<'logistics_loadings'>;
+export type PurchaseOrder = Tables<'ops_purchase_orders'>;
+export type SalesOrder = Tables<'ops_sales_orders'>;
+export type Loading = Tables<'ops_loadings'>;
 
-export type BankAccount = Tables<'contas_bancarias'>;
-export type StandaloneRecord = Tables<'standalone_records'>;
+export type BankAccount = Tables<'accounts'>;
+export type StandaloneRecord = Tables<'financial_entries'>;
 
 // Enums / Status literals
 export type FinancialEntryType = 'payable' | 'receivable';

@@ -294,11 +294,11 @@ export const financialTransactionService = {
             }
         }
 
-        // 2. Fallback: Deletar via Tags na descrição (Metadados legados)
+        // 2. Fallback: Deletar via Tags na descrição ou metadata
         const { error } = await supabase
             .from('financial_transactions')
             .delete()
-            .ilike('description', `%[ORIGIN:${originId}]%`);
+            .or(`description.ilike.%[ORIGIN:${originId}]%,metadata->>tx_id.eq.${originId}`);
 
         if (error) throw error;
     },

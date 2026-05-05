@@ -210,6 +210,7 @@ const OrderDetails: React.FC<Props> = ({ order, onBack, onEdit, onDelete, onFina
           transactions={mergedTransactions}
           paidValue={stats.totalSettled}    // REATIVO: Considera pagamentos + adiantamentos + despesas parceiro
           balanceValue={stats.balancePartner} // REATIVO: Calculado a partir dos romaneios v1
+          discountValue={stats.totalAbatements}
           deliveredValue={stats.totalPurchaseVal}
           contractValue={currentOrder.totalValue}
           onAddPayment={() => setIsPayModalOpen(true)}

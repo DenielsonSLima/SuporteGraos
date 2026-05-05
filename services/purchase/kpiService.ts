@@ -51,8 +51,8 @@ export const kpiService = {
     const totalAbatements = Number(order.discountValue) || 0;
     
     // 3. Saldo (Calculado localmente apenas como reflexo do que o banco enviou)
-    const balancePartner = Math.max(0, totalPurchaseVal - totalSettled);
-    const advanceBalance = Math.max(0, totalSettled - totalPurchaseVal);
+    const balancePartner = Math.max(0, totalPurchaseVal - totalSettled - totalAbatements);
+    const advanceBalance = Math.max(0, totalSettled + totalAbatements - totalPurchaseVal);
 
     const totalCommissionDue = order.hasBroker ? totalSc * (Number(order.brokerCommissionPerSc) || 0) : 0;
 
@@ -85,9 +85,9 @@ export const kpiService = {
     return orders.reduce((acc, order) => {
       const totalContract = Number(order.totalValue) || 0;
       const totalSettled = Number(order.paidValue) || 0;
-      const totalLoaded = Number(order.totalPurchaseValCalc) || 0;
+      const totalAbatements = Number(order.discountValue) || 0;
       
-      const pendingPayment = Math.max(0, totalLoaded - totalSettled);
+      const pendingPayment = Math.max(0, totalLoaded - totalSettled - totalAbatements);
 
       return {
         totalContractValue: acc.totalContractValue + totalContract,

@@ -66,7 +66,7 @@ export const handlePurchaseOrderPayment = async (
   // - Atualização automática do status do Payable (via Trigger fn_update_entry_paid_amount)
   const { data: result, error: rpcError } = await supabase.rpc('rpc_ops_financial_process_action', {
     p_entry_id: entryId,
-    p_account_id: data.accountId,
+    p_account_id: data.accountId || null,
     p_amount: data.amount,
     p_discount: data.discount || 0,
     p_description: description,

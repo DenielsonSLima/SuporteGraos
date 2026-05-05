@@ -15,6 +15,7 @@ interface Props {
   balanceValue: number; // Saldo pendente (Backend-driven)
   deliveredValue: number; // NOVO: Valor entregue/faturado
   contractValue: number;  // NOVO: Valor total do contrato
+  discountValue?: number; // NOVO: Valor total de descontos/abatimentos
   onAddPayment: () => void;
   onAddAdvance: () => void;
   onRefresh: () => void;
@@ -28,6 +29,7 @@ const OrderFinancialCard: React.FC<Props> = ({
   balanceValue, 
   deliveredValue,
   contractValue,
+  discountValue = 0,
   onAddPayment, 
   onAddAdvance, 
   onRefresh, 
@@ -38,12 +40,11 @@ const OrderFinancialCard: React.FC<Props> = ({
 
   const financialTransactions = transactions.filter(t => t.type === 'payment' || t.type === 'advance' || t.type === 'receipt');
 
-  // Lógica de Progresso unificada com o Pedido de Venda
-  // Preferencialmente contra o que foi entregue (Liquidação Operacional)
-  // Fallback para o valor do contrato caso nada tenha sido entregue ainda
+  const settledWithDiscount = paidValue + discountValue;
+
   const progressPercent = deliveredValue > 0 
-    ? Math.min((paidValue / deliveredValue) * 100, 100)
-    : (contractValue > 0 ? Math.min((paidValue / contractValue) * 100, 100) : 0);
+    ? Math.min((settledWithDiscount / deliveredValue) * 100, 100)
+    : (contractValue > 0 ? Math.min((settledWithDiscount / contractValue) * 100, 100) : 0);
 
   const displayTotalValue = deliveredValue > 0 ? deliveredValue : contractValue;
 
@@ -104,6 +105,12 @@ const OrderFinancialCard: React.FC<Props> = ({
               Base Cálculo: <span className="text-slate-700">{formatCurrency(displayTotalValue)}</span>
               <span className="mx-2 text-slate-200">|</span>
               Total Pago: <span className="text-emerald-600">{formatCurrency(paidValue)}</span>
+              {discountValue > 0 && (
+                <>
+                  <span className="mx-2 text-slate-200">|</span>
+                  Total Abatido: <span className="text-amber-600">{formatCurrency(discountValue)}</span>
+                </>
+              )}
             </span>
           </div>
         </div>
