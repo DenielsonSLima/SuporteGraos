@@ -40,7 +40,10 @@ export function useCreateLoading() {
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_PAYABLES }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_RECEIVABLES }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_SUMMARY }),
       ]);
       dispatchGlobalEvents({ type: 'loading_created' });
     },
@@ -65,7 +68,10 @@ export function useUpdateLoading() {
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_PAYABLES }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_RECEIVABLES }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_SUMMARY }),
       ]);
       dispatchGlobalEvents({ type: 'loading_updated', loadingId: loading.id });
     },
@@ -89,7 +95,10 @@ export function useDeleteLoading() {
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_PAYABLES }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_RECEIVABLES }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_SUMMARY }),
       ]);
       dispatchGlobalEvents({ type: 'loading_deleted', loadingId });
     },
@@ -113,7 +122,10 @@ export function useSaveLoadingTransaction() {
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_PAYABLES }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_RECEIVABLES }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_SUMMARY }),
       ]);
       dispatchGlobalEvents({ type: 'freight_payment', loadingId: loading.id });
     },

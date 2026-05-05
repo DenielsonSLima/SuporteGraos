@@ -43,7 +43,8 @@ export const searchService = {
     });
 
     // 2. BUSCA EM PARCEIROS
-    partnerService.getAll().forEach(p => {
+    const allPartners = await partnerService.getAll();
+    allPartners.forEach(p => {
       if (p.name.toLowerCase().includes(query) || p.document.includes(query)) {
         results.push({
           id: p.id,
@@ -72,7 +73,8 @@ export const searchService = {
     });
 
     // 4. BUSCA EM PEDIDOS DE VENDA
-    salesService.getAll().forEach(s => {
+    const allSales = await salesService.getAll();
+    allSales.forEach(s => {
       if (s.number.toLowerCase().includes(query) || s.customerName.toLowerCase().includes(query)) {
         results.push({
           id: s.id,
@@ -101,7 +103,8 @@ export const searchService = {
     });
 
     // 6. BUSCA EM FINANCEIRO (DESCRIÇÃO E ENTIDADE)
-    financialActionService.getStandaloneRecords().forEach(r => {
+    const standaloneRecords = await financialActionService.getStandaloneRecords();
+    standaloneRecords.forEach(r => {
       if (r.description.toLowerCase().includes(query) || r.entityName.toLowerCase().includes(query)) {
         results.push({
           id: r.id,

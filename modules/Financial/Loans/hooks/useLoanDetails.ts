@@ -4,7 +4,7 @@
 // SKIL: TSX NÃO deve importar services diretamente
 // ============================================================================
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { supabase } from '../../../../services/supabase';
 import { loansService } from '../../../../services/loansService';
 import { financialActionService } from '../../../../services/financialActionService';
@@ -26,10 +26,17 @@ export function useLoanDetails({ loan, onUpdate, onBack, addToast }: UseLoanDeta
   // ─── Extrato financeiro ─────────────────────────────────
   // ─── Extrato financeiro (Legado + Canônico) ─────────────────
   const [canonicalTransactions, setCanonicalTransactions] = useState<any[]>([]);
+  const [legacyTransactions, setLegacyTransactions] = useState<any[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
-  // Busca transações canônicas via Supabase
-  const fetchCanonical = useCallback(async () => {
+  // Busca transações (Canônicas + Legado)
+  const fetchHistory = useCallback(async () => {
+    // Só ativa o loading principal se for a primeira carga para evitar "piscar" a cada refresh
+    if (canonicalTransactions.length === 0 && legacyTransactions.length === 0) {
+      setIsLoadingHistory(true);
+    }
     try {
+      // 1. BUSCA CANÔNICA (financial_transactions)
       // Primeiro buscamos os IDs das entries vinculadas ao empréstimo
       const { data: entries } = await supabase
         .from('financial_entries')
@@ -37,41 +44,35 @@ export function useLoanDetails({ loan, onUpdate, onBack, addToast }: UseLoanDeta
         .eq('origin_id', loan.id)
         .eq('origin_type', 'loan');
 
-      if (!entries || entries.length === 0) {
-        setCanonicalTransactions([]);
-        return;
+      let entryIds: string[] = [];
+      if (entries && entries.length > 0) {
+        entryIds = entries.map(e => e.id);
       }
 
-      const entryIds = entries.map(e => e.id);
-
-      // 2. BUSCA COMPLEMENTAR: Buscar transações pela descrição (para pegar as que não estão vinculadas via entry_id)
+      // Busca transações pela descrição (legado/fallback)
       const { data: keywordData } = await supabase
         .from('financial_transactions')
-        .select(`
-          id,
-          transaction_date,
-          description,
-          amount,
-          account_id,
-          type
-        `)
+        .select(`id, transaction_date, description, amount, account_id, type`)
         .ilike('description', `%${loan.id}%`);
 
-      // 3. BUSCA CANÔNICA: transações das entries
-      const { data: entryData } = await supabase
+      // Busca transações via metadata loan_id
+      const { data: metadataData } = await supabase
         .from('financial_transactions')
-        .select(`
-          id,
-          transaction_date,
-          description,
-          amount,
-          account_id,
-          type
-        `)
-        .in('entry_id', entryIds);
+        .select(`id, transaction_date, description, amount, account_id, type`)
+        .eq('metadata->>loan_id', loan.id);
+
+      // Busca transações das entries (canônico)
+      let entryData: any[] = [];
+      if (entryIds.length > 0) {
+        const { data } = await supabase
+          .from('financial_transactions')
+          .select(`id, transaction_date, description, amount, account_id, type`)
+          .in('entry_id', entryIds);
+        entryData = data || [];
+      }
 
       // Unificar sem duplicados (por ID)
-      const allData = [...(entryData || []), ...(keywordData || [])];
+      const allData = [...entryData, ...(keywordData || []), ...(metadataData || [])];
       const uniqueData = Array.from(new Map(allData.map(item => [item.id, item])).values());
 
       setCanonicalTransactions(uniqueData.map(t => ({
@@ -82,28 +83,33 @@ export function useLoanDetails({ loan, onUpdate, onBack, addToast }: UseLoanDeta
         bankAccount: t.account_id,
         subType: t.type === 'credit' ? 'receipt' : 'admin'
       })));
+
+      // 2. BUSCA LEGADO (admin_expenses)
+      const legacyRecords = await financialActionService.getStandaloneRecords();
+      const filteredLegacy = legacyRecords.filter((r: any) => {
+        const hasLoanRef = r.id?.startsWith(loan.id) || r.notes?.includes(`[ORIGIN:${loan.id}]`);
+        return hasLoanRef &&
+          ['receipt', 'admin', 'loan_taken', 'loan_granted'].includes(r.subType || '') &&
+          ((r.paidValue || 0) > 0 || (r.originalValue || 0) > 0);
+      });
+      setLegacyTransactions(filteredLegacy);
+
     } catch (err) {
-      console.error('[useLoanDetails] Failed to fetch canonical tx:', err);
+      console.error('[useLoanDetails] Failed to fetch history:', err);
+    } finally {
+      setIsLoadingHistory(false);
     }
   }, [loan.id]);
 
-  useMemo(() => {
-    fetchCanonical();
-  }, [fetchCanonical, txVersion]);
+  // Efeito para carregar dados
+  useEffect(() => {
+    fetchHistory();
+  }, [fetchHistory, txVersion]);
 
   const financialHistory = useMemo(() => {
-    // 1. RegistrosLegado (admin_expenses)
-    const legacy = (financialActionService.getStandaloneRecords() as any[])
-      .filter((r: any) => {
-        return r.id?.startsWith(loan.id) &&
-          ['receipt', 'admin', 'loan_taken', 'loan_granted'].includes(r.subType || '') &&
-          (r.paidValue > 0 || r.originalValue > 0);
-      });
-
-    // 2. Unificar e ordenar
-    return [...legacy, ...canonicalTransactions]
+    return [...legacyTransactions, ...canonicalTransactions]
       .sort((a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime());
-  }, [loan.id, txVersion, canonicalTransactions]);
+  }, [legacyTransactions, canonicalTransactions]);
 
   // ─── Helpers de tipo ────────────────────────────────────
   const getTxTypeFromRecord = useCallback((subType?: string): 'increase' | 'decrease' => {
@@ -156,31 +162,27 @@ export function useLoanDetails({ loan, onUpdate, onBack, addToast }: UseLoanDeta
         }
       } else if (tx.accountId) {
         const subType = resolveSubTypeFromTx(tx.type);
-        const txId = crypto.randomUUID().slice(0, 9);
+        const txId = crypto.randomUUID();
 
-        await financialActionService.addAdminExpense({
-          id: `${loan.id}-tx-${txId}`,
+        // 🟢 ATUALIZADO: Usamos apenas addTransaction para evitar duplicidade no histórico
+        // O LoansService agora cuida do Caixa e dos Totais do Contrato de forma atômica.
+        await loansService.addTransaction(loan.id, {
+          type: tx.type,
+          value: tx.value,
           description: tx.description || (tx.type === 'increase' ? 'Reforço de Empréstimo' : 'Pagamento de Empréstimo'),
-          entityName: loan.entityName,
-          category: 'Empréstimos',
-          dueDate: tx.date,
-          issueDate: tx.date,
-          originalValue: tx.value,
-          paidValue: tx.value,
-          discountValue: 0,
-          status: 'paid',
-          subType: subType as any,
-          bankAccount: tx.accountId
+          accountId: tx.accountId,
+          date: tx.date
         });
       } else if (tx.isHistorical && !tx.accountId) {
         const subType = resolveSubTypeFromTx(tx.type);
-        const txId = crypto.randomUUID().slice(0, 9);
+        const txId = crypto.randomUUID();
 
         await financialActionService.addAdminExpense({
-          id: `${loan.id}-tx-${txId}`,
+          id: txId,
           description: tx.description || 'Abatimento / Desconto',
           entityName: loan.entityName,
           category: 'Empréstimos',
+          categoryId: '00000000-0000-0000-0000-000000000003',
           dueDate: tx.date,
           issueDate: tx.date,
           originalValue: tx.value,
@@ -188,7 +190,8 @@ export function useLoanDetails({ loan, onUpdate, onBack, addToast }: UseLoanDeta
           discountValue: 0,
           status: 'paid',
           subType: subType as any,
-          bankAccount: undefined
+          bankAccount: undefined,
+          notes: `[ORIGIN:${loan.id}]`
         });
       }
 
@@ -232,6 +235,9 @@ export function useLoanDetails({ loan, onUpdate, onBack, addToast }: UseLoanDeta
   const confirmDeleteTx = useCallback(async () => {
     if (!deletingTxRecord) return;
     try {
+      // 🟢 NOVO: Reverter Saldo do Empréstimo e Caixa Bancário antes de excluir o registro
+      await loansService.removeTransaction(loan.id, deletingTxRecord.id);
+      
       await financialActionService.deleteStandaloneRecord(deletingTxRecord.id);
       setDeletingTxRecord(null);
       setTxVersion(v => v + 1);

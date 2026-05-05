@@ -12,14 +12,14 @@ export const useAIAssistantContext = () => {
   const currentUser = useCurrentUser();
 
   const getSystemContext = useCallback(async () => {
-    const partners = partnerService.getAll();
+    const partners = await partnerService.getAll();
     const purchases = await purchaseService.loadFromSupabase();
-    const sales = salesService.getAll();
+    const sales = await salesService.getAll();
     const allLoadings = await loadingService.loadFromSupabase();
     const loadings = allLoadings.filter((loading) => loading.status !== 'canceled');
     const accounts = financialService.getBankAccounts();
-    const shareholders = shareholderService.getAll();
-    const standalone = financialActionService.getStandaloneRecords();
+    const shareholders = await shareholderService.getAll();
+    const standalone = await financialActionService.getStandaloneRecords();
 
     const totalQuebraKg = loadings.reduce((acc, loading) => acc + (loading.breakageKg || 0), 0);
     const totalFinanceiroAberto = standalone

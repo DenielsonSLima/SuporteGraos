@@ -62,6 +62,7 @@ export const toSupabase = (record: FinancialRecord): Partial<StandaloneRecordDB>
   status: record.status,
   sub_type: record.subType,
   bank_account: record.bankAccount,
+  account_id: record.bankAccount && record.bankAccount.length > 30 ? record.bankAccount : undefined,
   notes: record.notes,
   asset_id: record.assetId,
   is_asset_receipt: record.isAssetReceipt,
@@ -74,6 +75,8 @@ export const toSupabase = (record: FinancialRecord): Partial<StandaloneRecordDB>
   total_ton: record.totalTon,
   total_sc: record.totalSc,
   company_id: record.companyId || authService.getCurrentUser()?.companyId,
+  category_id: record.categoryId || '00000000-0000-0000-0000-000000000003',
+  amount: record.originalValue,
 });
 
 export const STANDALONE_SELECT_FIELDS = [
@@ -102,5 +105,7 @@ export const STANDALONE_SELECT_FIELDS = [
   'load_count',
   'total_ton',
   'total_sc',
-  'company_id'
+  'company_id',
+  'category_id',
+  'amount'
 ].join(',');

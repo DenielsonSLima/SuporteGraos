@@ -1,6 +1,7 @@
 export type FinancialEntryType = 'payable' | 'receivable';
 export type OriginType =
   | 'purchase_order'
+  | 'purchase_order_loading'
   | 'sales_order'
   | 'commission'
   | 'expense'
@@ -8,7 +9,8 @@ export type OriginType =
   | 'advance'
   | 'transfer'
   | 'credit'
-  | 'freight';
+  | 'freight'
+  | 'freight_loading';
 
 export type EntryStatus = 'open' | 'partially_paid' | 'paid' | 'overdue' | 'cancelled' | 'reversed';
 

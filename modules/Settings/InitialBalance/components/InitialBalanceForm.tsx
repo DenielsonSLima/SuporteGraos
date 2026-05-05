@@ -24,15 +24,18 @@ const InitialBalanceForm: React.FC<Props> = ({ accounts, onSave, onCancel }) => 
   };
 
   const handleValueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value.replace(/\D/g, '');
-    const num = Number(raw) / 100;
+    const value = e.target.value;
+    const isNegative = value.includes('-');
+    const raw = value.replace(/\D/g, '');
+    const num = (Number(raw) / 100) * (isNegative ? -1 : 1);
+    
     setNumericValue(num);
     setDisplayValue(formatBRL(num));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.accountId || numericValue <= 0) return;
+    if (!formData.accountId) return;
     onSave({ ...formData, value: numericValue });
   };
 

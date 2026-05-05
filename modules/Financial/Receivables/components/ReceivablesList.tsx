@@ -7,6 +7,8 @@ import { Search, LayoutList, Users, CheckSquare, DollarSign, X, Filter } from 'l
 import FinancialPaymentModal, { PaymentData } from '../../components/modals/FinancialPaymentModal';
 import { financialActionService } from '../../../../services/financialActionService';
 import { useTotalsByType } from '../../../../hooks/useFinancialEntries';
+import { useQueryClient } from '@tanstack/react-query';
+import { QUERY_KEYS } from '../../../../hooks/queryKeys';
 
 interface Props {
   records: FinancialRecord[];
@@ -22,6 +24,7 @@ const ReceivablesList: React.FC<Props> = ({ records, onReceive, onRefresh }) => 
   // Selection State
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
+  const queryClient = useQueryClient();
 
   // --- FILTERING ---
   const filteredRecords = useMemo(() => {
@@ -58,30 +61,46 @@ const ReceivablesList: React.FC<Props> = ({ records, onReceive, onRefresh }) => 
     setSelectedIds([]);
   };
 
-  const handleBulkPaymentConfirm = (data: PaymentData) => {
+  const handleBulkPaymentConfirm = async (data: PaymentData) => {
     if(window.confirm(`Confirma o recebimento em lote de ${selectedIds.length} títulos no valor total de ${currency(totalSelectedValue)}?`)) {
-      selectedIds.forEach(id => {
-        // For simple bulk logic:
-        // We consider the individual principal balance as the 'principal' paid.
-        // Any bulk discounts/interest would need complex distribution.
-        // Here we assume pure principal payment for each item.
-        
-        const record = records.find(r => r.id === id);
-        if (record) {
-          const balance = record.originalValue - record.paidValue;
-          financialActionService.processRecord(id, { 
-            ...data, 
-            principal: balance,
-            interest: 0,
-            discount: 0,
-            amount: balance 
-          }, record.subType);
+      try {
+        const results = await Promise.allSettled(
+          selectedIds.map(id => {
+            const record = records.find(r => r.id === id);
+            if (!record) return Promise.resolve();
+            const balance = record.originalValue - record.paidValue;
+            return financialActionService.processRecord(id, { 
+              ...data, 
+              amount: balance,
+              discount: 0
+            }, record.subType);
+          })
+        );
+
+        const failed = results.filter(r => r.status === 'rejected').length;
+        const succeeded = results.length - failed;
+
+        if (failed > 0) {
+          alert(`${succeeded} recebimentos registrados, ${failed} falharam.`);
         }
-      });
-      
-      setIsBulkModalOpen(false);
-      setSelectedIds([]);
-      onRefresh();
+      } catch (err) {
+        console.error('[ReceivablesList] Erro no recebimento em lote:', err);
+      } finally {
+        setIsBulkModalOpen(false);
+        setSelectedIds([]);
+        
+        // Invalidação completa
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_PAYABLES }),
+          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_RECEIVABLES }),
+          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS }),
+          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_SUMMARY }),
+          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT }),
+          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
+        ]);
+
+        onRefresh();
+      }
     }
   };
 

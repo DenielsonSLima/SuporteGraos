@@ -27,7 +27,18 @@ const AdvanceForm: React.FC<Props> = ({ isOpen, onClose, onSave }) => {
   const [numericValue, setNumericValue] = useState(0);
   
   const { data: allAccounts = [] } = useAccounts();
-  const accounts = useMemo(() => allAccounts.filter(a => a.is_active !== false).sort((a, b) => a.account_name.localeCompare(b.account_name)), [allAccounts]);
+  const accounts = useMemo(() => 
+    allAccounts
+      .filter(a => 
+        a.is_active !== false && 
+        !a.account_name.toLowerCase().includes('virtual') &&
+        !a.account_name.toLowerCase().includes('ajuste') &&
+        !(a.owner || '').toLowerCase().includes('virtual') &&
+        !(a.owner || '').toLowerCase().includes('ajuste')
+      )
+      .sort((a, b) => a.account_name.localeCompare(b.account_name)), 
+    [allAccounts]
+  );
   const [partners, setPartners] = useState<Partner[]>([]);
 
   useEffect(() => {

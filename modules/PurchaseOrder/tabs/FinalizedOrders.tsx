@@ -13,16 +13,12 @@ interface Props {
 }
 
 const FinalizedOrders: React.FC<Props> = ({ orders, onOrderClick, onDelete, groupBy }) => {
-  const filtered = useMemo(() => 
-    orders.filter(o => ['completed', 'canceled'].includes(o.status)),
-  [orders]);
-
   const groups = useMemo(() => {
     if (groupBy === 'none') return null;
 
     const grouped: Record<string, PurchaseOrder[]> = {};
     
-    filtered.forEach(order => {
+    orders.forEach(order => {
       let key = 'Outros';
       
       if (groupBy === 'month') {
@@ -47,7 +43,7 @@ const FinalizedOrders: React.FC<Props> = ({ orders, onOrderClick, onDelete, grou
       orders: value
     }));
 
-  }, [filtered, groupBy]);
+  }, [orders, groupBy]);
 
   const getGroupIcon = () => {
     if (groupBy === 'month') return <Calendar size={18} />;
@@ -56,9 +52,7 @@ const FinalizedOrders: React.FC<Props> = ({ orders, onOrderClick, onDelete, grou
     return <Layers size={18} />;
   };
 
-  if (filtered.length === 0) {
-    return <div className="text-center py-10 text-slate-500">Nenhum pedido finalizado encontrado.</div>;
-  }
+  if (orders.length === 0) return null;
 
   if (!groups) {
     return (

@@ -22,6 +22,7 @@ export interface ExpenseSubtype {
   categoryId: string;
   name: string;
   isSystem?: boolean;
+  active?: boolean;
 }
 
 
@@ -31,6 +32,7 @@ export interface ExpenseCategory {
   type: 'fixed' | 'variable' | 'administrative' | 'custom';
   color: string;
   isSystem?: boolean;
+  active?: boolean;
   icon?: unknown;
   subtypes?: ExpenseSubtype[];
 }
@@ -58,6 +60,7 @@ const mapRow = (row: any): ExpenseCategory => ({
   type: (row.type ?? 'custom') as ExpenseCategory['type'],
   color: row.color ?? 'bg-slate-50 text-slate-700 border-slate-200',
   isSystem: row.is_system ?? false,
+  active: row.active ?? true,
 });
 
 const mapSubcategory = (row: any): ExpenseSubtype => ({
@@ -65,6 +68,7 @@ const mapSubcategory = (row: any): ExpenseSubtype => ({
   categoryId: row.category_id,
   name: row.name,
   isSystem: row.is_system ?? false,
+  active: row.active ?? true,
 });
 
 const sortCategories = (cats: ExpenseCategory[]): ExpenseCategory[] =>
@@ -95,7 +99,7 @@ export const expenseCategoryService = {
   getAll: async (): Promise<ExpenseCategory[]> => {
     const { data, error } = await supabase
       .from('expense_categories')
-      .select('id, type, name, color, is_system')
+      .select('id, type, name, color, is_system, active')
       .order('created_at', { ascending: true });
     if (error) throw error;
     const categories = (data ?? []).map(mapRow);
@@ -103,7 +107,7 @@ export const expenseCategoryService = {
     // Buscar subcategorias
     const { data: subs, error: errSubs } = await supabase
       .from('expense_subcategories')
-      .select('id, category_id, name, is_system')
+      .select('id, category_id, name, is_system, active')
       .order('created_at', { ascending: true });
     if (errSubs) throw errSubs;
     const subcategories = (subs ?? []).map(mapSubcategory);
@@ -177,7 +181,19 @@ export const expenseCategoryService = {
       .from('expense_subcategories')
       .update({ name: name.trim() })
       .eq('id', subcategoryId)
-      .select('id, category_id, name, is_system')
+      .select('id, category_id, name, is_system, active')
+      .single();
+    if (error) throw error;
+    return mapSubcategory(data);
+  },
+
+  /** Alterna o status ativo/inativo de uma subcategoria. */
+  toggleSubcategoryStatus: async (subcategoryId: string, currentStatus: boolean): Promise<ExpenseSubtype> => {
+    const { data, error } = await supabase
+      .from('expense_subcategories')
+      .update({ active: !currentStatus })
+      .eq('id', subcategoryId)
+      .select('id, category_id, name, is_system, active')
       .single();
     if (error) throw error;
     return mapSubcategory(data);
@@ -203,7 +219,7 @@ export const expenseCategoryService = {
       .from('expense_categories')
       .update(payload)
       .eq('id', id)
-      .select('id, type, name, color, is_system')
+      .select('id, type, name, color, is_system, active')
       .single();
     if (error) {
       if (error.code === '23505') throw new Error(`Já existe uma categoria com esse nome.`);

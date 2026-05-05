@@ -140,7 +140,7 @@ const FloatingAssistant: React.FC = () => {
           // Captura functionCalls em streaming, se presentes
           if ((chunk as any)?.functionCalls) {
              for (const fc of (chunk as any).functionCalls) {
-                 const result = executeToolAction(fc.name, fc.args, userName);
+                 const result = await executeToolAction(fc.name, fc.args, userName);
                  const toolMessage = result.success ? `✅ ${result.message}` : `❌ ${result.message}`;
                  toolOutputs.push(toolMessage);
                  invalidateContext();
@@ -154,7 +154,7 @@ const FloatingAssistant: React.FC = () => {
         finalText = response.text || '';
         if (response.functionCalls) {
           for (const fc of response.functionCalls) {
-              const result = executeToolAction(fc.name, fc.args, userName);
+              const result = await executeToolAction(fc.name, fc.args, userName);
               const toolMessage = result.success ? `✅ ${result.message}` : `❌ ${result.message}`;
               toolOutputs.push(toolMessage);
               invalidateContext();

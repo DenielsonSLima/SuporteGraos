@@ -18,7 +18,15 @@ const SettleAdvanceModal: React.FC<Props> = ({ isOpen, onClose, onSave, advance 
   const { addToast } = useToast();
   const { data: allAccounts = [] } = useAccounts();
   const bankAccounts = useMemo(() =>
-    allAccounts.filter(a => a.is_active !== false).sort((a, b) => a.account_name.localeCompare(b.account_name)),
+    allAccounts
+      .filter(a => 
+        a.is_active !== false && 
+        !a.account_name.toLowerCase().includes('virtual') &&
+        !a.account_name.toLowerCase().includes('ajuste') &&
+        !(a.owner || '').toLowerCase().includes('virtual') &&
+        !(a.owner || '').toLowerCase().includes('ajuste')
+      )
+      .sort((a, b) => a.account_name.localeCompare(b.account_name)),
     [allAccounts]
   );
   

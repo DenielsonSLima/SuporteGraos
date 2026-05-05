@@ -110,6 +110,9 @@ export const financialEntriesLoader = {
     if (params?.endDate) query = query.lte('due_date', params.endDate);
     if (params?.partnerId) query = query.eq('partner_id', params.partnerId);
     
+    // Bug Fix: Somente tipos operacionais (Compra de Grão, Frete, Comissões)
+    query = query.in('origin_type', ['purchase_order', 'purchase_order_loading', 'freight', 'freight_loading', 'commission']);
+    
     // Paginação
     const page = params?.page ?? 0;
     const pageSize = params?.pageSize ?? 100; // Aumentado para 100 por ser financeiro
@@ -184,6 +187,9 @@ export const financialEntriesLoader = {
     if (params?.startDate) query = query.gte('due_date', params.startDate);
     if (params?.endDate) query = query.lte('due_date', params.endDate);
     if (params?.partnerId) query = query.eq('partner_id', params.partnerId);
+
+    // Bug Fix: Somente tipos operacionais (Venda de Grão)
+    query = query.in('origin_type', ['sales_order', 'sales_order_loading']);
 
     // Paginação
     const page = params?.page ?? 0;

@@ -1,7 +1,7 @@
 import React from 'react';
 import {
-  Receipt, Plus, Trash2, Search, X,
-  AlertTriangle, Tags, Anchor, TrendingUp, Briefcase
+  Receipt, Plus, Trash2, Search, X, Edit2,
+  AlertTriangle, Tags, Anchor, TrendingUp, Briefcase, Power
 } from 'lucide-react';
 import SettingsSubPage from '../../components/SettingsSubPage';
 import type { ExpenseCategory, ExpenseSubtype } from '../../../../services/expenseCategoryService';
@@ -23,6 +23,10 @@ interface ExpenseCategoryGridProps {
   onDeleteCategoryConfirm: () => void;
   onDeleteCategoryCancel: () => void;
   onBack: () => void;
+  onEditSubtype: (sub: ExpenseSubtype) => void;
+  onToggleSubtypeStatus: (sub: ExpenseSubtype) => void;
+  onEditCategory: (cat: ExpenseCategory) => void;
+  onToggleCategoryStatus: (cat: ExpenseCategory) => void;
 }
 
 const renderCategoryIcon = (type: string) => {
@@ -49,6 +53,10 @@ const ExpenseCategoryGrid: React.FC<ExpenseCategoryGridProps> = ({
   onDeleteCategoryConfirm,
   onDeleteCategoryCancel,
   onBack,
+  onEditSubtype,
+  onToggleSubtypeStatus,
+  onEditCategory,
+  onToggleCategoryStatus,
 }) => {
   return (
     <SettingsSubPage
@@ -92,32 +100,62 @@ const ExpenseCategoryGrid: React.FC<ExpenseCategoryGridProps> = ({
                     {renderCategoryIcon(cat.type)}
                     <h3 className="font-bold text-sm uppercase">{cat.name}</h3>
                   </div>
-                  {!cat.isSystem && (
-                    <button onClick={() => onDeleteCategoryRequest(cat.id)}
-                      className="rounded p-1 hover:bg-white/50 text-current transition-colors"
-                      title="Excluir Categoria Completa">
-                      <Trash2 size={16} />
+                  <div className="flex items-center gap-1">
+                    {!cat.isSystem && (
+                      <button onClick={() => onEditCategory(cat)}
+                        className="rounded p-1 hover:bg-white/50 text-current transition-colors"
+                        title="Editar Categoria">
+                        <Edit2 size={14} />
+                      </button>
+                    )}
+                    <button onClick={() => onToggleCategoryStatus(cat)}
+                      className={`rounded p-1 hover:bg-white/50 transition-colors ${cat.active ? 'text-emerald-600' : 'text-slate-400'}`}
+                      title={cat.active ? 'Inativar Categoria' : 'Ativar Categoria'}>
+                      <Power size={14} />
                     </button>
-                  )}
+                    {!cat.isSystem && (
+                      <button onClick={() => onDeleteCategoryRequest(cat.id)}
+                        className="rounded p-1 hover:bg-white/50 text-current transition-colors"
+                        title="Excluir Categoria Completa">
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div className="p-2 flex-1 flex flex-col gap-1">
                   {cat.subtypes?.length ? (
                     cat.subtypes.map((sub) => (
                       <div key={sub.id}
-                        className="group flex items-center justify-between rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50">
+                        className={`group flex items-center justify-between rounded-lg px-3 py-2 text-sm transition-all ${sub.active ? 'text-slate-600 hover:bg-slate-50' : 'opacity-40 grayscale bg-slate-50/50'}`}>
                         <div className="flex items-center gap-2">
-                          <div className="h-1.5 w-1.5 rounded-full bg-slate-300 group-hover:bg-rose-400" />
-                          <span>{sub.name}</span>
+                          <div className={`h-1.5 w-1.5 rounded-full ${sub.active ? 'bg-slate-300 group-hover:bg-rose-400' : 'bg-slate-400'}`} />
+                          <span className={sub.active ? '' : 'line-through'}>{sub.name}</span>
                         </div>
-                        {!cat.isSystem && (
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {!sub.isSystem && (
+                            <button
+                              onClick={() => onEditSubtype(sub)}
+                              className="p-1 rounded hover:bg-white text-slate-400 hover:text-blue-600"
+                              title="Editar item">
+                              <Edit2 size={14} />
+                            </button>
+                          )}
                           <button
-                            onClick={() => onDeleteSubtypeRequest(cat, sub)}
-                            className="opacity-0 transition-opacity p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-600 group-hover:opacity-100"
-                            title="Remover item">
-                            <X size={14} />
+                            onClick={() => onToggleSubtypeStatus(sub)}
+                            className={`p-1 rounded hover:bg-white ${sub.active ? 'text-slate-400 hover:text-emerald-600' : 'text-emerald-600'}`}
+                            title={sub.active ? 'Inativar item' : 'Ativar item'}>
+                            <Power size={14} />
                           </button>
-                        )}
+                          {!sub.isSystem && (
+                            <button
+                              onClick={() => onDeleteSubtypeRequest(cat, sub)}
+                              className="p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-600"
+                              title="Remover item">
+                              <X size={14} />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     ))
                   ) : (

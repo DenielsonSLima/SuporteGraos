@@ -160,7 +160,9 @@ export function useAddPurchaseOrder() {
       await Promise.all([
         qc.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
-        qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_PAYABLES }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_SUMMARY }),
       ]);
     },
   });
@@ -174,7 +176,9 @@ export function useUpdatePurchaseOrder() {
       await Promise.all([
         qc.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
-        qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_PAYABLES }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_SUMMARY }),
       ]);
     },
   });
@@ -188,7 +192,9 @@ export function useDeletePurchaseOrder() {
       await Promise.all([
         qc.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
-        qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_PAYABLES }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_SUMMARY }),
       ]);
     },
   });
@@ -203,7 +209,9 @@ export function useUpdatePurchaseTransaction() {
       await Promise.all([
         qc.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
-        qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_PAYABLES }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_SUMMARY }),
       ]);
     },
   });
@@ -219,7 +227,9 @@ export function useDeletePurchaseTransaction() {
       await Promise.all([
         qc.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
-        qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_PAYABLES }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_SUMMARY }),
       ]);
     },
   });

@@ -20,6 +20,10 @@ export function useAdvancesOperations({ addToast }: UseAdvancesOperationsOptions
 
   const refreshData = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ADVANCES });
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS });
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT });
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_SUMMARY });
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD });
   }, [queryClient]);
 
   // ─── Registrar novo adiantamento ────────────────────────

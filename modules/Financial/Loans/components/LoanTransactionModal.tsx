@@ -64,9 +64,9 @@ const LoanTransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, loanTy
       }
    }, [isOpen, initialTx]);
 
-  if (!isOpen) return null;
-
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

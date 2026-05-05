@@ -17,9 +17,12 @@ type TabType = 'all' | 'taken' | 'granted' | 'history';
 
 // Adaptador: Loan (DB) → LoanRecord (UI)
 function toLoanRecord(loan: Loan): LoanRecord {
+  // A descrição vem do financial_entry via join no service
+  const description = (loan as any).description;
+  
   return {
     id: loan.id,
-    entityName: loan.lender_id || 'Empréstimo',
+    entityName: description || loan.lender_id || 'Empréstimo',
     contractDate: loan.start_date,
     originalValue: loan.principal_amount,
     totalValue: loan.principal_amount,

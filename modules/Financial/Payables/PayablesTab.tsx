@@ -86,8 +86,8 @@ const PayablesTab: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
 
   const PAGE_SIZE = 100;
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [currentPage, setCurrentPage] = useState(1);
+  const [accumulatedPayables, setAccumulatedPayables] = useState<EnrichedPayableEntry[]>([]);
 
   const { data: rawPayables = [], isLoading: loading } = usePayables({
     startDate: startDate || undefined,
@@ -97,11 +97,20 @@ const PayablesTab: React.FC = () => {
     pageSize: PAGE_SIZE
   });
   
+  // Bug 8 Fix: Acúmulo de dados para Infinite Scroll manual
+  useEffect(() => {
+    if (currentPage === 1) {
+      setAccumulatedPayables(rawPayables);
+    } else {
+      setAccumulatedPayables(prev => [...prev, ...rawPayables]);
+    }
+  }, [rawPayables, currentPage]);
+
   const records = useMemo(() => {
-    return rawPayables
-      .filter(entry => entry.total_amount > 0 || entry.remaining_amount > 0) // Oculta títulos "fantasmas" zerados
+    return accumulatedPayables
+      .filter(entry => entry.total_amount > 0 || entry.remaining_amount > 0)
       .map(toFinancialRecord);
-  }, [rawPayables]);
+  }, [accumulatedPayables]);
 
   const allPurchases = useMemo(() => records.filter(r => r.subType === 'purchase_order'), [records]);
   const allFreights = useMemo(() => records.filter(r => r.subType === 'freight'), [records]);

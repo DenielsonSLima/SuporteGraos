@@ -48,6 +48,9 @@ export function useProcessPayment() {
         qc.invalidateQueries({ queryKey: QUERY_KEYS.TRANSFERS }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_ENTRIES }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_PAYABLES }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_RECEIVABLES }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_SUMMARY }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_TRANSACTIONS }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
@@ -65,6 +68,8 @@ export function useAddAdminExpense() {
       await Promise.all([
         qc.invalidateQueries({ queryKey: QUERY_KEYS.STANDALONE_RECORDS }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.ADMIN_EXPENSES }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_PAYABLES }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_SUMMARY }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS })
@@ -82,6 +87,9 @@ export function useDeleteStandaloneRecord() {
       await Promise.all([
         qc.invalidateQueries({ queryKey: QUERY_KEYS.STANDALONE_RECORDS }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.ADMIN_EXPENSES }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_PAYABLES }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_RECEIVABLES }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_SUMMARY }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS })
@@ -99,6 +107,7 @@ export function useAddTransfer() {
       await Promise.all([
         qc.invalidateQueries({ queryKey: QUERY_KEYS.TRANSFERS }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_SUMMARY }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
       ]);
@@ -115,6 +124,7 @@ export function useUpdateTransfer() {
       await Promise.all([
         qc.invalidateQueries({ queryKey: QUERY_KEYS.TRANSFERS }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_SUMMARY }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
       ]);
@@ -131,6 +141,7 @@ export function useDeleteTransfer() {
       await Promise.all([
         qc.invalidateQueries({ queryKey: QUERY_KEYS.TRANSFERS }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_SUMMARY }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
       ]);

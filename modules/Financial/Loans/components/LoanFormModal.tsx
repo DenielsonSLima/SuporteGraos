@@ -15,9 +15,10 @@ interface Props {
   onClose: () => void;
   onSave: (loan: any) => void;
   initialType?: 'taken' | 'granted';
+  initialLoan?: any;
 }
 
-const LoanFormModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialType = 'taken' }) => {
+const LoanFormModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialType = 'taken', initialLoan }) => {
   const { data: allBankAccounts = [] } = useAccounts();
   const bankAccounts = React.useMemo(() => allBankAccounts.sort((a, b) => a.account_name.localeCompare(b.account_name)), [allBankAccounts]);
   const [type, setType] = useState<'taken' | 'granted'>('taken');
@@ -47,18 +48,31 @@ const LoanFormModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialType =
 
   useEffect(() => {
     if (isOpen) {
-      setType('taken');
-      setFormData({
-        date: new Date().toISOString().split('T')[0],
-        description: '',
-        contractValue: '',
-        remainingValue: '',
-        accountId: ''
-      });
-      setDisplayContractValue('');
-      setDisplayRemainingValue('');
+      if (initialLoan) {
+        setType(initialLoan.type);
+        setFormData({
+          date: initialLoan.contractDate || new Date().toISOString().split('T')[0],
+          description: initialLoan.entityName || '',
+          contractValue: initialLoan.originalValue?.toString() || '',
+          remainingValue: initialLoan.remainingValue?.toString() || '',
+          accountId: initialLoan.accountId || ''
+        });
+        setDisplayContractValue(formatBRL(initialLoan.originalValue || 0));
+        setDisplayRemainingValue(formatBRL(initialLoan.remainingValue || 0));
+      } else {
+        setType(initialType);
+        setFormData({
+          date: new Date().toISOString().split('T')[0],
+          description: '',
+          contractValue: '',
+          remainingValue: '',
+          accountId: ''
+        });
+        setDisplayContractValue('');
+        setDisplayRemainingValue('');
+      }
     }
-  }, [isOpen, initialType]);
+  }, [isOpen, initialType, initialLoan]);
 
   const handleContractValueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const num = formatCurrencyInput(e.target.value);
@@ -97,7 +111,7 @@ const LoanFormModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialType =
       accountId: formData.accountId,
       accountName: selectedAccount?.account_name || ''
     });
-    addToast('success', 'Empréstimo criado');
+    addToast('success', initialLoan ? 'Contrato atualizado' : 'Empréstimo criado');
     onClose();
   };
 
@@ -114,10 +128,13 @@ const LoanFormModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialType =
           <div className={`px-8 py-6 flex justify-between items-center text-white ${type === 'taken' ? 'bg-rose-600' : 'bg-emerald-600'}`}>
             <div className="flex items-center gap-4">
                <div className="p-3 bg-white/20 rounded-2xl"><Landmark size={24} /></div>
-               <div>
-                  <h3 className="font-black text-xl uppercase tracking-tighter italic leading-none">{type === 'taken' ? 'Novo Empréstimo Tomado' : 'Novo Empréstimo Cedido'}</h3>
-                  <p className="text-[10px] font-black uppercase tracking-widest mt-1.5 opacity-80">Registro de Contrato Financeiro</p>
-               </div>
+                <div>
+                  <h3 className="font-black text-lg tracking-tight leading-tight whitespace-pre-wrap max-w-[300px]">
+                    {initialLoan ? 'Editar: ' : 'Novo '}
+                    {type === 'taken' ? 'Empréstimo Tomado' : 'Empréstimo Cedido'}
+                  </h3>
+                  <p className="text-[10px] font-black uppercase tracking-widest mt-1 opacity-80">Registro de Contrato Financeiro</p>
+                </div>
             </div>
             <button onClick={onClose} className="hover:bg-white/20 p-2 rounded-full transition-colors"><X size={28} /></button>
           </div>

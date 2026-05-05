@@ -5,9 +5,10 @@ import ModalPortal from '../../../../components/ui/ModalPortal';
 import type { ExpenseCategory } from '../../../../services/expenseCategoryService';
 import type { Account } from '../../../../services/accountsService';
 import { useAccounts } from '../../../../hooks/useAccounts';
-import { useExpenseCategories } from '../../../../hooks/useExpenseCategories';
+import { useExpenseCategories, useAddExpenseSubcategory, useAddExpenseCategory } from '../../../../hooks/useExpenseCategories';
 import { FinancialRecord } from '../../types';
 import { useToast } from '../../../../contexts/ToastContext';
+import { Plus } from 'lucide-react';
 import { formatAccountLabel } from '../../../../utils/formatters';
 
 interface Props {
@@ -23,8 +24,21 @@ const InstallmentExpenseForm: React.FC<Props> = ({ isOpen, onClose, onSave, onUp
   const isEditing = !!initialData;
   const formContainerRef = React.useRef<HTMLDivElement | null>(null);
   const { data: categories = [] } = useExpenseCategories();
+  const addSubcategoryMut = useAddExpenseSubcategory();
+  const addCategoryMut = useAddExpenseCategory();
   const { data: allBankAccounts = [] } = useAccounts();
-  const bankAccounts = React.useMemo(() => allBankAccounts.filter(a => a.is_active !== false).sort((a, b) => a.account_name.localeCompare(b.account_name)), [allBankAccounts]);
+  const bankAccounts = React.useMemo(() => 
+    allBankAccounts
+      .filter(a => 
+        a.is_active !== false && 
+        !a.account_name.toLowerCase().includes('virtual') &&
+        !a.account_name.toLowerCase().includes('ajuste') &&
+        !(a.owner || '').toLowerCase().includes('virtual') &&
+        !(a.owner || '').toLowerCase().includes('ajuste')
+      )
+      .sort((a, b) => a.account_name.localeCompare(b.account_name)), 
+    [allBankAccounts]
+  );
   
   // Form State
   const [mode, setMode] = useState<'single' | 'installment'>('single');
@@ -36,6 +50,8 @@ const InstallmentExpenseForm: React.FC<Props> = ({ isOpen, onClose, onSave, onUp
   
   const [description, setDescription] = useState('');
   const [categoryName, setCategoryName] = useState('');
+  const [isAddingNew, setIsAddingNew] = useState(false);
+  const [newName, setNewName] = useState('');
   const [issueDate, setIssueDate] = useState(new Date().toISOString().split('T')[0]);
   const [firstDueDate, setFirstDueDate] = useState(new Date().toISOString().split('T')[0]);
   const [totalValue, setTotalValue] = useState('');
@@ -93,6 +109,40 @@ const InstallmentExpenseForm: React.FC<Props> = ({ isOpen, onClose, onSave, onUp
     const categoryGroup = categories.find(c => c.type === selectedType);
     return categoryGroup ? [...categoryGroup.subtypes].sort((a, b) => a.name.localeCompare(b.name)) : [];
   }, [selectedType, categories]);
+
+  const handleQuickAdd = async () => {
+    if (!newName.trim() || !selectedType) return;
+
+    try {
+      let parentCategory = categories.find(c => c.type === selectedType);
+
+      // Se não existir uma categoria pai para este tipo, cria uma genérica primeiro
+      if (!parentCategory) {
+        const typeLabels: Record<string, string> = { 
+          fixed: 'Custos Fixos', 
+          variable: 'Custos Variáveis', 
+          administrative: 'Despesas Administrativas' 
+        };
+        parentCategory = await addCategoryMut.mutateAsync({
+          name: typeLabels[selectedType] || 'Outras Despesas',
+          type: selectedType,
+          color: 'bg-slate-50 text-slate-700 border-slate-200'
+        });
+      }
+
+      const newItem = await addSubcategoryMut.mutateAsync({
+        categoryId: parentCategory.id,
+        name: newName.trim()
+      });
+
+      setCategoryName(newItem.name);
+      setIsAddingNew(false);
+      setNewName('');
+      addToast('success', 'Categoria cadastrada e selecionada!');
+    } catch (err: any) {
+      addToast('error', 'Erro ao cadastrar', err.message);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -247,21 +297,55 @@ const InstallmentExpenseForm: React.FC<Props> = ({ isOpen, onClose, onSave, onUp
 
             <div className={`transition-all duration-300 ${!selectedType ? 'opacity-30 pointer-events-none' : 'opacity-100'}`}>
               <label className={labelClass}>2. Categoria (Plano de Contas)</label>
-              <div className="relative">
-                <Tag className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-                <select 
-                  required 
-                  className={`${inputClass} pl-12 appearance-none`}
-                  value={categoryName}
-                  onChange={e => setCategoryName(e.target.value)}
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Tag className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                  <select 
+                    required 
+                    disabled={isAddingNew}
+                    className={`${inputClass} pl-12 appearance-none disabled:opacity-50`}
+                    value={categoryName}
+                    onChange={e => setCategoryName(e.target.value)}
+                  >
+                    <option value="">{selectedType ? 'Selecione o item...' : 'Aguardando Natureza...'}</option>
+                    {filteredSubtypes.map(sub => (
+                      <option key={sub.id} value={sub.name}>{sub.name}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" size={18} />
+                </div>
+                
+                <button
+                  type="button"
+                  onClick={() => setIsAddingNew(!isAddingNew)}
+                  className={`p-3.5 rounded-xl border-2 transition-all shadow-sm ${isAddingNew ? 'bg-rose-50 border-rose-200 text-rose-500' : 'bg-white border-slate-200 text-slate-400 hover:border-slate-800 hover:text-slate-800'}`}
+                  title="Cadastrar nova categoria"
                 >
-                  <option value="">{selectedType ? 'Selecione o item...' : 'Aguardando Natureza...'}</option>
-                  {filteredSubtypes.map(sub => (
-                    <option key={sub.id} value={sub.name}>{sub.name}</option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" size={18} />
+                  {isAddingNew ? <X size={20} /> : <Plus size={20} />}
+                </button>
               </div>
+
+              {isAddingNew && (
+                <div className="mt-3 p-4 bg-emerald-50 rounded-2xl border-2 border-emerald-100 flex gap-2 animate-in slide-in-from-top-2">
+                  <input 
+                    autoFocus
+                    type="text"
+                    placeholder="Nome da nova categoria..."
+                    className="flex-1 px-4 py-2 rounded-xl border-2 border-emerald-200 bg-white text-sm font-bold focus:border-emerald-500 outline-none"
+                    value={newName}
+                    onChange={e => setNewName(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleQuickAdd())}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleQuickAdd}
+                    disabled={addSubcategoryMut.isPending || !newName.trim()}
+                    className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all disabled:opacity-50"
+                  >
+                    {addSubcategoryMut.isPending ? '...' : 'Salvar'}
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm space-y-4">

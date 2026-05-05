@@ -1,7 +1,9 @@
 
 import React from 'react';
-import { Landmark, ChevronRight } from 'lucide-react';
+import { Landmark } from 'lucide-react';
 import { LoanRecord } from '../../types';
+import LoanCard from './LoanCard';
+import { useLoansActiveTotals } from '../../../../hooks/useLoans';
 
 interface Props {
   loans: LoanRecord[];
@@ -9,12 +11,60 @@ interface Props {
 }
 
 const LoanList: React.FC<Props> = ({ loans, onSelect }) => {
-  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
-
   // Ordenar empréstimos alfabeticamente por nome da entidade
   const sortedLoans = [...loans].sort((a, b) => 
     a.entityName.localeCompare(b.entityName, 'pt-BR')
   );
+
+  const { data: totals } = useLoansActiveTotals();
+
+  const takenLoans = sortedLoans.filter(l => l.type === 'taken');
+  const grantedLoans = sortedLoans.filter(l => l.type === 'granted');
+
+  const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
+
+  const Section = ({ title, items, color, stats }: { title: string, items: LoanRecord[], color: string, stats?: { principal: number, paid: number, remaining: number } }) => {
+    if (items.length === 0) return null;
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-l-4 border-slate-200 pl-6 py-2 bg-slate-50/50 rounded-r-3xl">
+          <div className="flex items-center gap-3">
+            <h2 className={`text-xl font-black text-slate-800 uppercase tracking-tighter not-italic`}>{title}</h2>
+            <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest leading-none ${color.replace('border-', 'bg-').replace('-500', '-100')} ${color.replace('border-', 'text-')}`}>
+              {items.length} contratos
+            </span>
+          </div>
+
+          {stats && (
+            <div className="flex flex-wrap items-center gap-6 pr-4">
+              <div className="flex flex-col">
+                <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Valor Total</span>
+                <span className="text-sm font-black text-slate-700 tracking-tighter">{currency(stats.principal)}</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Já Liquidado</span>
+                <span className="text-sm font-black text-blue-600 tracking-tighter">{currency(stats.paid)}</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Saldo Aberto</span>
+                <span className={`text-sm font-black tracking-tighter ${color.replace('border-', 'text-')}`}>{currency(stats.remaining)}</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+          {items.map(loan => (
+            <LoanCard 
+              key={loan.id} 
+              loan={loan} 
+              onSelect={onSelect} 
+            />
+          ))}
+        </div>
+      </div>
+    );
+  };
 
   if (loans.length === 0) {
     return (
@@ -26,38 +76,28 @@ const LoanList: React.FC<Props> = ({ loans, onSelect }) => {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {sortedLoans.map(loan => (
-        <div 
-          key={loan.id} 
-          onClick={() => onSelect(loan.id)}
-          className="group cursor-pointer bg-white rounded-3xl border border-slate-200 p-6 shadow-sm hover:shadow-xl hover:border-blue-400 transition-all relative overflow-hidden"
-        >
-           <div className="flex justify-between items-start mb-6">
-              <div className={`p-3 rounded-2xl ${loan.type === 'taken' ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}>
-                  <Landmark size={24} />
-              </div>
-              <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase border ${loan.status === 'active' ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
-                  {loan.status === 'active' ? 'Ativo' : 'Liquidado'}
-              </span>
-           </div>
-           
-           <h3 className="text-lg font-black text-slate-900 uppercase tracking-tighter italic line-clamp-1">{loan.entityName}</h3>
-           <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Início: {new Date(loan.contractDate).toLocaleDateString()}</p>
-
-           <div className="mt-8 pt-6 border-t border-slate-50 flex justify-between items-end">
-              <div>
-                  <span className="text-[9px] font-black text-slate-400 uppercase block mb-1">Saldo Atual</span>
-                  <p className={`text-2xl font-black tracking-tighter ${loan.type === 'taken' ? 'text-rose-600' : 'text-emerald-600'}`}>
-                      {currency(loan.remainingValue)}
-                  </p>
-              </div>
-              <div className="p-2 bg-slate-50 rounded-xl group-hover:bg-slate-900 group-hover:text-white transition-all">
-                  <ChevronRight size={18} />
-              </div>
-           </div>
-        </div>
-      ))}
+    <div className="space-y-12">
+      <Section 
+        title="Empréstimos Tomados (Dívidas)" 
+        items={takenLoans} 
+        color="border-rose-500"
+        stats={totals ? {
+          principal: totals.takenPrincipal,
+          paid: totals.takenPaid,
+          remaining: totals.takenRemaining
+        } : undefined}
+      />
+      
+      <Section 
+        title="Empréstimos Cedidos (Créditos)" 
+        items={grantedLoans} 
+        color="border-emerald-500"
+        stats={totals ? {
+          principal: totals.grantedPrincipal,
+          paid: totals.grantedPaid,
+          remaining: totals.grantedRemaining
+        } : undefined}
+      />
     </div>
   );
 };

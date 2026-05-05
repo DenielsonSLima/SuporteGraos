@@ -20,11 +20,10 @@ export function useTransferOperations() {
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.TRANSFERS });
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS });
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_TRANSACTIONS });
-    queryClient.invalidateQueries({ queryKey: ['transactions_date_range'] });
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new Event('financial:updated'));
-      window.dispatchEvent(new Event('data:updated'));
-    }
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_SUMMARY });   // ADICIONADO
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT });     // ADICIONADO
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD });           // ADICIONADO
+    // Removidos: window.dispatchEvent — sem listeners registrados no sistema
   };
 
   return {

@@ -30,6 +30,7 @@ export interface FinancialRecord {
   totalSc?: number; // total em sacas (se disponível)
   orderNumber?: string; // número do pedido vinculado (ex: PV-2026-389)
   companyId?: string;
+  categoryId?: string;
   remainingValue?: number;
   deductionsAmount?: number;
   netAmount?: number;
@@ -54,7 +55,8 @@ export interface LoanRecord {
   totalValue: number; // Valor original do contrato
   interestRate: number;
   installments: number;
-  remainingValue: number; // Saldo atual calculado
+  paidValue: number; // Valor já pago/amortizado (Vem do DB)
+  remainingValue: number; // Saldo atual calculado (Vem do DB)
   nextDueDate: string;
   status: 'active' | 'settled' | 'default';
   type: 'taken' | 'granted';

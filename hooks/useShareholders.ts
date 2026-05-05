@@ -117,6 +117,8 @@ export function useShareholderTransaction() {
           qc.invalidateQueries({ queryKey: QUERY_KEYS.SHAREHOLDER_TOTALS(variables.shareholderId) }),
           qc.invalidateQueries({ queryKey: QUERY_KEYS.BANK_ACCOUNTS }),
           qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_TRANSACTIONS }),
+          qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_PAYABLES }),     // ADICIONADO
+          qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_SUMMARY }),      // ADICIONADO
           qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
           qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
         ]);
@@ -136,6 +138,8 @@ export function useUpdateShareholderTransaction() {
           qc.invalidateQueries({ queryKey: QUERY_KEYS.SHAREHOLDER_TOTALS(variables.shareholderId) }),
           qc.invalidateQueries({ queryKey: QUERY_KEYS.BANK_ACCOUNTS }),
           qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_TRANSACTIONS }),
+          qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_PAYABLES }),     // ADICIONADO
+          qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_SUMMARY }),      // ADICIONADO
           qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
           qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
         ]);
@@ -155,6 +159,8 @@ export function useDeleteShareholderTransaction() {
           qc.invalidateQueries({ queryKey: QUERY_KEYS.SHAREHOLDER_TOTALS(variables.shareholderId) }),
           qc.invalidateQueries({ queryKey: QUERY_KEYS.BANK_ACCOUNTS }),
           qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_TRANSACTIONS }),
+          qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_PAYABLES }),     // ADICIONADO
+          qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_SUMMARY }),      // ADICIONADO
           qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
           qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
         ]);

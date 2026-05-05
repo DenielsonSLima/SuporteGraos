@@ -53,9 +53,7 @@ const AllOrders: React.FC<Props> = ({ orders, onOrderClick, onDelete, groupBy })
     return <Layers size={18} />;
   };
 
-  if (orders.length === 0) {
-    return <div className="text-center py-10 text-slate-500">Nenhum pedido cadastrado.</div>;
-  }
+  if (orders.length === 0) return null;
 
   if (!groups) {
     return (

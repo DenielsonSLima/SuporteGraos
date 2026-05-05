@@ -49,6 +49,7 @@ export const QUERY_KEYS = {
 
   // ─── Financeiro — operações (FASE 1B) ───────────────────
   TRANSFERS: ['transfers'] as const,
+  TRANSFERS_MONTH_TOTAL: ['transfers_month_total'] as const,
   LOANS: ['loans'] as const,
   LOAN_INSTALLMENTS: ['loan_installments'] as const,
   CREDIT_LINES: ['credit_lines'] as const,

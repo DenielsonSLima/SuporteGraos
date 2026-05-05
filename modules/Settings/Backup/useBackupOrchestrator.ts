@@ -25,7 +25,7 @@ export interface BackupModuleDef {
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const resolveBackupData = async (modId: string) => {
-  if (modId === 'partners') return partnerService.getAll();
+  if (modId === 'partners') return await partnerService.getAll();
   if (modId === 'fleet') return { drivers: fleetService.getAllDrivers(), vehicles: fleetService.getAllVehicles() };
   if (modId === 'purchases') return purchaseService.getAll();
   if (modId === 'sales') return salesService.getAll();
@@ -37,8 +37,8 @@ const resolveBackupData = async (modId: string) => {
   if (modId === 'logs') return logService.getAll();
   if (modId === 'financial_admin') {
     return {
-      expenses: financialActionService.getStandaloneRecords(),
-      transfers: financialActionService.getTransfers()
+      expenses: await financialActionService.getStandaloneRecords(),
+      transfers: await financialActionService.getTransfers()
     };
   }
 

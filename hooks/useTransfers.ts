@@ -32,13 +32,13 @@ export function useTransfersMonthTotal() {
 
   useEffect(() => {
     const unsub = transfersService.subscribeRealtime(() => {
-      queryClient.invalidateQueries({ queryKey: ['transfers_month_total'] });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.TRANSFERS_MONTH_TOTAL });
     });
     return unsub;
   }, [queryClient]);
 
   return useQuery({
-    queryKey: ['transfers_month_total'],
+    queryKey: QUERY_KEYS.TRANSFERS_MONTH_TOTAL,
     queryFn: () => transfersService.getMonthTotal(),
     staleTime: STALE_TIMES.DYNAMIC,
     placeholderData: keepPreviousData,
@@ -60,8 +60,10 @@ export function useCreateTransfer() {
     onSuccess: () => {
       void Promise.all([
         qc.invalidateQueries({ queryKey: QUERY_KEYS.TRANSFERS }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.TRANSFERS_MONTH_TOTAL }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_TRANSACTIONS }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_SUMMARY }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
       ]);
@@ -83,8 +85,10 @@ export function useUpdateTransfer() {
     onSuccess: () => {
       void Promise.all([
         qc.invalidateQueries({ queryKey: QUERY_KEYS.TRANSFERS }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.TRANSFERS_MONTH_TOTAL }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_TRANSACTIONS }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_SUMMARY }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
       ]);
@@ -99,8 +103,10 @@ export function useDeleteTransfer() {
     onSuccess: () => {
       void Promise.all([
         qc.invalidateQueries({ queryKey: QUERY_KEYS.TRANSFERS }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.TRANSFERS_MONTH_TOTAL }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_TRANSACTIONS }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_SUMMARY }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
       ]);

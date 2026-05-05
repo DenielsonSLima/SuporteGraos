@@ -14,16 +14,12 @@ interface Props {
 }
 
 const ActiveOrders: React.FC<Props> = ({ orders, onOrderClick, onFinalize, onDelete, groupBy }) => {
-  const filtered = useMemo(() => 
-    orders.filter(o => ['pending', 'approved', 'transport'].includes(o.status)),
-  [orders]);
-
   // Grouping Logic
   const groups = useMemo(() => {
     if (groupBy === 'none') return null;
 
     // Preprocessa chave uma única vez por pedido
-    const withKeys = filtered.map(order => {
+    const withKeys = orders.map(order => {
       let key = 'Outros';
       if (groupBy === 'month') {
         const date = new Date(order.date);
@@ -52,7 +48,7 @@ const ActiveOrders: React.FC<Props> = ({ orders, onOrderClick, onFinalize, onDel
         orders: value
       }));
 
-  }, [filtered, groupBy]);
+  }, [orders, groupBy]);
 
   const getGroupIcon = () => {
     if (groupBy === 'month') return <Calendar size={18} />;
@@ -61,10 +57,7 @@ const ActiveOrders: React.FC<Props> = ({ orders, onOrderClick, onFinalize, onDel
     return <Layers size={18} />;
   };
 
-  if (filtered.length === 0) {
-    return <div className="text-center py-10 text-slate-500">Nenhum pedido ativo no momento.</div>;
-  }
-
+  if (orders.length === 0) return null;
   // Render Flat List
   if (!groups) {
     return (

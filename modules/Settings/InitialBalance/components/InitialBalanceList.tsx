@@ -56,7 +56,11 @@ const InitialBalanceList: React.FC<Props> = ({ balances, onDelete }) => {
                  </div>
               </td>
               <td className="px-6 py-4 text-right">
-                <span className="text-sm font-black text-emerald-600 bg-emerald-50 px-3 py-1 rounded-xl border border-emerald-100">
+                <span className={`text-sm font-black px-3 py-1 rounded-xl border ${
+                  b.value >= 0 
+                    ? 'text-emerald-600 bg-emerald-50 border-emerald-100' 
+                    : 'text-rose-600 bg-rose-50 border-rose-100'
+                }`}>
                   {currency(b.value)}
                 </span>
               </td>

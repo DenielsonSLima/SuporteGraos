@@ -130,7 +130,7 @@ export const aiTools: FunctionDeclaration[] = [
   }
 ];
 
-export const executeToolAction = (toolName: string, args: any, userName: string) => {
+export const executeToolAction = async (toolName: string, args: any, userName: string) => {
   const today = new Date().toISOString().split('T')[0];
 
   try {
@@ -150,7 +150,8 @@ export const executeToolAction = (toolName: string, args: any, userName: string)
 
       case 'delete_record':
         if (args.type === 'partner') {
-            const p = partnerService.getAll().find(i => i.name.toLowerCase().includes(args.search_term.toLowerCase()));
+            const allPartners = await partnerService.getAll();
+            const p = allPartners.find(i => i.name.toLowerCase().includes(args.search_term.toLowerCase()));
             if (!p) return { success: false, message: "❌ Parceiro não encontrado." };
             
             // 🔴 Pedir confirmação se ainda não foi confirmado
@@ -158,12 +159,13 @@ export const executeToolAction = (toolName: string, args: any, userName: string)
               return { success: false, message: `⚠️ Você tem certeza que quer DELETAR o parceiro "${p.name}"? Responda "SIM" para confirmar.` };
             }
             
-            partnerService.delete(p.id);
+            await partnerService.delete(p.id);
             aiContextCache.invalidateAll();
             return { success: true, message: `✅ Parceiro "${p.name}" foi excluído.` };
         } 
         else if (args.type === 'financial') {
-            const rec = financialActionService.getStandaloneRecords().find(r => r.description.toLowerCase().includes(args.search_term.toLowerCase()));
+            const standaloneRecords = await financialActionService.getStandaloneRecords();
+            const rec = standaloneRecords.find(r => r.description.toLowerCase().includes(args.search_term.toLowerCase()));
             if (!rec) return { success: false, message: "❌ Lançamento não encontrado." };
             
             // 🔴 Pedir confirmação se ainda não foi confirmado
@@ -171,7 +173,7 @@ export const executeToolAction = (toolName: string, args: any, userName: string)
               return { success: false, message: `⚠️ Você tem certeza que quer DELETAR o lançamento "${rec.description}" de R$ ${rec.originalValue.toLocaleString('pt-BR')}? Responda "SIM" para confirmar.` };
             }
             
-            financialActionService.deleteStandaloneRecord(rec.id);
+            await financialActionService.deleteStandaloneRecord(rec.id);
             aiContextCache.invalidateAll();
             return { success: true, message: `✅ Lançamento "${rec.description}" foi excluído.` };
         }
@@ -196,14 +198,15 @@ export const executeToolAction = (toolName: string, args: any, userName: string)
         }
         
         if (args.type === 'partner') {
-            const p = partnerService.getAll().find(i => i.name.toLowerCase().includes(args.search_term.toLowerCase()));
+            const allPartners = await partnerService.getAll();
+            const p = allPartners.find(i => i.name.toLowerCase().includes(args.search_term.toLowerCase()));
             if (!p) return { success: false, message: `❌ Parceiro não encontrado com termo "${args.search_term}".` };
             
             const fieldMap: any = { 'telefone': 'phone', 'email': 'email', 'nome': 'name', 'documento': 'document' };
             const field = fieldMap[args.field.toLowerCase()] || args.field;
             
             try {
-              partnerService.update({ ...p, [field]: args.new_value.trim() });
+              await partnerService.update({ ...p, [field]: args.new_value.trim() });
               aiContextCache.invalidateAll();
               return { success: true, message: `✅ Parceiro "${p.name}" teve ${args.field} atualizado para "${args.new_value.trim()}".` };
             } catch (e: any) {
@@ -233,8 +236,8 @@ export const executeToolAction = (toolName: string, args: any, userName: string)
         }
         
         // ✅ Criar despesa com validações
-        financialActionService.addAdminExpense({
-            id: Math.random().toString(36).substr(2, 9),
+        await financialActionService.addAdminExpense({
+            id: crypto.randomUUID(),
             description: args.description.trim(),
             entityName: 'Lançamento IA',
             category: args.category || 'Outros',
@@ -244,7 +247,7 @@ export const executeToolAction = (toolName: string, args: any, userName: string)
             dueDate: today,
             issueDate: today,
             subType: 'admin',
-            bankAccount: bank ? bank.bankName : 'Caixa'
+            bankAccount: bank ? bank.id : undefined // Use ID instead of name
         });
         
         // 🟢 Invalidar cache para refletir nova despesa
@@ -286,7 +289,8 @@ export const executeToolAction = (toolName: string, args: any, userName: string)
         }
         
         // Validar duplicata
-        const existingPartner = partnerService.getAll().find(p => 
+        const allPartnersList = await partnerService.getAll();
+        const existingPartner = allPartnersList.find(p => 
           p.document === args.document.trim()
         );
         
@@ -295,8 +299,8 @@ export const executeToolAction = (toolName: string, args: any, userName: string)
         }
         
         // ✅ Criar parceiro com validações
-        partnerService.add({
-            id: Math.random().toString(36).substr(2, 9),
+        await partnerService.add({
+            id: crypto.randomUUID(),
             name: args.name.trim(),
             document: args.document.trim(),
             type: args.type,
@@ -331,7 +335,7 @@ export const executeToolAction = (toolName: string, args: any, userName: string)
         // ✅ Criar pedido com validações
         const isBuy = args.type === 'compra';
         const orderData = {
-            id: Math.random().toString(36).substr(2, 9),
+            id: crypto.randomUUID(),
             number: `${isBuy?'PC':'PV'}-IA-${Math.floor(Math.random()*999)}`,
             date: today,
             status: 'approved',
@@ -342,9 +346,9 @@ export const executeToolAction = (toolName: string, args: any, userName: string)
         
         try {
           if (isBuy) {
-              purchaseService.add({ ...orderData, partnerName: args.partner_name.trim(), partnerId: 'temp', partnerDocument: '000', partnerCity: '', partnerState: '', items: [], transactions: [], useRegisteredLocation: true, loadingCity: '', loadingState: '', harvest: 'Atual', hasBroker: false } as any);
+              await purchaseService.add({ ...orderData, partnerName: args.partner_name.trim(), partnerId: 'temp', partnerDocument: '000', partnerCity: '', partnerState: '', items: [], transactions: [], useRegisteredLocation: true, loadingCity: '', loadingState: '', harvest: 'Atual', hasBroker: false } as any);
           } else {
-              salesService.add({ ...orderData, customerName: args.partner_name.trim(), customerId: 'temp', customerDocument: '000', customerCity: '', customerState: '', productName: 'Grãos', quantity: orderQuantity, unitPrice: orderPrice, transactions: [], loadings: [] } as any);
+              await salesService.add({ ...orderData, customerName: args.partner_name.trim(), customerId: 'temp', customerDocument: '000', customerCity: '', customerState: '', productName: 'Grãos', quantity: orderQuantity, unitPrice: orderPrice, transactions: [], loadings: [] } as any);
           }
           
           aiContextCache.invalidateAll();
@@ -360,8 +364,8 @@ export const executeToolAction = (toolName: string, args: any, userName: string)
           return { success: false, message: "❌ Descrição do título é obrigatória." };
         }
         
-        const payables = financialIntegrationService.getPayables();
-        const target = payables.find(p => p.description.toLowerCase().includes(args.search_term.toLowerCase()) || p.entityName.toLowerCase().includes(args.search_term.toLowerCase()));
+        const allPayables = await financialIntegrationService.getPayables();
+        const target = allPayables.find(p => p.description.toLowerCase().includes(args.search_term.toLowerCase()) || p.entityName.toLowerCase().includes(args.search_term.toLowerCase()));
         
         if (!target) {
           return { success: false, message: `❌ Título não encontrado com termo "${args.search_term}".` };
@@ -387,7 +391,7 @@ export const executeToolAction = (toolName: string, args: any, userName: string)
         
         // ✅ Processar baixa com validações
         try {
-          financialActionService.processRecord(target.id, {
+          await financialActionService.processRecord(target.id, {
               date: today,
               amount: settleAmount,
               discount: 0,
@@ -412,39 +416,39 @@ export const executeToolAction = (toolName: string, args: any, userName: string)
           
           switch (args.category) {
             case 'purchases':
-              const purchases = purchaseService.getAll()
+              const purchases = (await purchaseService.loadFromSupabase())
                 .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
                 .slice(0, limit);
               
               results = purchases.map(p => 
-                `📦 COMPRA #${p.orderNumber || p.id.slice(0,8)} - ${p.partnerName} | ${formatDate(p.date)} | ${p.quantity}kg × ${formatMoney(p.price)}/kg = ${formatMoney((p.quantity || 0) * (p.price || 0))} | Status: ${p.status}`
+                `📦 COMPRA #${p.number || p.id.slice(0,8)} - ${p.partnerName} | ${formatDate(p.date)} | ${p.totalValue} | Status: ${p.status}`
               );
               break;
               
             case 'sales':
-              const sales = salesService.getAll()
-                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+              const sales = await salesService.getAll();
+              const sortedSales = sales.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
                 .slice(0, limit);
               
-              results = sales.map(s => 
-                `💰 VENDA #${s.orderNumber || s.id.slice(0,8)} - ${s.partnerName} | ${formatDate(s.date)} | ${s.quantity}kg × ${formatMoney(s.price)}/kg = ${formatMoney((s.quantity || 0) * (s.price || 0))} | Status: ${s.status}`
+              results = sortedSales.map(s => 
+                `💰 VENDA #${s.number || s.id.slice(0,8)} - ${s.customerName} | ${formatDate(s.date)} | ${formatMoney(s.totalValue)} | Status: ${s.status}`
               );
               break;
               
             case 'loadings':
-              const loadings = loadingService.getAll()
-                .filter(l => l.status !== 'canceled')
+              const loadingsList = await loadingService.loadFromSupabase();
+              const loadings = loadingsList.filter(l => l.status !== 'canceled')
                 .sort((a, b) => new Date(b.unloadDate || b.loadDate).getTime() - new Date(a.unloadDate || a.loadDate).getTime())
                 .slice(0, limit);
               
               results = loadings.map(l => 
-                `🚛 CARREGAMENTO - ${l.driver || 'Sem motorista'} | Placa: ${l.vehiclePlate || 'N/A'} | ${formatDate(l.unloadDate || l.loadDate)} | Peso Bruto: ${l.grossWeightKg || 0}kg | Peso Líquido: ${l.netWeightKg || 0}kg | Quebra: ${l.breakageKg || 0}kg (${l.breakagePercent || 0}%)`
+                `🚛 CARREGAMENTO - ${l.driverName || 'Sem motorista'} | Placa: ${l.vehiclePlate || 'N/A'} | ${formatDate(l.unloadDate || l.loadDate)} | Peso Bruto: ${l.grossWeightKg || 0}kg | Peso Líquido: ${l.netWeightKg || 0}kg | Quebra: ${l.breakageKg || 0}kg`
               );
               break;
               
             case 'payables':
-              const payables = financialIntegrationService.getPayables()
-                .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
+              const payablesList = await financialIntegrationService.getPayables();
+              const payables = payablesList.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
                 .slice(0, limit);
               
               results = payables.map(p => {
@@ -454,8 +458,8 @@ export const executeToolAction = (toolName: string, args: any, userName: string)
               break;
               
             case 'receivables':
-              const receivables = financialIntegrationService.getReceivables()
-                .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
+              const receivablesList = await financialIntegrationService.getReceivables();
+              const receivables = receivablesList.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
                 .slice(0, limit);
               
               results = receivables.map(r => {
@@ -465,19 +469,19 @@ export const executeToolAction = (toolName: string, args: any, userName: string)
               break;
               
             case 'all':
-              const allPurchases = purchaseService.getAll().length;
-              const allSales = salesService.getAll().length;
-              const allLoadings = loadingService.getAll().filter(l => l.status !== 'canceled').length;
-              const allPayables = financialIntegrationService.getPayables().filter(p => p.status !== 'paid').length;
-              const allReceivables = financialIntegrationService.getReceivables().filter(r => r.status !== 'paid').length;
+              const purchasesCount = (await purchaseService.loadFromSupabase()).length;
+              const salesCount = (await salesService.getAll()).length;
+              const loadingsCount = (await loadingService.loadFromSupabase()).filter(l => l.status !== 'canceled').length;
+              const payablesCount = (await financialIntegrationService.getPayables()).filter(p => p.status !== 'paid').length;
+              const receivablesCount = (await financialIntegrationService.getReceivables()).filter(r => r.status !== 'paid').length;
               
               results = [
                 `📊 RESUMO GERAL DO SISTEMA:`,
-                `• Total de Compras: ${allPurchases}`,
-                `• Total de Vendas: ${allSales}`,
-                `• Total de Carregamentos: ${allLoadings}`,
-                `• Contas a Pagar Pendentes: ${allPayables}`,
-                `• Contas a Receber Pendentes: ${allReceivables}`
+                `• Total de Compras: ${purchasesCount}`,
+                `• Total de Vendas: ${salesCount}`,
+                `• Total de Carregamentos: ${loadingsCount}`,
+                `• Contas a Pagar Pendentes: ${payablesCount}`,
+                `• Contas a Receber Pendentes: ${receivablesCount}`
               ];
               break;
               

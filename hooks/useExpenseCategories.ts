@@ -60,6 +60,15 @@ export function useDeleteExpenseCategory() {
   });
 }
 
+export function useToggleExpenseCategoryStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (params: { id: string; active: boolean }) =>
+      expenseCategoryService.toggleCategoryStatus(params.id, params.active),
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: QUERY_KEYS.EXPENSE_CATEGORIES }); },
+  });
+}
+
 // ─── Subcategory Mutations ────────────────────────────────────
 
 export function useAddExpenseSubcategory() {
@@ -85,6 +94,15 @@ export function useDeleteExpenseSubcategory() {
   return useMutation({
     mutationFn: (subcategoryId: string) =>
       expenseCategoryService.deleteSubcategory(subcategoryId),
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: QUERY_KEYS.EXPENSE_CATEGORIES }); },
+  });
+}
+
+export function useToggleExpenseSubcategoryStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (params: { id: string; active: boolean }) =>
+      expenseCategoryService.toggleSubcategoryStatus(params.id, params.active),
     onSuccess: () => { void qc.invalidateQueries({ queryKey: QUERY_KEYS.EXPENSE_CATEGORIES }); },
   });
 }

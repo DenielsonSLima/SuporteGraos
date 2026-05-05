@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import type { ExpenseCategory, ExpenseSubtype } from '../../../services/expenseCategoryService';
 import { useToast } from '../../../contexts/ToastContext';
-import { useExpenseCategories, useAddExpenseCategory, useDeleteExpenseCategory, useAddExpenseSubcategory, useDeleteExpenseSubcategory } from '../../../hooks/useExpenseCategories';
+import { useExpenseCategories, useAddExpenseCategory, useUpdateExpenseCategory, useDeleteExpenseCategory, useToggleExpenseCategoryStatus, useAddExpenseSubcategory, useUpdateExpenseSubcategory, useDeleteExpenseSubcategory, useToggleExpenseSubcategoryStatus } from '../../../hooks/useExpenseCategories';
 import ExpenseTypeForm from './components/ExpenseTypeForm';
 import ExpenseCategoryGrid from './components/ExpenseCategoryGrid';
 
@@ -14,9 +14,13 @@ const ExpenseTypesSettings: React.FC<Props> = ({ onBack }) => {
   const { addToast } = useToast();
   const { data: categories = [], isLoading } = useExpenseCategories();
   const addCategory = useAddExpenseCategory();
+  const updateCategory = useUpdateExpenseCategory();
   const deleteCategory = useDeleteExpenseCategory();
+  const toggleCategoryStatus = useToggleExpenseCategoryStatus();
   const addSubcategory = useAddExpenseSubcategory();
+  const updateSubcategory = useUpdateExpenseSubcategory();
   const deleteSubcategoryMutation = useDeleteExpenseSubcategory();
+  const toggleSubcategoryStatus = useToggleExpenseSubcategoryStatus();
 
   const [viewMode, setViewMode] = useState<'list' | 'form'>('list');
   const [searchTerm, setSearchTerm] = useState('');
@@ -50,6 +54,48 @@ const ExpenseTypesSettings: React.FC<Props> = ({ onBack }) => {
       addToast('error', 'Erro ao Excluir', error.message);
     }
     setCategoryToDeleteId(null);
+  };
+
+  const handleEditSubtype = async (sub: ExpenseSubtype) => {
+    const newName = window.prompt('Novo nome para o item:', sub.name);
+    if (newName && newName.trim() !== sub.name) {
+      try {
+        await updateSubcategory.mutateAsync({ subcategoryId: sub.id, name: newName.trim() });
+        addToast('success', 'Item atualizado');
+      } catch (err: any) {
+        addToast('error', 'Erro ao atualizar', err.message);
+      }
+    }
+  };
+
+  const handleToggleSubtypeStatus = async (sub: ExpenseSubtype) => {
+    try {
+      await toggleSubcategoryStatus.mutateAsync({ id: sub.id, active: sub.active ?? true });
+      addToast('success', sub.active ? 'Item inativado' : 'Item ativado');
+    } catch (err: any) {
+      addToast('error', 'Erro ao alterar status', err.message);
+    }
+  };
+
+  const handleEditCategory = async (cat: ExpenseCategory) => {
+    const newName = window.prompt('Novo nome para a categoria:', cat.name);
+    if (newName && newName.trim() !== cat.name) {
+      try {
+        await updateCategory.mutateAsync({ id: cat.id, input: { name: newName.trim() } });
+        addToast('success', 'Categoria atualizada');
+      } catch (err: any) {
+        addToast('error', 'Erro ao atualizar', err.message);
+      }
+    }
+  };
+
+  const handleToggleCategoryStatus = async (cat: ExpenseCategory) => {
+    try {
+      await toggleCategoryStatus.mutateAsync({ id: cat.id, active: cat.active ?? true });
+      addToast('success', cat.active ? 'Categoria inativada' : 'Categoria ativada');
+    } catch (err: any) {
+      addToast('error', 'Erro ao alterar status', err.message);
+    }
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -122,6 +168,10 @@ const ExpenseTypesSettings: React.FC<Props> = ({ onBack }) => {
       onDeleteCategoryConfirm={confirmDeleteCategory}
       onDeleteCategoryCancel={() => setCategoryToDeleteId(null)}
       onBack={onBack}
+      onEditSubtype={handleEditSubtype}
+      onToggleSubtypeStatus={handleToggleSubtypeStatus}
+      onEditCategory={handleEditCategory}
+      onToggleCategoryStatus={handleToggleCategoryStatus}
     />
   );
 };

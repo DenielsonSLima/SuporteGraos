@@ -11,6 +11,8 @@ import { financialActionService } from '../../../../services/financialActionServ
 import { useAccounts } from '../../../../hooks/useAccounts';
 import { useToast } from '../../../../contexts/ToastContext';
 import { ModuleId } from '../../../../types';
+import { useQueryClient } from '@tanstack/react-query';
+import { QUERY_KEYS } from '../../../../hooks/queryKeys';
 
 // SHARED COMPONENTS
 import FinancialEntityCard from '../../components/shared/FinancialEntityCard';
@@ -35,6 +37,7 @@ const UnifiedPayableManager: React.FC<Props> = ({ records, onRefresh, type, sear
   const { data: rawAccounts = [] } = useAccounts();
   const accountsList = rawAccounts.filter(a => a.is_active !== false);
   const { addToast } = useToast();
+  const queryClient = useQueryClient();
 
   const [modalType, setModalType] = useState<'purchase' | 'freight' | 'generic' | 'quick_view' | null>(null);
   const [selectedRecordForSinglePay, setSelectedRecordForSinglePay] = useState<FinancialRecord | null>(null);
@@ -93,14 +96,24 @@ const UnifiedPayableManager: React.FC<Props> = ({ records, onRefresh, type, sear
         await financialActionService.processRecord(selectedRecordForSinglePay.id, data, selectedRecordForSinglePay.subType);
         addToast('success', 'Pagamento registrado com sucesso!');
       } else {
-        for (const id of selectedIds) {
-          const record = records.find(r => r.id === id);
-          if (record) {
-            const balance = record.remainingValue || 0;
-            await financialActionService.processRecord(id, { ...data, amount: balance, discount: 0 }, record.subType);
-          }
+        const results = await Promise.allSettled(
+          selectedIds.map(id => {
+            const record = records.find(r => r.id === id);
+            if (!record) return Promise.resolve();
+            return financialActionService.processRecord(
+              id,
+              { ...data, amount: record.remainingValue || 0 },
+              record.subType
+            );
+          })
+        );
+        const failed = results.filter(r => r.status === 'rejected').length;
+        const succeeded = results.length - failed;
+        if (failed > 0) {
+          addToast('error', `${succeeded} pagamentos registrados, ${failed} falharam.`);
+        } else {
+          addToast('success', `${succeeded} pagamentos registrados!`);
         }
-        addToast('success', `${selectedIds.length} pagamentos registrados!`);
       }
     } catch (err) {
       addToast('error', 'Erro ao processar pagamento');
@@ -109,6 +122,19 @@ const UnifiedPayableManager: React.FC<Props> = ({ records, onRefresh, type, sear
       setSelectedRecordForSinglePay(null);
       setSelectedIds([]);
       setIsProcessing(false);
+      
+      // Invalidação completa — todos os módulos que dependem de dados financeiros
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_PAYABLES }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_RECEIVABLES }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_SUMMARY }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_TRANSACTIONS }),
+      ]);
+
       onRefresh();
     }
   };
