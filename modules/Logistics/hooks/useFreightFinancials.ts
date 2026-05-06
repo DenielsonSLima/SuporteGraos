@@ -2,12 +2,14 @@
 import { useState, useMemo } from 'react';
 import { Freight } from '../types';
 import { financialActionService } from '../../../services/financialActionService';
-import { advanceService } from '../../Financial/Advances/services/advanceService';
+import { advancesService } from '../../../services/advancesService';
 import { useLoadings } from '../../../hooks/useLoadings';
 import { useQueryClient } from '@tanstack/react-query';
 import { QUERY_KEYS } from '../../../hooks/queryKeys';
 import { useToast } from '../../../contexts/ToastContext';
 import { useAdvanceSummaries } from '../../../hooks/useAdvances';
+
+const VIRTUAL_ACCOUNT_ID = '97e8bd30-3ba1-4658-a51e-5df6ce184845'; // Contas Virtuais
 
 export interface CarrierGroup {
   name: string;
@@ -114,14 +116,14 @@ export const useFreightFinancials = (freights: Freight[], onRefresh: () => void)
       // Encontra o ID do parceiro através de um dos fretes (assumindo mesmo ID) or busca no service
       const loadingRef = loadings.find((l: any) => l.id === selectedFreightIds[0]);
       if (loadingRef) {
-        advanceService.addTransaction({
-          partnerId: loadingRef.carrierId,
-          partnerName: loadingRef.carrierName,
-          type: 'taken', // TAKEN reduz o saldo (é como se tivéssemos "recebido" o serviço pago com o adiantamento)
+        await advancesService.create({
+          recipientId: loadingRef.carrierId,
+          recipientType: 'client', // TAKEN reduz o saldo (é como se tivéssemos "recebido" o serviço pago com o adiantamento)
+          amount: remainingMoney,
+          accountId: VIRTUAL_ACCOUNT_ID,
           date: data.date,
-          value: remainingMoney,
-          description: `Baixa de Fretes (Placas: ${selectedCarrier.freights.filter(f => selectedFreightIds.includes(f.id)).map(f => f.vehiclePlate).join(', ')})`
-        });
+          description: `Consumo de Saldo p/ Baixa de Fretes (Placas: ${selectedCarrier.freights.filter(f => selectedFreightIds.includes(f.id)).map(f => f.vehiclePlate).join(', ')})`
+        } as any);
       }
     }
 
@@ -147,7 +149,7 @@ export const useFreightFinancials = (freights: Freight[], onRefresh: () => void)
             ...data,
             amount: paymentPart,
             discount: discountPart,
-            accountId: isUsingAdvance ? 'advance_virtual' : data.accountId, // Se usar adiantamento, não mexe no banco
+            accountId: isUsingAdvance ? VIRTUAL_ACCOUNT_ID : data.accountId, // Se usar adiantamento, não mexe no banco
             accountName: isUsingAdvance ? 'SALDO ADIANTAMENTO' : data.accountName,
             notes: `${data.notes || 'Baixa de Frete'} ${isUsingAdvance ? '(Via Adiantamento)' : ''} - Placa ${freight.vehiclePlate}`
           };

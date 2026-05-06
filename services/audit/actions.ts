@@ -15,7 +15,6 @@ import { auditLogsDb, userSessionsDb, loginHistoryDb } from './store';
 import type { AuditLog, UserSession, LoginHistory } from './types';
 
 const persistAuditLog = async (log: AuditLog) => {
-  if (isSqlCanonicalOpsEnabled()) return;
   try {
     await waitForInit();
     const payload = mapAuditLogToDb(log);
@@ -29,7 +28,6 @@ const persistAuditLog = async (log: AuditLog) => {
 };
 
 const persistUserSession = async (session: UserSession) => {
-  if (isSqlCanonicalOpsEnabled()) return;
   try {
     await waitForInit();
     const payload = mapUserSessionToDb(session);
@@ -90,7 +88,7 @@ export const logAction = async (action: AuditLog['action'], module: string, desc
   entityId?: string;
   metadata?: any;
 }) => {
-  const { userId, userName, userEmail } = getCurrentUser();
+  const { userId, userName, userEmail, companyId } = getCurrentUser();
   const clientInfo = getClientInfo();
 
   const log: AuditLog = {
@@ -106,6 +104,7 @@ export const logAction = async (action: AuditLog['action'], module: string, desc
     ipAddress: clientInfo.ipAddress,
     userAgent: clientInfo.userAgent,
     metadata: options?.metadata,
+    companyId: options?.metadata?.companyId || companyId || undefined,
     createdAt: new Date().toISOString()
   };
 
@@ -114,7 +113,8 @@ export const logAction = async (action: AuditLog['action'], module: string, desc
 };
 
 export const createSession = async (companyId?: string): Promise<UserSession> => {
-  const { userId, userName, userEmail } = getCurrentUser();
+  const { userId, userName, userEmail, companyId: userCompanyId } = getCurrentUser();
+  const finalCompanyId = companyId || userCompanyId;
   const clientInfo = getClientInfo();
 
   await enforceActiveSessionLimit(userId);
@@ -130,7 +130,7 @@ export const createSession = async (companyId?: string): Promise<UserSession> =>
     browserInfo: clientInfo.browserInfo,
     deviceInfo: clientInfo.deviceInfo,
     status: 'active',
-    companyId,
+    companyId: finalCompanyId,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
@@ -156,7 +156,7 @@ export const closeSession = async (sessionId: string) => {
 
 export const recordLogin = async (userEmail: string, success: boolean, failureReason?: string): Promise<LoginHistory> => {
   const clientInfo = getClientInfo();
-  const { userName, userId } = getCurrentUser();
+  const { userName, userId, companyId } = getCurrentUser();
 
   const login: LoginHistory = {
     id: crypto.randomUUID(),
@@ -169,6 +169,7 @@ export const recordLogin = async (userEmail: string, success: boolean, failureRe
     userAgent: clientInfo.userAgent,
     browserInfo: clientInfo.browserInfo,
     deviceInfo: clientInfo.deviceInfo,
+    companyId: companyId || undefined,
     createdAt: new Date().toISOString()
   };
 

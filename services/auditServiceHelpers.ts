@@ -13,7 +13,8 @@ export const getCurrentUser = () => {
   return {
     userId: isValidUuid(user?.id) ? user!.id : null,
     userName: user?.name || 'Sistema',
-    userEmail: user?.email || 'system@system.com'
+    userEmail: user?.email || 'system@system.com',
+    companyId: user?.companyId || null
   };
 };
 
@@ -173,8 +174,27 @@ export const USER_SESSION_FIELDS = 'id,user_id,user_name,user_email,session_star
 export const LOGIN_HISTORY_FIELDS = 'id,user_email,user_name,user_id,login_type,failure_reason,ip_address,user_agent,browser_info,device_info,location,two_factor_used,session_id,company_id,created_at';
 
 export const buildDateRangeFilters = (query: any, startDate?: string, endDate?: string) => {
-  if (startDate) query = query.gte('created_at', `${startDate}T00:00:00.000Z`);
-  if (endDate) query = query.lte('created_at', `${endDate}T23:59:59.999Z`);
+  const formatIsoDate = (dateStr: string, time: string) => {
+    // If it's already YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+      return `${dateStr}T${time}`;
+    }
+    // If it's DD/MM/YYYY
+    const ddmmyyyy = dateStr.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (ddmmyyyy) {
+      return `${ddmmyyyy[3]}-${ddmmyyyy[2]}-${ddmmyyyy[1]}T${time}`;
+    }
+    return dateStr; // Fallback
+  };
+
+  if (startDate) {
+    const isoStart = formatIsoDate(startDate, '00:00:00.000Z');
+    query = query.gte('created_at', isoStart);
+  }
+  if (endDate) {
+    const isoEnd = formatIsoDate(endDate, '23:59:59.999Z');
+    query = query.lte('created_at', isoEnd);
+  }
   return query;
 };
 

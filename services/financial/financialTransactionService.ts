@@ -205,6 +205,13 @@ export const financialTransactionService = {
     async delete(txId: string) {
         if (!txId) return;
 
+        // 0. Fetch for audit log BEFORE deletion
+        const { data: existing } = await supabase
+            .from('financial_transactions')
+            .select('description, amount, type')
+            .eq('id', txId)
+            .maybeSingle();
+
         const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(txId);
 
         if (isValidUUID) {
@@ -217,6 +224,30 @@ export const financialTransactionService = {
             // Fallback para delete por REF ou ORIGIN se não for UUID (caso de despesas extras)
             await this.deleteByRef(txId);
             await this.deleteByOrigin(txId);
+        }
+
+        // 1. Log the action
+        if (existing) {
+            const { authService } = await import('../authService');
+            const { logService } = await import('../logService');
+            const { auditService } = await import('../auditService');
+            const user = authService.getCurrentUser();
+            const logDesc = `Excluiu transação: ${existing.description} (R$ ${existing.amount})`;
+            
+            logService.addLog({
+                userId: user?.id || 'system',
+                userName: user?.name || 'Sistema',
+                action: 'delete',
+                module: 'Financeiro',
+                description: logDesc,
+                entityId: txId
+            });
+
+            void auditService.logAction('delete', 'Financeiro', logDesc, { 
+                entityType: 'FinancialTransaction', 
+                entityId: txId,
+                metadata: { amount: existing.amount, type: existing.type }
+            });
         }
     },
 

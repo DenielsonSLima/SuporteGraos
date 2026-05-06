@@ -1,5 +1,6 @@
 import { supabase } from '../supabase';
 import { Advance } from './types';
+import { PartnerAdvanceSummary } from '../../modules/Financial/Advances/types';
 
 export function mapRow(row: any): Advance {
   return {
@@ -48,4 +49,23 @@ export const advancesLoader = {
     if (error) throw new Error(`Erro ao buscar adiantamentos abertos: ${error.message}`);
     return (data ?? []).map(mapRow);
   },
+
+  getSummaries: async (): Promise<PartnerAdvanceSummary[]> => {
+    const { data, error } = await supabase
+      .from('v_advances_summaries')
+      .select('*');
+
+    if (error) {
+      console.error('Erro ao buscar sumários de adiantamentos:', error);
+      return [];
+    }
+
+    return (data || []).map(row => ({
+      partnerId: row.partner_id,
+      partnerName: row.partner_name,
+      totalGiven: parseFloat(row.total_given ?? '0'),
+      totalTaken: parseFloat(row.total_taken ?? '0'),
+      netBalance: parseFloat(row.net_balance ?? '0'),
+    }));
+  }
 };

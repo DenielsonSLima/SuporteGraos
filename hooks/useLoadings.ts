@@ -8,6 +8,15 @@ import { QUERY_KEYS } from './queryKeys';
 import { loadingService } from '../services/loadingService';
 
 export function useLoadings() {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const unsubscribe = loadingService.subscribeRealtime(() => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOADINGS });
+    });
+    return () => unsubscribe();
+  }, [queryClient]);
+
   return useQuery({
     queryKey: QUERY_KEYS.LOADINGS,
     queryFn: () => loadingService.loadFromSupabase(),

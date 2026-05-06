@@ -113,7 +113,7 @@ const LogisticsModule: React.FC = () => {
       <div className="min-h-[400px]">
         {activeTab === 'open' && <OpenFreights freights={filteredFreights} onFreightClick={(f) => setSelectedLoading(findLoadingById(f.id))} />}
         {activeTab === 'all' && <AllFreights freights={filteredFreights} onFreightClick={(f) => setSelectedLoading(findLoadingById(f.id))} />}
-        {activeTab === 'financial' && <FreightFinancials freights={filteredFreights} onManageFinancials={(f) => setSelectedLoading(findLoadingById(f.id))} />}
+        {activeTab === 'financial' && <FreightFinancials freights={filteredFreights} carrierFilter={carrierFilter} onManageFinancials={(f) => setSelectedLoading(findLoadingById(f.id))} />}
       </div>
 
       {selectedLoading && <LoadingManagement loading={selectedLoading} onClose={() => setSelectedLoading(null)} onUpdate={() => { queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOADINGS }); }} originContext="logistics" />}

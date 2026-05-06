@@ -38,10 +38,6 @@ export const fetchAuditLogsPage = async (options: {
   startDate?: string;
   endDate?: string;
 }) => {
-  if (isSqlCanonicalOpsEnabled()) {
-    return { items: [], nextCursor: undefined, hasMore: false };
-  }
-
   await waitForInit();
   let query = supabase
     .from('audit_logs')
@@ -73,10 +69,6 @@ export const fetchUserSessionsPage = async (options: {
   startDate?: string;
   endDate?: string;
 }) => {
-  if (isSqlCanonicalOpsEnabled()) {
-    return { items: [], nextCursor: undefined, hasMore: false };
-  }
-
   await waitForInit();
   let query = supabase
     .from('user_sessions')
@@ -142,7 +134,6 @@ export const fetchLoginHistoryPage = async (options: {
 };
 
 export const fetchActiveSessionsCount = async (options?: { minutes?: number }) => {
-  if (isSqlCanonicalOpsEnabled()) return 0;
   const minutes = options?.minutes ?? 60;
   const thresholdIso = new Date(Date.now() - minutes * 60 * 1000).toISOString();
   await waitForInit();

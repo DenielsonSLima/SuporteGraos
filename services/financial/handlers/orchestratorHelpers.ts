@@ -99,6 +99,8 @@ export const registerFinancialRecords = async (params: RegisterFinancialParams) 
     driverName
   } = params;
 
+  const enhancedDescription = `${description}${accountName ? ` (Conta: ${accountName})` : ''}`;
+
   const isPureAdjustment = amount === 0 && discount > 0;
   const company = companyId || getCompanyId();
   const canonicalOps = isSqlCanonicalOpsEnabled();
@@ -124,7 +126,7 @@ export const registerFinancialRecords = async (params: RegisterFinancialParams) 
 
       txResult = await financialTransactionService.add({
         date,
-        description: `${description} [REF:${txId}] [ORIGIN:${recordId}]`,
+        description: `${enhancedDescription} [REF:${txId}] [ORIGIN:${recordId}]`,
         amount,
         type,
         bankAccountId: accountId,
@@ -149,7 +151,7 @@ export const registerFinancialRecords = async (params: RegisterFinancialParams) 
         balanceBefore: 0, 
         balanceAfter: 0,
         bankAccountId: resolveAccountId(accountId),
-        description,
+        description: enhancedDescription,
         partnerId,
         referenceType,
         referenceId,
@@ -167,7 +169,7 @@ export const registerFinancialRecords = async (params: RegisterFinancialParams) 
     const { standaloneRecordsService } = await import('../../standaloneRecordsService');
     await standaloneRecordsService.add({
       id: crypto.randomUUID(),
-      description: `${isPureAdjustment ? 'Abatimento' : 'Baixa'}: ${description}`,
+      description: `${isPureAdjustment ? 'Abatimento' : 'Baixa'}: ${enhancedDescription}`,
       entityName,
       driverName,
       category: isPureAdjustment ? 'Desconto/Ajuste' : `Liquidação - ${historyType}`,

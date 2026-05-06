@@ -2,12 +2,14 @@
 import { useState, useMemo, useCallback } from 'react';
 import { Freight } from '../types';
 import { financialActionService } from '../../../services/financialActionService';
-import { advanceService } from '../../Financial/Advances/services/advanceService';
+import { advancesService } from '../../../services/advancesService';
 import { useLoadings } from '../../../hooks/useLoadings';
 import { useQueryClient } from '@tanstack/react-query';
 import { QUERY_KEYS } from '../../../hooks/queryKeys';
 import { useToast } from '../../../contexts/ToastContext';
 import { useAdvanceSummaries } from '../../../hooks/useAdvances';
+
+const VIRTUAL_ACCOUNT_ID = '97e8bd30-3ba1-4658-a51e-5df6ce184845'; // Contas Virtuais
 
 export const useCarrierFinancials = (carrierName: string, allFreights: Freight[], onRefreshParent: () => void) => {
   const { addToast } = useToast();
@@ -59,78 +61,81 @@ export const useCarrierFinancials = (carrierName: string, allFreights: Freight[]
     }
   };
 
-  const processPayment = (paymentData: any) => {
+  const processPayment = async (paymentData: any) => {
     let remainingMoney = Number(paymentData.amount) || 0;
     let remainingDiscount = Number(paymentData.discount) || 0;
     const isUsingAdvance = paymentData.useAdvanceBalance === true;
 
-    // Se usar saldo, precisamos registrar o débito no módulo de adiantamentos
-    if (isUsingAdvance && remainingMoney > 0) {
-        // Pega ID do parceiro de uma das cargas
-        const loadingRef = loadings.find(l => l.id === selectedFreightIds[0]);
-        if (loadingRef) {
-            advanceService.addTransaction({
-                partnerId: loadingRef.carrierId,
-                partnerName: loadingRef.carrierName,
-                type: 'taken', // TAKEN reduz o saldo (consumo do crédito)
-                date: paymentData.date,
-                value: remainingMoney,
-                description: `Baixa de Fretes (Ref: ${loadingRef.vehiclePlate} e outros)`
-            });
-        }
-    }
+    try {
+      // Se usar saldo, precisamos registrar o débito no módulo de adiantamentos
+      if (isUsingAdvance && remainingMoney > 0) {
+          // Pega ID do parceiro de uma das cargas
+          const loadingRef = loadings.find(l => l.id === selectedFreightIds[0]);
+          if (loadingRef) {
+              await advancesService.create({
+                  recipientId: loadingRef.carrierId,
+                  recipientType: 'client', // TAKEN reduz o saldo (consumo do crédito)
+                  amount: remainingMoney,
+                  accountId: VIRTUAL_ACCOUNT_ID,
+                  date: paymentData.date,
+                  description: `Consumo de Saldo p/ Baixa de Fretes (Placa: ${loadingRef.vehiclePlate})`
+              } as any);
+          }
+      }
 
-    const freightsToPay = carrierFreights
-        .filter(f => selectedFreightIds.includes(f.id))
-        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      const freightsToPay = carrierFreights
+          .filter(f => selectedFreightIds.includes(f.id))
+          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    let paidCount = 0;
+      let paidCount = 0;
 
-    freightsToPay.forEach(freight => {
-        const loading = loadings.find((l: any) => l.id === freight.id);
-        
-        if (loading && (remainingMoney > 0 || remainingDiscount > 0)) {
-            const currentDebt = loading.totalFreightValue - loading.freightPaid;
+      for (const freight of freightsToPay) {
+          const loading = loadings.find((l: any) => l.id === freight.id);
+          
+          if (loading && (remainingMoney > 0 || remainingDiscount > 0)) {
+              const currentDebt = loading.totalFreightValue - loading.freightPaid;
 
-            if (currentDebt <= 0.05) return; 
+              if (currentDebt <= 0.05) continue; 
 
-            const paymentPart = Math.min(currentDebt, remainingMoney);
-            const debtAfterCash = currentDebt - paymentPart;
-            const discountPart = Math.min(debtAfterCash, remainingDiscount);
+              const paymentPart = Math.min(currentDebt, remainingMoney);
+              const debtAfterCash = currentDebt - paymentPart;
+              const discountPart = Math.min(debtAfterCash, remainingDiscount);
 
-            if (paymentPart > 0 || discountPart > 0) {
-                const payload = {
-                    ...paymentData,
-                    amount: paymentPart,
-                    discount: discountPart,
-                    accountId: isUsingAdvance ? 'advance_virtual' : paymentData.accountId,
-                    accountName: isUsingAdvance ? 'SALDO ADIANTAMENTO' : paymentData.accountName,
-                    notes: paymentData.notes ? `${paymentData.notes} (Ref: ${freight.vehiclePlate})` : `Pagamento Frete ${freight.vehiclePlate}`
-                };
+              if (paymentPart > 0 || discountPart > 0) {
+                  const payload = {
+                      ...paymentData,
+                      amount: paymentPart,
+                      discount: discountPart,
+                      accountId: isUsingAdvance ? VIRTUAL_ACCOUNT_ID : paymentData.accountId,
+                      accountName: isUsingAdvance ? 'SALDO ADIANTAMENTO' : paymentData.accountName,
+                      notes: paymentData.notes ? `${paymentData.notes} (Ref: ${freight.vehiclePlate})` : `Pagamento Frete ${freight.vehiclePlate}`
+                  };
 
-                financialActionService.processRecord(`fr-${loading.id}`, payload, 'freight');
+                  await financialActionService.processRecord(`fr-${loading.id}`, payload, 'freight');
 
-                remainingMoney -= paymentPart;
-                remainingDiscount -= discountPart;
-                paidCount++;
-            }
-        }
-    });
+                  remainingMoney -= paymentPart;
+                  remainingDiscount -= discountPart;
+                  paidCount++;
+              }
+          }
+      }
 
-    if (paidCount > 0) {
-        addToast('success', 'Baixa Realizada', `${paidCount} fretes foram baixados com sucesso.`);
-        setSelectedFreightIds([]);
-        // Invalida caches via TanStack Query (SKIL: sem reload manual)
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOADINGS });
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FREIGHTS });
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_TRANSACTIONS });
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ADVANCES });
-        onRefreshParent();
-    } else {
-        addToast('warning', 'Nenhuma baixa', 'Verifique os valores ou seleção.');
+      if (paidCount > 0) {
+          addToast('success', 'Baixa Realizada', `${paidCount} fretes foram baixados com sucesso.`);
+          setSelectedFreightIds([]);
+          // Invalida caches via TanStack Query (SKIL: sem reload manual)
+          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOADINGS });
+          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FREIGHTS });
+          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_TRANSACTIONS });
+          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ADVANCES });
+          onRefreshParent();
+      } else {
+          addToast('warning', 'Nenhuma baixa', 'Verifique os valores ou seleção.');
+      }
+    } catch (err: any) {
+      addToast('error', 'Erro no processamento', err.message);
     }
   };
-
   return {
     carrierFreights,
     selectedFreightIds,
@@ -142,3 +147,4 @@ export const useCarrierFinancials = (carrierName: string, allFreights: Freight[]
     }
   };
 };
+

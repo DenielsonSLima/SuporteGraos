@@ -10,6 +10,8 @@ import { mapOrderToDb } from './mappers';
 import { loadFromSupabase } from './loader';
 import { queryClient } from '../../lib/queryClient';
 import { QUERY_KEYS } from '../../hooks/queryKeys';
+import { logService } from '../logService';
+import { auditService } from '../auditService';
 
 export const syncExpenses = async (order: PurchaseOrder) => {
   try {
@@ -159,6 +161,11 @@ export const add = async (order: PurchaseOrder) => {
     // ✅ ALWAYS keep legacy sync for UI/Report compatibility (pode ser async/void)
     syncExpenses(order).catch(() => {});
     createPayableForPurchaseOrder(order);
+
+    const user = authService.getCurrentUser();
+    logService.addLog({ userId: user?.id || 'system', userName: user?.name || 'Sistema', action: 'create', module: 'Compras', description: `Pedido de Compra: ${order.number}`, entityId: order.id });
+    void auditService.logAction('create', 'Compras', `Pedido de Compra criado: ${order.number}`, { entityType: 'PurchaseOrder', entityId: order.id });
+
     return { success: true };
   }
 
@@ -167,6 +174,11 @@ export const add = async (order: PurchaseOrder) => {
   if (!result.success) return result;
 
   createPayableForPurchaseOrder(order);
+  
+  const user = authService.getCurrentUser();
+  logService.addLog({ userId: user?.id || 'system', userName: user?.name || 'Sistema', action: 'create', module: 'Compras', description: `Pedido de Compra (Legacy): ${order.number}`, entityId: order.id });
+  void auditService.logAction('create', 'Compras', `Pedido de Compra criado (Legacy): ${order.number}`, { entityType: 'PurchaseOrder', entityId: order.id });
+
   return { success: true };
 };
 
@@ -177,6 +189,11 @@ export const update = async (order: PurchaseOrder) => {
     if (!result.success) return result;
 
     syncExpenses(order).catch(() => {});
+    
+    const user = authService.getCurrentUser();
+    logService.addLog({ userId: user?.id || 'system', userName: user?.name || 'Sistema', action: 'update', module: 'Compras', description: `Atualizou Pedido de Compra: ${order.number}`, entityId: order.id });
+    void auditService.logAction('update', 'Compras', `Pedido de Compra atualizado: ${order.number}`, { entityType: 'PurchaseOrder', entityId: order.id });
+    
     return { success: true };
   }
 
@@ -185,6 +202,11 @@ export const update = async (order: PurchaseOrder) => {
   if (!result.success) return result;
 
   syncExpenses(order).catch(() => {});
+  
+  const user = authService.getCurrentUser();
+  logService.addLog({ userId: user?.id || 'system', userName: user?.name || 'Sistema', action: 'update', module: 'Compras', description: `Atualizou Pedido de Compra (Legacy): ${order.number}`, entityId: order.id });
+  void auditService.logAction('update', 'Compras', `Pedido de Compra atualizado (Legacy): ${order.number}`, { entityType: 'PurchaseOrder', entityId: order.id });
+
   return { success: true };
 };
 
@@ -193,6 +215,10 @@ export const remove = async (id: string) => {
   if (isSqlCanonicalOpsEnabled()) {
     const result = await deletePurchaseOrderCanonical(id);
     if (result.success) {
+      const user = authService.getCurrentUser();
+      logService.addLog({ userId: user?.id || 'system', userName: user?.name || 'Sistema', action: 'delete', module: 'Compras', description: `Excluiu Pedido de Compra ID ${id}`, entityId: id });
+      void auditService.logAction('delete', 'Compras', `Pedido de Compra excluído ID: ${id}`, { entityType: 'PurchaseOrder', entityId: id });
+
       // 🔥 Invalidação Imediata
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD });
@@ -207,6 +233,10 @@ export const remove = async (id: string) => {
     const { error } = await supabase.from('ops_purchase_orders').delete().eq('id', id);
     if (error) return { success: false, error: error.message };
     
+    const user = authService.getCurrentUser();
+    logService.addLog({ userId: user?.id || 'system', userName: user?.name || 'Sistema', action: 'delete', module: 'Compras', description: `Excluiu Pedido de Compra ID ${id} (Legacy)`, entityId: id });
+    void auditService.logAction('delete', 'Compras', `Pedido de Compra excluído ID: ${id} (Legacy)`, { entityType: 'PurchaseOrder', entityId: id });
+
     // 🔥 Invalidação Imediata
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS });
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD });
@@ -233,6 +263,10 @@ export const cancel = async (id: string, reason?: string) => {
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_ENTRIES });
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS });
     
+    const user = authService.getCurrentUser();
+    logService.addLog({ userId: user?.id || 'system', userName: user?.name || 'Sistema', action: 'cancel', module: 'Compras', description: `Cancelou Pedido de Compra ID ${id}. Motivo: ${reason || 'Não informado'}`, entityId: id });
+    void auditService.logAction('cancel', 'Compras', `Pedido de Compra cancelado ID: ${id}`, { entityType: 'PurchaseOrder', entityId: id, metadata: { reason } });
+
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message || 'Erro inesperado' };

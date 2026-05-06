@@ -147,6 +147,7 @@ export const salesActions = {
     salesStore.delete(id);
     const { userId, userName } = await getLogInfo();
     logService.addLog({ userId, userName, action: 'delete', module: 'Vendas', description: `Excluiu Pedido de Venda ${order.number}`, entityId: id });
+    void auditService.logAction('delete', 'Vendas', `Pedido de venda excluído: #${order.number}`, { entityId: id });
     
     DashboardCache.clearAll();
     invalidateDashboardCache();
@@ -170,6 +171,10 @@ export const salesActions = {
       invalidateDashboardCache();
       invalidateFinancialCache();
       salesLoader.loadFromSupabase(); // Força recarga do store local legado
+
+      const { userId, userName } = await getLogInfo();
+      logService.addLog({ userId, userName, action: 'cancel', module: 'Vendas', description: `Cancelou Pedido de Venda ID ${id}. Motivo: ${reason || 'Não informado'}`, entityId: id });
+      void auditService.logAction('cancel', 'Vendas', `Pedido de venda cancelado ID: ${id}`, { entityId: id, metadata: { reason } });
 
       return { success: true };
     } catch (err: any) {

@@ -7,6 +7,7 @@ import { useAdvanceSummaries } from '../../../../hooks/useAdvances';
 
 interface Props {
   freights: Freight[];
+  carrierFilter?: string;
   onSelectCarrier: (carrierName: string) => void;
 }
 
@@ -18,13 +19,14 @@ interface CarrierGroup {
   count: number;
 }
 
-const FreightFinancialsDashboard: React.FC<Props> = ({ freights, onSelectCarrier }) => {
+const FreightFinancialsDashboard: React.FC<Props> = ({ freights, carrierFilter, onSelectCarrier }) => {
   
   const { data: advanceSummaries = [] } = useAdvanceSummaries();
   
   const carrierGroups = useMemo(() => {
     const groups: Record<string, CarrierGroup> = {};
     
+    // 1. Processar fretes (carregamentos)
     freights.forEach(f => {
       if (f.balanceValue > 0.05 || f.advanceValue > 0 || f.financialStatus !== 'paid') {
         if (!groups[f.carrierName]) {
@@ -45,8 +47,28 @@ const FreightFinancialsDashboard: React.FC<Props> = ({ freights, onSelectCarrier
       }
     });
 
-    return Object.values(groups).sort((a, b) => b.totalBalance - a.totalBalance);
-  }, [freights, advanceSummaries]);
+    // 2. Adicionar parceiros que têm adiantamento (crédito) mas NÃO têm fretes ativos na lista
+    advanceSummaries.forEach(a => {
+      // Se tiver saldo positivo e (não tem filtro ou bate no filtro) e não está no grupo ainda
+      const matchesFilter = !carrierFilter || a.partnerName === carrierFilter;
+      
+      if (a.netBalance > 0 && matchesFilter && !groups[a.partnerName]) {
+        // Como o dashboard é focado em fretes, só incluímos se houver indício de ser transportadora
+        // No caso, se bater no filtro de transportadora ou se já tiver histórico de frete (mas aqui freights é filtrado)
+        // Por segurança, se o usuário filtrou especificamente por ela, mostramos.
+        // Se não filtrou, mostramos todas que têm crédito (adiantamento dado).
+        groups[a.partnerName] = {
+          name: a.partnerName,
+          totalBalance: 0,
+          totalAdvances: 0,
+          globalCredit: a.netBalance,
+          count: 0
+        };
+      }
+    });
+
+    return Object.values(groups).sort((a, b) => (b.totalBalance + b.globalCredit) - (a.totalBalance + a.globalCredit));
+  }, [freights, advanceSummaries, carrierFilter]);
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
@@ -62,7 +84,10 @@ const FreightFinancialsDashboard: React.FC<Props> = ({ freights, onSelectCarrier
 
       {carrierGroups.length === 0 ? (
         <div className="text-center py-12 text-slate-400 bg-white rounded-xl border border-slate-200 border-dashed">
-          Nenhuma pendência financeira encontrada para fretes.
+          {carrierFilter 
+            ? `Nenhuma pendência ou crédito encontrado para ${carrierFilter}.`
+            : "Nenhuma pendência financeira encontrada para fretes."
+          }
         </div>
       ) : (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">

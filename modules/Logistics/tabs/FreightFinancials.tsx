@@ -8,10 +8,11 @@ import { QUERY_KEYS } from '../../../hooks/queryKeys';
 
 interface Props {
   freights: Freight[];
+  carrierFilter?: string;
   onManageFinancials: (freight: Freight) => void; 
 }
 
-const FreightFinancials: React.FC<Props> = ({ freights }) => {
+const FreightFinancials: React.FC<Props> = ({ freights, carrierFilter }) => {
   const queryClient = useQueryClient();
   const [selectedCarrierName, setSelectedCarrierName] = useState<string | null>(null);
 
@@ -36,6 +37,7 @@ const FreightFinancials: React.FC<Props> = ({ freights }) => {
   return (
     <FreightFinancialsDashboard 
       freights={freights} 
+      carrierFilter={carrierFilter}
       onSelectCarrier={setSelectedCarrierName} 
     />
   );

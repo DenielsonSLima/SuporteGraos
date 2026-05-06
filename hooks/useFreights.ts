@@ -15,6 +15,7 @@ import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-quer
 import { QUERY_KEYS, STALE_TIMES } from './queryKeys';
 import { fetchFreights } from '../services/freightService';
 import { loadingService } from '../services/loadingService';
+import { advancesService } from '../services/advancesService';
 
 /**
  * Retorna freights com campos computados no banco.
@@ -23,7 +24,22 @@ import { loadingService } from '../services/loadingService';
 export function useFreights() {
   const queryClient = useQueryClient();
 
-  // A invalidação agora é gerenciada globalmente pelo Realtime Sync do Supabase
+  useEffect(() => {
+    // Invalida fretes quando houver mudança em romaneios (loadings)
+    const unsubLoadings = loadingService.subscribeRealtime(() => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FREIGHTS });
+    });
+
+    // Invalida fretes quando houver mudança em adiantamentos (podem afetar saldos globais exibidos junto)
+    const unsubAdvances = advancesService.subscribeRealtime(() => {
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FREIGHTS });
+    });
+
+    return () => {
+      unsubLoadings();
+      unsubAdvances();
+    };
+  }, [queryClient]);
 
   return useQuery({
     queryKey: QUERY_KEYS.FREIGHTS,

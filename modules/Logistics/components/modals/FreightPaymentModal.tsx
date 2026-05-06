@@ -4,7 +4,6 @@ import { X, DollarSign, Calendar, Wallet, FileText, ArrowDown, MinusCircle, Aler
 import type { Account } from '../../../../services/accountsService';
 import { useAccounts } from '../../../../hooks/useAccounts';
 import { getLocalDateString } from '../../../../utils/dateUtils';
-import { advanceService } from '../../../Financial/Advances/services/advanceService';
 import { BankAccount } from '../../../Financial/types';
 import { useToast } from '../../../../contexts/ToastContext';
 import { formatAccountLabel } from '../../../../utils/formatters';
