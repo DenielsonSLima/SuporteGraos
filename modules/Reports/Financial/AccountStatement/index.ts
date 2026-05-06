@@ -1,9 +1,7 @@
 
 import { Landmark } from 'lucide-react';
 import { ReportModule } from '../../types';
-import { accountsService } from '../../../../services/accountsService';
-import { initialBalanceService } from '../../../../services/initialBalanceService';
-import { financialTransactionsService } from '../../../../services/financialTransactionsService';
+import { supabase } from '../../../../services/supabase';
 import Template from './Template';
 import PdfDocument from './PdfDocument';
 import Filters from './Filters';

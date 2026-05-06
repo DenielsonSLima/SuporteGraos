@@ -8,7 +8,14 @@ interface Props {
 }
 
 const Filters: React.FC<Props> = ({ filters, onChange }) => {
-  const { data: accounts = [], isLoading } = useAccounts();
+  const { data: allAccounts = [], isLoading } = useAccounts();
+
+  // Filtra contas virtuais e de sistema (não são contas bancárias reais)
+  const accounts = allAccounts.filter(a =>
+    !a.account_name.toLowerCase().includes('virtual') &&
+    !(a.owner || '').toLowerCase().includes('virtual') &&
+    !a.account_name.toLowerCase().includes('terceiros')
+  );
 
   return (
     <div className="space-y-5 animate-in slide-in-from-left-2">
