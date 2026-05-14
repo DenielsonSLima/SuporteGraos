@@ -107,7 +107,7 @@ export const loadingService = {
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS });
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS });
 
-    logService.addLog({ userId, userName, action: 'create', module: 'Logística', description: `Carregamento: ${loading.vehiclePlate}`, entityId: loading.id });
+    logService.addLog({ userId, userName, action: 'create', module: 'Logística', description: `Carregamento: ${loading.vehiclePlate}`, entityId: loading.id, companyId });
     void auditService.logAction('create', 'Logística', `Carregamento criado: ${loading.vehiclePlate}`, { entityType: 'Loading', entityId: loading.id });
   },
 
@@ -133,7 +133,7 @@ export const loadingService = {
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS });
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS });
 
-    logService.addLog({ userId, userName, action: 'update', module: 'Logística', description: `Atualizou carregamento ${updatedLoading.vehiclePlate}`, entityId: updatedLoading.id });
+    logService.addLog({ userId, userName, action: 'update', module: 'Logística', description: `Atualizou carregamento ${updatedLoading.vehiclePlate}`, entityId: updatedLoading.id, companyId });
     void auditService.logAction('update', 'Logística', `Carregamento atualizado: ${updatedLoading.vehiclePlate}`, { entityType: 'Loading', entityId: updatedLoading.id });
   },
 
@@ -159,7 +159,7 @@ export const loadingService = {
 
     // 2. Audit
     const { userId, userName } = await getLogInfo();
-    logService.addLog({ userId, userName, action: 'delete', module: 'Logística', description: `Excluiu carregamento ID ${id}`, entityId: id });
+    logService.addLog({ userId, userName, action: 'delete', module: 'Logística', description: `Excluiu carregamento ID ${id}`, entityId: id, companyId: (await getLogInfo()).companyId });
     db.delete(id);
     invalidateDashboardCache();
     DashboardCache.clearAll();

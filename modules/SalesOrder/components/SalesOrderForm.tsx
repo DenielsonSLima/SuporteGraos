@@ -8,6 +8,7 @@ import { usePartners } from '../../../hooks/useParceiros';
 import { useShareholders } from '../../../hooks/useShareholders';
 import { useProductTypes } from '../../../hooks/useClassifications';
 import QuickProductModal from '../../Settings/ProductTypes/components/QuickProductModal';
+import QuickPartnerModal from '../../Partners/components/QuickPartnerModal';
 
 interface Props {
   initialData?: SalesOrder;
@@ -40,6 +41,7 @@ const SalesOrderForm: React.FC<Props> = ({ initialData, onSave, onCancel }) => {
   const [customerSearch, setCustomerSearch] = useState(initialData?.customerName || '');
   const [isSearching, setIsSearching] = useState(false);
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
+  const [isQuickPartnerOpen, setIsQuickPartnerOpen] = useState(false);
 
   const partners = useMemo(() => {
     return (partnersData?.data || [])
@@ -159,7 +161,8 @@ const SalesOrderForm: React.FC<Props> = ({ initialData, onSave, onCancel }) => {
                 {/* BUSCA DE CLIENTE DETALHADA - ORDEM ALFABÉTICA */}
                 <div className="md:col-span-2 relative" ref={dropdownRef}>
                     <label className={labelClass}>Cliente (Comprador)</label>
-                    <div className="relative">
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                         <input 
                             type="text" 
@@ -172,6 +175,15 @@ const SalesOrderForm: React.FC<Props> = ({ initialData, onSave, onCancel }) => {
                         {formData.customerId && !isSearching && (
                             <CheckCircle2 className="absolute right-4 top-1/2 -translate-y-1/2 text-emerald-500" size={22} />
                         )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsQuickPartnerOpen(true)}
+                        title="Cadastrar novo cliente"
+                        className="flex items-center justify-center p-3 bg-white border-2 border-slate-200 text-slate-400 hover:text-emerald-600 hover:border-emerald-200 rounded-2xl transition-all shadow-sm"
+                      >
+                        <Plus size={24} />
+                      </button>
                     </div>
 
                     {isSearching && (
@@ -260,6 +272,15 @@ const SalesOrderForm: React.FC<Props> = ({ initialData, onSave, onCancel }) => {
             isOpen={isQuickAddOpen} 
             onClose={() => setIsQuickAddOpen(false)}
             onSuccess={(newName) => setFormData(prev => ({ ...prev, productName: newName }))}
+          />
+
+          <QuickPartnerModal
+            isOpen={isQuickPartnerOpen}
+            onClose={() => setIsQuickPartnerOpen(false)}
+            defaultCategories={['5', '2']}
+            onSuccess={(newPartner) => {
+              handleSelectCustomer(newPartner);
+            }}
           />
       </form>
     </div>

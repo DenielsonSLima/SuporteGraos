@@ -100,9 +100,9 @@ const OrderDetails: React.FC<Props> = ({ order, onBack, onEdit, onDelete, onFina
     setIsNoteModalOpen(false);
   };
 
-  const onLoadingSave = (loading: Loading) => {
+  const onLoadingSave = async (loading: Loading) => {
     try {
-      actions.handleSaveNewLoading(loading);
+      await actions.handleSaveNewLoading(loading);
     } finally {
       setShowLoadingForm(false);
     }

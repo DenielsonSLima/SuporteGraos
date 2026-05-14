@@ -48,18 +48,26 @@ export const kpiService = {
     const pendingQty = Math.max(0, contractQty - totalLoadedSc);
 
     // 2. Custos e Investimento - SQL-FIRST 🟢
-    // Agora consumimos diretamente os campos calculados pelo banco (vw_sales_orders_enriched)
-    const totalGrainCost = Number(order.totalGrainCost || 0);
-    const totalFreightCost = Number(order.totalFreightCost || 0);
-    const totalDirectInvestment = Number(order.grossProfit !== undefined ? (order.deliveredValue || 0) - (order.grossProfit || 0) : (totalGrainCost + totalFreightCost));
+    // Consumimos diretamente os campos do banco (vw_sales_orders_enriched), ou calculamos via romaneios como fallback
+    const totalGrainCost = Number(order.totalGrainCost) || activeLoadings.reduce((acc, l) => acc + (Number(l.totalPurchaseValue) || 0), 0);
+    const totalFreightCost = Number(order.totalFreightCost) || activeLoadings.reduce((acc, l) => acc + (Number(l.totalFreightValue) || 0), 0);
+    const totalDirectInvestment = totalGrainCost + totalFreightCost;
 
     // 3. Receita (Faturamento) - SQL-FIRST 🟢
     const totalRevenueRealized = Number(order.deliveredValue || 0);
     const totalContractValue = Number(order.totalValue || (contractQty * (Number(order.unitPrice) || 0)));
 
-    // 4. Resultado (P&L) - SQL-FIRST 🟢
-    const grossProfit = Number(order.grossProfit ?? (totalRevenueRealized - totalDirectInvestment));
-    const marginPercent = Number(order.marginPercent ?? (totalRevenueRealized > 0 ? (grossProfit / totalRevenueRealized) * 100 : 0));
+    // 4. Resultado (P&L) - Resiliência contra o mapper que joga 0 quando a view não possui o campo
+    const calculatedGrossProfit = totalRevenueRealized - totalDirectInvestment;
+    const calculatedMargin = totalRevenueRealized > 0 ? (calculatedGrossProfit / totalRevenueRealized) * 100 : 0;
+    
+    const grossProfit = (order.grossProfit !== 0 && order.grossProfit !== undefined && !isNaN(order.grossProfit)) 
+      ? Number(order.grossProfit) 
+      : calculatedGrossProfit;
+
+    const marginPercent = (order.marginPercent !== 0 && order.marginPercent !== undefined && !isNaN(order.marginPercent))
+      ? Number(order.marginPercent)
+      : calculatedMargin;
 
     // 5. Recebimentos (Financeiro)
     const totalReceived = transactions.length > 0

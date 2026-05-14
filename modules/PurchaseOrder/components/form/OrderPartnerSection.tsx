@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, MapPin, Wheat, CheckCircle2, ChevronDown, Map, User } from 'lucide-react';
+import { Search, MapPin, Wheat, CheckCircle2, ChevronDown, Map, User, Plus } from 'lucide-react';
 import { PurchaseOrder } from '../../types';
 import { Partner } from '../../../Partners/types';
 import { PARTNER_CATEGORY_IDS } from '../../../../constants';
 import { locationService } from '../../../../services/locationService';
+import QuickPartnerModal from '../../../Partners/components/QuickPartnerModal';
 
 interface Props {
   data: Partial<PurchaseOrder>;
@@ -16,6 +17,7 @@ const OrderPartnerSection: React.FC<Props> = ({ data, partners, onChange }) => {
   const [partnerSearchTerm, setPartnerSearchTerm] = useState(data.partnerName || '');
   const [isSearchingPartner, setIsSearchingPartner] = useState(false);
   const partnerSearchRef = useRef<HTMLDivElement>(null);
+  const [isQuickPartnerOpen, setIsQuickPartnerOpen] = useState(false);
 
   const [citySearchTerm, setCitySearchTerm] = useState('');
   const [isSearchingCity, setIsSearchingCity] = useState(false);
@@ -104,19 +106,29 @@ const OrderPartnerSection: React.FC<Props> = ({ data, partners, onChange }) => {
 
       <div className="relative" ref={partnerSearchRef}>
         <label className={labelClass}>Fornecedor (Produtor / Empresa)</label>
-        <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-          <input
-            type="text"
-            value={partnerSearchTerm}
-            onFocus={() => setIsSearchingPartner(true)}
-            onChange={(e) => { setPartnerSearchTerm(e.target.value); setIsSearchingPartner(true); }}
-            placeholder="Nome ou documento..."
-            className={`${inputClass} pl-12`}
-          />
-          {data.partnerId && !isSearchingPartner && (
-             <CheckCircle2 className="absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-emerald-500" />
-          )}
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <input
+              type="text"
+              value={partnerSearchTerm}
+              onFocus={() => setIsSearchingPartner(true)}
+              onChange={(e) => { setPartnerSearchTerm(e.target.value); setIsSearchingPartner(true); }}
+              placeholder="Nome ou documento..."
+              className={`${inputClass} pl-12`}
+            />
+            {data.partnerId && !isSearchingPartner && (
+               <CheckCircle2 className="absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-emerald-500" />
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsQuickPartnerOpen(true)}
+            title="Cadastrar novo fornecedor"
+            className="flex items-center justify-center p-2.5 bg-white border-2 border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-200 rounded-xl transition-all shadow-sm"
+          >
+            <Plus size={22} />
+          </button>
         </div>
 
         {isSearchingPartner && filteredPartners.length > 0 && (
@@ -222,6 +234,15 @@ const OrderPartnerSection: React.FC<Props> = ({ data, partners, onChange }) => {
           </div>
         </div>
       </div>
+
+      <QuickPartnerModal
+        isOpen={isQuickPartnerOpen}
+        onClose={() => setIsQuickPartnerOpen(false)}
+        defaultCategories={['1', '7']}
+        onSuccess={(newPartner) => {
+          handleSelectPartner(newPartner);
+        }}
+      />
     </div>
   );
 };

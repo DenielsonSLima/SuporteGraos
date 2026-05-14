@@ -50,6 +50,7 @@ const mapLogToDb = (log: LogEntry) => ({
   entity_id: log.entityId,
   description: log.description,
   metadata: log.metadata,
+  company_id: log.companyId || null,
   created_at: log.timestamp
 });
 

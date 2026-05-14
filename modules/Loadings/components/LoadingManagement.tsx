@@ -9,6 +9,7 @@ import {
 import { Loading } from '../types';
 import { loadingKpiService } from '../../../services/loadings/loadingKpiService';
 import ModalPortal from '../../../components/ui/ModalPortal';
+import ActionConfirmationModal from '../../../components/ui/ActionConfirmationModal';
 import { useToast } from '../../../contexts/ToastContext';
 
 // ─── TanStack Query Hooks ──────────────────────────────────────────────────
@@ -44,6 +45,8 @@ const LoadingManagement: React.FC<Props> = ({ loading, onClose, onUpdate, origin
   const [activeTab, setActiveTab] = useState<'info' | 'financial'>('info');
   const [isEditing, setIsEditing] = useState(false);
   const [isQuickRedirecting, setIsQuickRedirecting] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showFinalizeModal, setShowFinalizeModal] = useState(false);
 
   const [editForm, setEditForm] = useState<Loading>({ ...loading });
   const [freightBase, setFreightBase] = useState<'origin' | 'destination'>('origin');
@@ -137,14 +140,7 @@ const LoadingManagement: React.FC<Props> = ({ loading, onClose, onUpdate, origin
   };
 
   const handleFinalize = () => {
-    if (window.confirm('Deseja finalizar esta carga?\n\nIsso moverá o registro para o histórico de concluídos.')) {
-      const updated: Loading = { ...editForm, status: 'completed' };
-      setEditForm(updated);
-      updateLoadingMut.mutate(updated);
-      onUpdate(updated);
-      addToast('success', 'Carga Finalizada', 'O registro foi marcado como concluído.');
-      onClose();
-    }
+    setShowFinalizeModal(true);
   };
 
   // A aba financeira agora gerencia suas próprias transações via FreightPaymentsCard
@@ -166,12 +162,7 @@ const LoadingManagement: React.FC<Props> = ({ loading, onClose, onUpdate, origin
           isEditing={isEditing}
           onEditToggle={setIsEditing}
           onSave={handleSaveStructural}
-          onDelete={() => {
-            const msg = loading.totalFreightValue && loading.totalFreightValue > 0
-              ? `⚠️ Excluir carga?\n\n⚡ O frete (${currency(loading.totalFreightValue)}) será DELETADO do Financeiro!`
-              : 'Deseja excluir esta carga?';
-            if (window.confirm(msg)) { deleteLoadingMut.mutate(loading.id); onUpdate(null); onClose(); }
-          }}
+          onDelete={() => setShowDeleteModal(true)}
           onClose={onClose}
           onFinalize={handleFinalize}
           canFinalize={canFinalize}
@@ -241,6 +232,42 @@ const LoadingManagement: React.FC<Props> = ({ loading, onClose, onUpdate, origin
         </div>
       </div>
     </div>
+
+    <ActionConfirmationModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={() => {
+          deleteLoadingMut.mutate(loading.id);
+          onUpdate(null);
+          onClose();
+        }}
+        title="Excluir Carga"
+        description={
+          loading.totalFreightValue && loading.totalFreightValue > 0
+            ? <span>Esta carga será excluída.<br/><br/><strong className="text-red-600">Atenção:</strong> O frete ({currency(loading.totalFreightValue)}) será <strong>DELETADO</strong> do Financeiro!</span>
+            : 'Deseja realmente excluir esta carga?'
+        }
+        confirmLabel="Excluir"
+        type="danger"
+    />
+
+    <ActionConfirmationModal
+        isOpen={showFinalizeModal}
+        onClose={() => setShowFinalizeModal(false)}
+        onConfirm={() => {
+          const updated: Loading = { ...editForm, status: 'completed' };
+          setEditForm(updated);
+          updateLoadingMut.mutate(updated);
+          onUpdate(updated);
+          addToast('success', 'Carga Finalizada', 'O registro foi marcado como concluído.');
+          onClose();
+        }}
+        title="Finalizar Carga"
+        description="Deseja finalizar esta carga? Isso moverá o registro para o histórico de concluídos."
+        confirmLabel="Finalizar"
+        type="success"
+    />
+
     </ModalPortal>
   );
 };
