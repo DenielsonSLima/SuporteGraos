@@ -8,6 +8,8 @@ export interface AdvanceTransaction {
   type: AdvanceType;
   date: string;
   value: number;
+  settledAmount?: number;
+  remainingAmount?: number;
   description: string;
   status: 'active' | 'settled'; // Active counts towards balance
   accountId?: string; // ID da conta bancária

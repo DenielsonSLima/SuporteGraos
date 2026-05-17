@@ -11,6 +11,7 @@ const lazyReportImports = {
   monthlyFreightHistoryReport: () => import('./Logistics/MonthlyFreightHistory/index.tsx'),
   monthlyFreightPaymentsReport: () => import('./Logistics/MonthlyFreightPayments'),
   freightPaymentDetailsReport: () => import('./Logistics/FreightPaymentDetailsReport'),
+  freightStatementReport: () => import('./Logistics/FreightStatementReport'),
 
   // Analytics
   abcClientsReport: () => import('./Analytics/AbcClients'),
@@ -55,6 +56,7 @@ export const REPORT_METADATA = [
   { id: 'freight_monthly_history', category: 'logistics' as const, order: 3 },
   { id: 'freight_payments_report', category: 'logistics' as const, order: 4 },
   { id: 'freight_payments_detailed', category: 'logistics' as const, order: 5 },
+  { id: 'freight_statement_report', category: 'logistics' as const, order: 6 },
 
   // Analytics
   { id: 'abc_clients', category: 'analytics' as const, order: 1 },
@@ -94,6 +96,7 @@ const reportIdToImportKey: Record<string, keyof typeof lazyReportImports> = {
   'freight_monthly_history': 'monthlyFreightHistoryReport',
   'freight_payments_report': 'monthlyFreightPaymentsReport',
   'freight_payments_detailed': 'freightPaymentDetailsReport',
+  'freight_statement_report': 'freightStatementReport',
   'abc_clients': 'abcClientsReport',
   'abc_states': 'abcStatesReport',
   'dre': 'dreReport',

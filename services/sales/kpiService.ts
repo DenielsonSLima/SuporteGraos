@@ -25,6 +25,7 @@ export interface SalesPerformanceStats {
   totalReceived: number;
   totalPending: number;
   receivedPercent: number;
+  totalTransitValue: number;
 }
 
 /**
@@ -82,7 +83,7 @@ export const kpiService = {
       : (totalContractValue > 0 ? (totalReceived / totalContractValue) * 100 : 0);
 
     // 6. Carga em Trânsito (Síncrono com os romaneios da auditoria)
-    const transitLoadings = activeLoadings.filter(l => !l.unloadWeightKg && l.status !== 'unloaded');
+    const transitLoadings = activeLoadings.filter(l => !l.unloadWeightKg && l.status !== 'completed');
     const totalTransitValue = transitLoadings.reduce((acc, l) => acc + (Number(l.totalSalesValue) || 0), 0);
 
     return {

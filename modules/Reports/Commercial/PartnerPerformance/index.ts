@@ -20,7 +20,7 @@ const partnerPerformanceReport: ReportModule = {
     endDate: new Date().toISOString().split('T')[0],
   },
   FilterComponent: DefaultFilters,
-  fetchData: ({ startDate, endDate }) => {
+  fetchData: async ({ startDate, endDate }) => {
     const filterByDate = (dateStr: string) => {
       if (!startDate && !endDate) return true;
       const d = new Date(dateStr).getTime();
@@ -29,13 +29,13 @@ const partnerPerformanceReport: ReportModule = {
       return d >= start && d <= end;
     };
 
-    const purchaseFinancial = financialIntegrationService
-      .getPayables()
+    const payables = await financialIntegrationService.getPayables();
+    const purchaseFinancial = payables
       .filter((r) => r.subType === 'purchase_order')
       .filter((r) => filterByDate(r.issueDate || r.dueDate));
 
-    const salesFinancial = financialIntegrationService
-      .getReceivables()
+    const receivables = await financialIntegrationService.getReceivables();
+    const salesFinancial = receivables
       .filter((r) => r.subType === 'sales_order')
       .filter((r) => filterByDate(r.issueDate || r.dueDate));
 

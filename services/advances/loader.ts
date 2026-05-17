@@ -17,7 +17,43 @@ export function mapRow(row: any): Advance {
     status: row.status ?? 'open',
     created_at: row.created_at,
     updated_at: row.updated_at,
+    parent_id: row.parent_id,
   };
+}
+
+async function enrichWithAccounts(advances: Advance[]): Promise<Advance[]> {
+  if (advances.length === 0) return advances;
+
+  const advIds = advances.map(a => a.id);
+  const { data: entries } = await supabase
+    .from('financial_entries')
+    .select('id, origin_id')
+    .eq('origin_type', 'advance')
+    .in('origin_id', advIds);
+
+  if (entries && entries.length > 0) {
+    const entryIds = entries.map(e => e.id);
+    
+    const { data: txs } = await supabase
+      .from('financial_transactions')
+      .select('entry_id, account_id, accounts(account_name)')
+      .in('entry_id', entryIds);
+
+    if (txs && txs.length > 0) {
+      advances.forEach(adv => {
+        const entry = entries.find(e => e.origin_id === adv.id);
+        if (entry) {
+          const tx = txs.find(t => t.entry_id === entry.id);
+          if (tx) {
+            adv.account_id = tx.account_id;
+            adv.account_name = (tx.accounts as any)?.account_name || 'Caixa/Banco';
+          }
+        }
+      });
+    }
+  }
+
+  return advances;
 }
 
 export const advancesLoader = {
@@ -25,9 +61,11 @@ export const advancesLoader = {
     const { data, error } = await supabase
       .from('advances')
       .select('*')
+      .is('parent_id', null)
       .order('advance_date', { ascending: false });
     if (error) throw new Error(`Erro ao buscar adiantamentos: ${error.message}`);
-    return (data ?? []).map(mapRow);
+    const mapped = (data ?? []).map(mapRow);
+    return enrichWithAccounts(mapped);
   },
 
   getByRecipientType: async (type: 'supplier' | 'client' | 'shareholder'): Promise<Advance[]> => {
@@ -35,9 +73,11 @@ export const advancesLoader = {
       .from('advances')
       .select('*')
       .eq('recipient_type', type)
+      .is('parent_id', null)
       .order('advance_date', { ascending: false });
     if (error) throw new Error(`Erro ao buscar adiantamentos por tipo: ${error.message}`);
-    return (data ?? []).map(mapRow);
+    const mapped = (data ?? []).map(mapRow);
+    return enrichWithAccounts(mapped);
   },
 
   getOpen: async (): Promise<Advance[]> => {
@@ -45,9 +85,30 @@ export const advancesLoader = {
       .from('advances')
       .select('*')
       .eq('status', 'open')
+      .is('parent_id', null)
       .order('advance_date', { ascending: false });
     if (error) throw new Error(`Erro ao buscar adiantamentos abertos: ${error.message}`);
-    return (data ?? []).map(mapRow);
+    const mapped = (data ?? []).map(mapRow);
+    return enrichWithAccounts(mapped);
+  },
+
+  /**
+   * Busca o adiantamento aberto de um parceiro específico (para vincular como parent_id).
+   * Retorna o adiantamento mais antigo com saldo disponível.
+   */
+  getOpenByRecipient: async (recipientId: string): Promise<Advance | null> => {
+    const { data, error } = await supabase
+      .from('advances')
+      .select('*')
+      .eq('recipient_id', recipientId)
+      .eq('recipient_type', 'supplier')
+      .in('status', ['open', 'partially_settled'])
+      .is('parent_id', null)
+      .order('advance_date', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (error || !data) return null;
+    return mapRow(data);
   },
 
   getSummaries: async (): Promise<PartnerAdvanceSummary[]> => {
@@ -67,5 +128,16 @@ export const advancesLoader = {
       totalTaken: parseFloat(row.total_taken ?? '0'),
       netBalance: parseFloat(row.net_balance ?? '0'),
     }));
+  },
+
+  getChildren: async (parentId: string): Promise<Advance[]> => {
+    const { data, error } = await supabase
+      .from('advances')
+      .select('*')
+      .eq('parent_id', parentId)
+      .order('advance_date', { ascending: false });
+    if (error) throw new Error(`Erro ao buscar consumos do adiantamento: ${error.message}`);
+    const mapped = (data ?? []).map(mapRow);
+    return enrichWithAccounts(mapped);
   }
 };

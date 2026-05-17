@@ -27,7 +27,7 @@ export const freightService = {
     discount?: number;
   }, existingTxId?: string) {
     const txId = existingTxId || generateUUID();
-    const notesWithRef = `${data.notes || ''} [REF:${txId}]`.trim();
+    const notesWithRef = data.notes ? data.notes.trim() : '';
 
     // 1. Processar no Financeiro (Orquestrador)
     const orchestratorData: PaymentData = {

@@ -9,9 +9,18 @@ interface Props {
 }
 
 const Filters: React.FC<Props> = ({ filters, onChange }) => {
-  const purchaseRecords = financialIntegrationService.getPayables().filter((record) => record.subType === 'purchase_order');
-  const partners = Array.from(new Set(purchaseRecords.map((record) => record.entityName).filter(Boolean))).sort();
-  const products = Array.from(new Set(purchaseRecords.map((record) => record.description).filter(Boolean))).sort();
+  const [partners, setPartners] = React.useState<string[]>([]);
+  const [products, setProducts] = React.useState<string[]>([]);
+
+  React.useEffect(() => {
+    financialIntegrationService.getPayables().then((records) => {
+      const purchaseRecords = records.filter((record) => record.subType === 'purchase_order');
+      const uniquePartners = Array.from(new Set(purchaseRecords.map((record) => record.entityName).filter(Boolean))).sort();
+      const uniqueProducts = Array.from(new Set(purchaseRecords.map((record) => record.description).filter(Boolean))).sort();
+      setPartners(uniquePartners as string[]);
+      setProducts(uniqueProducts as string[]);
+    });
+  }, []);
 
   return (
     <div className="space-y-5 animate-in slide-in-from-left-2">

@@ -11,7 +11,9 @@ import {
   X,
   Printer,
   DollarSign,
-  AlertTriangle
+  AlertTriangle,
+  Edit3,
+  Trash2
 } from 'lucide-react';
 import { useAdvances } from '../../../hooks/useAdvances';
 import { usePartners } from '../../../hooks/useParceiros';
@@ -23,8 +25,9 @@ import AdvanceListPdfModal from './components/AdvanceListPdfModal';
 import SettleAdvanceModal from './components/SettleAdvanceModal';
 import { useToast } from '../../../contexts/ToastContext';
 import { useAdvancesOperations } from './hooks/useAdvancesOperations';
+import AdvanceTracebackView from './components/AdvanceTracebackView';
 
-type AdvanceSubTab = 'taken' | 'given' | 'history';
+type AdvanceSubTab = 'taken' | 'given' | 'history' | 'traceback';
 
 // Adapter: Advance (DB) → AdvanceTransaction (UI)
 function toAdvanceTransaction(adv: Advance, partners: Partner[]): AdvanceTransaction {
@@ -37,8 +40,12 @@ function toAdvanceTransaction(adv: Advance, partners: Partner[]): AdvanceTransac
     type: adv.recipient_type === 'client' ? 'taken' : 'given',
     date: adv.advance_date,
     value: adv.amount,
+    settledAmount: adv.settled_amount,
+    remainingAmount: adv.remaining_amount,
     description: adv.description || '',
     status: adv.status === 'open' || adv.status === 'partially_settled' ? 'active' : 'settled',
+    accountId: adv.account_id || undefined,
+    accountName: adv.account_name || undefined,
   };
 }
 
@@ -48,7 +55,7 @@ const AdvancesTab: React.FC = () => {
   const partnersParams = useMemo(() => ({ page: 1, pageSize: 2000 }), []);
   const { data: partnersResult } = usePartners(partnersParams);
   const partners: Partner[] = partnersResult?.data || [];
-  const { handleSaveAdvance, handleConfirmSettle } = useAdvancesOperations({ addToast });
+  const { handleSaveAdvance, handleConfirmSettle, handleUpdateAdvance, handleDeleteAdvance } = useAdvancesOperations({ addToast });
 
   const [activeSubTab, setActiveSubTab] = useState<AdvanceSubTab>('taken');
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -60,6 +67,31 @@ const AdvancesTab: React.FC = () => {
 
   const [isSettleModalOpen, setIsSettleModalOpen] = useState(false);
   const [txToSettle, setTxToSettle] = useState<AdvanceTransaction | null>(null);
+  const [txToEdit, setTxToEdit] = useState<AdvanceTransaction | null>(null);
+
+  const handleDeleteClick = async (tx: AdvanceTransaction) => {
+    if (tx.settledAmount && tx.settledAmount > 0) {
+      addToast('error', 'Não é possível excluir', `Este adiantamento já possui R$ ${tx.settledAmount} consumidos em fretes.`);
+      return;
+    }
+
+    if (window.confirm(`Tem certeza que deseja excluir o adiantamento de ${currency(tx.value)} para ${tx.partnerName}?\n\nEsta ação irá estornar a transação financeira correspondente no caixa e não poderá ser desfeita.`)) {
+      await handleDeleteAdvance(tx.id);
+    }
+  };
+
+  const [txForDetails, setTxForDetails] = useState<AdvanceTransaction | null>(null);
+
+  const handleOpenDetails = (tx: AdvanceTransaction) => {
+    setTxForDetails(tx);
+    setActiveSubTab('traceback');
+  };
+
+  const handleDeleteChild = async (childId: string) => {
+    if (window.confirm('Tem certeza que deseja estornar este desconto/baixa? O valor retornará para o saldo do adiantamento principal e a transação bancária correspondente será estornada.')) {
+      await handleDeleteAdvance(childId);
+    }
+  };
 
   // Convert DB advances to UI format
   const transactions = useMemo(() => advances.map((adv) => toAdvanceTransaction(adv, partners)), [advances, partners]);
@@ -101,6 +133,43 @@ const AdvancesTab: React.FC = () => {
   };
 
   const fixedInputClass = 'w-full pl-10 pr-4 py-2.5 border-2 border-slate-300 rounded-xl text-sm bg-white text-slate-950 font-bold focus:border-primary-500 focus:ring-0 outline-none transition-all placeholder:text-slate-400';
+
+  if (activeSubTab === 'traceback' && txForDetails) {
+    return (
+      <div className="space-y-6 animate-in fade-in duration-500">
+        <AdvanceTracebackView
+          advance={txForDetails}
+          allAdvances={transactions}
+          onBack={() => {
+            setActiveSubTab('taken');
+            setTxForDetails(null);
+          }}
+          onEdit={(tx) => {
+            setTxToEdit(tx);
+          }}
+          onDelete={async (tx) => {
+            await handleDeleteClick(tx);
+            setActiveSubTab('taken');
+            setTxForDetails(null);
+          }}
+          onDeleteChild={handleDeleteChild}
+        />
+
+        <AdvanceForm
+          isOpen={!!txToEdit}
+          onClose={() => {
+            setTxToEdit(null);
+          }}
+          onSave={async (data) => {
+            if (txToEdit) {
+              await handleUpdateAdvance(txToEdit.id, data);
+            }
+          }}
+          initialData={txToEdit || undefined}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -216,7 +285,8 @@ const AdvancesTab: React.FC = () => {
           {filteredData.map((tx) => (
             <div
               key={tx.id}
-              className="group bg-white rounded-2xl border border-slate-200 p-6 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between h-full relative overflow-hidden"
+              onClick={() => handleOpenDetails(tx)}
+              className="cursor-pointer group bg-white rounded-2xl border border-slate-200 p-6 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between h-full relative overflow-hidden hover:border-slate-300"
             >
               <div>
                 <div className="flex justify-between items-start mb-4">
@@ -231,34 +301,86 @@ const AdvancesTab: React.FC = () => {
                 </div>
 
                 <h3 className="font-black text-slate-800 text-lg mb-1 line-clamp-1 uppercase italic tracking-tight">{tx.partnerName}</h3>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-5 flex items-center gap-1.5">
-                  <Calendar size={12} /> Data: {dateStr(tx.date)}
-                </p>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-5">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                    <Calendar size={12} /> Data: {dateStr(tx.date)}
+                  </p>
+                  {tx.accountName && (
+                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
+                      Conta: {tx.accountName}
+                    </p>
+                  )}
+                </div>
 
                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 mb-6">
                   <p className="text-[9px] text-slate-400 uppercase font-black tracking-widest mb-1">Descrição do Lançamento</p>
                   <p className="text-xs font-bold text-slate-600 line-clamp-2">{tx.description}</p>
                 </div>
+
+                {tx.settledAmount && tx.settledAmount > 0 ? (
+                  <div className="bg-amber-50/50 p-3 rounded-xl border border-amber-100 mb-6 space-y-1.5 animate-in slide-in-from-top-2">
+                    <div className="flex justify-between text-[10px] font-bold text-slate-500">
+                      <span>VALOR ORIGINAL:</span>
+                      <span className="font-black text-slate-700">{currency(tx.value)}</span>
+                    </div>
+                    <div className="flex justify-between text-[10px] font-bold text-amber-700">
+                      <span>CONSUMIDO (BAIXADO):</span>
+                      <span className="font-black">- {currency(tx.settledAmount)}</span>
+                    </div>
+                    <div className="flex justify-between text-[10px] font-black text-emerald-700 pt-1.5 border-t border-dashed border-amber-200">
+                      <span>SALDO DISPONÍVEL:</span>
+                      <span className="text-sm font-black">{currency(tx.remainingAmount ?? 0)}</span>
+                    </div>
+                  </div>
+                ) : null}
               </div>
 
               <div className="pt-5 border-t border-slate-100 flex justify-between items-center">
                 <div>
                   <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-1">
-                    {tx.type === 'given' ? 'Valor que eu Paguei' : 'Valor que eu Recebi'}
+                    {tx.settledAmount && tx.settledAmount > 0 ? 'Saldo Restante' : (tx.type === 'given' ? 'Valor que eu Paguei' : 'Valor que eu Recebi')}
                   </p>
-                  <p className={`text-2xl font-black tracking-tighter ${tx.type === 'taken' ? 'text-amber-600' : 'text-indigo-600'}`}>
-                    {currency(tx.value)}
+                  <p className={`text-2xl font-black tracking-tighter ${tx.settledAmount && tx.settledAmount > 0 ? 'text-emerald-600' : (tx.type === 'taken' ? 'text-amber-600' : 'text-indigo-600')}`}>
+                    {currency(tx.settledAmount && tx.settledAmount > 0 ? (tx.remainingAmount ?? 0) : tx.value)}
                   </p>
                 </div>
                 <div className="flex gap-2">
                   {tx.status === 'active' && (
-                    <button
-                      onClick={() => handleOpenSettle(tx)}
-                      className="p-3 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
-                      title="Realizar Baixa"
-                    >
-                      <DollarSign size={20} />
-                    </button>
+                    <>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setTxToEdit(tx); }}
+                        className="p-3 rounded-xl bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
+                        title="Editar Adiantamento"
+                      >
+                        <Edit3 size={20} />
+                      </button>
+
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDeleteClick(tx); }}
+                        className={`p-3 rounded-xl transition-all shadow-sm ${
+                          tx.settledAmount && tx.settledAmount > 0
+                            ? 'bg-slate-100 text-slate-400 cursor-not-allowed opacity-50'
+                            : 'bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white'
+                        }`}
+                        disabled={!!(tx.settledAmount && tx.settledAmount > 0)}
+                        title={
+                          tx.settledAmount && tx.settledAmount > 0
+                            ? 'Não é possível excluir adiantamentos consumidos'
+                            : 'Excluir Adiantamento'
+                        }
+                      >
+                        <Trash2 size={20} />
+                      </button>
+
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleOpenSettle(tx); }}
+                        className="p-3 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
+                        title="Realizar Baixa"
+                      >
+                        <DollarSign size={20} />
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
@@ -268,9 +390,19 @@ const AdvancesTab: React.FC = () => {
       )}
 
       <AdvanceForm
-        isOpen={isFormOpen}
-        onClose={() => setIsFormOpen(false)}
-        onSave={handleSaveAdvance}
+        isOpen={isFormOpen || !!txToEdit}
+        onClose={() => {
+          setIsFormOpen(false);
+          setTxToEdit(null);
+        }}
+        onSave={(data) => {
+          if (txToEdit) {
+            handleUpdateAdvance(txToEdit.id, data);
+          } else {
+            handleSaveAdvance(data);
+          }
+        }}
+        initialData={txToEdit || undefined}
       />
 
       {txToSettle && (
@@ -287,7 +419,7 @@ const AdvancesTab: React.FC = () => {
         isOpen={isPdfModalOpen}
         onClose={() => setIsPdfModalOpen(false)}
         transactions={filteredData}
-        tab={activeSubTab}
+        tab={activeSubTab === 'traceback' ? 'taken' : activeSubTab}
       />
 
     </div>

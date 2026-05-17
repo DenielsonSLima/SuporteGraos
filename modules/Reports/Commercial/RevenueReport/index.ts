@@ -19,9 +19,9 @@ const revenueReport: ReportModule = {
     endDate: new Date().toISOString().split('T')[0],
   },
   FilterComponent: DefaultFilters,
-  fetchData: ({ startDate, endDate }) => {
-    const receivables = financialIntegrationService
-      .getReceivables()
+  fetchData: async ({ startDate, endDate }) => {
+    const allReceivables = await financialIntegrationService.getReceivables();
+    const receivables = allReceivables
       .filter((r) => r.subType === 'sales_order')
       .filter((r) => {
         const referenceDate = r.issueDate || r.dueDate;

@@ -12,4 +12,7 @@ export interface Advance {
   status: 'open' | 'partially_settled' | 'settled' | 'cancelled';
   created_at: string;
   updated_at: string;
+  parent_id?: string | null;
+  account_id?: string | null;
+  account_name?: string | null;
 }

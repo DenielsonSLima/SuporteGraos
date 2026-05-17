@@ -3,6 +3,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { Freight } from '../types';
 import { financialActionService } from '../../../services/financialActionService';
 import { advancesService } from '../../../services/advancesService';
+import { freightService } from '../../../services/loadings/freightService';
 import { useLoadings } from '../../../hooks/useLoadings';
 import { useQueryClient } from '@tanstack/react-query';
 import { QUERY_KEYS } from '../../../hooks/queryKeys';
@@ -67,18 +68,27 @@ export const useCarrierFinancials = (carrierName: string, allFreights: Freight[]
     const isUsingAdvance = paymentData.useAdvanceBalance === true;
 
     try {
-      // Se usar saldo, precisamos registrar o débito no módulo de adiantamentos
+      let parentAdvanceForNotes: any = null;
+      // Se usar saldo, precisamos registrar o consumo do adiantamento
       if (isUsingAdvance && remainingMoney > 0) {
           // Pega ID do parceiro de uma das cargas
           const loadingRef = loadings.find(l => l.id === selectedFreightIds[0]);
           if (loadingRef) {
+              // Busca o adiantamento pai (original) para vincular corretamente
+              const parentAdvance = await advancesService.getOpenByRecipient(loadingRef.carrierId);
+              if (!parentAdvance) {
+                throw new Error('Nenhum adiantamento aberto encontrado para esta transportadora.');
+              }
+              parentAdvanceForNotes = parentAdvance;
+
               await advancesService.create({
                   recipientId: loadingRef.carrierId,
-                  recipientType: 'client', // TAKEN reduz o saldo (consumo do crédito)
+                  recipientType: 'supplier', // ✅ Transportadora é fornecedora de serviço
                   amount: remainingMoney,
                   accountId: VIRTUAL_ACCOUNT_ID,
-                  date: paymentData.date,
-                  description: `Consumo de Saldo p/ Baixa de Fretes (Placa: ${loadingRef.vehiclePlate})`
+                  parentId: parentAdvance.id, // ✅ Vincula ao adiantamento pai
+                  advanceDate: paymentData.date,
+                  description: `Consumo de Saldo p/ Baixa de Frete (Placa: ${loadingRef.vehiclePlate})`
               } as any);
           }
       }
@@ -102,16 +112,25 @@ export const useCarrierFinancials = (carrierName: string, allFreights: Freight[]
               const discountPart = Math.min(debtAfterCash, remainingDiscount);
 
               if (paymentPart > 0 || discountPart > 0) {
+                  let customAccountName = paymentData.accountName;
+                  if (isUsingAdvance && parentAdvanceForNotes) {
+                    const dateStr = new Date(parentAdvanceForNotes.advanceDate).toLocaleDateString();
+                    const valStr = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(parentAdvanceForNotes.amount);
+                    customAccountName = `Adiantamento (${dateStr} - ${valStr})`;
+                  } else if (isUsingAdvance) {
+                    customAccountName = 'Adiantamento';
+                  }
+
                   const payload = {
-                      ...paymentData,
                       amount: paymentPart,
+                      date: paymentData.date,
                       discount: discountPart,
                       accountId: isUsingAdvance ? VIRTUAL_ACCOUNT_ID : paymentData.accountId,
-                      accountName: isUsingAdvance ? 'SALDO ADIANTAMENTO' : paymentData.accountName,
-                      notes: paymentData.notes ? `${paymentData.notes} (Ref: ${freight.vehiclePlate})` : `Pagamento Frete ${freight.vehiclePlate}`
+                      accountName: customAccountName,
+                      notes: `${paymentData.notes || 'Baixa de Frete'} ${isUsingAdvance ? `(Via ${customAccountName})` : ''} - Placa ${freight.vehiclePlate}`
                   };
 
-                  await financialActionService.processRecord(`fr-${loading.id}`, payload, 'freight');
+                  await freightService.addFreightPayment(loading as any, payload);
 
                   remainingMoney -= paymentPart;
                   remainingDiscount -= discountPart;

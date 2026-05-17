@@ -19,9 +19,9 @@ const monthlyFreightPaymentsReport: ReportModule = {
     endDate: new Date().toISOString().split('T')[0],
   },
   FilterComponent: DefaultFilters,
-  fetchData: ({ startDate, endDate }) => {
-    const paymentRows = financialIntegrationService
-      .getPayables()
+  fetchData: async ({ startDate, endDate }) => {
+    const payables = await financialIntegrationService.getPayables();
+    const paymentRows = payables
       .filter((record) => record.subType === 'freight')
       .filter((record) => {
         if ((record.paidValue || 0) <= 0) return false;

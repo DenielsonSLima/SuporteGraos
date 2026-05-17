@@ -74,3 +74,26 @@ export function useAdvanceSummaries() {
     placeholderData: keepPreviousData,
   });
 }
+
+export function useAdvanceChildren(parentId: string | null) {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!parentId) return;
+    const unsub = advancesService.subscribeRealtime(() => {
+      queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.ADVANCES, 'children', parentId] });
+    });
+    return unsub;
+  }, [queryClient, parentId]);
+
+  return useQuery({
+    queryKey: [...QUERY_KEYS.ADVANCES, 'children', parentId],
+    queryFn: () => {
+      if (!parentId) return [];
+      return advancesService.getChildren(parentId);
+    },
+    enabled: !!parentId,
+    staleTime: STALE_TIMES.DYNAMIC,
+    placeholderData: keepPreviousData,
+  });
+}

@@ -9,8 +9,15 @@ interface Props {
 }
 
 const Filters: React.FC<Props> = ({ filters, onChange }) => {
-  const freightPayables = financialIntegrationService.getPayables().filter((record) => record.subType === 'freight');
-  const carriers = Array.from(new Set(freightPayables.map((record) => record.entityName).filter(Boolean))).sort();
+  const [carriers, setCarriers] = React.useState<string[]>([]);
+
+  React.useEffect(() => {
+    financialIntegrationService.getPayables().then((records) => {
+      const freightPayables = records.filter((record) => record.subType === 'freight');
+      const uniqueCarriers = Array.from(new Set(freightPayables.map((record) => record.entityName).filter(Boolean))).sort();
+      setCarriers(uniqueCarriers as string[]);
+    });
+  }, []);
 
   return (
     <div className="space-y-5 animate-in slide-in-from-left-2">

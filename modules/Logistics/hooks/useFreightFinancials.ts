@@ -3,6 +3,7 @@ import { useState, useMemo } from 'react';
 import { Freight } from '../types';
 import { financialActionService } from '../../../services/financialActionService';
 import { advancesService } from '../../../services/advancesService';
+import { freightService } from '../../../services/loadings/freightService';
 import { useLoadings } from '../../../hooks/useLoadings';
 import { useQueryClient } from '@tanstack/react-query';
 import { QUERY_KEYS } from '../../../hooks/queryKeys';
@@ -110,18 +111,27 @@ export const useFreightFinancials = (freights: Freight[], onRefresh: () => void)
     let remainingMoney = Number(data.amount) || 0;
     let remainingDiscount = Number(data.discount) || 0;
     const isUsingAdvance = data.useAdvanceBalance === true;
+    let parentAdvanceForNotes: any = null;
 
-    // Se usar saldo, precisamos registrar o débito no módulo de adiantamentos
+    // Se usar saldo, precisamos registrar o consumo do adiantamento
     if (isUsingAdvance && remainingMoney > 0) {
-      // Encontra o ID do parceiro através de um dos fretes (assumindo mesmo ID) or busca no service
+      // Encontra o ID do parceiro através de um dos fretes
       const loadingRef = loadings.find((l: any) => l.id === selectedFreightIds[0]);
       if (loadingRef) {
+        // Busca o adiantamento pai (original) para vincular corretamente
+        const parentAdvance = await advancesService.getOpenByRecipient(loadingRef.carrierId);
+        if (!parentAdvance) {
+          throw new Error('Nenhum adiantamento aberto encontrado para esta transportadora.');
+        }
+        parentAdvanceForNotes = parentAdvance;
+
         await advancesService.create({
           recipientId: loadingRef.carrierId,
-          recipientType: 'client', // TAKEN reduz o saldo (é como se tivéssemos "recebido" o serviço pago com o adiantamento)
+          recipientType: 'supplier', // ✅ Transportadora é fornecedora de serviço
           amount: remainingMoney,
           accountId: VIRTUAL_ACCOUNT_ID,
-          date: data.date,
+          parentId: parentAdvance.id, // ✅ Vincula ao adiantamento pai
+          advanceDate: data.date,
           description: `Consumo de Saldo p/ Baixa de Fretes (Placas: ${selectedCarrier.freights.filter(f => selectedFreightIds.includes(f.id)).map(f => f.vehiclePlate).join(', ')})`
         } as any);
       }
@@ -145,17 +155,26 @@ export const useFreightFinancials = (freights: Freight[], onRefresh: () => void)
         const discountPart = Math.min(debtAfterCash, remainingDiscount);
 
         if (paymentPart > 0 || discountPart > 0) {
+          let customAccountName = data.accountName;
+          if (isUsingAdvance && parentAdvanceForNotes) {
+            const dateStr = new Date(parentAdvanceForNotes.advanceDate).toLocaleDateString();
+            const valStr = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(parentAdvanceForNotes.amount);
+            customAccountName = `Adiantamento (${dateStr} - ${valStr})`;
+          } else if (isUsingAdvance) {
+             customAccountName = 'Adiantamento';
+          }
+
           const payload = {
-            ...data,
             amount: paymentPart,
+            date: data.date,
             discount: discountPart,
             accountId: isUsingAdvance ? VIRTUAL_ACCOUNT_ID : data.accountId, // Se usar adiantamento, não mexe no banco
-            accountName: isUsingAdvance ? 'SALDO ADIANTAMENTO' : data.accountName,
-            notes: `${data.notes || 'Baixa de Frete'} ${isUsingAdvance ? '(Via Adiantamento)' : ''} - Placa ${freight.vehiclePlate}`
+            accountName: customAccountName,
+            notes: `${data.notes || 'Baixa de Frete'} ${isUsingAdvance ? `(Via ${customAccountName})` : ''} - Placa ${freight.vehiclePlate}`
           };
 
           // ✅ AWAIT: Esperar processamento financeiro
-          await financialActionService.processRecord(`fr-${loading.id}`, payload, 'freight');
+          await freightService.addFreightPayment(loading as any, payload);
 
           remainingMoney -= paymentPart;
           remainingDiscount -= discountPart;

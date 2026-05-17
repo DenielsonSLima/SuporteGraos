@@ -28,10 +28,10 @@ const FinancialEntityCard: React.FC<FinancialEntityCardProps> = ({ name, type, b
                     </div>
                     <div>
                         <h3 className="font-black text-white uppercase tracking-tighter text-lg italic leading-none">{name}</h3>
-                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1.5 flex items-center gap-2">
+                        <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1.5 flex items-center gap-2">
                             <div className={`w-1.5 h-1.5 rounded-full bg-${accentColor}-500 animate-pulse`} />
                             Saldo {isPayable ? 'pendente com o' : 'consolidado do'} parceiro
-                        </p>
+                        </div>
                     </div>
                 </div>
 

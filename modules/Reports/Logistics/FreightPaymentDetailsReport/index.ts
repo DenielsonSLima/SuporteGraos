@@ -20,9 +20,9 @@ const freightPaymentDetailsReport: ReportModule = {
         carrierName: ''
     },
     FilterComponent: Filters,
-    fetchData: ({ startDate, endDate, carrierName }) => {
-        const records = financialIntegrationService
-          .getPayables()
+    fetchData: async ({ startDate, endDate, carrierName }) => {
+        const payables = await financialIntegrationService.getPayables();
+        const records = payables
           .filter((r) => r.subType === 'freight')
           .filter((r) => {
             const referenceDate = r.issueDate || r.dueDate;

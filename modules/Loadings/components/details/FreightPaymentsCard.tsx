@@ -147,10 +147,6 @@ export function FreightPaymentsCard({ loading, onUpdate }: FreightPaymentsCardPr
                               <Calendar size={10} />
                               {new Date(tx.date).toLocaleDateString()}
                             </span>
-                            <span className="w-1 h-1 bg-slate-300 rounded-full" />
-                            <span className="text-[10px] text-slate-400 font-mono tracking-tight">
-                              ID: {tx.id.substring(0, 8)}
-                            </span>
                           </div>
                         </div>
                       </div>

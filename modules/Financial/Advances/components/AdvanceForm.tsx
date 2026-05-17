@@ -14,9 +14,10 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onSave: (data: any) => void;
+  initialData?: any;
 }
 
-const AdvanceForm: React.FC<Props> = ({ isOpen, onClose, onSave }) => {
+const AdvanceForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialData }) => {
   const { addToast } = useToast();
   const [type, setType] = useState<AdvanceType>('given');
   const [partnerId, setPartnerId] = useState('');
@@ -65,15 +66,26 @@ const AdvanceForm: React.FC<Props> = ({ isOpen, onClose, onSave }) => {
           .then(({ data }) => setPartners(data || []))
           .catch(() => setPartners([]));
         
-        // Reset form
-        setPartnerId('');
-        setDisplayValue('');
-        setNumericValue(0);
-        setAccountId('');
-        setDescription('');
-        setDate(new Date().toISOString().split('T')[0]);
+        if (initialData) {
+          setType(initialData.type);
+          setPartnerId(initialData.partnerId);
+          setDate(initialData.date);
+          setDescription(initialData.description);
+          setAccountId(initialData.accountId || '');
+          setNumericValue(initialData.value);
+          setDisplayValue(formatCurrencyMask(initialData.value));
+        } else {
+          // Reset form
+          setType('given');
+          setPartnerId('');
+          setDisplayValue('');
+          setNumericValue(0);
+          setAccountId('');
+          setDescription('');
+          setDate(new Date().toISOString().split('T')[0]);
+        }
     }
-  }, [isOpen]);
+  }, [isOpen, initialData]);
 
   useEffect(() => {
     const unsubscribe = parceirosService.subscribeRealtime(() => {
@@ -149,8 +161,12 @@ const AdvanceForm: React.FC<Props> = ({ isOpen, onClose, onSave }) => {
                   <Wallet size={24} />
                </div>
                <div>
-                  <h3 className="font-black text-lg uppercase tracking-tighter italic leading-none">Novo Adiantamento</h3>
-                  <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest mt-1.5">Registro de Fluxo de Crédito/Débito</p>
+                  <h3 className="font-black text-lg uppercase tracking-tighter italic leading-none">
+                    {initialData ? 'Editar Adiantamento' : 'Novo Adiantamento'}
+                  </h3>
+                  <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest mt-1.5">
+                    {initialData ? 'Edição de Lançamento Ativo' : 'Registro de Fluxo de Crédito/Débito'}
+                  </p>
                </div>
             </div>
             <button onClick={onClose} className="hover:bg-white/10 p-2 rounded-full transition-colors">

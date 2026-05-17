@@ -122,6 +122,7 @@ const ReportsModule: React.FC = () => {
     'freight_monthly_history': { title: 'Histórico de Fretes do Mês', description: 'Relatório completo de todas as cargas do mês com volumes e quebras.', icon: Truck },
     'freight_payments_report': { title: 'Pagamentos de Frete (Mês)', description: 'Lista de adiantamentos e pagamentos de saldo realizados no período.', icon: DollarSign },
     'freight_payments_detailed': { title: 'Relatório Detalhado de Fretes e Pagamentos', description: 'Visualização completa das cargas, pagamentos efetuados e saldos pendentes.', icon: Truck },
+    'freight_statement_report': { title: 'Extrato Completo de Fretes', description: 'Conta corrente com detalhes de pesagem e todos os adiantamentos.', icon: FileText },
     'abc_clients': { title: 'Análise ABC de Clientes', description: 'Classificação de clientes por volume de compras.', icon: BarChart2 },
     'abc_states': { title: 'Análise ABC por Estado', description: 'Distribuição de vendas por estado (UF).', icon: BarChart2 },
     'dre': { title: 'DRE - Demonstrativo de Resultados', description: 'Receitas, despesas e resultado líquido do período.', icon: DollarSign },

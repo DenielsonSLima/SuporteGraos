@@ -79,9 +79,39 @@ export function useAdvancesOperations({ addToast }: UseAdvancesOperationsOptions
     }
   }, [addToast, refreshData]);
 
+  // ─── Atualizar adiantamento ────────────────────────────
+  const handleUpdateAdvance = useCallback(async (id: string, data: any) => {
+    try {
+      await advancesService.update({
+        id,
+        amount: data.value,
+        accountId: data.accountId,
+        description: data.description,
+        advanceDate: data.date,
+      });
+      refreshData();
+      addToast('success', 'Adiantamento atualizado com sucesso');
+    } catch (err: any) {
+      addToast('error', 'Erro ao atualizar adiantamento', err.message);
+    }
+  }, [addToast, refreshData]);
+
+  // ─── Excluir adiantamento ──────────────────────────────
+  const handleDeleteAdvance = useCallback(async (id: string) => {
+    try {
+      await advancesService.delete(id);
+      refreshData();
+      addToast('success', 'Adiantamento excluído com sucesso');
+    } catch (err: any) {
+      addToast('error', 'Erro ao excluir adiantamento', err.message);
+    }
+  }, [addToast, refreshData]);
+
   return {
     refreshData,
     handleSaveAdvance,
     handleConfirmSettle,
+    handleUpdateAdvance,
+    handleDeleteAdvance,
   };
 }
