@@ -72,7 +72,7 @@ const freightStatementReport: ReportModule = {
                date: dateRef,
                carrier: r.entityName,
                driver: loading?.driverName || r.driverName || 'N/A',
-               plate: loading?.vehiclePlate || r.plate || 'N/A',
+               plate: loading?.vehiclePlate || (r as any).plate || 'N/A',
                origin: loading?.originName || 'N/A',
                destination: loading?.destinationName || 'N/A',
                weightOrigin,
@@ -97,6 +97,7 @@ const freightStatementReport: ReportModule = {
         title: 'Extrato Completo de Fretes',
         subtitle: `Período: ${startDate ? new Date(startDate+'T12:00:00').toLocaleDateString() : ''} a ${endDate ? new Date(endDate+'T12:00:00').toLocaleDateString() : ''} ${carrierName ? `- ${carrierName}` : ''}`,
         landscape: true,
+        rows,
         columns: [
           { header: 'Data', accessor: 'date', format: 'date', width: 'w-24' },
           { header: 'Transportadora', accessor: 'carrier' },
