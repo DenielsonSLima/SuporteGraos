@@ -4,7 +4,9 @@
  * ============================================================================
  * 
  * Responsável por estornar uma transação específica e RESTAURAR o saldo
- * no Contas a Paga
+ * no Contas a Pagar.
+ */
+
 import { financialHistoryService } from '../financialHistoryService';
 import { isSqlCanonicalOpsEnabled } from '../../sqlCanonicalOps';
 
