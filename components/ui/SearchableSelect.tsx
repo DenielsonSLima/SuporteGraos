@@ -133,8 +133,8 @@ const SearchableSelect: React.FC<Props> = ({
                     )}
                   </div>
                   {(opt.sublabel || opt.category) && (
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                      {opt.sublabel && <span className="truncate max-w-[150px]">{opt.sublabel}</span>}
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 flex-wrap">
+                      {opt.sublabel && <span>{opt.sublabel}</span>}
                       {opt.sublabel && opt.category && <span>•</span>}
                       {opt.category && <span>{opt.category}</span>}
                     </span>

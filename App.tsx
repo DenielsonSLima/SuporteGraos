@@ -80,6 +80,14 @@ const AppContent: React.FC = () => {
     setActiveModule(id);
   }, []);
 
+  // Scroll to top when module changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0 });
+    // Also scroll the main content container if it exists
+    const mainEl = document.querySelector('main');
+    if (mainEl) mainEl.scrollTo({ top: 0, left: 0 });
+  }, [activeModule]);
+
   useEffect(() => {
     const handleGlobalNav = (e: any) => {
       if (e.detail && e.detail.moduleId) {

@@ -4,7 +4,7 @@ import { LoanRecord, LoanTransaction } from '../../types';
 import LoanTransactionModal from './LoanTransactionModal';
 import LoanFormModal from './LoanFormModal';
 import LoanPdfModal from './LoanPdfModal';
-import ActionConfirmationModal from '../../../../components/ui/ActionConfirmationModal';
+import ConfirmModal from '../../../../components/ui/ConfirmModal';
 import { useToast } from '../../../../contexts/ToastContext';
 import { useAccounts } from '../../../../hooks/useAccounts';
 import { useLoanDetails } from '../hooks/useLoanDetails';
@@ -168,16 +168,19 @@ const LoanDetails: React.FC<Props> = ({ loan, onBack, onUpdate }) => {
         history={financialHistory as any[]} 
       />
 
-      <ActionConfirmationModal
+      <ConfirmModal
         isOpen={isDeleteModalOpen}
         onClose={() => setIsDeleteModalOpen(false)}
         onConfirm={handleDeleteContract}
         title="Excluir Contrato?"
-        description={<p>Tem certeza que deseja apagar o contrato com <strong>{loan.entityName}</strong>? Todos os lançamentos internos serão perdidos.</p>}
-        type="danger"
+        message={`Tem certeza que deseja apagar o contrato com ${loan.entityName}?`}
+        detail="Todos os lançamentos internos serão perdidos e a transação financeira original será estornada."
+        confirmLabel="Sim, Excluir"
+        cancelLabel="Não, Manter"
+        variant="danger"
       />
 
-      <ActionConfirmationModal
+      <ConfirmModal
         isOpen={isDeleteTxModalOpen}
         onClose={() => {
           setIsDeleteTxModalOpen(false);
@@ -185,8 +188,11 @@ const LoanDetails: React.FC<Props> = ({ loan, onBack, onUpdate }) => {
         }}
         onConfirm={onConfirmDeleteTx}
         title="Excluir Movimentação?"
-        description={<p>Tem certeza que deseja apagar esta movimentação? <strong>{deletingTxRecord?.description}</strong></p>}
-        type="danger"
+        message="Tem certeza que deseja apagar esta movimentação?"
+        detail={deletingTxRecord?.description}
+        confirmLabel="Sim, Excluir"
+        cancelLabel="Não, Manter"
+        variant="danger"
       />
     </div>
   );

@@ -111,6 +111,13 @@ const FINANCIAL_MODULES = [
 const FinancialModule: React.FC = () => {
   const [activeTabId, setActiveTabId] = useState<string>(FINANCIAL_MODULES[0].id);
 
+  // Scroll to top when switching financial sub-tabs
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0 });
+    const mainEl = document.querySelector('main');
+    if (mainEl) mainEl.scrollTo({ top: 0, left: 0 });
+  }, [activeTabId]);
+
   // Dados financeiros são carregados via TanStack Query nos hooks
   // (usePayables, useReceivables, etc.) — com realtime automático
 

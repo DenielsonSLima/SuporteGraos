@@ -23,6 +23,7 @@ import { AdvanceTransaction } from './types';
 import AdvanceForm from './components/AdvanceForm';
 import AdvanceListPdfModal from './components/AdvanceListPdfModal';
 import SettleAdvanceModal from './components/SettleAdvanceModal';
+import ConfirmModal from '../../../components/ui/ConfirmModal';
 import { useToast } from '../../../contexts/ToastContext';
 import { useAdvancesOperations } from './hooks/useAdvancesOperations';
 import AdvanceTracebackView from './components/AdvanceTracebackView';
@@ -69,14 +70,30 @@ const AdvancesTab: React.FC = () => {
   const [txToSettle, setTxToSettle] = useState<AdvanceTransaction | null>(null);
   const [txToEdit, setTxToEdit] = useState<AdvanceTransaction | null>(null);
 
-  const handleDeleteClick = async (tx: AdvanceTransaction) => {
+  // Confirm modal states
+  const [deleteTarget, setDeleteTarget] = useState<AdvanceTransaction | null>(null);
+  const [deleteChildId, setDeleteChildId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDeleteClick = (tx: AdvanceTransaction) => {
     if (tx.settledAmount && tx.settledAmount > 0) {
-      addToast('error', 'Não é possível excluir', `Este adiantamento já possui R$ ${tx.settledAmount} consumidos em fretes.`);
+      addToast('error', 'Não é possível excluir', `Este adiantamento já possui ${currency(tx.settledAmount)} consumidos. Estorne as baixas primeiro.`);
       return;
     }
+    setDeleteTarget(tx);
+  };
 
-    if (window.confirm(`Tem certeza que deseja excluir o adiantamento de ${currency(tx.value)} para ${tx.partnerName}?\n\nEsta ação irá estornar a transação financeira correspondente no caixa e não poderá ser desfeita.`)) {
-      await handleDeleteAdvance(tx.id);
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    try {
+      await handleDeleteAdvance(deleteTarget.id);
+      addToast('success', 'Excluído com sucesso', `Adiantamento de ${currency(deleteTarget.value)} para ${deleteTarget.partnerName} foi excluído e o valor estornado.`);
+    } catch {
+      addToast('error', 'Erro ao excluir', 'Não foi possível excluir o adiantamento. Tente novamente.');
+    } finally {
+      setIsDeleting(false);
+      setDeleteTarget(null);
     }
   };
 
@@ -87,9 +104,21 @@ const AdvancesTab: React.FC = () => {
     setActiveSubTab('traceback');
   };
 
-  const handleDeleteChild = async (childId: string) => {
-    if (window.confirm('Tem certeza que deseja estornar este desconto/baixa? O valor retornará para o saldo do adiantamento principal e a transação bancária correspondente será estornada.')) {
-      await handleDeleteAdvance(childId);
+  const handleDeleteChild = (childId: string) => {
+    setDeleteChildId(childId);
+  };
+
+  const handleConfirmDeleteChild = async () => {
+    if (!deleteChildId) return;
+    setIsDeleting(true);
+    try {
+      await handleDeleteAdvance(deleteChildId);
+      addToast('success', 'Baixa estornada', 'O valor foi devolvido ao saldo do adiantamento principal.');
+    } catch {
+      addToast('error', 'Erro ao estornar', 'Não foi possível estornar a baixa. Tente novamente.');
+    } finally {
+      setIsDeleting(false);
+      setDeleteChildId(null);
     }
   };
 
@@ -420,6 +449,37 @@ const AdvancesTab: React.FC = () => {
         onClose={() => setIsPdfModalOpen(false)}
         transactions={filteredData}
         tab={activeSubTab === 'traceback' ? 'taken' : activeSubTab}
+      />
+
+      {/* Confirm Delete Advance Modal */}
+      <ConfirmModal
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleConfirmDelete}
+        title="Excluir Adiantamento"
+        message={deleteTarget
+          ? `Deseja realmente excluir o adiantamento de ${currency(deleteTarget.value)} para ${deleteTarget.partnerName}?`
+          : ''
+        }
+        detail="Esta ação irá estornar a transação financeira correspondente no caixa. Essa operação não poderá ser desfeita."
+        confirmLabel="Sim, Excluir"
+        cancelLabel="Não, Manter"
+        variant="danger"
+        isLoading={isDeleting}
+      />
+
+      {/* Confirm Delete Child Settlement Modal */}
+      <ConfirmModal
+        isOpen={!!deleteChildId}
+        onClose={() => setDeleteChildId(null)}
+        onConfirm={handleConfirmDeleteChild}
+        title="Estornar Baixa"
+        message="Deseja realmente estornar este desconto/baixa do adiantamento?"
+        detail="O valor retornará para o saldo do adiantamento principal e a transação bancária correspondente será estornada."
+        confirmLabel="Sim, Estornar"
+        cancelLabel="Não, Manter"
+        variant="warning"
+        isLoading={isDeleting}
       />
 
     </div>

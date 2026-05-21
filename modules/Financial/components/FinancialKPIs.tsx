@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { DollarSign, Clock, AlertCircle, Calendar } from 'lucide-react';
+import { DollarSign, CheckCircle2, Clock } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../../services/supabase';
 import { formatMoney } from '../../../utils/formatters';
@@ -15,9 +15,9 @@ const FinancialKPIs: React.FC<Props> = ({ type }) => {
   const currentUser = useCurrentUser();
 
   const { data: stats, isLoading } = useQuery({
-    queryKey: [...QUERY_KEYS.FINANCIAL_SUMMARY, currentUser?.companyId],
+    queryKey: [...QUERY_KEYS.FINANCIAL_SUMMARY, currentUser?.companyId, 'v4'],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('rpc_get_financial_summary_v3', {
+      const { data, error } = await supabase.rpc('rpc_get_financial_summary_v4', {
         p_company_id: currentUser?.companyId
       });
       if (error) throw error;
@@ -45,31 +45,64 @@ const FinancialKPIs: React.FC<Props> = ({ type }) => {
     </div>
   );
 
+  if (type === 'payable') {
+    return (
+      <div className="grid gap-6 sm:grid-cols-1 lg:grid-cols-3 mb-8 animate-in fade-in slide-in-from-top-4 duration-700">
+        <StatCard 
+          label="Valor Total"
+          value={currentStats?.total_amount || 0} 
+          icon={DollarSign} 
+          color="bg-rose-600"
+          subtext="Soma de todas as contas"
+          loading={isLoading}
+        />
+        <StatCard 
+          label="Valor Pago" 
+          value={currentStats?.paid_amount || 0} 
+          icon={CheckCircle2} 
+          color="bg-emerald-600"
+          subtext="Total já quitado"
+          loading={isLoading}
+        />
+        <StatCard 
+          label="Valor em Aberto" 
+          value={currentStats?.open_amount || 0} 
+          icon={Clock} 
+          color="bg-amber-500"
+          subtext="Saldo pendente de pagamento"
+          bgClass={currentStats?.open_amount > 0 ? 'bg-amber-50 border-amber-100' : 'bg-white border-slate-200'}
+          loading={isLoading}
+        />
+      </div>
+    );
+  }
+
+  // type === 'receivable'
   return (
     <div className="grid gap-6 sm:grid-cols-1 lg:grid-cols-3 mb-8 animate-in fade-in slide-in-from-top-4 duration-700">
       <StatCard 
-        label={`Total a ${type === 'payable' ? 'Pagar' : 'Receber'}`}
-        value={currentStats?.total || 0} 
+        label="Valor Total"
+        value={currentStats?.total_amount || 0} 
         icon={DollarSign} 
-        color={type === 'payable' ? 'bg-rose-600' : 'bg-emerald-600'}
-        subtext="Saldo total pendente"
+        color="bg-emerald-600"
+        subtext="Soma de todas as contas"
         loading={isLoading}
       />
       <StatCard 
-        label="Vence Hoje" 
-        value={currentStats?.today || 0} 
-        icon={Calendar} 
+        label="Valor Recebido" 
+        value={currentStats?.paid_amount || 0} 
+        icon={CheckCircle2} 
+        color="bg-blue-600"
+        subtext="Total já recebido"
+        loading={isLoading}
+      />
+      <StatCard 
+        label="Valor Pendente" 
+        value={currentStats?.pending_amount || 0} 
+        icon={Clock} 
         color="bg-amber-500"
-        subtext="Compromissos do dia"
-        loading={isLoading}
-      />
-      <StatCard 
-        label="Atrasado" 
-        value={currentStats?.overdue || 0} 
-        icon={AlertCircle} 
-        color="bg-rose-700"
-        subtext="Títulos vencidos"
-        bgClass={currentStats?.overdue > 0 ? 'bg-rose-50 border-rose-100' : 'bg-white border-slate-200'}
+        subtext="Saldo a receber"
+        bgClass={currentStats?.pending_amount > 0 ? 'bg-amber-50 border-amber-100' : 'bg-white border-slate-200'}
         loading={isLoading}
       />
     </div>

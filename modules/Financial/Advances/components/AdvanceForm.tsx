@@ -54,7 +54,7 @@ const AdvanceForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialData }) 
     sortedPartners.map(p => ({
       id: p.id,
       label: p.name,
-      sublabel: `${p.nickname || ''}${p.document ? ` • ${p.document}` : ''}`.trim() || undefined,
+      sublabel: [p.nickname, p.document].filter(Boolean).join(' • ') || undefined,
       category: p.type
     })),
     [sortedPartners]
