@@ -2,21 +2,19 @@
 // ============================================================================
 // Hooks TanStack Query para Adiantamentos
 // ============================================================================
+// REFATORADO: Usa financialRealtimeHub (canal único) em vez de canais individuais.
+// Garante que mudanças em financial_transactions (rollback de adiantamento)
+// propagam para TODOS os computadores em tempo real.
+// ============================================================================
 
-import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { advancesService } from '../services/advancesService';
 import { QUERY_KEYS, STALE_TIMES } from './queryKeys';
+import { useFinancialRealtime } from './useFinancialRealtime';
 
 export function useAdvances() {
-  const queryClient = useQueryClient();
-
-  useEffect(() => {
-    const unsub = advancesService.subscribeRealtime(() => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ADVANCES });
-    });
-    return unsub;
-  }, [queryClient]);
+  // Canal único financeiro — invalida todos os caches quando qualquer tabela muda
+  useFinancialRealtime();
 
   return useQuery({
     queryKey: QUERY_KEYS.ADVANCES,
@@ -40,14 +38,8 @@ export function useAdvancesByType(type: 'supplier' | 'client' | 'shareholder' | 
 }
 
 export function useOpenAdvances() {
-  const queryClient = useQueryClient();
-
-  useEffect(() => {
-    const unsub = advancesService.subscribeRealtime(() => {
-      queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.ADVANCES, 'open'] });
-    });
-    return unsub;
-  }, [queryClient]);
+  // Canal único financeiro
+  useFinancialRealtime();
 
   return useQuery({
     queryKey: [...QUERY_KEYS.ADVANCES, 'open'],
@@ -58,14 +50,8 @@ export function useOpenAdvances() {
 }
 
 export function useAdvanceSummaries() {
-  const queryClient = useQueryClient();
-
-  useEffect(() => {
-    const unsub = advancesService.subscribeRealtime(() => {
-      queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.ADVANCES, 'summaries'] });
-    });
-    return unsub;
-  }, [queryClient]);
+  // Canal único financeiro
+  useFinancialRealtime();
 
   return useQuery({
     queryKey: [...QUERY_KEYS.ADVANCES, 'summaries'],
@@ -76,15 +62,8 @@ export function useAdvanceSummaries() {
 }
 
 export function useAdvanceChildren(parentId: string | null) {
-  const queryClient = useQueryClient();
-
-  useEffect(() => {
-    if (!parentId) return;
-    const unsub = advancesService.subscribeRealtime(() => {
-      queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.ADVANCES, 'children', parentId] });
-    });
-    return unsub;
-  }, [queryClient, parentId]);
+  // Canal único financeiro
+  useFinancialRealtime();
 
   return useQuery({
     queryKey: [...QUERY_KEYS.ADVANCES, 'children', parentId],

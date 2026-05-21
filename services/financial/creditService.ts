@@ -185,7 +185,7 @@ export const loadFromSupabase = async (): Promise<FinancialRecord[]> => {
         .from('financial_entries')
         .select('*')
         .eq('origin_type', 'credit')
-        .not('status', 'in', '("cancelled", "reversed")')
+        .not('status', 'in', '(cancelled,reversed)')
         .order('created_date', { ascending: false });
 
       if (error) {
@@ -449,7 +449,7 @@ export const remove = async (id: string): Promise<boolean> => {
 
   if (canonicalMode) {
     try {
-      // No modo canônico, preferimos marcar como cancelado em vez de deletar
+      // 1. Marcar como cancelado na financial_entries
       const { error } = await supabase
         .from('financial_entries')
         .update({ status: 'cancelled' })
@@ -457,16 +457,18 @@ export const remove = async (id: string): Promise<boolean> => {
 
       if (error) return false;
 
-      // Criar estorno da transação financeira para abater o saldo da conta
-      const reversalSuccess = await financialTransactionService.deleteByEntryId(id);
-
-      if (!reversalSuccess) {
-        // Se falhar o estorno, não removemos do cache local para manter consistência
-        return false;
+      // 2. Estornar transações financeiras vinculadas
+      try {
+        await financialTransactionService.deleteByEntryId(id);
+      } catch (err) {
+        // Log mas não impede a exclusão do registro
+        console.warn('[creditService.remove] Erro no estorno de transações:', err);
       }
 
+      // 3. SEMPRE limpar cache local e forçar reload
       const records = db.getAll();
       db.setAll(records.filter(r => r.id !== id));
+      isLoaded = false; // Força reload na próxima consulta
       invalidateFinancialCache();
       return true;
     } catch (err) {

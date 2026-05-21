@@ -2,21 +2,17 @@
 // ============================================================================
 // Hooks TanStack Query para Despesas Administrativas
 // ============================================================================
+// REFATORADO: Usa financialRealtimeHub (canal único) em vez de canal individual.
+// ============================================================================
 
-import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { adminExpensesService } from '../services/adminExpensesService';
 import { QUERY_KEYS, STALE_TIMES } from './queryKeys';
+import { useFinancialRealtime } from './useFinancialRealtime';
 
 export function useAdminExpenses() {
-  const queryClient = useQueryClient();
-
-  useEffect(() => {
-    const unsub = adminExpensesService.subscribeRealtime(() => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ADMIN_EXPENSES });
-    });
-    return unsub;
-  }, [queryClient]);
+  // Canal único financeiro — invalida todos os caches quando qualquer tabela muda
+  useFinancialRealtime();
 
   return useQuery({
     queryKey: QUERY_KEYS.ADMIN_EXPENSES,

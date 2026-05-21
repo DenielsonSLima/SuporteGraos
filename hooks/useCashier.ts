@@ -3,44 +3,26 @@
  *
  * Hooks TanStack Query para o módulo Caixa.
  *
- * OTIMIZADO:
+ * REFATORADO:
+ * ✅ Usa financialRealtimeHub (canal único) em vez de canais individuais
  * ✅ Cache inteligente com staleTime
  * ✅ keepPreviousData — sem piscar ao re-fetchar
  * ✅ Deduplicação automática de requests
- * ✅ 1 ÚNICA subscription compartilhada (era 6 = 3 por hook × 2 hooks)
- *    A subscription fica no financialEntriesService que já escuta a tabela
- *    financial_entries — qualquer mudança financeira invalida o caixa.
+ * ✅ Cross-module: mudanças em transfers, accounts, transactions propagam automaticamente
  */
 
-import { useEffect } from 'react';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { QUERY_KEYS, STALE_TIMES } from './queryKeys';
-import { financialEntriesService } from '../services/financialEntriesService';
-import { supabase } from '../services/supabase';
-import { financialTransactionService } from '../services/financial/financialTransactionService';
-import { accountsService } from '../services/accountsService';
-import { assetService } from '../services/assetService';
 import { cashierService } from '../modules/Cashier/services/cashierService';
+import { useFinancialRealtime } from './useFinancialRealtime';
 
 /**
  * Relatório do mês atual — dados vêm do SQL (RPC).
- * Invalida automaticamente quando houver mudança em:
- * 1. Entries (obrigações)
- * 2. Transactions (movimentações/caixa)
- * 3. Accounts (saldos/transferências)
+ * Invalida automaticamente quando houver mudança em qualquer tabela financeira.
  */
 export function useCashierCurrentMonth() {
-  const queryClient = useQueryClient();
-
-  // Realtime: consome o canal singleton do serviço (escuta 7+ tabelas)
-  useEffect(() => {
-    const invalidate = () => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT });
-    };
-
-    const unsub = cashierService.subscribeRealtime(invalidate);
-    return unsub;
-  }, [queryClient]);
+  // Canal único financeiro — invalida todos os caches quando qualquer tabela muda
+  useFinancialRealtime();
 
   return useQuery({
     queryKey: QUERY_KEYS.CASHIER_CURRENT,
@@ -52,17 +34,11 @@ export function useCashierCurrentMonth() {
 
 /**
  * Histórico de fechamentos mensais.
- * Invalida quando entries financeiras mudam.
+ * Invalida quando qualquer tabela financeira muda.
  */
 export function useCashierHistory() {
-  const queryClient = useQueryClient();
-
-  useEffect(() => {
-    const unsub = financialEntriesService.subscribeRealtime(() => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_HISTORY });
-    });
-    return unsub;
-  }, [queryClient]);
+  // Canal único financeiro
+  useFinancialRealtime();
 
   return useQuery({
     queryKey: QUERY_KEYS.CASHIER_HISTORY,
@@ -74,19 +50,11 @@ export function useCashierHistory() {
 
 /**
  * Hook para buscar estatísticas modulares (Compras, Fretes, Despesas, etc.)
- * Atualiza em tempo real.
+ * Atualiza em tempo real via hub financeiro.
  */
 export function useCashierModularStats(referenceDate?: string) {
-  const queryClient = useQueryClient();
-
-  useEffect(() => {
-    const invalidate = () => {
-      queryClient.invalidateQueries({ queryKey: ['cashier_modular_stats', referenceDate] });
-    };
-
-    const unsub = cashierService.subscribeRealtime(invalidate);
-    return unsub;
-  }, [queryClient, referenceDate]);
+  // Canal único financeiro
+  useFinancialRealtime();
 
   return useQuery({
     queryKey: ['cashier_modular_stats', referenceDate],

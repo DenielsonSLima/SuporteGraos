@@ -2,22 +2,17 @@
 // ============================================================================
 // Hooks TanStack Query para Empréstimos e Parcelas
 // ============================================================================
+// REFATORADO: Usa financialRealtimeHub (canal único) em vez de canais individuais.
+// ============================================================================
 
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { useEffect } from 'react';
 import { loansService, Loan } from '../services/loansService';
 import { QUERY_KEYS, STALE_TIMES } from './queryKeys';
+import { useFinancialRealtime } from './useFinancialRealtime';
 
 export function useLoans() {
-  const queryClient = useQueryClient();
-
-  useEffect(() => {
-    const unsub = loansService.subscribeRealtime(() => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOANS });
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOAN_INSTALLMENTS });
-    });
-    return unsub;
-  }, [queryClient]);
+  // Canal único financeiro — invalida todos os caches quando qualquer tabela muda
+  useFinancialRealtime();
 
   return useQuery({
     queryKey: QUERY_KEYS.LOANS,
@@ -77,15 +72,8 @@ export function useDeleteLoan() {
 }
 
 export function useLoanInstallments(loanId: string | null) {
-  const queryClient = useQueryClient();
-
-  useEffect(() => {
-    if (!loanId) return;
-    const unsub = loansService.subscribeRealtime(() => {
-      queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.LOAN_INSTALLMENTS, loanId] });
-    });
-    return unsub;
-  }, [queryClient, loanId]);
+  // Canal único financeiro
+  useFinancialRealtime();
 
   return useQuery({
     queryKey: [...QUERY_KEYS.LOAN_INSTALLMENTS, loanId],
@@ -101,14 +89,8 @@ export function useLoanInstallments(loanId: string | null) {
 
 // Hook: Totais de empréstimos ativos via RPC — Zero cálculo no frontend
 export function useLoansActiveTotals() {
-  const queryClient = useQueryClient();
-
-  useEffect(() => {
-    const unsub = loansService.subscribeRealtime(() => {
-      queryClient.invalidateQueries({ queryKey: ['loans_active_totals'] });
-    });
-    return unsub;
-  }, [queryClient]);
+  // Canal único financeiro
+  useFinancialRealtime();
 
   return useQuery({
     queryKey: ['loans_active_totals'],

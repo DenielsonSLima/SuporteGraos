@@ -2,53 +2,27 @@
 // ============================================================================
 // Hooks TanStack Query para gerenciar Contas a Pagar/Receber
 // ============================================================================
-// OTIMIZADO:
-// ✅ staleTime padronizado via STALE_TIMES (era hardcoded)
-// ✅ Cada hook principal registra 1 subscription (não duplica)
+// REFATORADO:
+// ✅ Usa financialRealtimeHub (canal único) em vez de canais individuais
+// ✅ staleTime padronizado via STALE_TIMES
+// ✅ Cross-module: mudanças em financial_transactions invalidam entries
 // ✅ Hooks auxiliares NÃO registram subscription própria
-//    (são invalidados pela key hierárquica)
 // ============================================================================
 
-import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import {
   financialEntriesService,
   FinancialEntryType,
   EntryStatus,
   FinancialFilterParams,
 } from '../services/financialEntriesService';
-import { loadingService } from '../services/loadingService';
 import { QUERY_KEYS, STALE_TIMES } from './queryKeys';
+import { useFinancialRealtime } from './useFinancialRealtime';
 
 // Hook principal: Contas a Pagar
 export function usePayables(params?: FinancialFilterParams) {
-  const queryClient = useQueryClient();
-
-  useEffect(() => {
-    // 1. Invalida apenas quando o tipo mudado é 'payable' (ou desconhecido como fallback seguro)
-    const unsubEntries = financialEntriesService.subscribeRealtime((entryType) => {
-      if (!entryType || entryType === 'payable') {
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_PAYABLES });
-      }
-    });
-
-    // 2. Invalida quando houver mudanças em Carregamentos (Logística)
-    // Muitos títulos de frete são gerados/atualizados via Logística.
-    // Usamos debounce para evitar excesso de rede (Egress Saver).
-    let timer: NodeJS.Timeout;
-    const unsubLoadings = loadingService.subscribeRealtime(() => {
-      clearTimeout(timer);
-      timer = setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_PAYABLES });
-      }, 1000); // 1s debounce
-    });
-
-    return () => {
-      unsubEntries();
-      unsubLoadings();
-      clearTimeout(timer);
-    };
-  }, [queryClient]);
+  // Canal único financeiro — invalida todos os caches quando qualquer tabela muda
+  useFinancialRealtime();
 
   return useQuery({
     queryKey: [QUERY_KEYS.FINANCIAL_PAYABLES, params],
@@ -60,36 +34,8 @@ export function usePayables(params?: FinancialFilterParams) {
 
 // Hook principal: Contas a Receber
 export function useReceivables(params?: FinancialFilterParams) {
-  const queryClient = useQueryClient();
-
-  useEffect(() => {
-    // 1. Invalida apenas quando o tipo mudado é 'receivable' (ou desconhecido como fallback seguro)
-    const unsubEntries = financialEntriesService.subscribeRealtime((entryType) => {
-      if (!entryType || entryType === 'receivable') {
-        queryClient.invalidateQueries({
-          queryKey: QUERY_KEYS.FINANCIAL_RECEIVABLES,
-        });
-      }
-    });
-
-    // 2. Invalida quando houver mudanças em Carregamentos (Logística)
-    // Títulos de receita de venda são vinculados a carregamentos.
-    let timer: NodeJS.Timeout;
-    const unsubLoadings = loadingService.subscribeRealtime(() => {
-      clearTimeout(timer);
-      timer = setTimeout(() => {
-        queryClient.invalidateQueries({
-          queryKey: QUERY_KEYS.FINANCIAL_RECEIVABLES,
-        });
-      }, 1000); // 1s debounce
-    });
-
-    return () => {
-      unsubEntries();
-      unsubLoadings();
-      clearTimeout(timer);
-    };
-  }, [queryClient]);
+  // Canal único financeiro
+  useFinancialRealtime();
 
   return useQuery({
     queryKey: [QUERY_KEYS.FINANCIAL_RECEIVABLES, params],

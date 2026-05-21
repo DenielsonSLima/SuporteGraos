@@ -2,7 +2,7 @@
 // ============================================================================
 // Hook TanStack Query para gerenciar contas (accounts)
 // ============================================================================
-// Cache + Realtime + keepPreviousData (sem piscar)
+// Cache + Realtime via Hub Financeiro + keepPreviousData (sem piscar)
 // ============================================================================
 
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
@@ -10,6 +10,7 @@ import { useEffect } from 'react';
 import { accountsService, Account } from '../services/accountsService';
 import { setAccountsCache } from '../services/financial/handlers/orchestratorHelpers';
 import { QUERY_KEYS, STALE_TIMES } from './queryKeys';
+import { useFinancialRealtime } from './useFinancialRealtime';
 
 export type { Account };
 
@@ -29,16 +30,8 @@ interface AccountUpdateInput {
 }
 
 export function useAccounts() {
-  const queryClient = useQueryClient();
-
-  // Realtime: invalida cache quando há mudanças
-  useEffect(() => {
-    const unsub = accountsService.subscribeRealtime(() => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS });
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.TOTAL_BALANCE });
-    });
-    return unsub;
-  }, [queryClient]);
+  // Canal único financeiro — invalida todos os caches quando qualquer tabela muda
+  useFinancialRealtime();
 
   // Query: carrega dados com cache
   const query = useQuery({

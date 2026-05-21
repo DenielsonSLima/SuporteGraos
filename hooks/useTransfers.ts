@@ -2,21 +2,19 @@
 // ============================================================================
 // Hook TanStack Query para Transferências entre Contas
 // ============================================================================
+// REFATORADO: Usa financialRealtimeHub (canal único) em vez de canal individual.
+// Garante que mudanças em transfers, accounts, financial_transactions propagam
+// para TODOS os computadores em tempo real, sem precisar de F5.
+// ============================================================================
 
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { useEffect } from 'react';
 import { transfersService } from '../services/transfersService';
 import { QUERY_KEYS, STALE_TIMES } from './queryKeys';
+import { useFinancialRealtime } from './useFinancialRealtime';
 
 export function useTransfers() {
-  const queryClient = useQueryClient();
-
-  useEffect(() => {
-    const unsub = transfersService.subscribeRealtime(() => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.TRANSFERS });
-    });
-    return unsub;
-  }, [queryClient]);
+  // Canal único financeiro — invalida todos os caches quando qualquer tabela muda
+  useFinancialRealtime();
 
   return useQuery({
     queryKey: QUERY_KEYS.TRANSFERS,
@@ -28,14 +26,8 @@ export function useTransfers() {
 
 // Hook: Totais do mês via RPC — Zero cálculo no frontend
 export function useTransfersMonthTotal() {
-  const queryClient = useQueryClient();
-
-  useEffect(() => {
-    const unsub = transfersService.subscribeRealtime(() => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.TRANSFERS_MONTH_TOTAL });
-    });
-    return unsub;
-  }, [queryClient]);
+  // Realtime via hub financeiro (já ativado pelo useTransfers no mesmo componente)
+  useFinancialRealtime();
 
   return useQuery({
     queryKey: QUERY_KEYS.TRANSFERS_MONTH_TOTAL,

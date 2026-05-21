@@ -4,8 +4,12 @@ import creditService from '../services/financial/creditService';
 import type { FinancialRecord } from '../modules/Financial/types';
 import { handleStandalonePayment } from '../services/financial/handlers/standaloneHandler';
 import { supabase } from '../services/supabase';
+import { useFinancialRealtime } from './useFinancialRealtime';
 
 export const useCredits = () => {
+  // Canal único financeiro — invalida quando qualquer tabela financeira muda
+  useFinancialRealtime();
+
   return useQuery({
     queryKey: QUERY_KEYS.CREDITS,
     queryFn: async () => {
@@ -172,12 +176,17 @@ export const useDeleteCredit = () => {
       return result;
     },
     onSuccess: async () => {
+      // Invalida TODOS os caches relevantes para garantir que o registro saia de TODAS as telas
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CREDITS }),
+        queryClient.invalidateQueries({ queryKey: ['credits', 'summary'] }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.STANDALONE_RECORDS }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ADMIN_EXPENSES }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.TOTAL_BALANCE }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_ENTRIES }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_TRANSACTIONS }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD })
       ]);
     },
