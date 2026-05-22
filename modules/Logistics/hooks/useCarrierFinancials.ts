@@ -114,7 +114,15 @@ export const useCarrierFinancials = (carrierName: string, allFreights: Freight[]
               if (paymentPart > 0 || discountPart > 0) {
                   let customAccountName = paymentData.accountName;
                   if (isUsingAdvance && parentAdvanceForNotes) {
-                    const dateStr = new Date(parentAdvanceForNotes.advanceDate).toLocaleDateString();
+                    let dateStr = 'Data Inválida';
+                    if (parentAdvanceForNotes.advance_date) {
+                      const parts = parentAdvanceForNotes.advance_date.split('-');
+                      if (parts.length === 3) {
+                        dateStr = `${parts[2]}/${parts[1]}/${parts[0]}`;
+                      } else {
+                        dateStr = new Date(parentAdvanceForNotes.advance_date).toLocaleDateString();
+                      }
+                    }
                     const valStr = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(parentAdvanceForNotes.amount);
                     customAccountName = `Adiantamento (${dateStr} - ${valStr})`;
                   } else if (isUsingAdvance) {
