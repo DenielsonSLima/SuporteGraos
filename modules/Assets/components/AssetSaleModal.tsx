@@ -55,8 +55,8 @@ const AssetSaleModal: React.FC<Props> = ({ isOpen, onClose, asset, onConfirmSale
   const inputClass = 'w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-600';
   const labelClass = 'block text-xs font-bold text-slate-500 uppercase mb-1';
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
+  const modalContent = (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
       <div className="w-full max-w-lg bg-white rounded-xl shadow-2xl overflow-hidden animate-in zoom-in-95 flex flex-col max-h-[90vh]">
         
         <div className="bg-emerald-700 px-6 py-4 flex justify-between items-center text-white shrink-0">

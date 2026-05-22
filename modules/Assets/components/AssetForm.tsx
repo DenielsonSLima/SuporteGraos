@@ -5,6 +5,8 @@ import { Asset, AssetType } from '../types';
 import { assetService } from '../../../services/assetService';
 import { getTodayBR } from '../../../utils/dateUtils';
 
+import { createPortal } from 'react-dom';
+
 interface Props {
   isOpen: boolean;
   onClose: () => void;
@@ -70,8 +72,8 @@ const AssetForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialData }) =>
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
+  const modalContent = (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
       <div className="w-full max-w-md bg-white rounded-[2rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
         <div className="bg-slate-900 px-8 py-6 text-white flex justify-between items-center">
           <h3 className="font-black uppercase tracking-tighter italic text-lg">{initialData ? 'Editar Bem' : 'Novo Ativo'}</h3>
@@ -135,6 +137,9 @@ const AssetForm: React.FC<Props> = ({ isOpen, onClose, onSave, initialData }) =>
       </div>
     </div>
   );
+
+  // Return the portal attached to document.body
+  return typeof window !== 'undefined' ? createPortal(modalContent, document.body) : modalContent;
 };
 
 export default AssetForm;

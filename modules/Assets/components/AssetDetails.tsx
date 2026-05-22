@@ -31,7 +31,7 @@ interface Props {
 
 const AssetDetails: React.FC<Props> = ({ asset, onBack, onDelete, onEdit, onRefresh }) => {
     const { addToast } = useToast();
-    const { financialHistory, confirmPayment, updateRecord, deleteRecord, updateAsset } = useAssetDetailsOperations(asset.id);
+    const { financialHistory, confirmPayment, updateRecord, deleteRecord, updateAsset, undoSale } = useAssetDetailsOperations(asset.id);
     const assetSale = useAssetSale();
 
     // Modals Control
@@ -270,6 +270,26 @@ const AssetDetails: React.FC<Props> = ({ asset, onBack, onDelete, onEdit, onRefr
                                         <span className="text-[9px] font-bold text-slate-500 uppercase block">Valor Negociado</span>
                                         <p className="font-black text-emerald-400 text-lg">{currency(asset.saleValue || 0)}</p>
                                     </div>
+                                </div>
+                                
+                                <div className="pt-4 mt-4 border-t border-white/10">
+                                    <button
+                                        onClick={async () => {
+                                            if (window.confirm('Tem certeza que deseja estornar esta venda? Isso excluirá todas as parcelas pendentes (as já pagas impedem o estorno) e retornará o ativo para o inventário.')) {
+                                                try {
+                                                    await undoSale();
+                                                    addToast('success', 'Venda Estornada', 'O ativo retornou ao imobilizado e as parcelas foram canceladas.');
+                                                    onRefresh();
+                                                    setRefreshKey(prev => prev + 1);
+                                                } catch (error: any) {
+                                                    addToast('error', 'Erro ao estornar', error.message || 'Erro desconhecido');
+                                                }
+                                            }
+                                        }}
+                                        className="w-full flex items-center justify-center gap-2 bg-white/10 hover:bg-rose-600 text-white p-3 rounded-xl transition-all text-xs font-black uppercase tracking-wider"
+                                    >
+                                        <History size={16} /> Estornar Venda
+                                    </button>
                                 </div>
                             </div>
                         </div>
