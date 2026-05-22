@@ -24,6 +24,19 @@ export function useAdvances() {
   });
 }
 
+// Hook: Totais de adiantamentos ativos via RPC — Zero cálculo no frontend
+export function useAdvancesActiveTotals() {
+  // Canal único financeiro
+  useFinancialRealtime();
+
+  return useQuery({
+    queryKey: QUERY_KEYS.ADVANCES_ACTIVE_TOTALS,
+    queryFn: () => advancesService.getActiveTotals(),
+    staleTime: STALE_TIMES.DYNAMIC,
+    placeholderData: keepPreviousData,
+  });
+}
+
 export function useAdvancesByType(type: 'supplier' | 'client' | 'shareholder' | null) {
   return useQuery({
     queryKey: [...QUERY_KEYS.ADVANCES, 'type', type],

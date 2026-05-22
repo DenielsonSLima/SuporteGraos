@@ -93,7 +93,7 @@ export function useLoansActiveTotals() {
   useFinancialRealtime();
 
   return useQuery({
-    queryKey: ['loans_active_totals'],
+    queryKey: QUERY_KEYS.LOANS_ACTIVE_TOTALS,
     queryFn: () => loansService.getActiveTotals(),
     staleTime: STALE_TIMES.MODERATE,
     placeholderData: keepPreviousData,

@@ -139,5 +139,19 @@ export const advancesLoader = {
     if (error) throw new Error(`Erro ao buscar consumos do adiantamento: ${error.message}`);
     const mapped = (data ?? []).map(mapRow);
     return enrichWithAccounts(mapped);
+  },
+
+  getActiveTotals: async (): Promise<{ takenRemaining: number, givenRemaining: number, countActive: number, netBalance: number }> => {
+    const { data, error } = await supabase.rpc('rpc_get_advances_active_totals');
+    if (error) {
+      console.error('Erro ao buscar totais de adiantamentos:', error);
+      return { takenRemaining: 0, givenRemaining: 0, countActive: 0, netBalance: 0 };
+    }
+    return {
+      takenRemaining: data?.takenRemaining || 0,
+      givenRemaining: data?.givenRemaining || 0,
+      countActive: data?.countActive || 0,
+      netBalance: data?.netBalance || 0,
+    };
   }
 };

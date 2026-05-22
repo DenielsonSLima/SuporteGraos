@@ -12,6 +12,7 @@ const LoanKPIs: React.FC = () => {
     takenTotal: totals?.takenRemaining ?? 0,
     grantedTotal: totals?.grantedRemaining ?? 0,
     countActive: totals?.countActive ?? 0,
+    netBalance: totals?.netBalance ?? 0,
   };
 
   return (
@@ -40,16 +41,28 @@ const LoanKPIs: React.FC = () => {
         </div>
       </div>
 
-      {/* Saldo Líquido */}
-      <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between group hover:border-blue-300 transition-all">
+      {/* Saldo Líquido Inteligente */}
+      <div className={`bg-white p-5 rounded-3xl border shadow-sm flex items-center justify-between group transition-all ${
+        stats.netBalance < 0 ? 'border-rose-200 hover:border-rose-300' :
+        stats.netBalance > 0 ? 'border-emerald-200 hover:border-emerald-300' :
+        'border-slate-200 hover:border-slate-300'
+      }`}>
         <div>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 leading-none">Saldo Líquido</p>
-          <h3 className={`text-xl font-black tracking-tighter ${stats.grantedTotal - stats.takenTotal >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-            {currency(stats.grantedTotal - stats.takenTotal)}
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 leading-none">
+            {stats.netBalance < 0 ? 'Dívida Líquida' : stats.netBalance > 0 ? 'Crédito Líquido' : 'Saldo Zerado'}
+          </p>
+          <h3 className={`text-xl font-black tracking-tighter ${
+            stats.netBalance < 0 ? 'text-rose-600' : stats.netBalance > 0 ? 'text-emerald-600' : 'text-slate-600'
+          }`}>
+            {currency(Math.abs(stats.netBalance))}
           </h3>
-          <p className="text-[9px] text-slate-400 font-bold uppercase mt-1 leading-none">Balanço Geral</p>
+          <p className="text-[9px] text-slate-400 font-bold uppercase mt-1 leading-none">
+            {stats.netBalance < 0 ? 'Saldo a pagar' : stats.netBalance > 0 ? 'Saldo a receber' : 'Sem pendências'}
+          </p>
         </div>
-        <div className="p-3 rounded-2xl bg-slate-50 text-slate-600 shadow-sm">
+        <div className={`p-3 rounded-2xl shadow-sm ${
+          stats.netBalance < 0 ? 'bg-rose-50 text-rose-600' : stats.netBalance > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-600'
+        }`}>
           <Scale size={20} />
         </div>
       </div>

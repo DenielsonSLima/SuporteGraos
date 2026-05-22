@@ -465,13 +465,14 @@ export const loansService = {
     grantedPrincipal: number; 
     grantedPaid: number; 
     grantedRemaining: number; 
-    countActive: number 
+    countActive: number;
+    netBalance: number;
   }> => {
     const { data, error } = await supabase.rpc('rpc_loans_active_totals');
 
     if (error) {
       console.error('[loansService] getActiveTotals RPC error:', error.message);
-      return { takenTotal: 0, grantedTotal: 0, countActive: 0 };
+      return { takenPrincipal: 0, takenPaid: 0, takenRemaining: 0, grantedPrincipal: 0, grantedPaid: 0, grantedRemaining: 0, countActive: 0, netBalance: 0 };
     }
 
     const result = typeof data === 'string' ? JSON.parse(data) : data;
@@ -483,6 +484,7 @@ export const loansService = {
       grantedPaid: Number(result?.grantedPaid ?? 0),
       grantedRemaining: Number(result?.grantedRemaining ?? 0),
       countActive: Number(result?.countActive ?? 0),
+      netBalance: Number(result?.netBalance ?? 0),
     };
   },
 };

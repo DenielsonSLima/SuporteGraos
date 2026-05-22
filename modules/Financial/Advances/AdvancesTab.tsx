@@ -28,7 +28,9 @@ import { useToast } from '../../../contexts/ToastContext';
 import { useAdvancesOperations } from './hooks/useAdvancesOperations';
 import AdvanceTracebackView from './components/AdvanceTracebackView';
 
-type AdvanceSubTab = 'taken' | 'given' | 'history' | 'traceback';
+import AdvanceKPIs from './components/AdvanceKPIs';
+
+type AdvanceSubTab = 'active' | 'taken' | 'given' | 'history' | 'traceback';
 
 // Adapter: Advance (DB) → AdvanceTransaction (UI)
 function toAdvanceTransaction(adv: Advance, partners: Partner[]): AdvanceTransaction {
@@ -58,11 +60,11 @@ const AdvancesTab: React.FC = () => {
   const partners: Partner[] = partnersResult?.data || [];
   const { handleSaveAdvance, handleConfirmSettle, handleUpdateAdvance, handleDeleteAdvance } = useAdvancesOperations({ addToast });
 
-  const [activeSubTab, setActiveSubTab] = useState<AdvanceSubTab>('taken');
+  const [activeSubTab, setActiveSubTab] = useState<AdvanceSubTab>('active');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
 
-  const [historySearch, setHistorySearch] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
   const [historyStartDate, setHistoryStartDate] = useState('');
   const [historyEndDate, setHistoryEndDate] = useState('');
 
@@ -135,19 +137,22 @@ const AdvancesTab: React.FC = () => {
   };
 
   const filteredData = useMemo(() => {
-    if (activeSubTab === 'history') {
-      return transactions.filter(t => {
-        const matchesSearch = t.partnerName.toLowerCase().includes(historySearch.toLowerCase()) ||
-          t.description.toLowerCase().includes(historySearch.toLowerCase());
+    return transactions.filter(t => {
+      const matchesSearch = t.partnerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        t.description.toLowerCase().includes(searchTerm.toLowerCase());
+        
+      if (activeSubTab === 'history') {
         const matchesStart = !historyStartDate || t.date >= historyStartDate;
         const matchesEnd = !historyEndDate || t.date <= historyEndDate;
         return matchesSearch && matchesStart && matchesEnd;
-      }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    }
+      }
 
-    return transactions.filter(t => t.type === activeSubTab && t.status === 'active')
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [transactions, activeSubTab, historySearch, historyStartDate, historyEndDate]);
+      if (!matchesSearch) return false;
+
+      if (activeSubTab === 'active') return t.status === 'active';
+      return t.type === activeSubTab && t.status === 'active';
+    }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [transactions, activeSubTab, searchTerm, historyStartDate, historyEndDate]);
 
   const handleOpenSettle = (tx: AdvanceTransaction) => {
     setTxToSettle(tx);
@@ -203,68 +208,53 @@ const AdvancesTab: React.FC = () => {
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
 
-      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
+      <AdvanceKPIs />
+
+      <div className="flex flex-col xl:flex-row justify-between items-center gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
         <div className="flex bg-slate-100 p-1 rounded-xl w-full xl:w-auto shadow-inner">
-          <button
-            onClick={() => setActiveSubTab('taken')}
-            className={`flex-1 xl:flex-none flex items-center justify-center gap-2 px-6 py-2.5 text-xs font-black uppercase tracking-widest rounded-lg transition-all ${activeSubTab === 'taken' ? 'bg-white text-amber-600 shadow-md' : 'text-slate-500 hover:text-slate-700'
-              }`}
-          >
-            <ArrowDownLeft size={16} />
-            Dinheiro Entrando
+          <button onClick={() => setActiveSubTab('active')} className={`flex-1 px-5 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all flex items-center justify-center gap-2 ${activeSubTab === 'active' ? 'bg-white shadow text-slate-800' : 'text-slate-400'}`}>
+            <Wallet size={14} /> Ativos
           </button>
-          <button
-            onClick={() => setActiveSubTab('given')}
-            className={`flex-1 xl:flex-none flex items-center justify-center gap-2 px-6 py-2.5 text-xs font-black uppercase tracking-widest rounded-lg transition-all ${activeSubTab === 'given' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-500 hover:text-slate-700'
-              }`}
-          >
-            <ArrowUpRight size={16} />
-            Dinheiro Saindo
+          <button onClick={() => setActiveSubTab('taken')} className={`flex-1 px-5 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all flex items-center justify-center gap-2 ${activeSubTab === 'taken' ? 'bg-white shadow text-amber-600' : 'text-slate-400'}`}>
+            <ArrowDownLeft size={14} /> Dinheiro Entrando
           </button>
-          <button
-            onClick={() => setActiveSubTab('history')}
-            className={`flex-1 xl:flex-none flex items-center justify-center gap-2 px-6 py-2.5 text-xs font-black uppercase tracking-widest rounded-lg transition-all ${activeSubTab === 'history' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-700'
-              }`}
-          >
-            <History size={16} />
-            Histórico Geral
+          <button onClick={() => setActiveSubTab('given')} className={`flex-1 px-5 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all flex items-center justify-center gap-2 ${activeSubTab === 'given' ? 'bg-white shadow text-indigo-600' : 'text-slate-400'}`}>
+            <ArrowUpRight size={14} /> Dinheiro Saindo
+          </button>
+          <div className="w-px h-4 bg-slate-300 mx-1 self-center"></div>
+          <button onClick={() => setActiveSubTab('history')} className={`flex-1 px-5 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all flex items-center justify-center gap-2 ${activeSubTab === 'history' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-400'}`}>
+            <History size={14} /> Histórico Geral
           </button>
         </div>
 
-        <div className="flex gap-3 w-full xl:w-auto">
+        <div className="flex-1 w-full max-w-md relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+          <input
+            type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+            placeholder="Pesquisar parceiro ou descrição..."
+            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border-2 border-slate-100 rounded-xl focus:bg-white focus:border-slate-800 outline-none font-bold text-sm text-slate-900"
+          />
+        </div>
+
+        <div className="flex gap-2 w-full xl:w-auto">
           <button
             onClick={() => setIsPdfModalOpen(true)}
             disabled={filteredData.length === 0}
-            className="flex-1 xl:flex-none flex items-center justify-center gap-2 rounded-xl border-2 border-slate-300 bg-white px-6 py-3 text-xs font-black uppercase tracking-widest text-slate-700 hover:bg-slate-50 shadow-sm transition-all active:scale-95 disabled:opacity-50"
+            className="flex-1 xl:flex-none bg-white border-2 border-slate-200 text-slate-700 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-sm hover:bg-slate-50 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
           >
-            <Printer size={18} />
-            Exportar PDF
+            <Printer size={18} /> Exportar PDF
           </button>
           <button
             onClick={() => setIsFormOpen(true)}
-            className="flex-1 xl:flex-none flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-6 py-3 text-xs font-black uppercase tracking-widest text-white hover:bg-primary-700 shadow-lg shadow-primary-200 transition-all active:scale-95"
+            className="flex-1 xl:flex-none bg-slate-900 text-white px-8 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-slate-800 transition-all active:scale-95 flex items-center justify-center gap-2"
           >
-            <Plus size={18} />
-            Novo Registro
+            <Plus size={18} /> Novo Registro
           </button>
         </div>
       </div>
 
       {activeSubTab === 'history' && (
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-12 gap-4 animate-in slide-in-from-top-2">
-          <div className="md:col-span-5 relative">
-            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 block ml-1">Pesquisar Parceiro / Descrição</label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-              <input
-                type="text"
-                value={historySearch}
-                onChange={e => setHistorySearch(e.target.value)}
-                placeholder="Nome do cliente, produtor ou motivo..."
-                className={fixedInputClass}
-              />
-            </div>
-          </div>
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-7 gap-4 animate-in slide-in-from-top-2">
           <div className="md:col-span-3">
             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 block ml-1">Data Inicial</label>
             <div className="relative">
@@ -291,7 +281,7 @@ const AdvancesTab: React.FC = () => {
           </div>
           <div className="md:col-span-1 flex items-end">
             <button
-              onClick={() => { setHistorySearch(''); setHistoryStartDate(''); setHistoryEndDate(''); }}
+              onClick={() => { setSearchTerm(''); setHistoryStartDate(''); setHistoryEndDate(''); }}
               className="w-full h-11 flex items-center justify-center bg-slate-100 border-2 border-slate-200 rounded-xl text-slate-500 hover:text-rose-600 hover:border-rose-300 transition-all shadow-sm"
               title="Limpar Filtros"
             >
