@@ -14,6 +14,7 @@ import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { QUERY_KEYS, STALE_TIMES } from './queryKeys';
 import { ModuleId } from '../types';
+import { useCurrentUser } from './useCurrentUser';
 
 // Lazy imports para os services (não importa se o módulo não está montado)
 const prefetchMap: Record<string, () => Promise<void>> = {};
@@ -25,7 +26,11 @@ const prefetchMap: Record<string, () => Promise<void>> = {};
 export function usePrefetchModules(activeModule: ModuleId) {
   const queryClient = useQueryClient();
 
+  const currentUser = useCurrentUser();
+
   useEffect(() => {
+    if (!currentUser) return;
+
     // Delay para não competir com o carregamento do módulo ativo
     const timer = setTimeout(() => {
       switch (activeModule) {

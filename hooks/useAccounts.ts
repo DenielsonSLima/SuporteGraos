@@ -11,6 +11,7 @@ import { accountsService, Account } from '../services/accountsService';
 import { setAccountsCache } from '../services/financial/handlers/orchestratorHelpers';
 import { QUERY_KEYS, STALE_TIMES } from './queryKeys';
 import { useFinancialRealtime } from './useFinancialRealtime';
+import { useCurrentUser } from './useCurrentUser';
 
 export type { Account };
 
@@ -30,6 +31,8 @@ interface AccountUpdateInput {
 }
 
 export function useAccounts() {
+  const currentUser = useCurrentUser();
+
   // Canal único financeiro — invalida todos os caches quando qualquer tabela muda
   useFinancialRealtime();
 
@@ -39,6 +42,7 @@ export function useAccounts() {
     queryFn: () => accountsService.getAll(),
     staleTime: STALE_TIMES.REFERENCE,
     placeholderData: keepPreviousData,
+    enabled: !!currentUser,
   });
 
   // Sincroniza cache do orquestrador de pagamentos sempre que contas mudam
@@ -85,11 +89,14 @@ export function useAccountsForSettings() {
 
 // Hook auxiliar: busca saldo total (SEM subscription própria — já invalidado pelo useAccounts)
 export function useTotalBalance() {
+  const currentUser = useCurrentUser();
+
   return useQuery({
     queryKey: QUERY_KEYS.TOTAL_BALANCE,
     queryFn: () => accountsService.getTotalBalance(),
     staleTime: STALE_TIMES.REFERENCE,
     placeholderData: keepPreviousData,
+    enabled: !!currentUser,
   });
 }
 

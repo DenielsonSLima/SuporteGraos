@@ -88,6 +88,10 @@ const FinancialPaymentModal: React.FC<Props> = ({ record, bulkTotal, bulkCount, 
     const num = Number(raw) / 100;
     setNumericDiscount(num);
     setDisplayDiscount(formatBRL(num));
+
+    const calculatedAmount = Math.max(0, debtTotal - num);
+    setNumericAmount(calculatedAmount);
+    setDisplayAmount(formatBRL(calculatedAmount));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

@@ -89,6 +89,10 @@ const PurchasePaymentModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, tot
     const num = Number(raw) / 100;
     setNumericDiscount(num);
     setDisplayDiscount(formatBRL(num));
+
+    const calculatedAmount = Math.max(0, totalPending - num);
+    setNumericAmount(calculatedAmount);
+    setDisplayAmount(formatBRL(calculatedAmount));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -148,17 +152,7 @@ const PurchasePaymentModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, tot
               <label className={labelClass}>Desconto / Abatimento Comercial</label>
               <div className="relative">
                 <MinusCircle className="absolute left-4 top-1/2 -translate-y-1/2 text-amber-500" size={18} />
-                <input type="text" value={displayDiscount} onChange={(e) => {
-                  const raw = e.target.value.replace(/\D/g, '');
-                  const num = Number(raw) / 100;
-                  setNumericDiscount(num);
-                  setDisplayDiscount(formatBRL(num));
-
-                  if (!initialData && num >= totalPending && !accountId) {
-                    setNumericAmount(0);
-                    setDisplayAmount(formatBRL(0));
-                  }
-                }} className={`${inputClass} pl-12 border-amber-50 text-amber-800 focus:border-amber-500`} placeholder="R$ 0,00" />
+                <input type="text" value={displayDiscount} onChange={handleDiscountChange} className={`${inputClass} pl-12 border-amber-50 text-amber-800 focus:border-amber-500`} placeholder="R$ 0,00" />
               </div>
             </div>
             {isCashMovement ? (

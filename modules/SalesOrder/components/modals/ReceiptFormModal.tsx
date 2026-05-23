@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, DollarSign, Calendar, Wallet, FileText, ArrowDown, TrendingUp } from 'lucide-react';
+import { X, DollarSign, Calendar, Wallet, FileText, ArrowDown, TrendingUp, MinusCircle } from 'lucide-react';
 import type { Account } from '../../../../services/accountsService';
 import { useAccounts } from '../../../../hooks/useAccounts';
 import { useToast } from '../../../../contexts/ToastContext';
@@ -30,11 +30,31 @@ const ReceiptFormModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, totalPe
   const getTodayLocal = () => new Date().toISOString().split('T')[0];
 
   const [date, setDate] = useState(getTodayLocal());
-  const [amount, setAmount] = useState('');
-  const [discount, setDiscount] = useState('');
+  const [displayAmount, setDisplayAmount] = useState('');
+  const [numericAmount, setNumericAmount] = useState(0);
+  const [displayDiscount, setDisplayDiscount] = useState('');
+  const [numericDiscount, setNumericDiscount] = useState(0);
   const [accountId, setAccountId] = useState('');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleAmountChange = (val: string) => {
+    const raw = val.replace(/\D/g, '');
+    const num = Number(raw) / 100;
+    setNumericAmount(num);
+    setDisplayAmount(formatCurrency(num));
+  };
+
+  const handleDiscountChange = (val: string) => {
+    const raw = val.replace(/\D/g, '');
+    const num = Number(raw) / 100;
+    setNumericDiscount(num);
+    setDisplayDiscount(formatCurrency(num));
+
+    const calculatedAmount = Math.max(0, totalPending - num);
+    setNumericAmount(calculatedAmount);
+    setDisplayAmount(formatCurrency(calculatedAmount));
+  };
 
   const { data: allAccounts = [] } = useAccounts();
   const bankAccounts = useMemo(() =>
@@ -46,14 +66,20 @@ const ReceiptFormModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, totalPe
     if (isOpen) {
       if (initialData) {
         setDate(initialData.date || getTodayLocal());
-        setAmount(initialData.value?.toString() || '');
-        setDiscount(initialData.discountValue?.toString() || '');
+        const initAmount = Number(initialData.value) || 0;
+        const initDiscount = Number(initialData.discountValue) || 0;
+        setNumericAmount(initAmount);
+        setDisplayAmount(formatCurrency(initAmount));
+        setNumericDiscount(initDiscount);
+        setDisplayDiscount(formatCurrency(initDiscount));
         setAccountId(initialData.accountId || '');
         setNotes(initialData.notes || '');
       } else {
         setDate(getTodayLocal());
-        setAmount(totalPending > 0 ? totalPending.toFixed(2) : '');
-        setDiscount('');
+        setNumericAmount(totalPending);
+        setDisplayAmount(formatCurrency(totalPending));
+        setNumericDiscount(0);
+        setDisplayDiscount(formatCurrency(0));
         setAccountId('');
         setNotes('');
       }
@@ -62,8 +88,8 @@ const ReceiptFormModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, totalPe
 
   if (!isOpen) return null;
 
-  const valAmount = parseFloat(amount) || 0;
-  const valDiscount = parseFloat(discount) || 0;
+  const valAmount = numericAmount;
+  const valDiscount = numericDiscount;
   const totalOperation = valAmount + valDiscount;
   const isCashMovement = valAmount > 0;
 
@@ -131,7 +157,13 @@ const ReceiptFormModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, totalPe
                 <label className={labelClass}>Valor (R$)</label>
                 <div className="relative">
                   <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                  <input type="number" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} className={`${inputClass} pl-10 text-emerald-700`} placeholder="0,00" />
+                  <input 
+                    type="text" 
+                    value={displayAmount} 
+                    onChange={e => handleAmountChange(e.target.value)} 
+                    className={`${inputClass} pl-10 text-emerald-700`} 
+                    placeholder="R$ 0,00" 
+                  />
                 </div>
               </div>
             </div>
@@ -152,7 +184,7 @@ const ReceiptFormModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, totalPe
               </div>
             )}
 
-            {!isCashMovement && discount === '' && (
+            {!isCashMovement && valDiscount === 0 && (
               <div className="p-3 bg-amber-50 rounded-xl text-center text-xs text-amber-600 font-medium italic animate-pulse">
                 Informe um valor acima de zero ou use o campo de desconto abaixo.
               </div>
@@ -162,7 +194,13 @@ const ReceiptFormModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, totalPe
               <label className={labelClass}>Desconto / Ajuste (opcional)</label>
               <div className="relative">
                 <MinusCircle className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                <input type="number" step="0.01" value={discount} onChange={e => setDiscount(e.target.value)} className={`${inputClass} pl-10 text-slate-500`} placeholder="0,00" />
+                <input 
+                  type="text" 
+                  value={displayDiscount} 
+                  onChange={e => handleDiscountChange(e.target.value)} 
+                  className={`${inputClass} pl-10 text-slate-500`} 
+                  placeholder="R$ 0,00" 
+                />
               </div>
             </div>
 
@@ -193,4 +231,3 @@ const ReceiptFormModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, totalPe
 
 export default ReceiptFormModal;
 
-import { MinusCircle } from 'lucide-react';
