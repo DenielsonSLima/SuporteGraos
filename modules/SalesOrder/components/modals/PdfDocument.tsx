@@ -335,8 +335,15 @@ const PdfDocument: React.FC<Props> = ({ order, loadings, variant, company, water
                 .slice(0, 4)
                 .map((t, i) => (
                   <View key={i} style={stylesInternal.panelListItem}>
-                    <Text style={stylesInternal.tableCellSmall}>{dateStr(t.date)} - {receiptAccountLabel(t.accountName, t.notes)}</Text>
-                    <Text style={stylesInternal.tableCell}>{currency(t.value)}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={stylesInternal.tableCellSmall}>{dateStr(t.date)} - {receiptAccountLabel(t.accountName, t.notes)}</Text>
+                      {Number(t.discountValue) > 0 && (
+                        <Text style={[stylesInternal.tableCellSmall, { color: '#d97706', fontSize: 7, fontFamily: 'Helvetica-Bold', marginTop: 1 }]}>
+                          DESCONTO: {currency(Number(t.discountValue))}
+                        </Text>
+                      )}
+                    </View>
+                    <Text style={stylesInternal.tableCell}>{currency(Number(t.value) || 0)}</Text>
                   </View>
                 ))}
               {(order.transactions || []).length === 0 && (
@@ -580,7 +587,12 @@ const PdfDocument: React.FC<Props> = ({ order, loadings, variant, company, water
                 <View key={i} style={[styles.receiptCard, (i + 1) % 3 === 0 && styles.receiptCardLast]}>
                   <Text style={styles.receiptLabel}>{dateStr(r.date)}</Text>
                   <Text style={styles.receiptNote}>CONTA: {receiptAccountLabel(r.accountName, r.notes)}</Text>
-                  <Text style={styles.receiptValue}>{currency((Number(r.value) || 0) + (Number(r.discountValue) || 0))}</Text>
+                  <Text style={styles.receiptValue}>{currency(Number(r.value) || 0)}</Text>
+                  {Number(r.discountValue) > 0 && (
+                    <Text style={[styles.receiptNote, { color: '#d97706', marginTop: 2, fontFamily: 'Helvetica-Bold' }]}>
+                      DESCONTO: {currency(Number(r.discountValue))}
+                    </Text>
+                  )}
                 </View>
               ))}
             </View>

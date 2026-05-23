@@ -23,6 +23,7 @@ export interface SalesPerformanceStats {
 
   // Financeiro (Entradas)
   totalReceived: number;
+  totalDiscount: number;
   totalPending: number;
   receivedPercent: number;
   totalTransitValue: number;
@@ -77,7 +78,12 @@ export const kpiService = {
           .reduce((acc, tx) => acc + (Number(tx.amount || tx.value) || 0), 0)
       : Number(order.paidValue || 0);
     
-    const totalDiscount = Number(order.discountValue || 0);
+    const totalDiscount = transactions.length > 0
+      ? transactions
+          .filter(tx => tx.type === 'receipt' || tx.type === 'IN')
+          .reduce((acc, tx) => acc + (Number(tx.discountValue || tx.metadata?.discount_amount) || 0), 0)
+      : Number(order.discountValue || order.discount_value || 0);
+
     const totalPending = Math.max(0, totalRevenueRealized - totalReceived - totalDiscount);
     const receivedPercent = totalRevenueRealized > 0 
       ? ((totalReceived + totalDiscount) / totalRevenueRealized) * 100 
@@ -92,7 +98,7 @@ export const kpiService = {
       totalGrainCost, totalFreightCost, totalDirectInvestment,
       totalRevenueRealized, totalContractValue,
       grossProfit, marginPercent,
-      totalReceived, totalPending, receivedPercent,
+      totalReceived, totalDiscount, totalPending, receivedPercent,
       totalTransitValue
     };
   },

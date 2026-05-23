@@ -127,6 +127,7 @@ const SalesOrderDetails: React.FC<Props> = ({ order, onBack, onEdit, onDelete, o
         transitValue={stats.totalTransitValue}
         totalRevenueRealized={stats.totalRevenueRealized}
         totalReceived={stats.totalReceived}
+        totalDiscount={stats.totalDiscount}
         totalPending={stats.totalPending}
       />
 

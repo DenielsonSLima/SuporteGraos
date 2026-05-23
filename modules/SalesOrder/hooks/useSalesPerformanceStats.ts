@@ -35,6 +35,9 @@ export interface SalesPerformanceStats {
   // Resultado
   grossProfit: number;
   marginPercent: number;
+  totalDiscount: number;
+  netProfit: number;
+  netMarginPercent: number;
 }
 
 /**
@@ -43,6 +46,10 @@ export interface SalesPerformanceStats {
  */
 export function calculateSalesPerformance(order: SalesOrder, loadings: Loading[]): SalesPerformanceStats {
   const stats = kpiService.calculateOrderStats(order, loadings);
+  const netProfit = stats.grossProfit - stats.totalDiscount;
+  const netMarginPercent = stats.totalRevenueRealized > 0 
+    ? (netProfit / stats.totalRevenueRealized) * 100 
+    : 0;
   
   return {
     contractQty: stats.contractQty,
@@ -55,6 +62,9 @@ export function calculateSalesPerformance(order: SalesOrder, loadings: Loading[]
     totalRevenueRealized: stats.totalRevenueRealized,
     grossProfit: stats.grossProfit,
     marginPercent: stats.marginPercent,
+    totalDiscount: stats.totalDiscount,
+    netProfit,
+    netMarginPercent,
   };
 }
 

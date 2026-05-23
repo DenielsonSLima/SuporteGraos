@@ -23,6 +23,7 @@ const SalesProductSummary: React.FC<Props> = ({ order, loadings }) => {
     contractQty, totalLoadedSc, totalDeliveredSc, pendingQty,
     totalGrainCost, totalFreightCost, totalDirectInvestment,
     totalRevenueRealized, grossProfit, marginPercent,
+    totalDiscount, netProfit, netMarginPercent,
   } = useSalesPerformanceStats(order, loadings);
 
   const labelClass = 'text-[10px] font-black text-slate-400 uppercase tracking-widest';
@@ -66,7 +67,7 @@ const SalesProductSummary: React.FC<Props> = ({ order, loadings }) => {
               <p className="text-lg font-black text-amber-600">{num(pendingQty)} SC</p>
             </div>
           </div>
-
+ 
           {/* BLOCO DIREITO: CONTROLE FINANCEIRO (RESULTADO) */}
           <div className="lg:col-span-8">
             <div className="flex flex-col xl:flex-row gap-4 h-full">
@@ -83,7 +84,7 @@ const SalesProductSummary: React.FC<Props> = ({ order, loadings }) => {
                   <p className="text-xl font-black text-slate-800 tracking-tighter truncate">{currency(totalGrainCost)}</p>
                   <p className="text-[9px] text-slate-400 font-bold uppercase italic mt-1">Total Romaneios</p>
                 </div>
-
+ 
                 {/* CUSTO DO FRETE */}
                 <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex flex-col justify-center">
                   <div className="flex items-center gap-2 mb-1.5">
@@ -93,7 +94,7 @@ const SalesProductSummary: React.FC<Props> = ({ order, loadings }) => {
                   <p className="text-xl font-black text-slate-800 tracking-tighter truncate">{currency(totalFreightCost)}</p>
                   <p className="text-[9px] text-slate-400 font-bold uppercase italic mt-1">Logística Geral</p>
                 </div>
-
+ 
                 {/* SOMA DOS CUSTOS */}
                 <div className="bg-rose-50/30 p-4 rounded-2xl border border-rose-100/50 flex flex-col justify-center">
                   <div className="flex items-center gap-2 mb-1.5">
@@ -103,7 +104,7 @@ const SalesProductSummary: React.FC<Props> = ({ order, loadings }) => {
                   <p className="text-xl font-black text-rose-700 tracking-tighter truncate">{currency(totalDirectInvestment)}</p>
                   <p className="text-[9px] text-rose-400 font-black uppercase mt-1">(Grão + Frete)</p>
                 </div>
-
+ 
                 {/* FATURAMENTO REALIZADO */}
                 <div className="bg-emerald-50/20 p-4 rounded-2xl border border-emerald-100/50 flex flex-col justify-center">
                   <div className="flex items-center gap-2 mb-1.5">
@@ -113,9 +114,9 @@ const SalesProductSummary: React.FC<Props> = ({ order, loadings }) => {
                   <p className="text-xl font-black text-emerald-700 tracking-tighter truncate">{currency(totalRevenueRealized)}</p>
                   <p className="text-[9px] text-emerald-500 font-black uppercase mt-1">Receita Real</p>
                 </div>
-
+ 
               </div>
-
+ 
               {/* LUCRO BRUTO FINAL (DESTAQUE GRANDE) */}
                <div className={`p-6 rounded-3xl flex flex-col justify-center shadow-lg border-2 transition-all hover:scale-[1.02] xl:w-[280px] min-w-[240px] ${grossProfit >= 0 ? 'bg-emerald-600 border-emerald-500 text-white' : 'bg-rose-600 border-rose-500 text-white'}`}>
                 <div className="flex items-center justify-between mb-2">
@@ -124,9 +125,28 @@ const SalesProductSummary: React.FC<Props> = ({ order, loadings }) => {
                 <p className="text-2xl font-black leading-none tracking-tighter break-words antialiased">
                   {currency(grossProfit)}
                 </p>
-                <div className="mt-4 flex justify-between items-center border-t border-white/20 pt-3">
-                   <span className="text-[11px] font-black opacity-90 uppercase tracking-tight">{marginPercent.toFixed(1)}% de Margem</span>
+                <div className="flex justify-between items-center mt-1">
+                   <span className="text-[11px] font-bold opacity-80">{marginPercent.toFixed(1)}% de Margem</span>
                 </div>
+
+                {totalDiscount > 0 && (
+                  <>
+                    <div className="border-t border-white/20 my-3 pt-3 flex flex-col gap-1">
+                      <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-wider opacity-85">
+                        <span>Abatimentos</span>
+                        <span className="text-amber-300 font-bold">{currency(totalDiscount)}</span>
+                      </div>
+                    </div>
+
+                    <div className="border-t border-white/20 pt-3 flex flex-col gap-1">
+                      <span className="text-[10px] font-black uppercase tracking-widest opacity-80 italic">Lucro Líquido Final</span>
+                      <p className="text-xl font-black leading-none tracking-tighter antialiased">
+                        {currency(netProfit)}
+                      </p>
+                      <span className="text-[11px] font-bold opacity-90">{netMarginPercent.toFixed(1)}% de Margem</span>
+                    </div>
+                  </>
+                )}
               </div>
 
             </div>

@@ -5,6 +5,7 @@ interface SalesOrderKPIGridProps {
   transitValue: number;
   totalRevenueRealized: number;
   totalReceived: number;
+  totalDiscount: number;
   totalPending: number;
 }
 
@@ -12,12 +13,13 @@ const SalesOrderKPIGrid: React.FC<SalesOrderKPIGridProps> = ({
   transitValue, 
   totalRevenueRealized, 
   totalReceived, 
+  totalDiscount,
   totalPending 
 }) => {
   const isPendingWarning = totalPending > 0.1;
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
       {/* Carga em Trânsito */}
       <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm group hover:border-blue-200 transition-all">
         <span className="text-[9px] font-black text-slate-400 uppercase block mb-1 not-italic">Carga em Trânsito</span>
@@ -42,8 +44,16 @@ const SalesOrderKPIGrid: React.FC<SalesOrderKPIGridProps> = ({
         </p>
       </div>
 
+      {/* Descontos / Abatimentos */}
+      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm group hover:border-amber-300 transition-all">
+        <span className="text-[9px] font-black text-amber-600 uppercase block mb-1 not-italic">Descontos / Abatimentos</span>
+        <p className="text-xl font-black text-amber-600 tracking-tighter">
+          {formatCurrency(totalDiscount)}
+        </p>
+      </div>
+
       {/* Saldo Pendente */}
-      <div className={`p-5 rounded-2xl border-2 shadow-lg transition-all transform hover:scale-[1.02] duration-300 ${
+      <div className={`p-5 rounded-2xl border-2 shadow-lg transition-all transform hover:scale-[1.02] duration-300 lg:col-span-1 sm:col-span-2 ${
         isPendingWarning 
           ? 'bg-amber-50 border-amber-300 scale-100' 
           : 'bg-emerald-600 border-emerald-500 text-white shadow-emerald-200'
