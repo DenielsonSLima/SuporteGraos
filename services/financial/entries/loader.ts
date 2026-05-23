@@ -1,7 +1,7 @@
 import { supabase } from '../../supabase';
 import { 
   FinancialEntry, EnrichedPayableEntry, EnrichedReceivableEntry, 
-  OriginType, FinancialEntryType, EntryStatus 
+  OriginType, FinancialEntryType, EntryStatus, FinancialFilterParams 
 } from './types';
 
 /**
@@ -11,7 +11,7 @@ import {
 
 export const PAYABLES_VIEW_SELECT = `
   id, company_id, type, origin_type, origin_id, partner_id, 
-  total_amount, paid_amount, remaining_amount, deductions_amount, net_amount,
+  total_amount, paid_amount, remaining_amount, deductions_amount, net_amount, discount_amount,
   status, due_date, created_date, created_at, updated_at,
   partner_name, order_number, order_partner_name, load_count,
   total_weight_kg, total_weight_ton, total_weight_sc, agg_purchase_value, unit_price_sc,
@@ -21,21 +21,12 @@ export const PAYABLES_VIEW_SELECT = `
 
 export const RECEIVABLES_VIEW_SELECT = `
   id, company_id, type, origin_type, origin_id, partner_id,
-  total_amount, paid_amount, remaining_amount, deductions_amount, net_amount,
+  total_amount, paid_amount, remaining_amount, deductions_amount, net_amount, discount_amount,
   status, due_date, created_date, created_at, updated_at,
   partner_name, sales_order_number, sales_order_id,
   loading_weight_kg, loading_weight_ton, loading_weight_sc,
   loading_sales_value, unit_price_sc
 `.replace(/\s+/g, ' ').trim();
-
-export interface FinancialFilterParams {
-  startDate?: string;
-  endDate?: string;
-  partnerId?: string;
-  page?: number;
-  pageSize?: number;
-  search?: string;
-}
 
 
 // Mapeador: snake_case (DB) → camelCase (Frontend)
@@ -53,6 +44,7 @@ export function mapRow(row: any): FinancialEntry {
     remaining_amount: parseFloat(row.remaining_amount ?? '0'),
     deductions_amount: parseFloat(row.deductions_amount ?? '0'),
     net_amount: parseFloat(row.net_amount ?? '0'),
+    discount_amount: parseFloat(row.discount_amount ?? '0'),
     status: row.status as EntryStatus,
     created_date: row.created_date,
     due_date: row.due_date,
@@ -109,6 +101,9 @@ export const financialEntriesLoader = {
     if (params?.startDate) query = query.gte('due_date', params.startDate);
     if (params?.endDate) query = query.lte('due_date', params.endDate);
     if (params?.partnerId) query = query.eq('partner_id', params.partnerId);
+    if (params?.status === 'open') {
+      query = query.in('status', ['pending', 'partially_paid']);
+    }
     
     // Bug Fix: Somente tipos operacionais (Compra de Grão, Frete, Comissões)
     query = query.in('origin_type', ['purchase_order', 'purchase_order_loading', 'freight', 'freight_loading', 'commission']);
@@ -187,6 +182,9 @@ export const financialEntriesLoader = {
     if (params?.startDate) query = query.gte('due_date', params.startDate);
     if (params?.endDate) query = query.lte('due_date', params.endDate);
     if (params?.partnerId) query = query.eq('partner_id', params.partnerId);
+    if (params?.status === 'open') {
+      query = query.in('status', ['pending', 'partially_paid']);
+    }
 
     // Bug Fix: Somente tipos operacionais (Venda de Grão)
     query = query.in('origin_type', ['sales_order', 'sales_order_loading']);

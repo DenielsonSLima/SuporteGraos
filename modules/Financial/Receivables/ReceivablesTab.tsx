@@ -29,6 +29,7 @@ const toFinancialRecord = (entry: EnrichedReceivableEntry): FinancialRecord => {
     issueDate: entry.created_date,
     originalValue: entry.total_amount,
     paidValue: entry.paid_amount,
+    discountValue: entry.discount_amount || 0,
     remainingValue: entry.remaining_amount,
     deductionsAmount: entry.deductions_amount,
     netAmount: entry.net_amount,
@@ -64,9 +65,15 @@ const ReceivablesTab: React.FC = () => {
   
   const records = useMemo(() => {
     return rawReceivables
-      .filter(entry => entry.total_amount > 0 || entry.remaining_amount > 0)
+      .filter(entry => {
+        if (!(entry.total_amount > 0 || entry.remaining_amount > 0)) return false;
+        if (activeSubTab === 'open') {
+          return entry.status !== 'paid' && entry.status !== 'cancelled' && entry.status !== 'reversed';
+        }
+        return true;
+      })
       .map(toFinancialRecord);
-  }, [rawReceivables]);
+  }, [rawReceivables, activeSubTab]);
 
 
 

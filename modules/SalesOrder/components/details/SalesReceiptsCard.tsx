@@ -164,8 +164,13 @@ const SalesReceiptsCard: React.FC<Props> = ({
                         </p>
                       </div>
                     </div>
-                    <div className="text-right">
+                    <div className="text-right flex flex-col items-end">
                       <span className="font-black text-lg text-emerald-700 tracking-tighter">{formatCurrency(t.value)}</span>
+                      {t.discountValue && t.discountValue > 0 ? (
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tight mt-0.5">
+                          Desconto: {formatCurrency(t.discountValue)}
+                        </span>
+                      ) : null}
                     </div>
                   </div>
 

@@ -76,7 +76,7 @@ export function usePurchaseOrderTransactions(purchaseOrderId: string) {
                         type: getType(),
                         date: tx.transaction_date,
                         value: Number(tx.amount),
-                        discountValue: Number(metadata.discount || 0),
+                        discountValue: Number(tx.metadata?.discount_amount || metadata.discount || 0),
                         accountId: tx.account_id,
                         accountName: tx.description?.split(' [')[0] || 'Caixa',
                         notes: tx.description,

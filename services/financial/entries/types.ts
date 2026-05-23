@@ -26,6 +26,7 @@ export interface FinancialEntry {
   remaining_amount: number;
   deductions_amount?: number;
   net_amount?: number;
+  discount_amount?: number;
   status: EntryStatus;
   created_date: string;
   due_date?: string;

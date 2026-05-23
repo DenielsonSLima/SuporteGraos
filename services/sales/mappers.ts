@@ -152,6 +152,7 @@ export const mapOrderFromOpsRow = (row: SalesOrderOpsRow): SalesOrder => {
     deliveredQtySc: Number(row.delivered_qty_sc ?? 0),
     loadCount: Number(row.load_count ?? 0),
     balanceValue: Number(row.balance_value ?? 0),
+    discountValue: Number(row.discount_value ?? meta?.discountValue ?? 0),
     transitValue: Number(row.transit_value ?? 0),
     totalGrainCost: Number(row.total_grain_cost ?? 0),
     totalFreightCost: Number(row.total_freight_cost ?? 0),

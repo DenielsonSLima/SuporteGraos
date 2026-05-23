@@ -87,7 +87,7 @@ export const kpiService = {
       const totalSettled = Number(order.paidValue) || 0;
       const totalAbatements = Number(order.discountValue) || 0;
       
-      const pendingPayment = Math.max(0, totalLoaded - totalSettled - totalAbatements);
+      const pendingPayment = Math.max(0, totalContract - totalSettled - totalAbatements);
 
       return {
         totalContractValue: acc.totalContractValue + totalContract,

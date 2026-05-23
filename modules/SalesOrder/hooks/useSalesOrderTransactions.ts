@@ -75,6 +75,7 @@ export function useSalesOrderTransactions(salesOrderId: string) {
                 ...tx,
                 id: tx.id,
                 value: Number(tx.amount),
+                discountValue: Number(tx.metadata?.discount_amount || 0),
                 date: tx.transaction_date,
                 type: tx.type === 'IN' || tx.type === 'receipt' || tx.type === 'credit' ? 'receipt' : 'payment',
                 notes: tx.description,

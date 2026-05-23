@@ -103,6 +103,7 @@ export interface FinancialTransaction {
   bankAccountId?: string;
   categoryId?: string;
   companyId: string;
+  metadata?: any;
 }
 
 export interface Commission {

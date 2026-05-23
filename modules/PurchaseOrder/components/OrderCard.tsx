@@ -114,6 +114,13 @@ const OrderCard: React.FC<Props> = React.memo(({ order, onClick, onFinalize, onD
             </div>
         </div>
 
+        {stats.discountValue > 0 && (
+          <div className="flex justify-between items-center pt-2">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Descontos</span>
+            <span className="text-base font-black text-slate-500 tracking-tighter">{currency(stats.discountValue)}</span>
+          </div>
+        )}
+
         <div className="pt-3 border-t border-slate-100 flex justify-between items-center">
           {stats.advanceBalance > 0.05 ? (
               <>

@@ -155,10 +155,15 @@ const OrderFinancialCard: React.FC<Props> = ({
                         </p>
                       </div>
                     </div>
-                    <div className="text-right">
+                    <div className="text-right flex flex-col items-end">
                       <span className={`font-black text-lg tracking-tighter ${isAdvance ? 'text-amber-700' : 'text-slate-900'}`}>
-                        {formatCurrency(txSettledValue)}
+                        {formatCurrency(t.value || 0)}
                       </span>
+                      {t.discountValue && t.discountValue > 0 ? (
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tight mt-0.5">
+                          Desconto: {formatCurrency(t.discountValue)}
+                        </span>
+                      ) : null}
                     </div>
                   </div>
 

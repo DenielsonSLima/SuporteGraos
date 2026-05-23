@@ -98,6 +98,22 @@ const TransactionManagementModal: React.FC<Props> = ({ isOpen, onClose, transact
               </div>
             </div>
 
+            {formData.type === 'payment' && (
+              <div className="bg-amber-50/50 p-4 rounded-xl border border-amber-100 animate-in fade-in">
+                <label className={labelClass}>Desconto / Abatimento Comercial</label>
+                <div className="relative">
+                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-600" size={18} />
+                  <input 
+                    type="number" 
+                    step="0.01" 
+                    className={`${inputClass} pl-10 text-amber-800`} 
+                    value={formData.discountValue || 0} 
+                    onChange={e => setFormData({...formData, discountValue: parseFloat(e.target.value) || 0})} 
+                  />
+                </div>
+              </div>
+            )}
+
             <div>
               <label className={labelClass}>Histórico / Observação</label>
               <div className="relative">

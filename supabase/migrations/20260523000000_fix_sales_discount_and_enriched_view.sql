@@ -11,9 +11,9 @@ BEGIN
   -- Re-calcular o status baseado nos valores atuais da linha
   NEW.status := CASE
     WHEN NEW.status IN ('cancelled', 'reversed') THEN NEW.status
-    WHEN (NEW.paid_amount + COALESCE(NEW.discount_amount, 0)) >= NEW.total_amount AND NEW.total_amount > 0 THEN 'paid'::public.financial_entry_status
-    WHEN NEW.paid_amount > 0 OR COALESCE(NEW.discount_amount, 0) > 0 THEN 'partially_paid'::public.financial_entry_status
-    ELSE 'pending'::public.financial_entry_status
+    WHEN (NEW.paid_amount + COALESCE(NEW.discount_amount, 0)) >= NEW.total_amount AND NEW.total_amount > 0 THEN 'paid'
+    WHEN NEW.paid_amount > 0 OR COALESCE(NEW.discount_amount, 0) > 0 THEN 'partially_paid'
+    ELSE 'pending'
   END;
 
   RETURN NEW;
@@ -28,9 +28,9 @@ FOR EACH ROW EXECUTE FUNCTION public.fn_sync_financial_entry_status();
 
 -- 3. Atualizar retroativamente os status inconsistentes no banco
 UPDATE public.financial_entries
-SET status = 'paid'::public.financial_entry_status,
+SET status = 'paid',
     updated_at = now()
-WHERE status = 'partially_paid'::public.financial_entry_status
+WHERE status = 'partially_paid'
   AND (paid_amount + COALESCE(discount_amount, 0)) >= total_amount
   AND total_amount > 0;
 

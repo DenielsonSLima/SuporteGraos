@@ -40,10 +40,11 @@ const SalesOrderCard: React.FC<Props> = React.memo(({ order, onClick, onDelete, 
     const contractQtySc = order.quantity ?? 0;
     const deliveredValue = order.deliveredValue ?? 0;
     const receivedValue = order.paidValue ?? 0;
-    const pendingValue = Math.max(0, deliveredValue - receivedValue);
+    const discountValue = order.discountValue ?? 0;
+    const pendingValue = Math.max(0, deliveredValue - receivedValue - discountValue);
     const progress = contractQtySc > 0 ? Math.min((deliveredQtySc / contractQtySc) * 100, 100) : 0;
 
-    return { deliveredQtySc, contractQtySc, deliveredValue, receivedValue, pendingValue, progress };
+    return { deliveredQtySc, contractQtySc, deliveredValue, receivedValue, pendingValue, progress, discountValue };
   }, [order]);
 
   const handleDeleteClick = (e: React.MouseEvent) => {
@@ -123,6 +124,13 @@ const SalesOrderCard: React.FC<Props> = React.memo(({ order, onClick, onDelete, 
               <span className="text-base font-black text-emerald-700 tracking-tighter">{currency(stats.receivedValue)}</span>
             </div>
         </div>
+
+        {stats.discountValue > 0 && (
+          <div className="flex justify-between items-center pt-2">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Descontos</span>
+            <span className="text-base font-black text-slate-500 tracking-tighter">{currency(stats.discountValue)}</span>
+          </div>
+        )}
 
         <div className="flex justify-between items-center pt-3 border-t border-slate-100">
           <span className="text-[10px] font-black text-amber-600 uppercase tracking-widest">Saldo a Receber</span>

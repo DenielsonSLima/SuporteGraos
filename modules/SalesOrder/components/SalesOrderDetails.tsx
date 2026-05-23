@@ -174,7 +174,7 @@ const SalesOrderDetails: React.FC<Props> = ({ order, onBack, onEdit, onDelete, o
       <SalesPdfPreviewModal 
         isOpen={isPdfOpen} 
         onClose={() => setIsPdfOpen(false)} 
-        order={currentOrder} 
+        order={{ ...currentOrder, transactions: realTransactions }} 
         loadings={loadings} 
         variant={pdfVariant} 
       />

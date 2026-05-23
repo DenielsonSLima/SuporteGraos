@@ -114,6 +114,8 @@ export interface Views {
       customer_name: string | null
       total_value: number | null
       received_value: number
+      discount_value: number
+      balance_value: number
       metadata: Json | null
       raw_payload: Json | null
       created_at: string | null

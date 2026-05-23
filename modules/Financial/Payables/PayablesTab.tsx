@@ -65,7 +65,7 @@ const toFinancialRecord = (entry: EnrichedPayableEntry): FinancialRecord => {
     remainingValue: entry.remaining_amount,
     deductionsAmount: entry.deductions_amount,
     netAmount: entry.net_amount,
-    discountValue: 0,
+    discountValue: entry.discount_amount || 0,
     status,
     subType: subType as any,
     weightKg,

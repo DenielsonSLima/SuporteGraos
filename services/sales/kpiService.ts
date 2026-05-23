@@ -77,10 +77,11 @@ export const kpiService = {
           .reduce((acc, tx) => acc + (Number(tx.amount || tx.value) || 0), 0)
       : Number(order.paidValue || 0);
     
-    const totalPending = Math.max(0, totalRevenueRealized - totalReceived);
+    const totalDiscount = Number(order.discountValue || 0);
+    const totalPending = Math.max(0, totalRevenueRealized - totalReceived - totalDiscount);
     const receivedPercent = totalRevenueRealized > 0 
-      ? (totalReceived / totalRevenueRealized) * 100 
-      : (totalContractValue > 0 ? (totalReceived / totalContractValue) * 100 : 0);
+      ? ((totalReceived + totalDiscount) / totalRevenueRealized) * 100 
+      : (totalContractValue > 0 ? ((totalReceived + totalDiscount) / totalContractValue) * 100 : 0);
 
     // 6. Carga em Trânsito (Síncrono com os romaneios da auditoria)
     const transitLoadings = activeLoadings.filter(l => !l.unloadWeightKg && l.status !== 'completed');

@@ -166,9 +166,16 @@ const QuickPaymentViewModal: React.FC<Props> = ({ isOpen, onClose, record, onAdd
                                                             </span>
                                                         </td>
                                                         <td className="px-6 py-4 text-right">
-                                                            <span className={`text-[12px] font-black tracking-tighter italic ${tx.type === 'IN' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                                                {tx.type === 'IN' ? '+' : '-'} {currency(tx.amount)}
-                                                            </span>
+                                                            <div className="flex flex-col items-end">
+                                                                <span className={`text-[12px] font-black tracking-tighter italic ${tx.type === 'IN' || tx.type === 'credit' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                                                    {tx.type === 'IN' || tx.type === 'credit' ? '+' : '-'} {currency(tx.amount)}
+                                                                </span>
+                                                                {tx.metadata?.discount_amount && Number(tx.metadata.discount_amount) > 0 && (
+                                                                    <span className="text-[8px] font-black text-amber-600 uppercase mt-0.5">
+                                                                        Desc: {currency(Number(tx.metadata.discount_amount))}
+                                                                    </span>
+                                                                )}
+                                                            </div>
                                                         </td>
                                                         <td className="px-6 py-4">
                                                             <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-all">

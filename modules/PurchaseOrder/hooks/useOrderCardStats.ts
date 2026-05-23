@@ -34,10 +34,11 @@ export function useOrderCardStats(order: PurchaseOrder) {
     const totalLoadedValue = Number(order.totalPurchaseValCalc) || 0;
     const totalSettled = Number(order.paidValue) || 0;
     const loadedQty = Number(order.totalSc) || 0;
+    const discountValue = Number(order.discountValue) || 0;
     
     const contractQty = order.items.reduce((acc, i) => acc + i.quantity, 0);
-    const pendingValue = Math.max(0, totalLoadedValue - totalSettled);
-    const advanceBalance = Math.max(0, totalSettled - totalLoadedValue);
+    const pendingValue = Math.max(0, totalLoadedValue - totalSettled - discountValue);
+    const advanceBalance = Math.max(0, totalSettled + discountValue - totalLoadedValue);
     const progress = contractQty > 0 ? Math.min((loadedQty / contractQty) * 100, 100) : 0;
 
     return { 
@@ -47,7 +48,8 @@ export function useOrderCardStats(order: PurchaseOrder) {
       totalSettled, 
       pendingValue, 
       advanceBalance, 
-      progress 
+      progress,
+      discountValue
     };
   }, [order, refreshKey]);
 }
