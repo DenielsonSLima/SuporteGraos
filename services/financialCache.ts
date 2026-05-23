@@ -82,22 +82,22 @@ export const invalidateFinancialCache = () => {
     window.dispatchEvent(new CustomEvent('app:invalidate-query', { 
       detail: { 
         queryKeys: [
-          'financial_entries',
-          'financial_payables',
-          'financial_receivables',
-          'financial_transactions',
-          'financial-summary',
-          'freights',
-          'carriers',
-          'advances',
-          'advances_active_totals',
-          'loans',
-          'loans_active_totals',
-          'cashier',
-          'loadings',
-          'purchase_orders',
-          'sales_orders',
-          'dashboard'
+          ['financial_entries'],
+          ['financial_payables'],
+          ['financial_receivables'],
+          ['financial_transactions'],
+          ['financial-summary'],
+          ['freights'],
+          ['carriers'],
+          ['advances'],
+          ['advances_active_totals'],
+          ['loans'],
+          ['loans_active_totals'],
+          ['cashier'],
+          ['loadings'],
+          ['purchase_orders'],
+          ['sales_orders'],
+          ['dashboard']
         ] 
       } 
     }));

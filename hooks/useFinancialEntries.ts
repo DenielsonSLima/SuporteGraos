@@ -25,7 +25,7 @@ export function usePayables(params?: FinancialFilterParams) {
   useFinancialRealtime();
 
   return useQuery({
-    queryKey: [QUERY_KEYS.FINANCIAL_PAYABLES, params],
+    queryKey: [...QUERY_KEYS.FINANCIAL_PAYABLES, params],
     queryFn: () => financialEntriesService.getPayables(params),
     staleTime: STALE_TIMES.DYNAMIC,
     placeholderData: keepPreviousData,
@@ -38,7 +38,7 @@ export function useReceivables(params?: FinancialFilterParams) {
   useFinancialRealtime();
 
   return useQuery({
-    queryKey: [QUERY_KEYS.FINANCIAL_RECEIVABLES, params],
+    queryKey: [...QUERY_KEYS.FINANCIAL_RECEIVABLES, params],
     queryFn: () => financialEntriesService.getReceivables(params),
     staleTime: STALE_TIMES.DYNAMIC,
     placeholderData: keepPreviousData,
