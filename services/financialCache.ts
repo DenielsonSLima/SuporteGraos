@@ -78,10 +78,27 @@ if (typeof window !== 'undefined') {
 export const invalidateFinancialCache = () => {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event('financial:updated'));
-    // 🟢 MASTER SWITCH: Invalida queries do TanStack Query em todo o sistema (Consolidado)
+    // 🟢 MASTER SWITCH: Invalida queries do TanStack Query em todo o sistema (Consolidado com chaves exatas)
     window.dispatchEvent(new CustomEvent('app:invalidate-query', { 
       detail: { 
-        queryKeys: ['financial', 'cashier', 'dashboard', 'purchase_orders', 'sales_orders', 'loadings'] 
+        queryKeys: [
+          'financial_entries',
+          'financial_payables',
+          'financial_receivables',
+          'financial_transactions',
+          'financial-summary',
+          'freights',
+          'carriers',
+          'advances',
+          'advances_active_totals',
+          'loans',
+          'loans_active_totals',
+          'cashier',
+          'loadings',
+          'purchase_orders',
+          'sales_orders',
+          'dashboard'
+        ] 
       } 
     }));
   }

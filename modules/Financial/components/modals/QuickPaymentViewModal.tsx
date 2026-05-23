@@ -161,7 +161,9 @@ const QuickPaymentViewModal: React.FC<Props> = ({ isOpen, onClose, record, onAdd
                                                             </div>
                                                         </td>
                                                         <td className="px-6 py-4">
-                                                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-tight">{account?.account_name || 'Conta Excluída'}</span>
+                                                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-tight">
+                                                                {tx.account_id === '97e8bd30-3ba1-4658-a51e-5df6ce184845' ? 'Adiantamento' : (account?.account_name || 'Conta Excluída')}
+                                                            </span>
                                                         </td>
                                                         <td className="px-6 py-4 text-right">
                                                             <span className={`text-[12px] font-black tracking-tighter italic ${tx.type === 'IN' ? 'text-emerald-600' : 'text-rose-600'}`}>

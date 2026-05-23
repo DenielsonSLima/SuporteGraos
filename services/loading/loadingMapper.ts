@@ -124,6 +124,8 @@ export const mapLoadingFromDb = (row: any): Loading => {
     id: row?.id ?? base.id,
     date: row?.date ?? base.date,
     status: row?.status ?? base.status,
-    companyId: row?.company_id || undefined
+    companyId: row?.company_id || undefined,
+    freightPaid: row?.freight_paid !== undefined ? Number(row.freight_paid) : base.freightPaid,
+    totalFreightValue: row?.total_freight_value !== undefined ? Number(row.total_freight_value) : base.totalFreightValue
   };
 };
