@@ -111,7 +111,7 @@ export const registerFinancialRecords = async (params: RegisterFinancialParams) 
   let txResult = null;
   const isDomainHandled = ['purchase_order', 'sales_order', 'loading', 'commission'].includes(referenceType);
 
-  if ((!canonicalOps || !isDomainHandled) && amount > 0 && accountId) {
+  if ((!canonicalOps || !isDomainHandled) && !params.skipTransactionInsert && amount > 0 && accountId) {
     try {
       const linkParams: TransactionLinkParams = {
         linkType: type,
@@ -130,7 +130,7 @@ export const registerFinancialRecords = async (params: RegisterFinancialParams) 
         amount,
         type,
         bankAccountId: accountId,
-        financialRecordId: recordId,
+        financialRecordId: params.hasFinancialEntry === false ? undefined : recordId,
         companyId: company
       }, linkParams);
     } catch (err) {
@@ -163,30 +163,9 @@ export const registerFinancialRecords = async (params: RegisterFinancialParams) 
     }
   }
 
-  // 3. ADMIN_EXPENSES (standalone) — Registro de liquidação (LEGACY)
-  // TODO: Em breve removeremos esta inserção pois o admin_expenses deve refletir apenas OBRIGAÇÕES.
-  try {
-    const { standaloneRecordsService } = await import('../../standaloneRecordsService');
-    await standaloneRecordsService.add({
-      id: crypto.randomUUID(),
-      description: `${isPureAdjustment ? 'Abatimento' : 'Baixa'}: ${enhancedDescription}`,
-      entityName,
-      driverName,
-      category: isPureAdjustment ? 'Desconto/Ajuste' : `Liquidação - ${historyType}`,
-      dueDate: date,
-      issueDate: date,
-      settlementDate: date,
-      originalValue: amount + discount,
-      paidValue: amount,
-      discountValue: discount,
-      status: 'paid',
-      subType: referenceType as FinancialRecord['subType'],
-      bankAccount: isPureAdjustment ? 'ABATIMENTO' : (accountName || accountId || 'N/D'),
-      companyId: company,
-      notes: `${notes || ''} [ORIGIN:${recordId}] [REF:${txId}]`.trim()
-    });
-  } catch (err) {
-    // Falha não crítica
-  }
+  // 3. ADMIN_EXPENSES (standalone) — Registro de liquidação (REMOVIDO / LEGACY)
+  // Despesas administrativas reais agora são criadas exclusivamente pelo usuário no Módulo Despesas,
+  // e pagamentos/recebimentos de outros módulos (Compras, Vendas, Fretes, etc) possuem tabelas e views
+  // próprias e não devem poluir a tabela admin_expenses.
 
 };

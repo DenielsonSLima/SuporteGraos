@@ -156,6 +156,7 @@ export const financialTransactionService = {
                     });
 
                 if (linkError) {
+                    console.error('Error inserting financial link:', linkError);
                 }
             }
 

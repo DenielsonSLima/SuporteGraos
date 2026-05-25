@@ -30,18 +30,17 @@ export const expenseService = {
       transactions: [...(order.transactions || []), newTx]
     };
 
-    // 2. Persistir na tabela de despesas de operação (para relatórios)
+    // 2. Persistir na tabela de despesas de operação usando as colunas canônicas do banco (para relatórios e triggers)
     const { error: expError } = await supabase.from('ops_purchase_order_expenses').insert({
       id: expenseId,
       purchase_order_id: order.id,
-      expense_category_id: tx.accountId !== 'none' ? tx.accountId : '00000000-0000-0000-0000-000000000000',
       description: tx.notes || 'Despesa extra',
-      value: tx.value,
+      amount: tx.value,
       expense_date: tx.date || getTodayBR(),
-      paid: tx.accountId !== 'none',
-      notes: tx.notes || null,
       company_id: companyId,
-      deduct_from_partner: tx.deductFromPartner ?? true
+      deductible: tx.deductFromPartner ?? true,
+      deduct_target: tx.deductFromPartner ? 'supplier' : 'none',
+      metadata: tx
     });
 
     if (expError) throw expError;

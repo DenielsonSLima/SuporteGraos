@@ -12,6 +12,7 @@ Este é o ponto de entrada central para toda a base de conhecimento do projeto. 
 - `business_domain.md`: Fluxo central de negócio e terminologia.
 - `patterns_and_conventions.md`: Estilos (Tailwind/CSS) e padrões de UI.
 - `common_errors.md`: Post-mortems e armadilhas a evitar.
+- `contas_virtuais.md`: Diretrizes e lógica de ocultação de Contas Virtuais no Caixa.
 
 ### 🌾 [02. Suporte Grãos (Negócio)](file:///Users/denielson/Desktop/Suporte%20Graos%20ERP%20%20/.agents/memory/knowledge/suporte-graos/)
 *Regras específicas do ERP Grãos.*

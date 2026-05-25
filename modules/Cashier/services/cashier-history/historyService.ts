@@ -29,14 +29,55 @@ const rpcToMonthlyReport = (rpc: any, year: number, month: number): MonthlyRepor
   const monthKey = rpc.monthKey ?? `${year}-${String(month).padStart(2, '0')}`;
   const endOfMonth = rpc.referenceDate ?? new Date(year, month, 0).toISOString().split('T')[0];
 
-  const bankBalances = (rpc.bankBalances ?? []).map((b: any) => ({
-    id: b.id,
-    bankName: b.bankName,
-    owner: b.owner ?? undefined,
-    balance: Number(b.balance) || 0,
-  }));
+  // ═══════════════════════════════════════════════════════════════════
+  // REGRA DE OURO: CONTAS VIRTUAIS/INTERNAS NUNCA DEVEM IR PARA O CAIXA
+  // ═══════════════════════════════════════════════════════════════════
+  const VIRTUAL_ACCOUNT_ID = '97e8bd30-3ba1-4658-a51e-5df6ce184845';
+  
+  // Identifica se uma conta é virtual/uso interno (pelo ID fixo ou tags no nome/titular)
+  const isVirtualAccount = (acc: any): boolean => {
+    const accId = acc.id;
+    const accName = (acc.bankName || '').toLowerCase();
+    const accOwner = (acc.owner || '').toLowerCase();
+    
+    return accId === VIRTUAL_ACCOUNT_ID || 
+           accName.includes('virtual') || 
+           accOwner.includes('virtual');
+  };
 
-  const totalBankBalance = Number(rpc.totalBankBalance) || 0;
+  const rawBalances = rpc.bankBalances ?? [];
+
+  // Mapeia e filtra exibições de contas de banco no histórico
+  const bankBalances = rawBalances
+    .filter((b: any) => !isVirtualAccount(b))
+    .map((b: any) => ({
+      id: b.id,
+      bankName: b.bankName,
+      owner: b.owner ?? undefined,
+      balance: Number(b.balance) || 0,
+      startBalance: Number(b.startBalance) || 0,
+    }));
+
+  // Soma saldos virtuais removidos para deduzir dos totais retroativos
+  const virtualBankBalanceSum = rawBalances
+    .filter(isVirtualAccount)
+    .reduce((sum: number, b: any) => sum + (Number(b.balance) || 0), 0);
+
+  const virtualStartBalanceSum = rawBalances
+    .filter(isVirtualAccount)
+    .reduce((sum: number, b: any) => sum + (Number(b.startBalance) || 0), 0);
+
+  // Ajusta os totais retroativos para manter consistência de matemática exibida na interface
+  const totalBankBalance = Math.max(0, (Number(rpc.totalBankBalance) || 0) - virtualBankBalanceSum);
+  const totalInitialBalance = Math.max(0, (Number(rpc.totalInitialBalance) || 0) - virtualStartBalanceSum);
+  
+  const totalInitialMonthBalance = Number(rpc.totalInitialMonthBalance)
+    ? Math.max(0, Number(rpc.totalInitialMonthBalance) - virtualStartBalanceSum)
+    : bankBalances.reduce((acc: number, b: any) => acc + (Number(b.startBalance) || 0), 0);
+
+  const totalAssets = Math.max(0, (Number(rpc.totalAssets) || 0) - virtualBankBalanceSum);
+  const totalLiabilities = Number(rpc.totalLiabilities) || 0;
+  const netBalance = totalAssets - totalLiabilities;
 
   return {
     id: monthKey,
@@ -49,10 +90,8 @@ const rpcToMonthlyReport = (rpc: any, year: number, month: number): MonthlyRepor
 
     bankBalances,
     totalBankBalance,
-    totalInitialBalance: Number(rpc.totalInitialBalance) || 0,
-    totalInitialMonthBalance: Number(rpc.totalInitialMonthBalance) || bankBalances.reduce(
-      (acc: number, b: any) => acc + (Number(b.startBalance) || 0), 0
-    ),
+    totalInitialBalance,
+    totalInitialMonthBalance,
     initialMonthBalances: bankBalances.map((b: any) => ({
       id: b.id,
       bankName: b.bankName,
@@ -66,7 +105,7 @@ const rpcToMonthlyReport = (rpc: any, year: number, month: number): MonthlyRepor
     totalFixedAssetsValue: Number(rpc.totalFixedAssetsValue) || 0,
     pendingAssetSalesReceipts: 0,
     shareholderReceivables: Number(rpc.shareholderReceivables) || 0,
-    totalAssets: Number(rpc.totalAssets) || 0,
+    totalAssets,
 
     pendingPurchasePayments: Number(rpc.pendingPurchasePayments) || 0,
     pendingFreightPayments: Number(rpc.pendingFreightPayments) || 0,
@@ -74,9 +113,9 @@ const rpcToMonthlyReport = (rpc: any, year: number, month: number): MonthlyRepor
     commissionsToPay: Number(rpc.commissionsToPay) || 0,
     advancesTaken: Number(rpc.advancesTaken) || 0,
     shareholderPayables: Number(rpc.shareholderPayables) || 0,
-    totalLiabilities: Number(rpc.totalLiabilities) || 0,
+    totalLiabilities,
 
-    netBalance: Number(rpc.netBalance) || 0,
+    netBalance,
   } as MonthlyReport;
 };
 

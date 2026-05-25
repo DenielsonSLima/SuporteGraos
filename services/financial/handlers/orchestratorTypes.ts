@@ -57,4 +57,6 @@ export interface RegisterFinancialParams {
   shareholderTxId?: string;
   metadata?: any;
   purchaseOrderId?: string;
+  hasFinancialEntry?: boolean;
+  skipTransactionInsert?: boolean;
 }

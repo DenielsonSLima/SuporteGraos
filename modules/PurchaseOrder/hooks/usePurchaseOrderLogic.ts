@@ -42,12 +42,12 @@ export const usePurchaseOrderLogic = (initialOrder: PurchaseOrder, onFinalizeCal
   // Function to refresh manual invalidations if needed
   const refreshData = async () => {
     try {
-      // ✅ FORCE REFETCH: Forçamos o recarregamento imediato de tudo que está na tela
-      // Isso elimina a percepção de "delay" após deletar/confirmar.
+      // ✅ FORCE INVALIDATE: Invalidamos todas as queries relacionadas para que os componentes mostrem dados frescos
+      // e marcamos queries inativas (ex: lista parametrizada) como stale.
       await Promise.allSettled([
-        queryClient.refetchQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS, type: 'active' }),
-        queryClient.refetchQueries({ queryKey: ['purchase_order_transactions', order.id], type: 'active' }),
-        queryClient.refetchQueries({ queryKey: [QUERY_KEYS.PURCHASE_ORDERS, 'detail', order.id], type: 'active' }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS }),
+        queryClient.invalidateQueries({ queryKey: ['purchase_order_transactions', order.id] }),
+        queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.PURCHASE_ORDERS, 'detail', order.id] }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_TRANSACTIONS }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOADINGS }),
@@ -228,12 +228,7 @@ export const usePurchaseOrderLogic = (initialOrder: PurchaseOrder, onFinalizeCal
     },
     handleAddExpense: async (data: any) => {
       try {
-        const updatedOrder = await expenseService.addExpense(order, data);
-        
-        // Atualizar Cache Global
-        queryClient.setQueryData(QUERY_KEYS.PURCHASE_ORDERS, (old: any[] | undefined) => 
-          old ? old.map(o => o.id === order.id ? updatedOrder : o) : [updatedOrder]
-        );
+        await expenseService.addExpense(order, data);
         addToast('success', 'Despesa lançada com sucesso');
         
         SettingsCache.refreshBalances();

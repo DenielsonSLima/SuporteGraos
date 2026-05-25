@@ -70,25 +70,71 @@ export const cashierReportService = {
       throw error;
     }
 
-    // Mapeamento direto de 1 para 1 com o SQL modular
+    // ═══════════════════════════════════════════════════════════════════
+    // REGRA DE OURO: CONTAS VIRTUAIS/INTERNAS NUNCA DEVEM IR PARA O CAIXA
+    // ═══════════════════════════════════════════════════════════════════
+    const VIRTUAL_ACCOUNT_ID = '97e8bd30-3ba1-4658-a51e-5df6ce184845';
+    
+    // Identifica se uma conta é virtual/uso interno (pelo ID fixo ou tags no nome/titular)
+    const isVirtualAccount = (acc: any): boolean => {
+      const accId = acc.id || acc.accountId;
+      const accName = (acc.bankName || acc.accountName || '').toLowerCase();
+      const accOwner = (acc.owner || '').toLowerCase();
+      
+      return accId === VIRTUAL_ACCOUNT_ID || 
+             accName.includes('virtual') || 
+             accOwner.includes('virtual');
+    };
+
+    const rawBankBalances = report.bankBalances || [];
+    const rawInitialMonthBalances = report.initialMonthBalances || [];
+    const rawInitialBalances = report.initialBalances || [];
+
+    // Filtra as contas virtuais para ocultá-las da listagem de bancos e abertura
+    const bankBalances = rawBankBalances.filter((acc: any) => !isVirtualAccount(acc));
+    const initialMonthBalances = rawInitialMonthBalances.filter((acc: any) => !isVirtualAccount(acc));
+    const initialBalances = rawInitialBalances.filter((acc: any) => !isVirtualAccount(acc));
+
+    // Soma os saldos virtuais para deduzir dos totais consolidados e evitar divergências matemáticas visuais
+    const virtualBankBalanceSum = rawBankBalances
+      .filter(isVirtualAccount)
+      .reduce((sum: number, acc: any) => sum + (Number(acc.balance) || 0), 0);
+
+    const virtualInitialMonthSum = rawInitialMonthBalances
+      .filter(isVirtualAccount)
+      .reduce((sum: number, acc: any) => sum + (Number(acc.value || acc.balance) || 0), 0);
+
+    const virtualInitialSum = rawInitialBalances
+      .filter(isVirtualAccount)
+      .reduce((sum: number, acc: any) => sum + (Number(acc.value || acc.balance) || 0), 0);
+
+    // Ajusta os totais e recalcula o patrimônio líquido real (netBalance) sem as contas de uso interno
+    const totalBankBalance = Math.max(0, (Number(report.totalBankBalance) || 0) - virtualBankBalanceSum);
+    const totalInitialMonthBalance = Math.max(0, (Number(report.totalInitialMonthBalance) || 0) - virtualInitialMonthSum);
+    const totalInitialBalance = Math.max(0, (Number(report.totalInitialBalance) || 0) - virtualInitialSum);
+    
+    const totalAssets = Math.max(0, (Number(report.totalAssets) || 0) - virtualBankBalanceSum);
+    const totalLiabilities = Number(report.totalLiabilities) || 0;
+    const netBalance = totalAssets - totalLiabilities;
+
     return {
       // Totais Principais
-      totalBankBalance: report.totalBankBalance || 0,
-      totalLiabilities: report.totalLiabilities || 0,
-      totalAssets: report.totalAssets || 0,
-      netBalance: report.netBalance || 0,
+      totalBankBalance,
+      totalLiabilities,
+      totalAssets,
+      netBalance,
       
       pendingSalesReceipts: report.pendingSalesReceipts || 0,
       merchandiseInTransitValue: report.merchandiseInTransitValue || 0,
       pendingPurchasePayments: report.pendingPurchasePayments || 0,
       pendingFreightPayments: report.pendingFreightPayments || 0,
 
-      // Detalhamento Bancário e Saldos Iniciais
-      bankBalances: report.bankBalances || [],
-      initialBalances: report.initialBalances || [],
-      totalInitialBalance: report.totalInitialBalance || 0,
-      totalInitialMonthBalance: report.totalInitialMonthBalance || 0,
-      initialMonthBalances: report.initialMonthBalances || [],
+      // Detalhamento Bancário e Saldos Iniciais (Filtrados)
+      bankBalances,
+      initialBalances,
+      totalInitialBalance,
+      totalInitialMonthBalance,
+      initialMonthBalances,
       
       // Ativos e Passivos (Calculados individualmente no SQL)
       loanDebts: report.loansTaken || 0,

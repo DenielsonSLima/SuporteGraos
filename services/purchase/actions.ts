@@ -39,13 +39,13 @@ export const syncExpenses = async (order: PurchaseOrder) => {
     const expensesPayload = expenseTransactions.map(tx => ({
       id: tx.id,
       purchase_order_id: order.id,
-      expense_category_id: tx.accountId && tx.accountId !== 'none' ? tx.accountId : '00000000-0000-0000-0000-000000000000',
       description: tx.notes || 'Despesa extra',
-      value: tx.value,
+      amount: tx.value,
       expense_date: tx.date || getTodayBR(),
-      paid: !!tx.accountId && tx.accountId !== 'none',
-      notes: tx.notes || null,
-      company_id: companyId
+      company_id: companyId,
+      deductible: tx.deductFromPartner ?? true,
+      deduct_target: tx.deductFromPartner ? 'supplier' : 'none',
+      metadata: tx
     }));
 
     if (expensesPayload.length > 0) {
@@ -158,8 +158,8 @@ export const add = async (order: PurchaseOrder) => {
     const result = await upsertPurchaseOrderCanonical(order);
     if (!result.success) return result;
     
-    // ✅ ALWAYS keep legacy sync for UI/Report compatibility (pode ser async/void)
-    syncExpenses(order).catch(() => {});
+    // ✅ ALWAYS keep legacy sync for UI/Report compatibility - agora aguardado para evitar corridas
+    await syncExpenses(order).catch((e) => console.warn('Erro ao sincronizar despesas legadas:', e));
     createPayableForPurchaseOrder(order);
 
     const user = authService.getCurrentUser();
@@ -188,7 +188,7 @@ export const update = async (order: PurchaseOrder) => {
     const result = await upsertPurchaseOrderCanonical(order);
     if (!result.success) return result;
 
-    syncExpenses(order).catch(() => {});
+    await syncExpenses(order).catch((e) => console.warn('Erro ao sincronizar despesas legadas:', e));
     
     const user = authService.getCurrentUser();
     logService.addLog({ userId: user?.id || 'system', userName: user?.name || 'Sistema', action: 'update', module: 'Compras', description: `Atualizou Pedido de Compra: ${order.number}`, entityId: order.id });

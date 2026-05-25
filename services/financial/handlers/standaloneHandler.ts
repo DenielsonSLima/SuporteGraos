@@ -93,7 +93,8 @@ export const handleStandalonePayment = async (
       entityName,
       partnerId: data.partnerId,
       notes: data.notes,
-      companyId: standalone?.companyId
+      companyId: standalone?.companyId,
+      skipTransactionInsert: true
     });
   } else {
     // Via Registro Direto (Fallback/Extra)
@@ -108,7 +109,7 @@ export const handleStandalonePayment = async (
       accountName: data.accountName,
       type: txType,
       recordId,
-      referenceType: standalone?.subType || 'admin',
+      referenceType: data.purchaseOrderId ? 'purchase_order' : (standalone?.subType || 'admin'),
       referenceId: recordId,
       description,
       historyType: standalone?.category === 'income' ? 'Crédito Avulso' : 'Despesa Extra',
@@ -117,9 +118,11 @@ export const handleStandalonePayment = async (
       notes: data.notes,
       companyId: standalone?.companyId,
       metadata: { 
-        deductFromPartner: (data as any).deductFromPartner 
+        deductFromPartner: (data as any).deductFromPartner,
+        expenseId: recordId
       },
-      purchaseOrderId: data.purchaseOrderId
+      purchaseOrderId: data.purchaseOrderId,
+      hasFinancialEntry: false
     });
   }
 
