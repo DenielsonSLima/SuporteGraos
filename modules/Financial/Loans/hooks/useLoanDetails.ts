@@ -146,17 +146,13 @@ export function useLoanDetails({ loan, onUpdate, onBack, addToast }: UseLoanDeta
 
         if (isUuid) {
           // UPDATE na tabela canônica
-          const { error: updateError } = await supabase
-            .from('financial_transactions')
-            .update({
-              description: tx.description,
-              amount: tx.value,
-              transaction_date: tx.date,
-              account_id: tx.accountId
-            })
-            .eq('id', tx.id);
-
-          if (updateError) throw updateError;
+          await loansService.updateTransaction(loan.id, tx.id, {
+            type: tx.type,
+            value: tx.value,
+            description: tx.description || '',
+            accountId: tx.accountId,
+            date: tx.date
+          });
         } else {
           // UPDATE na tabela legado/auxiliar
           const subType = resolveSubTypeFromTx(tx.type);
@@ -237,7 +233,7 @@ export function useLoanDetails({ loan, onUpdate, onBack, addToast }: UseLoanDeta
       description: record.description,
       accountId: record.bankAccount,
       accountName: '',
-      isHistorical: false
+      isHistorical: !record.bankAccount
     });
   }, [getTxTypeFromRecord]);
 

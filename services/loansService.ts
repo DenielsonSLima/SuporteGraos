@@ -334,6 +334,163 @@ export const loansService = {
   },
 
   /**
+   * Atualiza uma transação existente de reforço ou pagamento, reajustando os saldos do empréstimo.
+   */
+  updateTransaction: async (loanId: string, txId: string, tx: {
+    type: 'increase' | 'decrease';
+    value: number;
+    description: string;
+    accountId?: string;
+    date: string;
+  }): Promise<void> => {
+    try {
+      // 1. Buscar dados do empréstimo
+      const { data: loan, error: fetchError } = await supabase
+        .from('loans')
+        .select('*')
+        .eq('id', loanId)
+        .single();
+      
+      if (fetchError || !loan) throw new Error('Empréstimo não encontrado');
+
+      // 2. Buscar a transação (canônica ou legado)
+      const { data: canonicalTx } = await supabase
+        .from('financial_transactions')
+        .select('*')
+        .eq('id', txId)
+        .maybeSingle();
+
+      if (canonicalTx) {
+        const oldVal = Number(canonicalTx.amount);
+        const oldIsReinforcement = !!canonicalTx.metadata?.is_reinforcement;
+
+        // 3. Reverter o impacto anterior nos totais do empréstimo
+        let principal = Number(loan.principal_amount);
+        let paid = Number(loan.paid_amount);
+
+        if (oldIsReinforcement) {
+          principal = Math.max(0, principal - oldVal);
+        } else {
+          paid = Math.max(0, paid - oldVal);
+        }
+
+        // 4. Aplicar o novo impacto nos totais do empréstimo
+        if (tx.type === 'increase') {
+          principal = principal + tx.value;
+        } else {
+          paid = paid + tx.value;
+        }
+
+        // 5. Atualizar a tabela de empréstimos
+        const { error: updateLoanError } = await supabase
+          .from('loans')
+          .update({
+            principal_amount: principal,
+            paid_amount: paid
+          })
+          .eq('id', loanId);
+
+        if (updateLoanError) throw updateLoanError;
+
+        // 6. Atualizar a transação financeira
+        let txType: 'credit' | 'debit';
+        if (loan.type === 'granted') {
+          txType = tx.type === 'increase' ? 'debit' : 'credit';
+        } else {
+          txType = tx.type === 'increase' ? 'credit' : 'debit';
+        }
+
+        const { error: updateTxError } = await supabase
+          .from('financial_transactions')
+          .update({
+            account_id: tx.accountId || null,
+            type: txType,
+            amount: tx.value,
+            transaction_date: tx.date,
+            description: tx.description,
+            metadata: {
+              ...canonicalTx.metadata,
+              loan_id: loanId,
+              origin_type: 'loan',
+              is_reinforcement: tx.type === 'increase',
+              is_payment: tx.type === 'decrease'
+            }
+          })
+          .eq('id', txId);
+
+        if (updateTxError) throw updateTxError;
+
+      } else {
+        // Fallback: tentar buscar em admin_expenses (legado)
+        const { data: adminTx } = await supabase
+          .from('admin_expenses')
+          .select('*')
+          .eq('id', txId)
+          .maybeSingle();
+
+        if (!adminTx) throw new Error('Transação não encontrada');
+
+        const oldVal = Number(adminTx.amount || adminTx.original_value || 0);
+        const oldDescription = adminTx.description || '';
+        const oldIsReinforcement = oldDescription.includes('Reforço');
+
+        // 3. Reverter o impacto anterior nos totais do empréstimo
+        let principal = Number(loan.principal_amount);
+        let paid = Number(loan.paid_amount);
+
+        if (oldIsReinforcement) {
+          principal = Math.max(0, principal - oldVal);
+        } else {
+          paid = Math.max(0, paid - oldVal);
+        }
+
+        // 4. Aplicar o novo impacto nos totais do empréstimo
+        if (tx.type === 'increase') {
+          principal = principal + tx.value;
+        } else {
+          paid = paid + tx.value;
+        }
+
+        // 5. Atualizar a tabela de empréstimos
+        const { error: updateLoanError } = await supabase
+          .from('loans')
+          .update({
+            principal_amount: principal,
+            paid_amount: paid
+          })
+          .eq('id', loanId);
+
+        if (updateLoanError) throw updateLoanError;
+
+        // 6. Atualizar o registro do admin_expenses
+        const { error: updateAdminError } = await supabase
+          .from('admin_expenses')
+          .update({
+            description: tx.description,
+            amount: tx.value,
+            original_value: tx.value,
+            paid_value: tx.value,
+            due_date: tx.date,
+            expense_date: tx.date,
+            account_id: tx.accountId || null
+          })
+          .eq('id', txId);
+
+        if (updateAdminError) throw updateAdminError;
+      }
+
+      // 7. Invalidar caches
+      const { invalidateFinancialCache } = await import('./financialCache');
+      const { invalidateDashboardCache } = await import('./dashboardCache');
+      invalidateFinancialCache();
+      invalidateDashboardCache();
+
+    } catch (error: any) {
+      throw new Error(`Erro ao atualizar transação de empréstimo: ${error.message}`);
+    }
+  },
+
+  /**
    * Remove uma transação de reforço ou pagamento e reverte o saldo.
    * ESTRATÉGIA: Deleta a transação diretamente (em vez de criar estorno),
    * e ajusta os totais do empréstimo.
