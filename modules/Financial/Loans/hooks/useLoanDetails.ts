@@ -250,10 +250,8 @@ export function useLoanDetails({ loan, onUpdate, onBack, addToast }: UseLoanDeta
   const confirmDeleteTx = useCallback(async () => {
     if (!deletingTxRecord) return;
     try {
-      // 🟢 NOVO: Reverter Saldo do Empréstimo e Caixa Bancário antes de excluir o registro
+      // Reverte saldo do empréstimo e deleta a transação financeira
       await loansService.removeTransaction(loan.id, deletingTxRecord.id);
-      
-      await financialActionService.deleteStandaloneRecord(deletingTxRecord.id);
       setDeletingTxRecord(null);
       setTxVersion(v => v + 1);
       onUpdate();
@@ -261,7 +259,7 @@ export function useLoanDetails({ loan, onUpdate, onBack, addToast }: UseLoanDeta
     } catch (error) {
       addToast('error', 'Erro ao excluir movimentação', (error as any).message);
     }
-  }, [deletingTxRecord, onUpdate, addToast]);
+  }, [deletingTxRecord, loan.id, onUpdate, addToast]);
 
   // ─── Excluir contrato ──────────────────────────────────
   const handleDeleteContract = useCallback(() => {

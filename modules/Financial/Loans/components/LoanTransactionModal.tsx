@@ -47,7 +47,11 @@ const LoanTransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, loanTy
          if (initialTx) {
             setType(initialTx.type);
             setIsAdjustment(!!initialTx.isHistorical);
-            setValue(formatCurrencyInput(String(initialTx.value ?? '')));
+            setValue(
+              typeof initialTx.value === 'number' && initialTx.value > 0
+                ? initialTx.value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                : ''
+            );
             setDescription(initialTx.description || '');
             setAccountId(initialTx.accountId || '');
             setIsHistorical(!!initialTx.isHistorical);

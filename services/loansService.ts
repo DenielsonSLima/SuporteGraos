@@ -207,71 +207,29 @@ export const loansService = {
 
   delete: async (loanId: string): Promise<void> => {
     try {
-      // 1. Buscar detalhes do empréstimo para o estorno
-      const { data: loan, error: fetchError } = await supabase
-        .from('loans')
-        .select('*')
-        .eq('id', loanId)
-        .single();
-      
-      if (fetchError || !loan) throw new Error('Empréstimo não encontrado');
-
-      // 2. Cancela parcelas associadas
+      // 1. Deletar parcelas associadas
       await supabase
         .from('loan_installments')
-        .update({ status: 'cancelled' })
+        .delete()
         .eq('loan_id', loanId);
 
-      // 3. Cancela a entrada financeira principal (financial_entries)
-      await supabase
-        .from('financial_entries')
-        .update({ status: 'cancelled' })
-        .eq('origin_id', loanId)
-        .eq('origin_type', 'loan');
-
-      // 4. Estornar a transação de desembolso inicial se houver
-      const { data: txs } = await supabase
-        .from('financial_transactions')
-        .select('*')
-        .eq('metadata->>loan_id', loanId)
-        .eq('metadata->>is_disbursement', 'true');
-
-      if (txs && txs.length > 0) {
-        for (const tx of txs) {
-          // Criar transação de estorno (tipo oposto)
-          const reversalType = tx.type === 'debit' ? 'credit' : 'debit';
-          await supabase.from('financial_transactions').insert({
-            company_id: loan.company_id,
-            account_id: tx.account_id,
-            type: reversalType,
-            amount: tx.amount,
-            transaction_date: new Date().toISOString().split('T')[0],
-            description: `[ESTORNO] ${tx.description}`,
-            metadata: {
-              loan_id: loanId,
-              is_reversal: true,
-              reverses_id: tx.id
-            }
-          });
-        }
-      }
-
-      // 5. Cancela o empréstimo
+      // 2. Deletar o empréstimo (o trigger fn_loan_delete_cleanup
+      //    cuida de deletar financial_transactions e financial_entries)
       const { error } = await supabase
         .from('loans')
-        .update({ status: 'cancelled' })
+        .delete()
         .eq('id', loanId);
 
       if (error) throw error;
 
-      // 6. Invalidar caches
+      // 3. Invalidar caches
       const { invalidateFinancialCache } = await import('./financialCache');
       const { invalidateDashboardCache } = await import('./dashboardCache');
       invalidateFinancialCache();
       invalidateDashboardCache();
 
     } catch (error: any) {
-      throw new Error(`Erro ao cancelar empréstimo: ${error.message}`);
+      throw new Error(`Erro ao excluir empréstimo: ${error.message}`);
     }
   },
 
@@ -376,7 +334,9 @@ export const loansService = {
   },
 
   /**
-   * Remove uma transação de reforço ou pagamento e estorna o saldo.
+   * Remove uma transação de reforço ou pagamento e reverte o saldo.
+   * ESTRATÉGIA: Deleta a transação diretamente (em vez de criar estorno),
+   * e ajusta os totais do empréstimo.
    */
   removeTransaction: async (loanId: string, txId: string): Promise<void> => {
     try {
@@ -389,71 +349,54 @@ export const loansService = {
       
       if (fetchError || !loan) throw new Error('Empréstimo não encontrado');
 
-      // 2. Tentar buscar em admin_expenses (Legado) ou financial_transactions (Canônico)
-      let value = 0;
-      let description = '';
-      let isReinforcement = false;
-      let targetTxId = '';
-
-      const { data: adminTx } = await supabase
-        .from('admin_expenses')
-        .select('*')
-        .eq('id', txId)
-        .single();
-
-      if (adminTx) {
-        value = Number(adminTx.amount || adminTx.original_value || 0);
-        description = adminTx.description;
-        isReinforcement = description.includes('Reforço') || adminTx.notes?.includes('increase');
-        targetTxId = txId;
-      } else {
-        // Se não for legado, busca na tabela canônica
-        const { data: canonicalTx } = await supabase
-          .from('financial_transactions')
-          .select('*')
-          .eq('id', txId)
-          .single();
-        
-        if (!canonicalTx) return;
-
-        value = Number(canonicalTx.amount);
-        description = canonicalTx.description;
-        isReinforcement = canonicalTx.metadata?.is_reinforcement || description.includes('Reforço');
-        targetTxId = txId;
-      }
-
-      // 3. Reverter totais no empréstimo
-      const updates: any = {};
-      if (isReinforcement) {
-        updates.principal_amount = Number(loan.principal_amount) - value;
-      } else {
-        updates.paid_amount = Number(loan.paid_amount) - value;
-      }
-
-      await supabase.from('loans').update(updates).eq('id', loanId);
-
-      // 4. Estornar transação bancária vinculada (se for canônico, já temos o ID)
-      const { data: targetTx } = await supabase
+      // 2. Buscar a transação canônica
+      const { data: canonicalTx } = await supabase
         .from('financial_transactions')
         .select('*')
-        .eq('id', targetTxId)
-        .single();
-      
-      if (targetTx) {
-        const reversalType = targetTx.type === 'debit' ? 'credit' : 'debit';
-        await supabase.from('financial_transactions').insert({
-          company_id: loan.company_id,
-          account_id: targetTx.account_id,
-          type: reversalType,
-          amount: targetTx.amount,
-          transaction_date: new Date().toISOString().split('T')[0],
-          description: `[ESTORNO] ${targetTx.description}`,
-          metadata: {
-            loan_id: loanId,
-            is_reversal: true,
-            reverses_id: targetTx.id
+        .eq('id', txId)
+        .maybeSingle();
+
+      if (canonicalTx) {
+        const value = Number(canonicalTx.amount);
+        const isReinforcement = !!canonicalTx.metadata?.is_reinforcement;
+
+        // 3. Reverter totais no empréstimo
+        const updates: any = {};
+        if (isReinforcement) {
+          updates.principal_amount = Math.max(0, Number(loan.principal_amount) - value);
+        } else {
+          updates.paid_amount = Math.max(0, Number(loan.paid_amount) - value);
+        }
+
+        await supabase.from('loans').update(updates).eq('id', loanId);
+
+        // 4. Deletar a transação (em vez de criar estorno)
+        await supabase
+          .from('financial_transactions')
+          .delete()
+          .eq('id', txId);
+      } else {
+        // Fallback: tentar buscar em admin_expenses (legado)
+        const { data: adminTx } = await supabase
+          .from('admin_expenses')
+          .select('*')
+          .eq('id', txId)
+          .maybeSingle();
+
+        if (adminTx) {
+          const value = Number(adminTx.amount || adminTx.original_value || 0);
+          const description = adminTx.description || '';
+          const isReinforcement = description.includes('Reforço');
+
+          const updates: any = {};
+          if (isReinforcement) {
+            updates.principal_amount = Math.max(0, Number(loan.principal_amount) - value);
+          } else {
+            updates.paid_amount = Math.max(0, Number(loan.paid_amount) - value);
           }
-        });
+
+          await supabase.from('loans').update(updates).eq('id', loanId);
+        }
       }
 
       // 5. Invalidar caches
