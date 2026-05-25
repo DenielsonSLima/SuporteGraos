@@ -72,7 +72,15 @@ export const accountsService = {
       .order('account_name', { ascending: true });
 
     if (error) throw new Error(`Erro ao buscar contas: ${error.message}`);
-    return (data ?? []).map(mapRow);
+    
+    const VIRTUAL_ACCOUNT_ID = '97e8bd30-3ba1-4658-a51e-5df6ce184845';
+    return (data ?? [])
+      .map(mapRow)
+      .filter(a => 
+        a.id !== VIRTUAL_ACCOUNT_ID &&
+        !a.account_name.toLowerCase().includes('virtual') &&
+        !(a.owner || '').toLowerCase().includes('virtual')
+      );
   },
 
   // LEITURA — todas (incluindo inativas) para Settings
