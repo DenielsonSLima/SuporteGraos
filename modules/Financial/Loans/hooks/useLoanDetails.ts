@@ -266,12 +266,13 @@ export function useLoanDetails({ loan, onUpdate, onBack, addToast }: UseLoanDeta
     void loansService.delete(loan.id)
       .then(() => {
         addToast('success', 'Empréstimo excluído');
+        onUpdate(); // Invalida o cache do TanStack Query (QUERY_KEYS.LOANS)
         onBack();
       })
       .catch((error: any) => {
         addToast('error', 'Erro ao excluir empréstimo', error?.message || 'Falha ao excluir');
       });
-  }, [loan.id, addToast, onBack]);
+  }, [loan.id, addToast, onUpdate, onBack]);
 
   return {
     // State

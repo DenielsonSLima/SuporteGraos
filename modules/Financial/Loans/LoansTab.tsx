@@ -102,7 +102,13 @@ const LoansTab: React.FC = () => {
           setSelectedLoanId(null);
           setSelectedLoanSnapshot(null);
         }}
-        onUpdate={() => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOANS })}
+        onUpdate={() => {
+          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOANS });
+          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOAN_INSTALLMENTS });
+          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOANS_ACTIVE_TOTALS });
+          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_ENTRIES });
+          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS });
+        }}
       />
     );
   }
