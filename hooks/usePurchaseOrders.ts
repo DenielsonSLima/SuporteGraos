@@ -163,6 +163,7 @@ export function useAddPurchaseOrder() {
         qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_PAYABLES }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_SUMMARY }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_STATS }),
       ]);
     },
   });
@@ -179,6 +180,7 @@ export function useUpdatePurchaseOrder() {
         qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_PAYABLES }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_SUMMARY }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_STATS }),
       ]);
     },
   });
@@ -195,6 +197,7 @@ export function useDeletePurchaseOrder() {
         qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_PAYABLES }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_SUMMARY }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_STATS }),
       ]);
     },
   });
@@ -212,6 +215,7 @@ export function useUpdatePurchaseTransaction() {
         qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_PAYABLES }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_SUMMARY }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_STATS }),
       ]);
     },
   });
@@ -230,6 +234,7 @@ export function useDeletePurchaseTransaction() {
         qc.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_PAYABLES }),
         qc.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_SUMMARY }),
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_STATS }),
       ]);
     },
   });

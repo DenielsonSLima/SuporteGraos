@@ -222,6 +222,7 @@ export const remove = async (id: string) => {
       // 🔥 Invalidação Imediata
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_STATS });
       return { success: true };
     }
     // Se falhar no canônico, retornamos o erro
@@ -240,6 +241,7 @@ export const remove = async (id: string) => {
     // 🔥 Invalidação Imediata
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS });
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD });
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_STATS });
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message || 'Erro inesperado' };
@@ -262,6 +264,7 @@ export const cancel = async (id: string, reason?: string) => {
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_ORDERS });
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_ENTRIES });
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS });
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_STATS });
     
     const user = authService.getCurrentUser();
     logService.addLog({ userId: user?.id || 'system', userName: user?.name || 'Sistema', action: 'cancel', module: 'Compras', description: `Cancelou Pedido de Compra ID ${id}. Motivo: ${reason || 'Não informado'}`, entityId: id });

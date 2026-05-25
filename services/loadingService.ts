@@ -170,6 +170,8 @@ export const loadingService = {
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS });
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOADINGS });
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_ENTRIES });
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PURCHASE_STATS });
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SALES_STATS });
   },
 
   reload: () => {
