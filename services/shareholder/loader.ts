@@ -21,7 +21,7 @@ export const loadFromSupabase = async (): Promise<Shareholder[]> => {
 
 export const getById = async (id: string): Promise<Shareholder | null> => {
   const [{ data: row, error }, { data: txRows, error: txErr }] = await Promise.all([
-    supabase.from('shareholders').select('*').eq('id', id).single(),
+    supabase.from('shareholders').select('*').eq('id', id).maybeSingle(),
     supabase.from('shareholder_transactions').select('*').eq('shareholder_id', id).order('date', { ascending: false }),
   ]);
 

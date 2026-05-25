@@ -52,13 +52,13 @@ export function useLoanDetails({ loan, onUpdate, onBack, addToast }: UseLoanDeta
       // Busca transações pela descrição (legado/fallback)
       const { data: keywordData } = await supabase
         .from('financial_transactions')
-        .select(`id, transaction_date, description, amount, account_id, type`)
+        .select(`id, transaction_date, description, amount, account_id, type, metadata`)
         .ilike('description', `%${loan.id}%`);
 
       // Busca transações via metadata loan_id
       const { data: metadataData } = await supabase
         .from('financial_transactions')
-        .select(`id, transaction_date, description, amount, account_id, type`)
+        .select(`id, transaction_date, description, amount, account_id, type, metadata`)
         .eq('metadata->>loan_id', loan.id);
 
       // Busca transações das entries (canônico)
@@ -66,7 +66,7 @@ export function useLoanDetails({ loan, onUpdate, onBack, addToast }: UseLoanDeta
       if (entryIds.length > 0) {
         const { data } = await supabase
           .from('financial_transactions')
-          .select(`id, transaction_date, description, amount, account_id, type`)
+          .select(`id, transaction_date, description, amount, account_id, type, metadata`)
           .in('entry_id', entryIds);
         entryData = data || [];
       }
@@ -81,7 +81,11 @@ export function useLoanDetails({ loan, onUpdate, onBack, addToast }: UseLoanDeta
         description: t.description,
         paidValue: Number(t.amount),
         bankAccount: t.account_id,
-        subType: t.type === 'credit' ? 'receipt' : 'admin'
+        subType: t.type === 'credit' ? 'receipt' : 'admin',
+        isDisbursement: !!t.metadata?.is_disbursement,
+        isReversal: !!t.metadata?.is_reversal,
+        reversesId: t.metadata?.reverses_id || null,
+        metadata: t.metadata
       })));
 
       // 2. BUSCA LEGADO (admin_expenses)
@@ -107,7 +111,18 @@ export function useLoanDetails({ loan, onUpdate, onBack, addToast }: UseLoanDeta
   }, [fetchHistory, txVersion]);
 
   const financialHistory = useMemo(() => {
-    return [...legacyTransactions, ...canonicalTransactions]
+    const list = [...legacyTransactions, ...canonicalTransactions];
+    
+    // Identifica transações que foram estornadas (revertidas)
+    const reversedIds = new Set(
+      list.map(t => t.reversesId).filter(Boolean)
+    );
+
+    return list
+      .map(t => ({
+        ...t,
+        isReversed: reversedIds.has(t.id)
+      }))
       .sort((a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime());
   }, [legacyTransactions, canonicalTransactions]);
 

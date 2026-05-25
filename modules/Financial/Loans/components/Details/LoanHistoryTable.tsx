@@ -48,24 +48,26 @@ const LoanHistoryTable: React.FC<Props> = ({
                     {isCredit ? '+' : '-'}{currency(record.paidValue || record.amount || 0)}
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <div className="inline-flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => onEdit(record)}
-                        className="p-2 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-100 transition-colors"
-                        aria-label="Editar lançamento"
-                      >
-                        <Pencil size={14} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onDelete(record)}
-                        className="p-2 rounded-lg border border-rose-100 text-rose-500 hover:bg-rose-50 transition-colors"
-                        aria-label="Excluir lançamento"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
+                    {!(record.isDisbursement || record.isReversal || record.isReversed || record.description?.startsWith('[ESTORNO]')) && (
+                      <div className="inline-flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => onEdit(record)}
+                          className="p-2 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-100 transition-colors"
+                          aria-label="Editar lançamento"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onDelete(record)}
+                          className="p-2 rounded-lg border border-rose-100 text-rose-500 hover:bg-rose-50 transition-colors"
+                          aria-label="Excluir lançamento"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               );

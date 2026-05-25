@@ -190,6 +190,19 @@ export const loansService = {
       })
       .eq('id', loanId);
     if (error) throw new Error(`Erro ao atualizar empréstimo: ${error.message}`);
+
+    // Se alterou valor principal ou data de início, sincroniza a transação de desembolso correspondente
+    if (updates.principal_amount !== undefined || updates.start_date !== undefined) {
+      const txUpdates: any = {};
+      if (updates.principal_amount !== undefined) txUpdates.amount = updates.principal_amount;
+      if (updates.start_date !== undefined) txUpdates.transaction_date = updates.start_date;
+
+      await supabase
+        .from('financial_transactions')
+        .update(txUpdates)
+        .eq('metadata->>loan_id', loanId)
+        .eq('metadata->>is_disbursement', 'true');
+    }
   },
 
   delete: async (loanId: string): Promise<void> => {
