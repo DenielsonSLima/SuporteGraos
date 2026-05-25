@@ -76,11 +76,17 @@ export const accountsService = {
     const VIRTUAL_ACCOUNT_ID = '97e8bd30-3ba1-4658-a51e-5df6ce184845';
     return (data ?? [])
       .map(mapRow)
-      .filter(a => 
-        a.id !== VIRTUAL_ACCOUNT_ID &&
-        !a.account_name.toLowerCase().includes('virtual') &&
-        !(a.owner || '').toLowerCase().includes('virtual')
-      );
+      .filter(a => {
+        const nameLower = a.account_name.toLowerCase();
+        const ownerLower = (a.owner || '').toLowerCase();
+        return a.id !== VIRTUAL_ACCOUNT_ID &&
+          !nameLower.includes('virtual') &&
+          !nameLower.includes('virtuais') &&
+          !nameLower.includes('ajuste') &&
+          !ownerLower.includes('virtual') &&
+          !ownerLower.includes('virtuais') &&
+          !ownerLower.includes('ajuste');
+      });
   },
 
   // LEITURA — todas (incluindo inativas) para Settings

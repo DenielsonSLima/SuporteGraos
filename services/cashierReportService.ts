@@ -83,7 +83,11 @@ export const cashierReportService = {
       
       return accId === VIRTUAL_ACCOUNT_ID || 
              accName.includes('virtual') || 
-             accOwner.includes('virtual');
+             accName.includes('virtuais') || 
+             accName.includes('ajuste') || 
+             accOwner.includes('virtual') || 
+             accOwner.includes('virtuais') || 
+             accOwner.includes('ajuste');
     };
 
     const rawBankBalances = report.bankBalances || [];
