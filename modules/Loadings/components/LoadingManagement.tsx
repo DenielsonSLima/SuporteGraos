@@ -107,6 +107,15 @@ const LoadingManagement: React.FC<Props> = ({ loading, onClose, onUpdate, origin
   };
 
   const handleSaveStructural = () => {
+    if (!editForm.salesOrderId) {
+      addToast('error', 'Falta Destino', 'Vincule um contrato de venda.');
+      return;
+    }
+    if (!editForm.isClientTransport && !editForm.driverId) {
+      addToast('error', 'Falta Logística', 'Selecione o motorista.');
+      return;
+    }
+
     const finalData = {
       ...editForm,
       freightBase: (freightBase === 'destination' ? 'Destino' : 'Origem') as Loading['freightBase'],

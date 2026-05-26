@@ -27,6 +27,18 @@ const LoadingStructuralInfo: React.FC<Props> = ({
     const labelClass = 'text-[9px] font-black text-slate-500 uppercase mb-1 block tracking-widest ml-0.5';
     const inputClass = 'w-full border-2 border-slate-200 bg-white px-2.5 py-1.5 text-slate-900 font-black focus:outline-none focus:border-blue-500 rounded-lg text-xs transition-all shadow-sm';
 
+    // CORREÇÃO DE FUSO HORÁRIO: Parse manual da string YYYY-MM-DD
+    const dateStr = (val: string) => {
+        if (!val) return '-';
+        if (val.includes('T')) return new Date(val).toLocaleDateString('pt-BR');
+        const parts = val.split('-');
+        if (parts.length === 3) {
+            const [year, month, day] = parts;
+            return `${day}/${month}/${year}`;
+        }
+        return new Date(val).toLocaleDateString('pt-BR');
+    };
+
     return (
         <div className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -52,6 +64,21 @@ const LoadingStructuralInfo: React.FC<Props> = ({
                                 <p className="font-black text-slate-800 text-base tracking-tighter">{currency(editForm.purchasePricePerSc)}</p>
                             )}
                         </div>
+                        <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 shadow-inner">
+                            <span className={labelClass}>Data do Carregamento</span>
+                            {isEditing ? (
+                                <input 
+                                    type="date" 
+                                    className={inputClass} 
+                                    value={editForm.date || ''} 
+                                    onChange={e => onUpdateForm({ date: e.target.value })} 
+                                />
+                            ) : (
+                                <p className="font-black text-slate-800 text-base tracking-tighter">
+                                    {dateStr(editForm.date)}
+                                </p>
+                            )}
+                        </div>
                         <div className="mt-[-8px]">
                             <span className={labelClass}>Gênero / Produto</span>
                             <p className="text-[9px] font-black text-slate-400 px-1 uppercase tracking-widest">{editForm.product}</p>
@@ -67,30 +94,79 @@ const LoadingStructuralInfo: React.FC<Props> = ({
                     </div>
                     {isEditing ? (
                         <div className="space-y-2">
+                            <label className="flex items-center gap-2 cursor-pointer group bg-slate-50 p-2 rounded-xl border border-slate-100 hover:border-blue-200 transition-all mb-2">
+                                <input
+                                    type="checkbox"
+                                    className="rounded border-slate-300 text-blue-600 focus:ring-0 cursor-pointer text-xs"
+                                    checked={editForm.isClientTransport || false}
+                                    onChange={e => {
+                                        const checked = e.target.checked;
+                                        if (checked) {
+                                            const sale = activeSales.find(s => s.id === editForm.salesOrderId);
+                                            onUpdateForm({
+                                                isClientTransport: true,
+                                                carrierId: sale?.customerId || '',
+                                                carrierName: sale ? `(FOB) ${sale.customerName}` : '',
+                                                freightPricePerTon: 0,
+                                                totalFreightValue: 0,
+                                                driverId: '',
+                                                driverName: ''
+                                            });
+                                        } else {
+                                            onUpdateForm({
+                                                isClientTransport: false,
+                                                carrierId: '',
+                                                carrierName: '',
+                                                driverId: '',
+                                                driverName: ''
+                                            });
+                                        }
+                                    }}
+                                />
+                                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Frete FOB (Cliente retira)</span>
+                            </label>
                             <div>
                                 <label className={labelClass}>Transportadora</label>
-                                <select className={inputClass} value={editForm.carrierId} onChange={e => { const c = allCarriers.find(x => x.id === e.target.value); onUpdateForm({ carrierId: e.target.value, carrierName: c?.name || '' }); }}>
-                                    {allCarriers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                <select 
+                                    className={inputClass} 
+                                    value={editForm.carrierId} 
+                                    onChange={e => { const c = allCarriers.find(x => x.id === e.target.value); onUpdateForm({ carrierId: e.target.value, carrierName: c?.name || '' }); }}
+                                    disabled={editForm.isClientTransport}
+                                >
+                                    {editForm.isClientTransport ? (
+                                        <option value={editForm.carrierId}>{editForm.carrierName || 'Transporte do Cliente (FOB)'}</option>
+                                    ) : (
+                                        <>
+                                            <option value="">Selecione...</option>
+                                            {allCarriers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                        </>
+                                    )}
                                 </select>
                             </div>
-                            <div>
-                                <label className={labelClass}>Motorista</label>
-                                <select className={inputClass} value={editForm.driverId} onChange={e => { const d = availableDrivers.find(x => x.id === e.target.value); onUpdateForm({ driverId: e.target.value, driverName: d?.name || '' }); }}>
-                                    <option value="">Selecione...</option>
-                                    {availableDrivers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                                </select>
-                            </div>
+                            {!editForm.isClientTransport && (
+                                <div>
+                                    <label className={labelClass}>Motorista</label>
+                                    <select className={inputClass} value={editForm.driverId} onChange={e => { const d = availableDrivers.find(x => x.id === e.target.value); onUpdateForm({ driverId: e.target.value, driverName: d?.name || '' }); }}>
+                                        <option value="">Selecione...</option>
+                                        {availableDrivers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                                    </select>
+                                </div>
+                            )}
                             <div>
                                 <label className={labelClass}>Placa</label>
-                                <input className={`${inputClass} uppercase`} value={editForm.vehiclePlate} onChange={e => onUpdateForm({ vehiclePlate: e.target.value })} />
+                                <input className={`${inputClass} uppercase`} value={editForm.vehiclePlate || ''} onChange={e => onUpdateForm({ vehiclePlate: e.target.value })} />
                             </div>
                         </div>
                     ) : (
                         <>
-                            <p className="font-black text-slate-900 text-sm truncate uppercase tracking-tighter leading-tight">{editForm.carrierName}</p>
-                            <p className="text-[10px] text-slate-500 mt-1 font-bold uppercase tracking-tight">{editForm.driverName}</p>
+                            <p className="font-black text-slate-900 text-sm truncate uppercase tracking-tighter leading-tight">
+                                {editForm.isClientTransport ? (editForm.carrierName || 'Frete FOB (Cliente retira)') : editForm.carrierName}
+                            </p>
+                            {!editForm.isClientTransport && editForm.driverName && (
+                                <p className="text-[10px] text-slate-500 mt-1 font-bold uppercase tracking-tight">{editForm.driverName}</p>
+                            )}
                             <div className="mt-3 inline-block px-3 py-1 bg-slate-900 text-white font-mono font-black rounded-lg text-xs tracking-[0.2em] shadow-md border border-slate-800">
-                                {editForm.vehiclePlate}
+                                {editForm.vehiclePlate || 'N/A'}
                             </div>
                         </>
                     )}

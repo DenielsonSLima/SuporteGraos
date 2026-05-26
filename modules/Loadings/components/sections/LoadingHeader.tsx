@@ -23,6 +23,18 @@ const LoadingHeader: React.FC<Props> = ({
     onFinalize,
     canFinalize
 }) => {
+    // CORREÇÃO DE FUSO HORÁRIO: Parse manual da string YYYY-MM-DD
+    const dateStr = (val: string) => {
+        if (!val) return '-';
+        if (val.includes('T')) return new Date(val).toLocaleDateString('pt-BR');
+        const parts = val.split('-');
+        if (parts.length === 3) {
+            const [year, month, day] = parts;
+            return `${day}/${month}/${year}`;
+        }
+        return new Date(val).toLocaleDateString('pt-BR');
+    };
+
     return (
         <div className={`px-4 py-2.5 flex justify-between items-center shrink-0 transition-all duration-500 ${isEditing ? 'bg-amber-600' : 'bg-slate-950'} shadow-md z-10`}>
             <div className="flex items-center gap-3">
@@ -39,7 +51,7 @@ const LoadingHeader: React.FC<Props> = ({
                         </span>
                         <span className="text-white/40 text-[9px]">•</span>
                         <p className="text-[9px] text-white/50 font-black uppercase tracking-widest">
-                            {new Date(loading.date).toLocaleDateString()} | {loading.vehiclePlate}
+                            {dateStr(loading.date)} | {loading.vehiclePlate}
                         </p>
                         {loading.status === 'completed' && (
                             <>
