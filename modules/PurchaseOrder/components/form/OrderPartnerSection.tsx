@@ -7,6 +7,8 @@ import { PARTNER_CATEGORY_IDS } from '../../../../constants';
 import { locationService } from '../../../../services/locationService';
 import QuickPartnerModal from '../../../Partners/components/QuickPartnerModal';
 
+const UF_LIST = locationService.ALL_STATES_LIST;
+
 interface Props {
   data: Partial<PurchaseOrder>;
   partners: Partner[]; 
@@ -232,6 +234,28 @@ const OrderPartnerSection: React.FC<Props> = ({ data, partners, onChange }) => {
               className={inputClass}
             />
           </div>
+        </div>
+
+        {/* UF Selector — always visible and editable */}
+        <div className="mt-6 pt-5 border-t-2 border-dashed border-slate-200">
+          <label className={labelClass}>UF de Origem (Estado)</label>
+          <div className="relative">
+            <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-500" size={18} />
+            <select
+              value={data.loadingState || ''}
+              onChange={(e) => onChange({ loadingState: e.target.value })}
+              className={`${inputClass} pl-12 pr-10 appearance-none cursor-pointer`}
+            >
+              <option value="">— Selecione o Estado —</option>
+              {UF_LIST.map(s => (
+                <option key={s.uf} value={s.uf}>{s.uf} — {s.name}</option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />
+          </div>
+          {!data.loadingState && data.partnerId && (
+            <p className="mt-2 text-[10px] font-bold text-amber-500 ml-1">⚠ Selecione o UF para melhorar a análise de Performance Geográfica</p>
+          )}
         </div>
       </div>
 

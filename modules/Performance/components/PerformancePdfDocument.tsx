@@ -2,7 +2,7 @@ import React from 'react';
 import { Document, Page, View, Text, Image, StyleSheet } from '@react-pdf/renderer';
 import { PerformanceReport } from '../types';
 import { settingsService } from '../../../services/settingsService';
-import { formatMoney, formatDecimal } from '../../../utils/formatters';
+import { formatMoney, formatDecimal, monthPtBr } from '../../../utils/formatters';
 
 interface Props {
   data: PerformanceReport;
@@ -273,7 +273,7 @@ const PerformancePdfDocument: React.FC<Props> = ({ data, periodLabel }) => {
             </View>
             {data.monthlyHistory.map((m) => (
               <View key={m.fullDate} style={styles.tableRow}>
-                <Text style={[styles.tableCell, { width: '20%' }]}>{m.name} {m.fullDate.split('-')[0]}</Text>
+                <Text style={[styles.tableCell, { width: '20%' }]}>{monthPtBr(m.name)} {m.fullDate.split('-')[0]}</Text>
                 <Text style={[styles.tableCell, { width: '20%', textAlign: 'right', color: '#047857' }]}>{formatMoney(m.revenue)}</Text>
                 <Text style={[styles.tableCell, { width: '20%', textAlign: 'right', color: '#b91c1c' }]}>{formatMoney(m.purchaseCost + m.freightCost)}</Text>
                 <Text style={[styles.tableCell, { width: '20%', textAlign: 'right', color: m.netResult >= 0 ? '#1d4ed8' : '#b91c1c' }]}>{formatMoney(m.netResult)}</Text>

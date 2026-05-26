@@ -1,9 +1,9 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Calendar, LayoutDashboard, Table, PieChart, Printer } from 'lucide-react';
 import { usePerformanceReport } from '../../hooks/usePerformance';
 import { PerformanceReport } from './types';
-import { formatMoney } from '../../utils/formatters';
+import { formatMoney, monthPtBr } from '../../utils/formatters';
 import FinancialKPIs from './components/FinancialKPIs';
 import OperationalStats from './components/OperationalStats';
 import EvolutionChart from './components/EvolutionChart';
@@ -17,10 +17,20 @@ import PerformancePdfModal from './components/PerformancePdfModal';
 
 const PerformanceModule: React.FC = () => {
   const [monthsBack, setMonthsBack] = useState<number | null>(6);
-  const { data, isLoading } = usePerformanceReport(monthsBack);
+  const { data: rawData, isLoading } = usePerformanceReport(monthsBack);
   const [isPdfOpen, setIsPdfOpen] = useState(false);
   const [pdfData, setPdfData] = useState<PerformanceReport | null>(null);
   const [pdfPeriodLabel, setPdfPeriodLabel] = useState('');
+
+  // Traduz nomes de meses EN → PT-BR em todos os arrays de histórico
+  const data = useMemo(() => {
+    if (!rawData) return null;
+    return {
+      ...rawData,
+      monthlyHistory: rawData.monthlyHistory.map(m => ({ ...m, name: monthPtBr(m.name) })),
+      priceTrendHistory: rawData.priceTrendHistory.map(m => ({ ...m, name: monthPtBr(m.name) })),
+    };
+  }, [rawData]);
 
   if (isLoading || !data) return <div className="p-10 text-center animate-pulse text-slate-400 font-black uppercase">Calculando Indicadores...</div>;
 

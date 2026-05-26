@@ -37,10 +37,17 @@ const HarvestBreakdown: React.FC<Props> = ({ harvests }) => {
               <tr><td colSpan={8} className="text-center py-10 text-slate-400 italic">Sem movimentação registrada no período.</td></tr>
             ) : (
               harvests.map((h) => (
-                <tr key={h.uf} className="hover:bg-slate-50 transition-colors">
+                <tr key={h.uf || 'N/I'} className="hover:bg-slate-50 transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-900 font-black">{h.uf}</div>
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-black ${
+                          !h.uf || h.uf === 'N/I' || h.uf === '' 
+                            ? 'bg-amber-100 text-amber-600' 
+                            : 'bg-slate-100 text-slate-900'
+                        }`}>{!h.uf || h.uf === 'N/I' || h.uf === '' ? '?' : h.uf}</div>
+                        {(!h.uf || h.uf === 'N/I' || h.uf === '') && (
+                          <span className="text-[10px] font-bold text-amber-500">Sem UF</span>
+                        )}
                     </div>
                   </td>
                   <td className="px-6 py-4 text-right text-slate-900">{formatInteger(h.volumeSc)}</td>

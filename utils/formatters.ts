@@ -74,6 +74,19 @@ export const formatInteger = (value: number | null | undefined): string => {
 };
 
 /**
+ * 🗓️ Traduz abreviação de mês (EN → PT-BR)
+ * Ex: "Jan" → "Jan", "Feb" → "Fev", "May" → "Mai", "Dec" → "Dez"
+ */
+const MONTH_PT: Record<string, string> = {
+  Jan: 'Jan', Feb: 'Fev', Mar: 'Mar', Apr: 'Abr',
+  May: 'Mai', Jun: 'Jun', Jul: 'Jul', Aug: 'Ago',
+  Sep: 'Set', Oct: 'Out', Nov: 'Nov', Dec: 'Dez',
+};
+
+export const monthPtBr = (name: string): string =>
+  MONTH_PT[name] ?? name;
+
+/**
  * 😷 Funções de Máscara para Inputs (Centavos Automáticos)
  */
 

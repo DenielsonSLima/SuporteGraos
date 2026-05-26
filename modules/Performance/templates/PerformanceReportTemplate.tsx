@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { PerformanceReport } from '../types';
-import { formatMoney } from '../../../utils/formatters';
+import { formatMoney, monthPtBr } from '../../../utils/formatters';
 import FinancialKPIs from '../components/FinancialKPIs';
 import OperationalStats from '../components/OperationalStats';
 import EvolutionChart from '../components/EvolutionChart';
@@ -123,7 +123,7 @@ const PerformanceReportTemplate: React.FC<Props> = ({ data, periodLabel }) => {
               <tbody className="divide-y divide-slate-50 font-bold">
                 {data.monthlyHistory.map(m => (
                   <tr key={m.fullDate}>
-                    <td className="px-4 py-2 font-black text-slate-800 uppercase">{m.name} {m.fullDate.split('-')[0]}</td>
+                    <td className="px-4 py-2 font-black text-slate-800 uppercase">{monthPtBr(m.name)} {m.fullDate.split('-')[0]}</td>
                     <td className="px-4 py-2 text-right text-emerald-700">{formatMoney(m.revenue)}</td>
                     <td className="px-4 py-2 text-right text-rose-700">{formatMoney(m.purchaseCost + m.freightCost)}</td>
                     <td className={`px-4 py-2 text-right font-black ${m.netResult >= 0 ? 'text-blue-700' : 'text-rose-700'}`}>{formatMoney(m.netResult)}</td>
