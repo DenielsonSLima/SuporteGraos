@@ -25,6 +25,7 @@ import { authService } from '../../services/authService';
 import { partnersService } from './partners.service';
 import { useQueryClient } from '@tanstack/react-query';
 import { QUERY_KEYS } from '../../hooks/queryKeys';
+import { financialRealtimeHub } from '../../services/financialRealtimeHub';
 
 const PartnersPage: React.FC = () => {
   const queryClient = useQueryClient();
@@ -103,14 +104,21 @@ const PartnersPage: React.FC = () => {
     return () => window.removeEventListener('app:navigate', handleGlobalNav);
   }, [partners]);
 
-  // ─── Listener de atualização financeira ─────────────────
+  // ─── Listener de atualização financeira e Realtime ─────────────────
   useEffect(() => {
     const handleFinancialUpdate = () => setBalancesTick(prev => prev + 1);
+    
+    // Escuta eventos locais
     window.addEventListener('financial:updated', handleFinancialUpdate);
     window.addEventListener('data:updated', handleFinancialUpdate);
+    
+    // Escuta realtime global (multi-usuário)
+    const unsubRealtime = financialRealtimeHub.subscribe(handleFinancialUpdate);
+
     return () => {
       window.removeEventListener('financial:updated', handleFinancialUpdate);
       window.removeEventListener('data:updated', handleFinancialUpdate);
+      unsubRealtime();
     };
   }, []);
 
