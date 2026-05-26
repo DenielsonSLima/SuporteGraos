@@ -86,8 +86,13 @@ const PdfDocument: React.FC<{ data: GeneratedReportData }> = ({ data }) => {
                       if (col.format === 'currency') {
                         cellValue = currency(val);
                       } else if (col.format === 'date') {
-                        const dateObj = new Date(val);
-                        cellValue = dateObj.toLocaleDateString('pt-BR');
+                        const pureDate = String(val).split('T')[0];
+                        const parts = pureDate.split('-');
+                        if (parts.length === 3 && parts[0].length === 4) {
+                          cellValue = `${parts[2]}/${parts[1]}/${parts[0]}`;
+                        } else {
+                          cellValue = new Date(val).toLocaleDateString('pt-BR');
+                        }
                       } else {
                         cellValue = String(val);
                       }

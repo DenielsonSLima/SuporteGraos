@@ -10,7 +10,18 @@ import { GeneratedReportData } from '../../types';
 
 const PdfDocument: React.FC<{ data: GeneratedReportData }> = ({ data }) => {
   const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
-  const date = (val: string) => new Date(val).toLocaleDateString('pt-BR');
+  const date = (val: string) => {
+    if (!val) return '-';
+    const pureDate = val.split('T')[0];
+    const parts = pureDate.split('-');
+    if (parts.length === 3) {
+      const [year, month, day] = parts;
+      if (year.length === 4) {
+        return `${day}/${month}/${year}`;
+      }
+    }
+    return new Date(val).toLocaleDateString('pt-BR');
+  };
 
   const totalPending = data.summary?.find(s => s.label.includes('Total a Pagar'))?.value || 0;
 

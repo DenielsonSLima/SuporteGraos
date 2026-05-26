@@ -9,7 +9,18 @@ interface Props {
 }
 
 const OrderObservationsCard: React.FC<Props> = ({ notes, onAddNote }) => {
-  const dateStr = (val: string) => new Date(val).toLocaleDateString('pt-BR');
+  const dateStr = (val: string) => {
+    if (!val) return '-';
+    const pureDate = val.split('T')[0];
+    const parts = pureDate.split('-');
+    if (parts.length === 3) {
+      const [year, month, day] = parts;
+      if (year.length === 4) {
+        return `${day}/${month}/${year}`;
+      }
+    }
+    return new Date(val).toLocaleDateString('pt-BR');
+  };
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col w-full">

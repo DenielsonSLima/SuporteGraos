@@ -112,12 +112,12 @@ export const cashierReportService = {
       .filter(isVirtualAccount)
       .reduce((sum: number, acc: any) => sum + (Number(acc.value || acc.balance) || 0), 0);
 
-    // Ajusta os totais e recalcula o patrimônio líquido real (netBalance) sem as contas de uso interno
-    const totalBankBalance = Math.max(0, (Number(report.totalBankBalance) || 0) - virtualBankBalanceSum);
-    const totalInitialMonthBalance = Math.max(0, (Number(report.totalInitialMonthBalance) || 0) - virtualInitialMonthSum);
-    const totalInitialBalance = Math.max(0, (Number(report.totalInitialBalance) || 0) - virtualInitialSum);
+    // Ajusta os totais e recalcula o patrimônio líquido real (netBalance) sem as contas de uso interno (permite valores negativos)
+    const totalBankBalance = (Number(report.totalBankBalance) || 0) - virtualBankBalanceSum;
+    const totalInitialMonthBalance = (Number(report.totalInitialMonthBalance) || 0) - virtualInitialMonthSum;
+    const totalInitialBalance = (Number(report.totalInitialBalance) || 0) - virtualInitialSum;
     
-    const totalAssets = Math.max(0, (Number(report.totalAssets) || 0) - virtualBankBalanceSum);
+    const totalAssets = (Number(report.totalAssets) || 0) - virtualBankBalanceSum;
     const totalLiabilities = Number(report.totalLiabilities) || 0;
     const netBalance = totalAssets - totalLiabilities;
 

@@ -25,7 +25,18 @@ const FreightSelectionModal: React.FC<Props> = ({
 }) => {
   
   const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
-  const date = (val: string) => new Date(val).toLocaleDateString('pt-BR');
+  const date = (val: string) => {
+    if (!val) return '-';
+    const pureDate = val.split('T')[0];
+    const parts = pureDate.split('-');
+    if (parts.length === 3) {
+      const [year, month, day] = parts;
+      if (year.length === 4) {
+        return `${day}/${month}/${year}`;
+      }
+    }
+    return new Date(val).toLocaleDateString('pt-BR');
+  };
 
   // Calcula o total apenas dos itens selecionados
   const totalSelected = freights

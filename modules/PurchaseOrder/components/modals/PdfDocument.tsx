@@ -26,9 +26,15 @@ const PdfDocument: React.FC<Props> = ({ order, loadings, variant, company, water
 
   const dateStr = (val: string) => {
     if (!val) return '-';
-    if (val.includes('T')) return new Date(val).toLocaleDateString('pt-BR');
-    const [year, month, day] = val.split('-');
-    return `${day}/${month}/${year}`;
+    const pureDate = val.split('T')[0];
+    const parts = pureDate.split('-');
+    if (parts.length === 3) {
+      const [year, month, day] = parts;
+      if (year.length === 4) {
+        return `${day}/${month}/${year}`;
+      }
+    }
+    return new Date(val).toLocaleDateString('pt-BR');
   };
 
   const formatDoc = (doc: string) => {

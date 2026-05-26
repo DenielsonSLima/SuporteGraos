@@ -64,7 +64,18 @@ const localStyles = StyleSheet.create({
 
 const PdfDocument: React.FC<{ data: GeneratedReportData }> = ({ data }) => {
     const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
-    const date = (val: string) => new Date(val + 'T12:00:00').toLocaleDateString('pt-BR');
+    const date = (val: string) => {
+    if (!val) return '-';
+    const pureDate = val.split('T')[0];
+    const parts = pureDate.split('-');
+    if (parts.length === 3) {
+      const [year, month, day] = parts;
+      if (year.length === 4) {
+        return `${day}/${month}/${year}`;
+      }
+    }
+    return new Date(val + 'T12:00:00').toLocaleDateString('pt-BR');
+  };
     const numberFormat = (val: number) => new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 }).format(val);
 
     const totalBruto = data.summary?.find(s => s.label.includes('Bruto'))?.value || 0;

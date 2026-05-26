@@ -13,8 +13,7 @@ const Filters: React.FC<Props> = ({ filters, onChange }) => {
   // Filtra contas virtuais e de sistema (não são contas bancárias reais)
   const accounts = allAccounts.filter(a =>
     !a.account_name.toLowerCase().includes('virtual') &&
-    !(a.owner || '').toLowerCase().includes('virtual') &&
-    !a.account_name.toLowerCase().includes('terceiros')
+    !(a.owner || '').toLowerCase().includes('virtual')
   );
 
   return (

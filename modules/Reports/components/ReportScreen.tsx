@@ -106,7 +106,19 @@ const ReportScreen: React.FC<Props> = ({ reportModule, reportId, onBack }) => {
   const formatValue = (value: any, type?: string) => {
     if (value === undefined || value === null) return '-';
     if (type === 'currency') return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(value) < 0.005 ? 0 : value);
-    if (type === 'date') return new Date(value).toLocaleDateString('pt-BR');
+    if (type === 'date') {
+      if (typeof value === 'string') {
+        const pureDate = value.split('T')[0];
+        const parts = pureDate.split('-');
+        if (parts.length === 3) {
+          const [year, month, day] = parts;
+          if (year.length === 4) {
+            return `${day}/${month}/${year}`;
+          }
+        }
+      }
+      return new Date(value).toLocaleDateString('pt-BR');
+    }
     if (type === 'number') return new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(value);
     return value;
   };

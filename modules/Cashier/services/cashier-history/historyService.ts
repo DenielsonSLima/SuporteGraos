@@ -29,7 +29,7 @@ const rpcToMonthlyReport = (rpc: any, year: number, month: number): MonthlyRepor
   const monthKey = rpc.monthKey ?? `${year}-${String(month).padStart(2, '0')}`;
   const endOfMonth = rpc.referenceDate ?? new Date(year, month, 0).toISOString().split('T')[0];
 
-  // ═══════════════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════════
   // REGRA DE OURO: CONTAS VIRTUAIS/INTERNAS NUNCA DEVEM IR PARA O CAIXA
   // ═══════════════════════════════════════════════════════════════════
   const VIRTUAL_ACCOUNT_ID = '97e8bd30-3ba1-4658-a51e-5df6ce184845';
@@ -67,15 +67,15 @@ const rpcToMonthlyReport = (rpc: any, year: number, month: number): MonthlyRepor
     .filter(isVirtualAccount)
     .reduce((sum: number, b: any) => sum + (Number(b.startBalance) || 0), 0);
 
-  // Ajusta os totais retroativos para manter consistência de matemática exibida na interface
-  const totalBankBalance = Math.max(0, (Number(rpc.totalBankBalance) || 0) - virtualBankBalanceSum);
-  const totalInitialBalance = Math.max(0, (Number(rpc.totalInitialBalance) || 0) - virtualStartBalanceSum);
+  // Ajusta os totais retroativos para manter consistência de matemática exibida na interface (permite valores negativos)
+  const totalBankBalance = (Number(rpc.totalBankBalance) || 0) - virtualBankBalanceSum;
+  const totalInitialBalance = (Number(rpc.totalInitialBalance) || 0) - virtualStartBalanceSum;
   
   const totalInitialMonthBalance = Number(rpc.totalInitialMonthBalance)
-    ? Math.max(0, Number(rpc.totalInitialMonthBalance) - virtualStartBalanceSum)
+    ? (Number(rpc.totalInitialMonthBalance) - virtualStartBalanceSum)
     : bankBalances.reduce((acc: number, b: any) => acc + (Number(b.startBalance) || 0), 0);
 
-  const totalAssets = Math.max(0, (Number(rpc.totalAssets) || 0) - virtualBankBalanceSum);
+  const totalAssets = (Number(rpc.totalAssets) || 0) - virtualBankBalanceSum;
   const totalLiabilities = Number(rpc.totalLiabilities) || 0;
   const netBalance = totalAssets - totalLiabilities;
 

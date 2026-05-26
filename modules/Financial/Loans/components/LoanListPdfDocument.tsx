@@ -339,8 +339,25 @@ const LoanListPdfDocument: React.FC<Props> = ({ loans, tab }) => {
   const currency = (val: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(!val || Math.abs(val) < 0.005 ? 0 : val);
 
-  const dateStr = (val: string) =>
-    new Date(val).toLocaleDateString('pt-BR');
+  const dateStr = (val: string) => {
+    if (!val) return '-';
+    const pureDate = val.split('T')[0];
+    const parts = pureDate.split('-');
+    if (parts.length === 3) {
+      const [year, month, day] = parts;
+      if (year.length === 4) {
+        return `${day}/${month}/${year}`;
+      }
+    }
+    const fallbackParts = pureDate.split(/[-/]/).map(Number);
+    if (fallbackParts.length === 3) {
+      const [year, month, day] = fallbackParts;
+      if (year && month && day) {
+        return new Date(year, month - 1, day).toLocaleDateString('pt-BR');
+      }
+    }
+    return new Date(val).toLocaleDateString('pt-BR');
+  };
 
   const titles: Record<string, string> = {
     all: 'Relatório de Empréstimos Ativos',

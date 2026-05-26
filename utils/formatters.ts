@@ -94,6 +94,17 @@ export const parseCurrencyInput = (value: string): number => {
  * Formatador de datas
  */
 export const formatDate = (date: string | Date): string => {
+  if (!date) return '-';
+  if (typeof date === 'string') {
+    const pureDate = date.split('T')[0];
+    const parts = pureDate.split('-');
+    if (parts.length === 3) {
+      const [year, month, day] = parts;
+      if (year.length === 4) {
+        return `${day}/${month}/${year}`;
+      }
+    }
+  }
   return new Date(date).toLocaleDateString('pt-BR');
 };
 

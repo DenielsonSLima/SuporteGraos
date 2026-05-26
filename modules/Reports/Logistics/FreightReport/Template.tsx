@@ -7,7 +7,18 @@ const Template: React.FC<{ data: GeneratedReportData }> = ({ data }) => {
   const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
   const number = (val: number) => new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(val);
   const numberInt = (val: number) => new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 }).format(val);
-  const date = (val: string) => new Date(val).toLocaleDateString('pt-BR');
+  const date = (val: string) => {
+    if (!val) return '-';
+    const pureDate = val.split('T')[0];
+    const parts = pureDate.split('-');
+    if (parts.length === 3) {
+      const [year, month, day] = parts;
+      if (year.length === 4) {
+        return `${day}/${month}/${year}`;
+      }
+    }
+    return new Date(val).toLocaleDateString('pt-BR');
+  };
 
   const totalCost = data.summary?.find(s => s.label.includes('Total Fretes'))?.value || 0;
   const totalVolume = data.summary?.find(s => s.label.includes('Total Volume'))?.value || 0;

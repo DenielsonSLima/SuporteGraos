@@ -25,6 +25,14 @@ const PdfDocument: React.FC<{ data: GeneratedReportData }> = ({ data }) => {
     const fmt = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
     const dt = (val: string) => {
         if (!val) return '-';
+        const pureDate = val.split('T')[0];
+        const parts = pureDate.split('-');
+        if (parts.length === 3) {
+            const [year, month, day] = parts;
+            if (year.length === 4) {
+                return `${day}/${month}/${year}`;
+            }
+        }
         return new Date((val.length <= 10 ? val + 'T12:00:00' : val)).toLocaleDateString('pt-BR');
     };
     const num = (val: number | null) => val != null ? new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 }).format(val) : '-';
