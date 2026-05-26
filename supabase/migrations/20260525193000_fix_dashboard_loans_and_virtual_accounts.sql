@@ -286,6 +286,10 @@ BEGIN
       hist AS (
         SELECT mg.i, 
                mg.month_name, 
+               COALESCE((SELECT SUM(amount) FROM financial_transactions WHERE company_id = $1 AND lower(type) IN ('in', 'credit') AND transfer_id IS NULL AND date_trunc('month', transaction_date) = mg.month_start), 0) AS recebido,
+               GREATEST(rh.pending_receivables, 0) AS a_receber,
+               COALESCE((SELECT SUM(amount) FROM financial_transactions WHERE company_id = $1 AND lower(type) IN ('out', 'debit') AND transfer_id IS NULL AND date_trunc('month', transaction_date) = mg.month_start), 0) AS pago,
+               GREATEST(ph.pending_payables, 0) AS a_pagar,
                GREATEST(bh.bank_assets + rh.pending_receivables + th.transit_value + ah.fixed_assets + lh.loans_granted + adh.advances_given, 0) AS assets, 
                (GREATEST(ph.pending_payables, 0) + lh.loans_taken + adh.advances_taken) AS liabilities, 
                (GREATEST(bh.bank_assets + rh.pending_receivables + th.transit_value + ah.fixed_assets + lh.loans_granted + adh.advances_given, 0) - (GREATEST(ph.pending_payables, 0) + lh.loans_taken + adh.advances_taken)) AS net_worth 
@@ -298,8 +302,22 @@ BEGIN
         JOIN loans_history lh ON lh.i = mg.i
         JOIN advances_history adh ON adh.i = mg.i
       ),
-      hist_with_change AS (SELECT i, month_name, assets, liabilities, net_worth, COALESCE(CASE WHEN LAG(net_worth) OVER (ORDER BY i DESC) = 0 THEN 0 ELSE ((net_worth - LAG(net_worth) OVER (ORDER BY i DESC)) / ABS(LAG(net_worth) OVER (ORDER BY i DESC))) * 100 END, 0) AS monthly_change FROM hist)
-      SELECT json_agg(json_build_object('name', month_name, 'netWorth', net_worth, 'assets', assets, 'liabilities', liabilities, 'monthlyChange', monthly_change) ORDER BY i DESC)
+      hist_with_change AS (
+        SELECT i, month_name, recebido, a_receber, pago, a_pagar, assets, liabilities, net_worth, 
+               COALESCE(CASE WHEN LAG(net_worth) OVER (ORDER BY i DESC) = 0 THEN 0 ELSE ((net_worth - LAG(net_worth) OVER (ORDER BY i DESC)) / ABS(LAG(net_worth) OVER (ORDER BY i DESC))) * 100 END, 0) AS monthly_change 
+        FROM hist
+      )
+      SELECT json_agg(json_build_object(
+        'name', month_name, 
+        'netWorth', net_worth, 
+        'assets', assets, 
+        'liabilities', liabilities, 
+        'recebido', recebido,
+        'aReceber', a_receber,
+        'pago', pago,
+        'aPagar', a_pagar,
+        'monthlyChange', monthly_change
+      ) ORDER BY i DESC)
       FROM hist_with_change
     $dyn$, v_loading_source) INTO v_history USING p_company_id;
   ELSE

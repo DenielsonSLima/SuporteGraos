@@ -224,6 +224,10 @@ export const dashboardService = {
           .on('postgres_changes', { event: '*', schema: 'public', table: 'ops_loadings' }, invalidate)
           .on('postgres_changes', { event: '*', schema: 'public', table: 'ops_purchase_orders' }, invalidate)
           .on('postgres_changes', { event: '*', schema: 'public', table: 'ops_sales_orders' }, invalidate)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'loans' }, invalidate)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'advances' }, invalidate)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'shareholders' }, invalidate)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'assets' }, invalidate)
           .subscribe();
       }
 

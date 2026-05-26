@@ -113,14 +113,20 @@ export const financialTransactionsService = {
   ): Promise<FinancialTransaction[]> => {
     const { data, error } = await supabase
       .from('financial_transactions')
-      .select('*')
+      .select('*, financial_entries (status)')
       .gte('transaction_date', startDate)
       .lte('transaction_date', endDate)
       .order('transaction_date', { ascending: false });
 
     if (error)
       throw new Error(`Erro ao buscar transações: ${error.message}`);
-    return (data ?? []).map(mapRow);
+
+    const filtered = (data ?? []).filter((row: any) => {
+      const entryStatus = row.financial_entries?.status;
+      return !entryStatus || !['cancelled', 'canceled'].includes(entryStatus);
+    });
+
+    return filtered.map(mapRow);
   },
 
   // LEITURA — Resumo: totais de créditos e débitos por conta
