@@ -3,6 +3,7 @@ import React from 'react';
 import { ShoppingBag, Search, ChevronDown, CheckCircle2, X, UserCheck } from 'lucide-react';
 import { SalesOrder } from '../../SalesOrder/types';
 import { Loading } from '../../types';
+import { formatCurrencyMask, parseCurrencyInput } from '../../../../utils/formatters';
 
 interface Props {
     formData: Partial<Loading>;
@@ -108,26 +109,51 @@ const LoadingFormDestination: React.FC<Props> = ({
             </div>
 
             {formData.salesOrderId && !isSalesDropdownOpen && (
-                <div className="mt-3 p-3 bg-emerald-50 rounded-xl border border-emerald-100 flex items-center justify-between animate-in zoom-in-95 duration-500 shadow-sm">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-emerald-500 rounded-lg text-white shadow-lg shadow-emerald-500/20">
-                            <CheckCircle2 size={16} />
+                <div className="mt-3 p-4 bg-emerald-50 rounded-xl border border-emerald-100 flex flex-col gap-4 animate-in zoom-in-95 duration-500 shadow-sm">
+                    <div className="flex items-center justify-between w-full">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-emerald-500 rounded-lg text-white shadow-lg shadow-emerald-500/20">
+                                <CheckCircle2 size={16} />
+                            </div>
+                            <div>
+                                <p className="text-[8px] font-black text-emerald-900 uppercase tracking-tighter leading-none mb-0.5 shadow-emerald-500">Contrato Vinculado com Sucesso</p>
+                                <p className="text-xs font-black text-emerald-700 tracking-tight">
+                                    {formData.customerName} {formData.customerNickname && <span className="text-emerald-500 text-[10px]">({formData.customerNickname})</span>}
+                                </p>
+                            </div>
                         </div>
-                        <div>
-                            <p className="text-[8px] font-black text-emerald-900 uppercase tracking-tighter leading-none mb-0.5 shadow-emerald-500">Contrato Vinculado com Sucesso</p>
-                            <p className="text-xs font-black text-emerald-700 tracking-tight">
-                                {formData.customerName} {formData.customerNickname && <span className="text-emerald-500 text-[10px]">({formData.customerNickname})</span>}
-                                <span className="mx-2 opacity-30">|</span> Preço Venda: {currency(formData.salesPrice || 0)}
-                            </p>
+                        <button
+                            type="button"
+                            onClick={() => { onSetFormData({ salesOrderId: '', customerName: '', customerNickname: '', salesPrice: 0 }); onSetSalesSearch(''); }}
+                            className="p-2 bg-white text-emerald-400 hover:text-rose-500 hover:bg-rose-50 transition-all rounded-lg border border-emerald-100 hover:border-rose-100 active:scale-95 shadow-sm"
+                        >
+                            <X size={14} />
+                        </button>
+                    </div>
+
+                    <div className="border-t border-emerald-100/70 pt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-4 w-full">
+                        <div className="flex items-center gap-3">
+                            <label className="text-[10px] font-black text-emerald-800 uppercase tracking-widest block whitespace-nowrap">Preço Venda (R$/SC)</label>
+                            <div className="relative w-36">
+                                <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    className="w-full rounded-xl border-2 border-emerald-200 bg-white px-3 py-1.5 pl-8 text-emerald-700 font-black focus:border-emerald-500 outline-none transition-all text-xs text-right shadow-sm"
+                                    value={formatCurrencyMask(formData.salesPrice)}
+                                    onChange={e => onSetFormData({ salesPrice: parseCurrencyInput(e.target.value) })}
+                                />
+                                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-emerald-400 uppercase tracking-widest pointer-events-none">
+                                    R$
+                                </div>
+                            </div>
+                        </div>
+                        <div className="text-right flex items-center justify-end gap-2">
+                            <span className="text-[9px] font-black text-emerald-800/60 uppercase tracking-widest block">Faturamento Estimado:</span>
+                            <span className="text-sm font-black text-emerald-900 tracking-tighter">
+                                {currency(formData.totalSalesValue || 0)}
+                            </span>
                         </div>
                     </div>
-                    <button
-                        type="button"
-                        onClick={() => { onSetFormData({ salesOrderId: '', customerName: '', customerNickname: '' }); onSetSalesSearch(''); }}
-                        className="p-2 bg-white text-emerald-400 hover:text-rose-500 hover:bg-rose-50 transition-all rounded-lg border border-emerald-100 hover:border-rose-100 active:scale-95 shadow-sm"
-                    >
-                        <X size={14} />
-                    </button>
                 </div>
             )}
         </div>

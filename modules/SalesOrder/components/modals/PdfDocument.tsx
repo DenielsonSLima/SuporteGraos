@@ -540,46 +540,50 @@ const PdfDocument: React.FC<Props> = ({ order, loadings, variant, company, water
 
         <View style={styles.table}>
           <View style={styles.tableHeader}>
-            <Text style={[styles.tableHeaderCell, { width: '14%' }]}>Data</Text>
-            <Text style={[styles.tableHeaderCell, { width: '12%' }]}>NF / Doc.</Text>
-            <Text style={[styles.tableHeaderCell, { width: '22%' }]}>Transportadora / Motorista</Text>
+            <Text style={[styles.tableHeaderCell, { width: '12%' }]}>Data</Text>
+            <Text style={[styles.tableHeaderCell, { width: '10%' }]}>NF / Doc.</Text>
+            <Text style={[styles.tableHeaderCell, { width: '20%' }]}>Transportadora / Motorista</Text>
             <Text style={[styles.tableHeaderCell, { width: '10%', textAlign: 'right' }]}>Peso Orig.</Text>
             <Text style={[styles.tableHeaderCell, { width: '10%', textAlign: 'right' }]}>Peso Dest.</Text>
-            <Text style={[styles.tableHeaderCell, { width: '10%', textAlign: 'right' }]}>Quebra KG</Text>
+            <Text style={[styles.tableHeaderCell, { width: '8%', textAlign: 'right' }]}>Quebra KG</Text>
             <Text style={[styles.tableHeaderCell, { width: '10%', textAlign: 'right' }]}>Volume SC</Text>
-            <Text style={[styles.tableHeaderCell, { width: '12%', textAlign: 'right' }]}>Total</Text>
+            <Text style={[styles.tableHeaderCell, { width: '10%', textAlign: 'right' }]}>Preço Unit.</Text>
+            <Text style={[styles.tableHeaderCell, { width: '10%', textAlign: 'right' }]}>Total</Text>
           </View>
 
           {stats.activeLoadings.map((l, idx) => {
             const isDelivered = Number(l?.unloadWeightKg) > 0;
             const weight = isDelivered ? Number(l?.unloadWeightKg) || 0 : Number(l?.weightKg) || 0;
             const breakage = isDelivered ? Math.max(0, (Number(l?.weightKg) || 0) - (Number(l?.unloadWeightKg) || 0)) : 0;
-            const totalLine = (weight / 60) * (Number(l?.salesPrice) || Number(order?.unitPrice) || 0);
+            const unitPrice = Number(l?.salesPrice) || Number(order?.unitPrice) || 0;
+            const totalLine = (weight / 60) * unitPrice;
 
             return (
               <View key={l.id || idx} style={[styles.tableRow, idx % 2 === 0 ? undefined : styles.tableRowOdd]}>
-                <View style={{ width: '14%' }}>
+                <View style={{ width: '12%' }}>
                   <Text style={styles.tableCell}>{dateStr(l.date)}</Text>
                 </View>
-                <Text style={[styles.tableCell, { width: '12%', color: '#64748b' }]}>NF-{l.invoiceNumber || '---'}</Text>
-                <View style={{ width: '22%' }}>
+                <Text style={[styles.tableCell, { width: '10%', color: '#64748b' }]}>NF-{l.invoiceNumber || '---'}</Text>
+                <View style={{ width: '20%' }}>
                   <Text style={styles.tableCell}>{l.carrierName || '-'}</Text>
                   <Text style={styles.tableCellMuted}>{l.driverName || '-'}</Text>
                 </View>
                 <Text style={[styles.tableCell, { width: '10%', textAlign: 'right', color: '#94a3b8' }]}> {num(l.weightKg, 0)} </Text>
                 <Text style={[styles.tableCell, { width: '10%', textAlign: 'right', color: '#047857' }]}> {isDelivered ? num(Number(l.unloadWeightKg) || 0, 0) : 'TRANSITO'} </Text>
-                <Text style={[styles.tableCell, { width: '10%', textAlign: 'right', color: breakage > 50 ? '#e11d48' : '#cbd5f1' }]}> {breakage > 0 ? num(breakage, 0) : '-'} </Text>
+                <Text style={[styles.tableCell, { width: '8%', textAlign: 'right', color: breakage > 50 ? '#e11d48' : '#cbd5f1' }]}> {breakage > 0 ? num(breakage, 0) : '-'} </Text>
                 <Text style={[styles.tableCell, { width: '10%', textAlign: 'right' }]}> {num(weight / 60, 2)} </Text>
-                <Text style={[styles.tableCell, { width: '12%', textAlign: 'right' }]}> {currency(totalLine)} </Text>
+                <Text style={[styles.tableCell, { width: '10%', textAlign: 'right', color: '#047857' }]}> {currency(unitPrice)} </Text>
+                <Text style={[styles.tableCell, { width: '10%', textAlign: 'right' }]}> {currency(totalLine)} </Text>
               </View>
             );
           })}
 
           <View style={styles.tableTotalRow}>
-            <Text style={[styles.tableCell, { width: '58%', textAlign: 'right' }]}>Totais consolidados confirmados:</Text>
-            <Text style={[styles.tableCell, { width: '10%', textAlign: 'right', color: '#e11d48' }]}> {num(stats.totalBreakageKg, 0)} KG</Text>
+            <Text style={[styles.tableCell, { width: '62%', textAlign: 'right' }]}>Totais consolidados confirmados:</Text>
+            <Text style={[styles.tableCell, { width: '8%', textAlign: 'right', color: '#e11d48' }]}> {num(stats.totalBreakageKg, 0)} KG</Text>
             <Text style={[styles.tableCell, { width: '10%', textAlign: 'right' }]}> {num(stats.totalDeliveredSc, 2)} SC</Text>
-            <Text style={[styles.tableCell, { width: '12%', textAlign: 'right', color: '#065f46' }]}> {currency(stats.totalInvoiced)} </Text>
+            <Text style={[styles.tableCell, { width: '10%', textAlign: 'right' }]}></Text>
+            <Text style={[styles.tableCell, { width: '10%', textAlign: 'right', color: '#065f46' }]}> {currency(stats.totalInvoiced)} </Text>
           </View>
         </View>
 

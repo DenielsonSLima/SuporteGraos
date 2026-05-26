@@ -84,7 +84,7 @@ const LoadingFormLogistics: React.FC<Props> = ({
                             });
                         }}
                         disabled={isLoadingDrivers}
-                        required
+                        required={!formData.isClientTransport}
                     >
                         <option value="">{isLoadingDrivers ? 'Buscando motoristas...' : 'Selecione o profissional...'}</option>
                         {availableDrivers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}

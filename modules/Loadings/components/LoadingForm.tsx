@@ -149,7 +149,7 @@ const LoadingForm: React.FC<Props> = ({ purchaseOrder, onSave, onClose }) => {
     if (isSubmitting) return;
 
     if (!formData.salesOrderId) return addToast('error', 'Falta Destino', 'Vincule um pedido de venda.');
-    if (!formData.driverId) return addToast('error', 'Falta Logística', 'Selecione o motorista.');
+    if (!formData.isClientTransport && !formData.driverId) return addToast('error', 'Falta Logística', 'Selecione o motorista.');
     if (!formData.weightKg || formData.weightKg <= 0) return addToast('error', 'Peso Inválido');
     if (!formData.purchasePricePerSc || formData.purchasePricePerSc <= 0) {
       return addToast('error', 'Preço Obrigatório', 'Informe o custo unitário de compra.');
@@ -157,15 +157,20 @@ const LoadingForm: React.FC<Props> = ({ purchaseOrder, onSave, onClose }) => {
 
     setIsSubmitting(true);
     try {
+      const weight = Number(formData.weightKg) || 0;
+      const isFob = !!formData.isClientTransport;
+
       const loadingData: Loading = {
         ...formData,
         id: formData.id || generateUUID(),
         date: formData.date || getLocalDate(),
         purchaseOrderId: purchaseOrder.id,
         salesOrderId: formData.salesOrderId || '',
-        weightKg: Number(formData.weightKg) || 0,
-        weightTon: (Number(formData.weightKg) || 0) / 1000,
-        weightSc: (Number(formData.weightKg) || 0) / 60,
+        weightKg: weight,
+        weightTon: weight / 1000,
+        weightSc: weight / 60,
+        unloadWeightKg: isFob ? weight : formData.unloadWeightKg,
+        status: isFob ? 'completed' : (formData.status || 'in_transit'),
         totalPurchaseValue: Number(formData.totalPurchaseValue) || 0,
         totalSalesValue: Number(formData.totalSalesValue) || 0,
         totalFreightValue: Number(formData.totalFreightValue) || 0,
