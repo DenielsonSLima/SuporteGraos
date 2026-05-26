@@ -1,53 +1,89 @@
-
 import React from 'react';
-import { Users } from 'lucide-react';
+import { Users, Play, Edit, Trash2, Link } from 'lucide-react';
 import { SectionTitle, GoldenRule, FieldTable, SubModule, ExampleBox, WarningBox, InfoBox } from '../HelpSharedComponents';
 
 export const HelpPartners: React.FC = () => (
-    <div className="animate-in fade-in slide-in-from-bottom-4">
+    <div className="animate-in fade-in slide-in-from-bottom-4 space-y-6">
         <SectionTitle title="Gestão de Parceiros" icon={Users} />
+        
         <p className="text-slate-600 mb-6 leading-relaxed font-medium">
-            Centralize todos os stakeholders da sua cadeia: produtores rurais, clientes (indústrias),
-            transportadoras e corretores. Um parceiro pode ter múltiplas categorias simultâneas.
+            Centralize todos os stakeholders da sua cadeia comercial: produtores rurais, clientes (indústrias/compradores),
+            transportadoras e corretores de grãos. O sistema permite que um mesmo parceiro pertença a múltiplas categorias.
         </p>
 
-        <GoldenRule text="Cadastre o parceiro ANTES de criar pedidos. O sistema só permite vincular parceiros já cadastrados nas telas de Compra, Venda e Logística." />
+        <GoldenRule text="Cadastre o parceiro ANTES de operar outros módulos. O sistema exige a vinculação de parceiros pré-cadastrados para garantir a consistência das faturas e contratos." />
 
-        <h3 className="font-black text-slate-800 uppercase text-xs tracking-widest mb-4">Campos do Formulário de Cadastro</h3>
+        {/* COMO LANÇAR / CADASTRAR */}
+        <div className="bg-slate-50 border border-slate-200 p-6 rounded-3xl">
+            <h4 className="font-black text-slate-800 text-xs uppercase mb-4 flex items-center gap-2">
+                <Play size={16} className="text-emerald-600" />
+                Como Cadastrar um Parceiro
+            </h4>
+            <div className="text-xs text-slate-600 space-y-3 font-medium">
+                <p>1. Acesse o menu <strong>Parceiros</strong> no painel lateral.</p>
+                <p>2. Clique no botão <strong>+ Novo Parceiro</strong> no canto superior direito.</p>
+                <p>3. Selecione o tipo de pessoa (**Jurídica** ou **Física**).</p>
+                <p>4. Insira o documento (CNPJ ou CPF). Caso seja Jurídica, você pode digitar o CNPJ e clicar em **Consultar** para preencher os dados automaticamente via ReceitaWS.</p>
+                <p>5. Marque as **Categorias** do parceiro (ex: Produtor Rural, Cliente, Transportadora). *Atenção: É obrigatório selecionar pelo menos uma.*</p>
+                <p>6. Preencha o Nome/Razão Social, Apelido, Telefone e Endereço, e clique em **Salvar**.</p>
+            </div>
+        </div>
+
+        {/* COMO EDITAR */}
+        <div className="bg-slate-50 border border-slate-200 p-6 rounded-3xl">
+            <h4 className="font-black text-slate-800 text-xs uppercase mb-4 flex items-center gap-2">
+                <Edit size={16} className="text-amber-600" />
+                Como Editar Dados do Parceiro
+            </h4>
+            <div className="text-xs text-slate-600 space-y-3 font-medium">
+                <p>1. Localize o parceiro na listagem (use a busca por nome ou filtros de categoria).</p>
+                <p>2. Clique no botão de **Lápis (Editar)** no card do parceiro.</p>
+                <p>3. Altere as informações de cadastro, categorias ou dados de contato/endereço e clique em **Salvar**.</p>
+                <p className="text-amber-700 italic">
+                    💡 Dica: Você pode ativar ou inativar o parceiro diretamente pelo botão tipo interruptor (switch) no card, suspendendo novos lançamentos sem perder o histórico do parceiro.
+                </p>
+            </div>
+        </div>
+
+        {/* COMO APAGAR */}
+        <div className="bg-slate-50 border border-slate-200 p-6 rounded-3xl">
+            <h4 className="font-black text-slate-800 text-xs uppercase mb-4 flex items-center gap-2">
+                <Trash2 size={16} className="text-rose-600" />
+                Como Apagar Parceiros (Regra de Exclusão Segura)
+            </h4>
+            <div className="text-xs text-slate-600 space-y-3 font-medium">
+                <p>• Para remover um parceiro, localize-o na listagem e clique no botão de **Lixeira (Excluir)**.</p>
+                <p className="text-rose-700 font-bold">
+                    ⚠ REGRA DE INTEGRIDADE: O sistema bloqueia a exclusão física de parceiros que já possuem qualquer vínculo com Pedidos de Compra, Pedidos de Venda ou Cargas na Logística. Isso evita a quebra de dados históricos e relatórios DRE. Nesses casos, a alternativa correta é apenas **Inativar** o parceiro.
+                </p>
+            </div>
+        </div>
+
+        {/* INTERLIGAÇÃO */}
+        <div className="bg-slate-50 border border-slate-200 p-6 rounded-3xl">
+            <h4 className="font-black text-slate-800 text-xs uppercase mb-4 flex items-center gap-2">
+                <Link size={16} className="text-indigo-600" />
+                Interligação e Impactos no Sistema
+            </h4>
+            <p className="text-xs text-slate-600 leading-relaxed font-medium">
+                A categoria selecionada determina onde o parceiro aparecerá nas outras telas:
+            </p>
+            <ul className="text-xs text-slate-600 list-disc pl-5 space-y-1 mt-2 font-medium">
+                <li><strong>Produtor Rural:</strong> Habilita o parceiro para ser selecionado como vendedor em **Pedidos de Compra**.</li>
+                <li><strong>Cliente / Indústria:</strong> Habilita o parceiro como comprador em **Pedidos de Venda**.</li>
+                <li><strong>Transportadora:</strong> Habilita o parceiro na seleção de transporte na **Logística** e libera a tela de detalhes de transportadora (para cadastrar **Motoristas** e **Veículos** da frota).</li>
+                <li><strong>Corretor:</strong> Habilita a vinculação de taxas de corretagem em contratos comerciais.</li>
+            </ul>
+        </div>
+
         <FieldTable fields={[
             { campo: 'Tipo Pessoa', tipo: 'PJ / PF', obs: 'Pessoa Jurídica (CNPJ) ou Física (CPF)' },
-            { campo: 'Documento', tipo: 'CNPJ ou CPF', obs: 'Validado automaticamente. Opção "Não informado" para estrangeiros' },
-            { campo: 'Categorias', tipo: 'Multi-seleção', obs: 'OBRIGATÓRIO ao menos 1: Produtor Rural, Cliente, Transportadora, Corretor, etc.' },
-            { campo: 'Razão Social / Nome', tipo: 'Texto', obs: 'Nome oficial do parceiro' },
-            { campo: 'Nome Fantasia', tipo: 'Texto', obs: 'Apenas para PJ — nome comercial' },
-            { campo: 'Apelido', tipo: 'Texto', obs: 'Nome curto para uso interno (ex: "Seu João da Fazenda")' },
-            { campo: 'Telefone', tipo: 'Telefone', obs: 'Contato principal' },
-            { campo: 'E-mail', tipo: 'E-mail', obs: 'Para comunicação' },
-            { campo: 'Endereço', tipo: 'CEP + Rua + Nº + Bairro + Cidade + UF', obs: 'Preenchimento automático pelo CEP' },
+            { campo: 'Documento', tipo: 'CNPJ ou CPF', obs: 'Validado automaticamente. Opção "Não informado" para parceiros sem documento local' },
+            { campo: 'Categorias', tipo: 'Multi-seleção', obs: 'Produtor Rural, Cliente, Transportadora, Corretor (pode marcar mais de uma)' },
+            { campo: 'Nome / Razão Social', tipo: 'Texto', obs: 'Razão social oficial (CNPJ) ou Nome Civil (CPF)' },
+            { campo: 'Apelido', tipo: 'Texto', obs: 'Nome curto amigável exibido nas tabelas rápidas do sistema' },
         ]} />
 
-        <SubModule name="Busca Inteligente por CNPJ (ReceitaWS)" desc="Ao cadastrar um PJ, digite o CNPJ e clique em 'Consultar'. O sistema busca na ReceitaWS e preenche automaticamente: Razão Social, Nome Fantasia, Endereço completo, Telefone e E-mail. Isso evita erros de digitação." />
-
-        <ExampleBox title="Exemplo Prático: Cadastrando um Produtor">
-            <p>1. Clique em <strong>+ Novo Parceiro</strong></p>
-            <p>2. Selecione <strong>Pessoa Física</strong></p>
-            <p>3. Digite o CPF: <strong>123.456.789-00</strong></p>
-            <p>4. Categoria: marque <strong>Produtor Rural</strong></p>
-            <p>5. Nome: <strong>João da Silva</strong></p>
-            <p>6. Apelido: <strong>Seu João</strong></p>
-            <p>7. Endereço: Fazenda Boa Vista, Rio Verde - GO</p>
-            <p>8. Clique <strong>Salvar</strong></p>
-            <p className="mt-2 text-blue-700 italic">→ Agora "Seu João" aparecerá como opção ao criar Pedidos de Compra.</p>
-        </ExampleBox>
-
-        <SubModule name="Ficha 360° (Dossiê)" desc="No card de cada parceiro, clique no ícone de impressora. Será gerado um PDF com: dados cadastrais, histórico completo de compras, vendas, fretes e saldo financeiro atualizado." />
-
-        <SubModule name="Sub-módulo: Motoristas" desc="Ao acessar o detalhe de uma Transportadora, há a seção de Motoristas. Cadastre nome, CPF, CNH (número e categoria) e vincule a Veículos (placa, modelo, cor). Isso cria 'Conjuntos' usados no lançamento de cargas." />
-
-        <SubModule name="Sub-módulo: Veículos" desc="Cadastre a frota da transportadora: placa, marca, modelo, cor e ano. Vincule motoristas aos veículos para agilizar o preenchimento de cargas na Logística." />
-
-        <WarningBox text="Cada CNPJ/CPF é único no sistema. Se tentar cadastrar um documento que já existe, o sistema bloqueará e mostrará o parceiro existente." />
-
-        <InfoBox text="Um mesmo parceiro pode ser simultaneamente Produtor e Cliente. Basta marcar ambas as categorias. Ele aparecerá nas telas de compra E de venda." />
+        <InfoBox text="Ao inativar um parceiro, ele deixa de aparecer nos seletores de novos contratos e novas cargas, mas todas as faturas e relatórios antigos dele permanecem preservados no Caixa e no DRE." />
     </div>
 );
