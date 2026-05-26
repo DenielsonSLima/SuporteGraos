@@ -4,13 +4,14 @@
 // Responsabilidade: gerenciar estado, fluxo e coordenar componentes filhos.
 // ============================================================================
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import PartnerFilters from './components/PartnerFilters';
 import PartnerList from './components/PartnerList';
 import PartnerFormAdd from './components/PartnerFormAdd';
 import PartnerFormEdit from './components/PartnerFormEdit';
 import PartnerPdfModal from './components/modals/PartnerPdfModal';
 import AllPartnersPdfModal from './components/modals/AllPartnersPdfModal';
+import PartnerKpis from './components/PartnerKpis';
 import PartnerDeleteModal from './components/modals/PartnerDeleteModal';
 import CarrierDetails from './submodules/Carriers/CarrierDetails';
 import BrokerDetails from './submodules/Brokers/BrokerDetails';
@@ -67,6 +68,20 @@ const PartnersPage: React.FC = () => {
   const totalCount = data?.count || 0;
 
   const { partnerBalances, savePartnerAddress } = usePartnersModule({ partners, balancesTick });
+
+  const totals = useMemo(() => {
+    let totalReceivable = 0;
+    let totalPayable = 0;
+    Object.values(partnerBalances).forEach(b => {
+      totalReceivable += b.credit;
+      totalPayable += b.debit;
+    });
+    return {
+      totalReceivable,
+      totalPayable,
+      netBalance: totalReceivable - totalPayable
+    };
+  }, [partnerBalances]);
 
   // ─── Navegação global via evento ────────────────────────
   useEffect(() => {
@@ -237,6 +252,12 @@ const PartnersPage: React.FC = () => {
   // ─── Listagem Principal ─────────────────────────────────
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
+      <PartnerKpis
+        totalReceivable={totals.totalReceivable}
+        totalPayable={totals.totalPayable}
+        netBalance={totals.netBalance}
+      />
+
       <PartnerFilters
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
