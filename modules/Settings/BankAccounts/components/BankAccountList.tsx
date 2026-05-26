@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   Landmark, Plus, Pencil, Trash2, Search, Power,
-  ShieldCheck, ShieldAlert, AlertTriangle
+  ShieldCheck, ShieldAlert, AlertTriangle, Lock
 } from 'lucide-react';
 import SettingsSubPage from '../../components/SettingsSubPage';
 import type { Account } from '../../../../hooks/useAccounts';
@@ -62,11 +62,17 @@ const BankAccountList: React.FC<BankAccountListProps> = ({
           </thead>
           <tbody className="divide-y divide-slate-100">
             {isLoading ? (
-              <SkeletonTableRows rows={4} cols={5} />
+               <SkeletonTableRows rows={4} cols={5} />
             ) : accounts.length === 0 ? (
               <tr><td colSpan={5} className="px-6 py-10 text-center text-slate-500">Nenhuma conta encontrada.</td></tr>
             ) : accounts.map(a => {
               const isActive = a.is_active !== false;
+              const nameLower = (a.account_name || '').toLowerCase();
+              const ownerLower = (a.owner || '').toLowerCase();
+              const isVirtual = a.id === '97e8bd30-3ba1-4658-a51e-5df6ce184845' ||
+                                nameLower.includes('virtual') ||
+                                nameLower.includes('virtuais') ||
+                                ownerLower.includes('sistema');
               return (
                 <tr key={a.id} className={`hover:bg-slate-50 transition-colors ${!isActive ? 'opacity-60 bg-slate-50' : ''}`}>
                   <td className="px-6 py-4">
@@ -77,6 +83,7 @@ const BankAccountList: React.FC<BankAccountListProps> = ({
                       <div>
                         <span className={`font-semibold ${isActive ? 'text-slate-900' : 'text-slate-500'}`}>{a.account_name}</span>
                         {!isActive && <span className="ml-2 text-[9px] font-black uppercase bg-slate-200 text-slate-500 px-1.5 py-0.5 rounded">Inativa</span>}
+                        {isVirtual && <span className="ml-2 text-[9px] font-black uppercase bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded border border-amber-200 inline-flex items-center gap-0.5"><Lock size={8} /> Sistema</span>}
                       </div>
                     </div>
                   </td>
@@ -103,15 +110,23 @@ const BankAccountList: React.FC<BankAccountListProps> = ({
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      <button onClick={() => onToggleStatus(a)} className={`rounded-lg p-2 transition-colors ${isActive ? 'text-emerald-600 hover:bg-emerald-50' : 'text-slate-400 hover:bg-slate-100'}`} title={isActive ? 'Desativar' : 'Ativar'}>
-                        <Power size={18} />
-                      </button>
-                      <button onClick={() => onEdit(a)} className="rounded p-1 text-slate-400 hover:bg-indigo-50 hover:text-indigo-600 transition-colors" title="Editar">
-                        <Pencil size={18} />
-                      </button>
-                      <button onClick={() => onDeleteRequest(a)} className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors" title="Excluir">
-                        <Trash2 size={18} />
-                      </button>
+                      {isVirtual ? (
+                        <span className="text-[10px] font-bold text-slate-400 bg-slate-100 border border-slate-200 px-2.5 py-1.5 rounded-xl inline-flex items-center gap-1 select-none">
+                          <Lock size={12} className="text-slate-400" /> Protegida
+                        </span>
+                      ) : (
+                        <>
+                          <button onClick={() => onToggleStatus(a)} className={`rounded-lg p-2 transition-colors ${isActive ? 'text-emerald-600 hover:bg-emerald-50' : 'text-slate-400 hover:bg-slate-100'}`} title={isActive ? 'Desativar' : 'Ativar'}>
+                            <Power size={18} />
+                          </button>
+                          <button onClick={() => onEdit(a)} className="rounded p-1 text-slate-400 hover:bg-indigo-50 hover:text-indigo-600 transition-colors" title="Editar">
+                            <Pencil size={18} />
+                          </button>
+                          <button onClick={() => onDeleteRequest(a)} className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors" title="Excluir">
+                            <Trash2 size={18} />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>

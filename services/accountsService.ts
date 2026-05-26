@@ -153,6 +153,10 @@ export const accountsService = {
 
   // ATUALIZAÇÃO
   update: async (id: string, partial: Partial<Account>): Promise<void> => {
+    const VIRTUAL_ACCOUNT_ID = '97e8bd30-3ba1-4658-a51e-5df6ce184845';
+    if (id === VIRTUAL_ACCOUNT_ID) {
+      throw new Error('Esta conta é reservada para uso interno do sistema e não pode ser modificada.');
+    }
     const { error } = await supabase
       .from('accounts')
       .update({
@@ -170,6 +174,10 @@ export const accountsService = {
 
   // EXCLUSÃO lógica (só marca como inativa)
   softDelete: async (id: string): Promise<void> => {
+    const VIRTUAL_ACCOUNT_ID = '97e8bd30-3ba1-4658-a51e-5df6ce184845';
+    if (id === VIRTUAL_ACCOUNT_ID) {
+      throw new Error('Esta conta é reservada para uso interno do sistema e não pode ser desativada.');
+    }
     const { error } = await supabase
       .from('accounts')
       .update({ is_active: false })

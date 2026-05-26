@@ -89,6 +89,13 @@ const OrderCard: React.FC<Props> = React.memo(({ order, onClick, onFinalize, onD
             <User size={12} className="text-blue-400 shrink-0" /> 
             <span className="truncate">Sócio: {order.consultantName}</span>
           </div>
+          
+          {order.notes && (
+            <div className="mt-3 p-3 bg-amber-50/60 border-l-4 border-amber-500 rounded-r-2xl text-[11px] font-medium text-slate-700 shadow-sm leading-relaxed">
+              <span className="text-[9px] font-black text-amber-700 uppercase tracking-widest block mb-1">Anotações</span>
+              <p className="line-clamp-2">{order.notes}</p>
+            </div>
+          )}
         </div>
       </div>
 

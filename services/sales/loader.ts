@@ -63,7 +63,7 @@ export const salesLoader = {
 
         // --- Filtros Adicionais (Server-side) ---
         if (searchTerm) {
-          query = query.or(`number.ilike.%${searchTerm}%,customer_name.ilike.%${searchTerm}%,customer_nickname.ilike.%${searchTerm}%`);
+          query = query.or(`number.ilike.%${searchTerm}%,customer_name.ilike.%${searchTerm}%`);
         }
 
         if (startDate) {

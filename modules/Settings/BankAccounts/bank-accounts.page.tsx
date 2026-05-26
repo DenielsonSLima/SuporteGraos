@@ -23,8 +23,19 @@ const BankAccountsSettings: React.FC<Props> = ({ onBack }) => {
   const [formData, setFormData] = useState(initialForm);
   const [accountToDelete, setAccountToDelete] = useState<Account | null>(null);
 
+  const isSystemVirtual = (id: string, name: string, owner?: string) => {
+    const VIRTUAL_ACCOUNT_ID = '97e8bd30-3ba1-4658-a51e-5df6ce184845';
+    const nameLower = (name || '').toLowerCase();
+    const ownerLower = (owner || '').toLowerCase();
+    return id === VIRTUAL_ACCOUNT_ID || nameLower.includes('virtual') || nameLower.includes('virtuais') || ownerLower.includes('sistema');
+  };
+
   const handleAddNew = () => { setFormData(initialForm); setEditingId(null); setViewMode('form'); };
   const handleEdit = (a: Account) => {
+    if (isSystemVirtual(a.id, a.account_name, a.owner)) {
+      addToast('error', 'Ação Não Permitida', 'A Conta Virtual do sistema não pode ser editada.');
+      return;
+    }
     setFormData({
       account_name: a.account_name,
       owner: a.owner ?? '',
@@ -39,6 +50,10 @@ const BankAccountsSettings: React.FC<Props> = ({ onBack }) => {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (editingId && isSystemVirtual(editingId, formData.account_name, formData.owner)) {
+      addToast('error', 'Ação Não Permitida', 'A Conta Virtual do sistema não pode ser editada.');
+      return;
+    }
     try {
       if (editingId) {
         await updateAccount.mutateAsync({ id: editingId, data: {
@@ -69,6 +84,10 @@ const BankAccountsSettings: React.FC<Props> = ({ onBack }) => {
   };
 
   const handleToggleStatus = async (a: Account) => {
+    if (isSystemVirtual(a.id, a.account_name, a.owner)) {
+      addToast('error', 'Ação Não Permitida', 'A Conta Virtual do sistema não pode ser desativada.');
+      return;
+    }
     const newActive = a.is_active === false;
     try {
       await updateAccount.mutateAsync({ id: a.id, data: { is_active: newActive } });
@@ -80,6 +99,11 @@ const BankAccountsSettings: React.FC<Props> = ({ onBack }) => {
 
   const confirmDelete = async () => {
     if (!accountToDelete) return;
+    if (isSystemVirtual(accountToDelete.id, accountToDelete.account_name, accountToDelete.owner)) {
+      addToast('error', 'Ação Não Permitida', 'A Conta Virtual do sistema não pode ser desativada.');
+      setAccountToDelete(null);
+      return;
+    }
     try {
       await softDeleteAccount.mutateAsync(accountToDelete.id);
       addToast('success', 'Conta Removida', 'A conta bancária foi desativada.');

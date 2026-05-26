@@ -69,6 +69,17 @@ const OrderGeneralInfo: React.FC<Props> = ({ data, onChange, shareholders }) => 
         </div>
 
       </div>
+      
+      <div className="mt-6">
+        <label className={labelClass}>Anotações</label>
+        <textarea
+          rows={3}
+          value={data.notes || ''}
+          onChange={e => onChange('notes', e.target.value)}
+          placeholder="Alguma observação ou anotação importante sobre esta negociação..."
+          className="block w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-2.5 text-slate-900 font-bold focus:border-blue-600 focus:outline-none transition-all placeholder:text-slate-400"
+        />
+      </div>
     </div>
   );
 };

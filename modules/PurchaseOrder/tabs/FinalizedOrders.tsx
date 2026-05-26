@@ -26,7 +26,10 @@ const FinalizedOrders: React.FC<Props> = ({ orders, onOrderClick, onDelete, grou
         const display = date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
         key = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2, '0')}|${display}`;
       } else if (groupBy === 'harvest') {
-        key = order.harvest || 'Safra Não Informada';
+        const fallbackUf = order.loadingState || order.partnerState;
+        const fallbackYear = order.date ? new Date(order.date).getFullYear() : new Date().getFullYear();
+        const fallbackHarvest = fallbackUf ? `SAFRA/${fallbackUf} ${fallbackYear}` : 'Safra Não Informada';
+        key = (order.harvest && order.harvest !== '-') ? order.harvest : fallbackHarvest;
       } else if (groupBy === 'partner') {
         key = order.partnerName || 'Fornecedor Desconhecido';
       }
@@ -57,7 +60,7 @@ const FinalizedOrders: React.FC<Props> = ({ orders, onOrderClick, onDelete, grou
   if (!groups) {
     return (
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {filtered.map(order => (
+        {orders.map(order => (
           <OrderCard 
             key={order.id} 
             order={order} 

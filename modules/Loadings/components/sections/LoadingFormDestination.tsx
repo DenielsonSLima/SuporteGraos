@@ -3,7 +3,7 @@ import React from 'react';
 import { ShoppingBag, Search, ChevronDown, CheckCircle2, X, UserCheck } from 'lucide-react';
 import { SalesOrder } from '../../SalesOrder/types';
 import { Loading } from '../../types';
-import { formatCurrencyMask, parseCurrencyInput } from '../../../../utils/formatters';
+import { formatCurrencyMask, parseCurrencyInput, formatDate } from '../../../../utils/formatters';
 
 interface Props {
     formData: Partial<Loading>;
@@ -93,6 +93,9 @@ const LoadingFormDestination: React.FC<Props> = ({
                                             )}
                                             <div className="flex items-center gap-3 mt-1">
                                                 <span className="text-[9px] font-black text-indigo-400 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100 uppercase tracking-widest leading-none shrink-0">Venda #{sale.number}</span>
+                                                {sale.date && (
+                                                    <span className="text-[9px] font-black text-slate-500 bg-slate-50 px-2 py-0.5 rounded border border-slate-100 uppercase tracking-widest leading-none shrink-0">{formatDate(sale.date)}</span>
+                                                )}
                                                 <div className="flex items-center gap-1.5 text-[9px] font-black text-slate-400 uppercase tracking-widest truncate"><UserCheck size={12} className="text-indigo-300 shrink-0" /> {sale.consultantName}</div>
                                             </div>
                                         </div>

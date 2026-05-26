@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, Search, Layers, AlertTriangle, Calendar, User, X } from 'lucide-react';
+import { Plus, Search, Layers, AlertTriangle, Calendar, User, X, Printer } from 'lucide-react';
 import { PurchaseOrder } from './types';
 import PurchaseKPIs from './components/PurchaseKPIs';
 import OrderForm from './components/OrderForm';
@@ -9,6 +9,7 @@ import ActiveOrders from './tabs/ActiveOrders';
 import FinalizedOrders from './tabs/FinalizedOrders';
 import AllOrders from './tabs/AllOrders';
 import OrderDeleteModal from './components/OrderDeleteModal';
+import PurchaseListPdfModal from './components/modals/PurchaseListPdfModal';
 import ActionConfirmationModal from '../../components/ui/ActionConfirmationModal';
 import { useToast } from '../../contexts/ToastContext';
 import { usePurchaseOrders } from '../../hooks/usePurchaseOrders';
@@ -39,6 +40,7 @@ const PurchaseOrderModule: React.FC = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [selectedShareholder, setSelectedShareholder] = useState('');
+  const [isListPdfOpen, setIsListPdfOpen] = useState(false);
 
   // Data State — Pedidos de Compra via TanStack Query (cache + realtime automático)
   const { data: ordersResult, isFetching, isLoading } = usePurchaseOrders({
@@ -163,6 +165,13 @@ const PurchaseOrderModule: React.FC = () => {
     setCurrentPage(1);
   }, [activeTab, searchTerm, startDate, endDate, selectedShareholder]);
 
+  // Reset scroll to top when changing viewMode or selecting another order
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0 });
+    const mainEl = document.querySelector('main');
+    if (mainEl) mainEl.scrollTo({ top: 0, left: 0 });
+  }, [viewMode, selectedOrderId]);
+
   // --- KPI DADOS ---
   const kpiList = useMemo(() => orders, [orders]);
 
@@ -210,6 +219,14 @@ const PurchaseOrderModule: React.FC = () => {
                             <X size={14} /> Limpar
                         </button>
                      )}
+                     <button 
+                        onClick={() => setIsListPdfOpen(true)}
+                        disabled={orders.length === 0}
+                        className="flex items-center gap-2 rounded-xl bg-slate-100 border border-slate-200 px-4 py-3 text-xs font-black uppercase tracking-widest text-slate-700 hover:bg-slate-200 shadow-sm transition-all active:scale-95 disabled:opacity-50"
+                        title="Gerar PDF da Lista"
+                     >
+                        <Printer size={16} /> Imprimir Lista
+                     </button>
                      <button 
                         onClick={handleAddNew} 
                         className="flex items-center gap-2 rounded-xl bg-slate-900 px-6 py-3 text-xs font-black uppercase tracking-widest text-white hover:bg-slate-800 shadow-lg transition-all active:scale-95"
@@ -331,6 +348,15 @@ const PurchaseOrderModule: React.FC = () => {
         onClose={() => setOrderToDelete(null)} 
         onConfirm={executeDelete} 
         order={orderToDelete} 
+      />
+      <PurchaseListPdfModal 
+        isOpen={isListPdfOpen}
+        onClose={() => setIsListPdfOpen(false)}
+        orders={orders}
+        searchTerm={searchTerm}
+        startDate={startDate}
+        endDate={endDate}
+        selectedShareholder={selectedShareholder}
       />
     </>
   );

@@ -200,10 +200,6 @@ const PartnerForm: React.FC<Props> = ({ initialData, categories, onSave, onCance
         addToast('warning', 'UF obrigatória', 'Informe o estado (UF) do parceiro.');
         return;
       }
-      if (!formData.address.street) {
-        addToast('warning', 'Rua obrigatória', 'Qual a rua/lougradouro do parceiro?');
-        return;
-      }
     }
 
     onSave({

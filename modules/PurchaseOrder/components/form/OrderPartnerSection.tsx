@@ -243,7 +243,14 @@ const OrderPartnerSection: React.FC<Props> = ({ data, partners, onChange }) => {
             <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-500" size={18} />
             <select
               value={data.loadingState || ''}
-              onChange={(e) => onChange({ loadingState: e.target.value })}
+              onChange={(e) => {
+                const newUf = e.target.value;
+                const orderYear = data.date ? new Date(data.date).getFullYear() : new Date().getFullYear();
+                onChange({
+                  loadingState: newUf,
+                  harvest: newUf ? `SAFRA/${newUf} ${orderYear}` : ''
+                });
+              }}
               className={`${inputClass} pl-12 pr-10 appearance-none cursor-pointer`}
             >
               <option value="">— Selecione o Estado —</option>

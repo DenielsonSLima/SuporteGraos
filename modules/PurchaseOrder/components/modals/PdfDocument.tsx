@@ -44,6 +44,18 @@ const PdfDocument: React.FC<Props> = ({ order, loadings, variant, company, water
       .replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
   };
 
+  const getHarvest = (ord: PurchaseOrder) => {
+    if (ord.harvest && ord.harvest.trim() !== '' && ord.harvest.trim() !== '-') {
+      return ord.harvest;
+    }
+    const uf = ord.loadingState || ord.partnerState;
+    if (uf) {
+      const year = ord.date ? new Date(ord.date).getFullYear() : new Date().getFullYear();
+      return `SAFRA/${uf} ${year}`;
+    }
+    return '-';
+  };
+
   const statsProducer = useMemo(() => {
     const safeLoadings = Array.isArray(loadings) ? loadings : [];
     const activeLoadings = safeLoadings.filter((l) => l?.status !== 'canceled');
@@ -150,7 +162,7 @@ const PdfDocument: React.FC<Props> = ({ order, loadings, variant, company, water
                   <Text style={stylesInternal.headerMetaText}>Contrato compra: #{order.number} - {order.supplierName || order.partnerName || '-'}</Text>
                 </View>
                 <View style={[stylesInternal.headerMetaRow, { marginTop: 2 }]}>
-                  <Text style={stylesInternal.headerMetaText}>Safra: {order.harvest || '-'}</Text>
+                  <Text style={stylesInternal.headerMetaText}>Safra: {getHarvest(order)}</Text>
                   <Text style={stylesInternal.headerMetaText}>Emissao: {new Date().toLocaleDateString('pt-BR')}</Text>
                 </View>
                 <View style={[stylesInternal.headerMetaRow, { marginTop: 2 }]}>
@@ -512,7 +524,7 @@ const PdfDocument: React.FC<Props> = ({ order, loadings, variant, company, water
             <View style={stylesProducer.infoRowGrid}>
               <View style={stylesProducer.infoCell}>
                 <Text style={stylesProducer.infoLabel}>Safra Vinculada</Text>
-                <Text style={stylesProducer.infoValueStrong}>{order.harvest || '-'}</Text>
+                <Text style={stylesProducer.infoValueStrong}>{getHarvest(order)}</Text>
               </View>
               <View style={stylesProducer.infoCellLast}>
                 <Text style={stylesProducer.infoLabel}>Consultor Responsavel</Text>

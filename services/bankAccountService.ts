@@ -76,6 +76,10 @@ async function add(account: BankAccount): Promise<void> {
 }
 
 async function update(account: BankAccount): Promise<void> {
+  const VIRTUAL_ACCOUNT_ID = '97e8bd30-3ba1-4658-a51e-5df6ce184845';
+  if (account.id === VIRTUAL_ACCOUNT_ID) {
+    throw new Error('Esta conta é reservada para uso interno do sistema e não pode ser modificada.');
+  }
   const { error } = await supabase
     .from('accounts')
     .update({
@@ -90,6 +94,10 @@ async function update(account: BankAccount): Promise<void> {
 }
 
 async function remove(id: string): Promise<void> {
+  const VIRTUAL_ACCOUNT_ID = '97e8bd30-3ba1-4658-a51e-5df6ce184845';
+  if (id === VIRTUAL_ACCOUNT_ID) {
+    throw new Error('Esta conta é reservada para uso interno do sistema e não pode ser excluída.');
+  }
   const { error } = await supabase
     .from('accounts')
     .delete()
