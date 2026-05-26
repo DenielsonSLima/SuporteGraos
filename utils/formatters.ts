@@ -78,13 +78,31 @@ export const formatInteger = (value: number | null | undefined): string => {
  * Ex: "Jan" → "Jan", "Feb" → "Fev", "May" → "Mai", "Dec" → "Dez"
  */
 const MONTH_PT: Record<string, string> = {
-  Jan: 'Jan', Feb: 'Fev', Mar: 'Mar', Apr: 'Abr',
-  May: 'Mai', Jun: 'Jun', Jul: 'Jul', Aug: 'Ago',
-  Sep: 'Set', Oct: 'Out', Nov: 'Nov', Dec: 'Dez',
+  jan: 'Jan', feb: 'Fev', mar: 'Mar', apr: 'Abr',
+  may: 'Mai', jun: 'Jun', jul: 'Jul', aug: 'Ago',
+  sep: 'Set', oct: 'Out', nov: 'Nov', dec: 'Dez',
 };
 
-export const monthPtBr = (name: string): string =>
-  MONTH_PT[name] ?? name;
+export const monthPtBr = (name: string): string => {
+  if (!name) return name;
+  const trimmed = name.trim();
+  const clean = trimmed.toLowerCase();
+  
+  // 1. Direct match
+  if (MONTH_PT[clean]) {
+    return MONTH_PT[clean];
+  }
+  
+  // 2. Substring or pattern match (e.g. "May 2026")
+  for (const key of Object.keys(MONTH_PT)) {
+    const regex = new RegExp(`\\b${key}\\b`, 'gi');
+    if (regex.test(trimmed)) {
+      return trimmed.replace(regex, MONTH_PT[key]);
+    }
+  }
+  
+  return trimmed;
+};
 
 /**
  * 😷 Funções de Máscara para Inputs (Centavos Automáticos)

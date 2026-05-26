@@ -10,7 +10,7 @@
  * ✅ staleTime 30s — dados do dashboard são voláteis
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import MarketTicker from './components/MarketTicker';
 import FinancialSummary from './components/FinancialSummary';
 import OperationalSummary from './components/OperationalSummary';
@@ -18,9 +18,28 @@ import DashboardChart from './components/DashboardChart';
 import NetWorthChart from './components/NetWorthChart';
 import { useDashboard } from '../../hooks/useDashboard';
 import { AlertTriangle } from 'lucide-react';
+import { monthPtBr } from '../../utils/formatters';
 
 const Dashboard = () => {
-  const { data, isLoading, error } = useDashboard();
+  const { data: rawData, isLoading, error } = useDashboard();
+
+  const data = useMemo(() => {
+    if (!rawData) return null;
+    return {
+      ...rawData,
+      netWorth: {
+        ...rawData.netWorth,
+        history: rawData.netWorth.history.map((h: any) => ({
+          ...h,
+          name: monthPtBr(h.name),
+        })),
+      },
+      chart: rawData.chart.map((c: any) => ({
+        ...c,
+        name: monthPtBr(c.name),
+      })),
+    };
+  }, [rawData]);
 
   const showError = !!error;
 
