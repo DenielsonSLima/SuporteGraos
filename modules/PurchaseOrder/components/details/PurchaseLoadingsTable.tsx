@@ -47,6 +47,7 @@ const PurchaseLoadingsTable: React.FC<Props> = ({ loadings, onViewLoading, onAdd
 
   const navigateToSales = (e: React.MouseEvent, salesId: string) => {
     e.stopPropagation();
+    (window as any).__pendingOrderNav = { moduleId: ModuleId.SALES_ORDER, orderId: salesId };
     window.dispatchEvent(new CustomEvent('app:navigate', { 
       detail: { moduleId: ModuleId.SALES_ORDER, orderId: salesId } 
     }));
@@ -135,7 +136,7 @@ const PurchaseLoadingsTable: React.FC<Props> = ({ loadings, onViewLoading, onAdd
                         <p className="text-sm font-black text-slate-900">{currency(l.purchasePricePerSc)} <span className="text-[9px] font-normal text-slate-400">/SC</span></p>
                         <p className="text-[11px] font-black text-blue-700 mt-0.5">{currency(l.totalPurchaseValue)}</p>
                       </td>
-                      <td className="px-6 py-4 text-right border-r border-slate-100 bg-slate-50/20" rowSpan={3}>
+                      <td className="px-6 py-4 text-right border-r border-slate-100 bg-slate-50/20 border-b-[8px] border-slate-300" rowSpan={3}>
                          <div className="flex flex-col justify-center h-full">
                             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Resultado Líquido Carga</span>
                             <span className={`text-2xl font-black tracking-tighter ${profit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{currency(profit)}</span>
@@ -151,7 +152,7 @@ const PurchaseLoadingsTable: React.FC<Props> = ({ loadings, onViewLoading, onAdd
                             </div>
                          </div>
                       </td>
-                      <td className="px-4 py-4 text-center" rowSpan={3}>
+                      <td className="px-4 py-4 text-center border-b-[8px] border-slate-300" rowSpan={3}>
                         <div className="flex flex-col gap-2 items-center">
                             <button onClick={(e) => { e.stopPropagation(); onViewLoading(l); }} className="p-2 text-blue-600 hover:bg-blue-600 hover:text-white rounded-xl transition-all shadow-sm border border-blue-100 bg-white" title="Editar Detalhes">
                               <Pencil size={18} />
@@ -240,8 +241,8 @@ const PurchaseLoadingsTable: React.FC<Props> = ({ loadings, onViewLoading, onAdd
                     </tr>
 
                     {/* BLOCO: LINHA 3 - VENDA / DESTINO */}
-                    <tr className={`hover:bg-blue-50/40 cursor-pointer transition-colors border-b-[6px] border-slate-900 ${rowBgColor}`} onClick={() => onViewLoading(l)}>
-                      <td className="px-6 py-3 border-r border-slate-100">
+                    <tr className={`hover:bg-blue-50/40 cursor-pointer transition-colors ${rowBgColor}`} onClick={() => onViewLoading(l)}>
+                      <td className="px-6 py-3 border-r border-slate-100 border-b-[8px] border-slate-300">
                         <div className="flex items-center gap-3">
                            <div className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg"><Navigation size={16}/></div>
                            <div className="flex-1 min-w-0">
@@ -263,14 +264,14 @@ const PurchaseLoadingsTable: React.FC<Props> = ({ loadings, onViewLoading, onAdd
                            </div>
                         </div>
                       </td>
-                      <td className="px-6 py-3 text-center border-r border-slate-100">
+                      <td className="px-6 py-3 text-center border-r border-slate-100 border-b-[8px] border-slate-300">
                          <div className="flex flex-col items-center">
                             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Faturamento Carga</span>
                             <span className="font-black text-emerald-700 text-base">{currency(l.totalSalesValue)}</span>
                             <p className="text-[9px] font-bold text-slate-400 uppercase italic">Ref: Peso {isDelivered ? 'Destino' : 'Origem'}</p>
                          </div>
                       </td>
-                      <td className="px-6 py-3 text-right border-r border-slate-100">
+                      <td className="px-6 py-3 text-right border-r border-slate-100 border-b-[8px] border-slate-300">
                          <span className="text-[9px] font-black text-slate-400 uppercase">Preço Venda</span>
                          <p className="text-sm font-black text-emerald-800">{currency(l.salesPrice)} <span className="text-[9px] font-normal text-slate-400">/SC</span></p>
                       </td>

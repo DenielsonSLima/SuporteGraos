@@ -58,6 +58,7 @@ const SalesOrderModule: React.FC = () => {
     isLoading, 
     isFetching, 
     getOrderById, 
+    fetchOrderById,
     getLinkedLoadings, 
     saveOrder, 
     deleteOrder, 
@@ -116,27 +117,34 @@ const SalesOrderModule: React.FC = () => {
   }, [viewMode, selectedOrder?.id]);
 
   useEffect(() => {
-    const handleNavigation = (e: any) => {
+    const handleNavigation = async (e: any) => {
       if (e.detail?.moduleId === 'sales_order' && e.detail?.orderId) {
-        const order = getOrderById(e.detail.orderId);
+        const order = await fetchOrderById(e.detail.orderId);
         if (order) {
           setSelectedOrder(order);
           setViewMode('details');
+        } else {
+          addToast('error', 'Pedido de Venda não encontrado');
         }
       }
     };
     window.addEventListener('app:navigate', handleNavigation);
 
     // Navegação pendente (definida antes do módulo montar)
-    const pending = (window as any).__pendingOrderNav;
-    if (pending && pending.moduleId === 'sales_order' && pending.orderId) {
-      delete (window as any).__pendingOrderNav;
-      const order = getOrderById(pending.orderId);
-      if (order) {
-        setSelectedOrder(order);
-        setViewMode('details');
+    const handlePending = async () => {
+      const pending = (window as any).__pendingOrderNav;
+      if (pending && pending.moduleId === 'sales_order' && pending.orderId) {
+        delete (window as any).__pendingOrderNav;
+        const order = await fetchOrderById(pending.orderId);
+        if (order) {
+          setSelectedOrder(order);
+          setViewMode('details');
+        } else {
+          addToast('error', 'Pedido de Venda não encontrado');
+        }
       }
-    }
+    };
+    handlePending();
 
     return () => {
       window.removeEventListener('app:navigate', handleNavigation);

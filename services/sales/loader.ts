@@ -213,6 +213,39 @@ export const salesLoader = {
     }
   },
 
+  fetchById: async (id: string): Promise<SalesOrder | null> => {
+    if (!id) return null;
+    const isCanonical = isSqlCanonicalOpsEnabled();
+    const tableName = isCanonical ? 'vw_sales_orders_enriched' : 'sales_orders';
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
+    try {
+      let query = supabase.from(tableName).select('*');
+      if (isCanonical) {
+        if (isUuid) {
+          query = query.or(`id.eq.${id},legacy_id.eq.${id}`);
+        } else {
+          query = query.eq('legacy_id', id);
+        }
+      } else {
+        query = query.eq('id', id);
+      }
+
+      const { data, error } = await query.maybeSingle();
+      if (error) throw error;
+      if (!data) return null;
+
+      const mapped = isCanonical ? mapOrderFromOpsRow(data) : mapOrderFromDb(data);
+      if (mapped) {
+        await salesLoader.enrichAddresses([mapped]);
+      }
+      return mapped;
+    } catch (error) {
+      sqlCanonicalOpsLog(`Falha ao buscar venda por ID ${id} (${isCanonical ? 'canônico' : 'legado'})`, error);
+      return null;
+    }
+  },
+
   /**
    * Carrega estatísticas globais de vendas via RPC.
    * Utilizado pelos KPIs de Faturamento Contratado.

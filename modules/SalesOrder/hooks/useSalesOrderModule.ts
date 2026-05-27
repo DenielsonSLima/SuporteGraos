@@ -29,6 +29,17 @@ export function useSalesOrderModule(params: SalesLoadParams = {}) {
   const getOrderById = (id: string): SalesOrder | undefined =>
     sales.find(o => o.id === id) ?? salesService.getById(id);
 
+  // Busca pedido por ID de forma assíncrona (tenta cache local, depois store, depois banco)
+  const fetchOrderById = async (id: string): Promise<SalesOrder | null> => {
+    const local = sales.find(o => o.id === id);
+    if (local) return local;
+
+    const storeLocal = salesService.getById(id);
+    if (storeLocal) return storeLocal;
+
+    return salesService.fetchById(id);
+  };
+
   // Verifica carregamentos vinculados a um pedido de venda
   const getLinkedLoadings = (salesOrderId: string) =>
     loadingService.getBySalesOrder(salesOrderId);
@@ -76,6 +87,7 @@ export function useSalesOrderModule(params: SalesLoadParams = {}) {
     isLoading,
     isFetching,
     getOrderById,
+    fetchOrderById,
     getLinkedLoadings,
     saveOrder,
     deleteOrder,

@@ -13,6 +13,7 @@ export const salesService = {
   // State & Subscriptions
   getAll: () => salesStore.get(),
   getById: (id: string) => salesStore.get().find(s => s.id === id),
+  fetchById: (id: string) => salesLoader.fetchById(id),
   subscribe: (callback: (items: SalesOrder[]) => void) => salesStore.subscribe(callback),
 
   // Loading
