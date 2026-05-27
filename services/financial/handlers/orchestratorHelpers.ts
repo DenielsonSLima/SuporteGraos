@@ -111,7 +111,7 @@ export const registerFinancialRecords = async (params: RegisterFinancialParams) 
   let txResult = null;
   const isDomainHandled = ['purchase_order', 'sales_order', 'loading', 'commission'].includes(referenceType);
 
-  if ((!canonicalOps || !isDomainHandled) && !params.skipTransactionInsert && amount > 0 && accountId) {
+  if ((!canonicalOps || !isDomainHandled || params.hasFinancialEntry === false) && !params.skipTransactionInsert && amount > 0 && accountId) {
     try {
       const linkParams: TransactionLinkParams = {
         linkType: type,

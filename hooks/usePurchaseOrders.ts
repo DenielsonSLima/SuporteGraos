@@ -55,7 +55,7 @@ function ensurePurchaseChannel() {
     )
     .on(
       'postgres_changes',
-      { event: '*', schema: 'public', table: 'purchase_expenses' },
+      { event: '*', schema: 'public', table: 'ops_purchase_order_expenses' },
       () => _purchaseListeners.forEach(cb => cb()),
     )
     .subscribe();

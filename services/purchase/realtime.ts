@@ -105,7 +105,7 @@ export const startRealtime = async (companyId?: string) => {
     .channel('purchase_expenses_realtime')
     .on(
       'postgres_changes',
-      { event: '*', schema: 'public', table: 'purchase_expenses' },
+      { event: '*', schema: 'public', table: 'ops_purchase_order_expenses' },
       async (payload: any) => {
         const orderId = payload.new?.purchase_order_id || payload.old?.purchase_order_id;
         if (orderId) {

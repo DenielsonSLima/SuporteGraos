@@ -25,12 +25,8 @@ const LogisticsModule: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'open' | 'all' | 'financial'>('open');
   const [searchTerm, setSearchTerm] = useState('');
   const [carrierFilter, setCarrierFilter] = useState('');
-  const [startDate, setStartDate] = useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 30);
-    return d.toISOString().split('T')[0];
-  });
-  const [endDate, setEndDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [selectedLoading, setSelectedLoading] = useState<Loading | null>(null);
 
   const selectedLoadingRef = React.useRef<Loading | null>(null);
