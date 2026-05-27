@@ -71,8 +71,10 @@ export const statusFromDb = (status?: string): SalesStatus => {
     case 'approved':
       return 'approved';
     case 'delivered':
+    case 'completed':
       return 'completed';
     case 'cancelled':
+    case 'canceled':
       return 'canceled';
     case 'shipped':
       return 'approved';

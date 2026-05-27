@@ -37,16 +37,26 @@ const PurchaseOrderModule: React.FC = () => {
   
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [selectedShareholder, setSelectedShareholder] = useState('');
   const [isListPdfOpen, setIsListPdfOpen] = useState(false);
 
+  // Debounce for search to improve performance/responsiveness
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setCurrentPage(1); // Reset page on search
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   // Data State — Pedidos de Compra via TanStack Query (cache + realtime automático)
   const { data: ordersResult, isFetching, isLoading } = usePurchaseOrders({
     page: currentPage,
     pageSize,
-    searchTerm,
+    searchTerm: debouncedSearch,
     startDate,
     endDate,
     shareholder: selectedShareholder,
@@ -188,11 +198,19 @@ const PurchaseOrderModule: React.FC = () => {
     if (viewMode === 'form') return <OrderForm initialData={selectedOrder} onSave={handleSave} onCancel={() => setViewMode(selectedOrder ? 'details' : 'list')} />;
     if (viewMode === 'details' && selectedOrder) return <OrderDetails order={selectedOrder} onBack={() => setViewMode('list')} onEdit={() => setViewMode('form')} onDelete={() => handleDeleteRequest(selectedOrder)} onFinalize={() => handleFinalizeRequest(selectedOrder)} />;
 
+    const kpiParams = {
+      searchTerm: debouncedSearch,
+      startDate,
+      endDate,
+      shareholder: selectedShareholder,
+      statuses: activeTab === 'all' ? undefined : (activeTab === 'active' ? ['pending', 'approved', 'transport'] : ['completed', 'canceled'])
+    };
+
     return (
       <div className="space-y-6 animate-in fade-in duration-500">
         
-        {/* KPI Section - Recebe a lista JÁ FILTRADA + loadings reativos */}
-        <PurchaseKPIs orders={orders} loadings={loadings} />
+        {/* KPI Section - Recebe filtros ativos para cálculo no banco */}
+        <PurchaseKPIs params={kpiParams} />
         
         {/* Filter Bar (Estilo Sales Order) */}
         <div className="flex flex-col gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">

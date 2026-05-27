@@ -72,7 +72,7 @@ const SalesOrderModule: React.FC = () => {
     startDate,
     endDate,
     shareholder: selectedShareholder,
-    statuses: activeTab === 'all' ? undefined : (activeTab === 'active' ? ['pending', 'approved', 'shipped', 'draft'] : ['delivered', 'cancelled'])
+    statuses: activeTab === 'all' ? undefined : (activeTab === 'active' ? ['pending', 'approved', 'shipped', 'draft'] : ['completed', 'delivered', 'canceled', 'cancelled'])
   });
 
   // Modals
@@ -386,11 +386,19 @@ const SalesOrderModule: React.FC = () => {
       />
     );
 
+    const kpiParams = {
+      searchTerm: debouncedSearch,
+      startDate,
+      endDate,
+      shareholder: selectedShareholder,
+      statuses: activeTab === 'all' ? undefined : (activeTab === 'active' ? ['pending', 'approved', 'shipped', 'draft'] : ['completed', 'delivered', 'canceled', 'cancelled'])
+    };
+
     return (
       <div className="space-y-6 animate-in fade-in duration-500">
 
         {/* KPI Section */}
-        <SalesKPIs orders={sales} />
+        <SalesKPIs params={kpiParams} />
 
         {/* Filter Bar */}
         <div className="flex flex-col gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">

@@ -250,10 +250,15 @@ export const salesLoader = {
    * Carrega estatísticas globais de vendas via RPC.
    * Utilizado pelos KPIs de Faturamento Contratado.
    */
-  loadStats: async (companyId: string) => {
+  loadStats: async (companyId: string, params: SalesLoadParams = {}) => {
     if (!companyId) return null;
-    const { data, error } = await supabase.rpc('rpc_get_sales_order_stats_v3', {
-      p_company_id: companyId
+    const { data, error } = await supabase.rpc('rpc_get_sales_order_stats_v4', {
+      p_company_id: companyId,
+      p_search_term: params.searchTerm || null,
+      p_start_date: params.startDate || null,
+      p_end_date: params.endDate || null,
+      p_shareholder: params.shareholder || null,
+      p_statuses: params.statuses || null
     });
     if (error) throw error;
     return data;

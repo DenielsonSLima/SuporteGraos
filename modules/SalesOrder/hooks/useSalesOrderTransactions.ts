@@ -48,40 +48,47 @@ export function useSalesOrderTransactions(salesOrderId: string) {
                 }
             }
 
-            // Busca a entry relativa a este pedido
-            const { data: entries } = await supabase
-                .from('financial_entries')
-                .select('id')
-                .eq('origin_id', resolvedOrderId)
-                .eq('origin_type', 'sales_order');
-
-            if (!entries || entries.length === 0) return [];
-
-            const entryId = entries[0].id;
-
-            // Busca as transações dessa entry com o nome da conta (JOIN)
-            const { data: txs } = await supabase
-                .from('financial_transactions')
+            // Busca transações VIA LINKS (Robusto para Foundation V2)
+            // Isso garante que recebimentos e suas observações customizadas sejam resgatados corretamente.
+            const { data: links, error: linkError } = await supabase
+                .from('financial_links')
                 .select(`
-                    *,
-                    account:accounts(account_name, owner)
+                    transaction_id,
+                    link_type,
+                    metadata,
+                    transaction:financial_transactions(
+                        *,
+                        account:accounts(account_name, owner)
+                    )
                 `)
-                .eq('entry_id', entryId)
-                .order('transaction_date', { ascending: false });
+                .eq('sales_order_id', resolvedOrderId)
+                .order('created_at', { ascending: false });
 
-            if (!txs) return [];
+            if (linkError || !links) return [];
 
-            return txs.map((tx: any) => ({
-                ...tx,
-                id: tx.id,
-                value: Number(tx.amount),
-                discountValue: Number(tx.metadata?.discount_amount || 0),
-                date: tx.transaction_date,
-                type: tx.type === 'IN' || tx.type === 'receipt' || tx.type === 'credit' ? 'receipt' : 'payment',
-                notes: tx.description,
-                accountId: tx.account_id || tx.bank_account_id,
-                accountName: tx.account ? `${tx.account.account_name}${tx.account.owner ? ` - ${tx.account.owner}` : ''}` : null
-            }));
+            return links
+                .filter(l => l.transaction) // Garante que a transação existe
+                .map((l: any) => {
+                    const tx = l.transaction;
+                    const metadata = l.metadata || {};
+
+                    return {
+                        id: tx.id,
+                        value: Number(tx.amount),
+                        discountValue: Number(tx.metadata?.discount_amount || metadata.discount || 0),
+                        date: tx.transaction_date,
+                        type: tx.type === 'IN' || tx.type === 'receipt' || tx.type === 'credit' ? 'receipt' : 'payment',
+                        notes: metadata.notes || (
+                            tx.description && 
+                            !tx.description.startsWith('Recebimento Pedido Venda:') && 
+                            tx.description !== 'Recebimento de Venda'
+                                ? tx.description
+                                : ''
+                        ),
+                        accountId: tx.account_id || tx.bank_account_id,
+                        accountName: tx.account ? `${tx.account.account_name}${tx.account.owner ? ` - ${tx.account.owner}` : ''}` : (tx.description?.split(' [')[0] || 'Caixa')
+                    };
+                });
         },
         enabled: !!salesOrderId,
         staleTime: 0, // Realtime

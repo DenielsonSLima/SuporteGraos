@@ -2,9 +2,14 @@ import React from 'react';
 import { DollarSign, Truck, Clock, PackageCheck } from 'lucide-react';
 import { useSalesStats } from '../../../hooks/useSalesStats';
 import { formatCurrency } from '../../../utils/formatters';
+import { SalesLoadParams } from '../../../services/sales/loader';
 
-const SalesKPIs: React.FC = React.memo(() => {
-  const { data: stats, isLoading } = useSalesStats();
+interface Props {
+  params: SalesLoadParams;
+}
+
+const SalesKPIs: React.FC<Props> = React.memo(({ params }) => {
+  const { data: stats, isLoading } = useSalesStats(params);
 
   const StatCard = ({ label, value, icon: Icon, color, subtext, bgClass, loading }: any) => (
     <div className={`p-6 rounded-3xl border shadow-sm flex items-start justify-between hover:shadow-xl hover:-translate-y-1 transition-all duration-300 ${bgClass || 'bg-white border-slate-200'}`}>

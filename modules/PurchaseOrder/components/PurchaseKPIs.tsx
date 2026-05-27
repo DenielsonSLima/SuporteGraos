@@ -1,24 +1,36 @@
 import React from 'react';
 import { DollarSign, Truck, Clock, CheckCircle2 } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { supabase } from '../../../services/supabase';
 import { formatMoney } from '../../../utils/formatters';
 import { useCurrentUser } from '../../../hooks/useCurrentUser';
 import { QUERY_KEYS } from '../../../hooks/queryKeys';
 
-const PurchaseKPIs: React.FC = React.memo(() => {
+import { PurchaseLoadParams } from '../../../services/purchase/loader';
+
+interface Props {
+  params: PurchaseLoadParams;
+}
+
+const PurchaseKPIs: React.FC<Props> = React.memo(({ params }) => {
   const currentUser = useCurrentUser();
 
   const { data: stats, isLoading } = useQuery({
-    queryKey: [...QUERY_KEYS.PURCHASE_STATS, currentUser?.companyId],
+    queryKey: [...QUERY_KEYS.PURCHASE_STATS, currentUser?.companyId, params],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('rpc_get_purchase_order_stats_v3', {
-        p_company_id: currentUser?.companyId
+      const { data, error } = await supabase.rpc('rpc_get_purchase_order_stats_v4', {
+        p_company_id: currentUser?.companyId,
+        p_search_term: params.searchTerm || null,
+        p_start_date: params.startDate || null,
+        p_end_date: params.endDate || null,
+        p_shareholder: params.shareholder || null,
+        p_statuses: params.statuses || null
       });
       if (error) throw error;
       return data;
     },
-    enabled: !!currentUser?.companyId
+    enabled: !!currentUser?.companyId,
+    placeholderData: keepPreviousData
   });
 
   const StatCard = ({ label, value, icon: Icon, color, subtext, bgClass, loading }: any) => (

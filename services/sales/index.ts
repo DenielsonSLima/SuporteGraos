@@ -43,5 +43,5 @@ export const salesService = {
     salesStore.setAll(data);
   },
 
-  getStats: (companyId: string) => salesLoader.loadStats(companyId)
+  getStats: (companyId: string, params?: any) => salesLoader.loadStats(companyId, params)
 };
