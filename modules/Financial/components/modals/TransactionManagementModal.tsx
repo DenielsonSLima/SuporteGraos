@@ -15,9 +15,10 @@ interface Props {
   onUpdate: (data: OrderTransaction) => void | Promise<void>;
   onDelete: (id: string) => void | Promise<void>;
   title?: string;
+  isOrderFinalized?: boolean;
 }
 
-const TransactionManagementModal: React.FC<Props> = ({ isOpen, onClose, transaction, onUpdate, onDelete, title }) => {
+const TransactionManagementModal: React.FC<Props> = ({ isOpen, onClose, transaction, onUpdate, onDelete, title, isOrderFinalized }) => {
   const { data: allBankAccounts = [] } = useAccounts();
   const bankAccounts = React.useMemo(() => allBankAccounts.sort((a, b) => a.account_name.localeCompare(b.account_name)), [allBankAccounts]);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
@@ -148,7 +149,7 @@ const TransactionManagementModal: React.FC<Props> = ({ isOpen, onClose, transact
             onClose(); 
           }}
           title="Estornar Lançamento?"
-          description="Esta operação removerá o valor do fluxo de caixa e o saldo voltará a constar como aberto no pedido. Deseja continuar?"
+          description={isOrderFinalized ? "Este pedido está FINALIZADO. Excluir este lançamento reabrirá o pedido para que fique em aberto novamente. Tem certeza que deseja continuar?" : "Esta operação removerá o valor do fluxo de caixa e o saldo voltará a constar como aberto no pedido. Deseja continuar?"}
           type="danger"
         />
       </div>

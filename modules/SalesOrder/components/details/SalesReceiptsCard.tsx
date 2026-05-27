@@ -19,6 +19,7 @@ interface Props {
   receivedPercent: number;
   onRefresh: () => void;
   onReceiptSuccess?: () => void;
+  isOrderFinalized?: boolean;
 }
 
 const SalesReceiptsCard: React.FC<Props> = ({ 
@@ -30,7 +31,8 @@ const SalesReceiptsCard: React.FC<Props> = ({
   totalBilled,
   receivedPercent,
   onRefresh,
-  onReceiptSuccess
+  onReceiptSuccess,
+  isOrderFinalized
 }) => {
   const { addToast } = useToast();
   const { data: accounts = [] } = useAccounts();
@@ -243,6 +245,7 @@ const SalesReceiptsCard: React.FC<Props> = ({
           amount: deletingTx.value,
           accountName: deletingTx.accountName || 'Não informada'
         } : undefined}
+        isOrderFinalized={isOrderFinalized}
       />
     </div>
   );

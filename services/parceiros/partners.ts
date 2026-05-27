@@ -215,5 +215,22 @@ export const partnersActions = {
   async deletePartner(id: string) {
     const { error } = await supabase.from('parceiros_parceiros').delete().eq('id', id);
     if (error) throw error;
+  },
+
+  async getPartnerStats(params?: {
+    searchTerm?: string;
+    category?: string;
+  }) {
+    const companyId = authService.getCurrentUser()?.companyId;
+    if (!companyId) return { total_receivable: 0, total_payable: 0, net_balance: 0 };
+
+    const { data, error } = await supabase.rpc('rpc_get_partner_stats_v1', {
+      p_company_id: companyId,
+      p_search_term: params?.searchTerm || null,
+      p_category: params?.category || null
+    });
+
+    if (error) throw error;
+    return data?.[0] || { total_receivable: 0, total_payable: 0, net_balance: 0 };
   }
 };

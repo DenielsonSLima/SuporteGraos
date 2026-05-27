@@ -85,7 +85,7 @@ export const userActions = {
   },
 
   /**
-   * Gera um token de recuperação.
+   * Gera um token de recuperação e salva no banco de dados.
    */
   generateRecoveryToken: async (userId: string): Promise<string> => {
     const { data: row, error: fetchErr } = await supabase
@@ -101,7 +101,44 @@ export const userActions = {
       Math.random().toString(36).slice(2, 6).toUpperCase() + '-' +
       Math.random().toString(36).slice(2, 6).toUpperCase();
 
+    const { error: updateErr } = await supabase
+      .from('app_users')
+      .update({ recovery_token: token })
+      .eq('auth_user_id', userId);
+
+    if (updateErr) throw new Error(`Falha ao salvar token: ${updateErr.message}`);
+
     return token;
+  },
+
+  /**
+   * Busca um usuário pelo token de recuperação.
+   */
+  getByRecoveryToken: async (token: string): Promise<UserData | null> => {
+    if (!token) return null;
+
+    const { data, error } = await invokeEdgeFunction('validate-recovery-token', { token }, true);
+    if (error || !data || !data.user) {
+      console.error('[getByRecoveryToken] Erro ou token inválido:', error);
+      return null;
+    }
+
+    return data.user;
+  },
+
+  /**
+   * Reseta a senha usando o token de recuperação.
+   */
+  resetPasswordWithToken: async (token: string, newPassword: string): Promise<boolean> => {
+    if (!token || !newPassword) return false;
+
+    const { data, error } = await invokeEdgeFunction('reset-password-by-token', { token, password: newPassword }, true);
+    if (error || !data || !data.success) {
+      console.error('[resetPasswordWithToken] Erro ao redefinir:', error);
+      return false;
+    }
+
+    return true;
   },
 
   // Alias legacy para compatibilidade

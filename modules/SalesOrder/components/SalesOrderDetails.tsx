@@ -153,6 +153,7 @@ const SalesOrderDetails: React.FC<Props> = ({ order, onBack, onEdit, onDelete, o
           receivedPercent={stats.receivedPercent}
           onRefresh={() => refreshData(currentOrder.id)}
           onReceiptSuccess={handleReceiptSuccess}
+          isOrderFinalized={currentOrder.status === 'completed'}
         />
         
         <SalesOrderNotesSection 

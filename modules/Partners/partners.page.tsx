@@ -17,7 +17,7 @@ import CarrierDetails from './submodules/Carriers/CarrierDetails';
 import BrokerDetails from './submodules/Brokers/BrokerDetails';
 import { Partner, SavePartnerData } from './partners.types';
 import { DEFAULT_PARTNER_CATEGORIES, PARTNER_CATEGORY_IDS } from '../../constants';
-import { usePartners, useCreatePartner, useUpdatePartner, useDeletePartner } from '../../hooks/useParceiros';
+import { usePartners, useCreatePartner, useUpdatePartner, useDeletePartner, usePartnerStats } from '../../hooks/useParceiros';
 import { useToast } from '../../contexts/ToastContext';
 import { SkeletonCards } from '../../components/ui/SkeletonCards';
 import { usePartnersModule } from './hooks/usePartnersModule';
@@ -70,19 +70,18 @@ const PartnersPage: React.FC = () => {
 
   const { partnerBalances, savePartnerAddress } = usePartnersModule({ partners, balancesTick });
 
+  const { data: statsData } = usePartnerStats({
+    searchTerm: debouncedSearch,
+    category: activeTab
+  });
+
   const totals = useMemo(() => {
-    let totalReceivable = 0;
-    let totalPayable = 0;
-    Object.values(partnerBalances).forEach(b => {
-      totalReceivable += b.credit;
-      totalPayable += b.debit;
-    });
     return {
-      totalReceivable,
-      totalPayable,
-      netBalance: totalReceivable - totalPayable
+      totalReceivable: statsData?.totalReceivable ?? 0,
+      totalPayable: statsData?.totalPayable ?? 0,
+      netBalance: statsData?.netBalance ?? 0
     };
-  }, [partnerBalances]);
+  }, [statsData]);
 
   // ─── Navegação global via evento ────────────────────────
   useEffect(() => {

@@ -3,21 +3,26 @@ import { supabaseUrl, supabaseAnonKey, getSupabaseSession } from '../supabase';
 export async function invokeEdgeFunction(
   action: string,
   payload: Record<string, unknown>,
+  isPublic = false,
 ): Promise<{ data: any; error: string | null }> {
-  const session = await getSupabaseSession();
-  if (!session?.access_token) {
-    return { data: null, error: 'Sessão expirada. Faça login novamente.' };
+  let headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'apikey': supabaseAnonKey,
+  };
+
+  if (!isPublic) {
+    const session = await getSupabaseSession();
+    if (!session?.access_token) {
+      return { data: null, error: 'Sessão expirada. Faça login novamente.' };
+    }
+    headers['Authorization'] = `Bearer ${session.access_token}`;
   }
 
   let res: Response;
   try {
     res = await fetch(`${supabaseUrl}/functions/v1/manage-users`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.access_token}`,
-        'apikey': supabaseAnonKey,
-      },
+      headers,
       body: JSON.stringify({ action, ...payload }),
     });
   } catch (networkErr: any) {

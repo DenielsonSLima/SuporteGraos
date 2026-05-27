@@ -285,6 +285,7 @@ const OrderDetails: React.FC<Props> = ({ order, onBack, onEdit, onDelete, onFina
           onUpdate={onTxUpdate}
           onDelete={actions.handleDeleteTx}
           title={selectedTx.type === 'expense' ? "Editar Despesa Extra" : (selectedTx.type === 'commission' ? "Editar Comissão" : (selectedTx.type === 'advance' ? "Editar Adiantamento" : "Editar Pagamento"))}
+          isOrderFinalized={order.status === 'completed'}
         />
       )}
 
@@ -298,7 +299,7 @@ const OrderDetails: React.FC<Props> = ({ order, onBack, onEdit, onDelete, onFina
           setPendingDeleteTxId(null);
         }}
         title="Estornar Lançamento?"
-        description="O valor sairá do histórico e o saldo voltará a constar como aberto."
+        description={order.status === 'completed' ? "Este pedido está FINALIZADO. Excluir este lançamento reabrirá o pedido para que fique em aberto novamente. Tem certeza que deseja continuar?" : "O valor sairá do histórico e o saldo voltará a constar como aberto."}
         type="danger"
       />
 

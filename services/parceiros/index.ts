@@ -41,6 +41,9 @@ export const parceirosService = {
   // Realtime
   subscribeRealtime: (callback: () => void) => partnersRealtime.subscribe(callback),
 
+  // Stats
+  getPartnerStats: (params?: any) => partnersActions.getPartnerStats(params),
+
   // Cache (Centralizado)
   clearCache: (partnerId?: string) => {
     driversActions.clearCache(partnerId);

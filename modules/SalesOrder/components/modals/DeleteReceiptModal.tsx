@@ -12,9 +12,10 @@ interface Props {
     amount: number;
     accountName: string;
   };
+  isOrderFinalized?: boolean;
 }
 
-const DeleteReceiptModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, receiptData }) => {
+const DeleteReceiptModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, receiptData, isOrderFinalized }) => {
   const [isDeleting, setIsDeleting] = React.useState(false);
 
   if (!isOpen) return null;
@@ -50,7 +51,9 @@ const DeleteReceiptModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, recei
               </div>
               <h4 className="text-xl font-black text-slate-800">Você tem certeza?</h4>
               <p className="text-sm text-slate-500 font-medium leading-relaxed">
-                Esta ação irá **estornar** o recebimento do pedido e remover o lançamento da conta bancária. O saldo do pedido será restaurado.
+                {isOrderFinalized 
+                  ? "Este pedido está FINALIZADO. Excluir este recebimento reabrirá o pedido para que fique em aberto novamente. Tem certeza que deseja continuar?" 
+                  : "Esta ação irá estornar o recebimento do pedido e remover o lançamento da conta bancária. O saldo do pedido será restaurado."}
               </p>
             </div>
 

@@ -254,3 +254,37 @@ export function useDeleteVehicle(partnerId: string) {
         }
     });
 }
+
+export function usePartnerStats(params?: {
+    searchTerm?: string;
+    category?: string;
+}) {
+    const queryClient = useQueryClient();
+    const enableRealtimeInDev = String((import.meta as any).env?.VITE_ENABLE_PARTNERS_REALTIME_DEV || '').toLowerCase() === 'true';
+    const shouldUseRealtime = !import.meta.env.DEV || enableRealtimeInDev;
+
+    useEffect(() => {
+        if (!shouldUseRealtime) {
+            return;
+        }
+
+        const unsub = parceirosService.subscribeRealtime(() => {
+            queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.PARTNERS, 'stats'] });
+        });
+        return unsub;
+    }, [queryClient, shouldUseRealtime]);
+
+    return useQuery({
+        queryKey: [...QUERY_KEYS.PARTNERS, 'stats', params],
+        queryFn: async () => {
+            const stats = await parceirosService.getPartnerStats(params);
+            return {
+                totalReceivable: Number(stats.total_receivable || 0),
+                totalPayable: Number(stats.total_payable || 0),
+                netBalance: Number(stats.net_balance || 0),
+            };
+        },
+        staleTime: STALE_5_MIN,
+        placeholderData: keepPreviousData,
+    });
+}

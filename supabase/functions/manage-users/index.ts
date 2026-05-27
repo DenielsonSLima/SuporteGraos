@@ -76,53 +76,61 @@ serve(async (req: Request) => {
     return fail('Variáveis de ambiente não configuradas', 500);
   }
 
-  // 3. Validar o JWT do chamador
-  //    Padrão oficial Supabase: createClient com ANON_KEY + Authorization header
-  const authHeader = req.headers.get('Authorization') ?? '';
-  if (!authHeader.startsWith('Bearer ')) {
-    return fail('Authorization header ausente ou inválido', 401);
-  }
-
-  const userClient = createClient(SUPABASE_URL, ANON_KEY, {
-    global: { headers: { Authorization: authHeader } },
-    auth: { persistSession: false },
-  });
-
-  const { data: { user: caller }, error: callerErr } = await userClient.auth.getUser();
-  if (callerErr || !caller) {
-    return fail(`Token inválido: ${callerErr?.message ?? 'sem usuário'}`, 401);
-  }
-
-  // 4. Buscar perfil do chamador em app_users (dados sempre frescos, nunca do JWT)
   const adminClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
     auth: { persistSession: false },
   });
 
-  const { data: profile, error: profileErr } = await adminClient
-    .from('app_users')
-    .select('company_id, role, active')
-    .eq('auth_user_id', caller.id)
-    .single();
+  let companyId: string | undefined;
+  let callerRole: string | undefined;
+  let isAdmin = false;
 
-  if (profileErr || !profile) {
-    return fail(`Perfil não encontrado (uid=${caller.id})`, 403);
-  }
+  const IS_PUBLIC_ACTION = ['validate-recovery-token', 'reset-password-by-token'].includes(action);
 
-  if (!profile.active) {
-    return fail('Usuário inativo', 403);
-  }
+  if (!IS_PUBLIC_ACTION) {
+    // 3. Validar o JWT do chamador
+    //    Padrão oficial Supabase: createClient com ANON_KEY + Authorization header
+    const authHeader = req.headers.get('Authorization') ?? '';
+    if (!authHeader.startsWith('Bearer ')) {
+      return fail('Authorization header ausente ou inválido', 401);
+    }
 
-  const companyId = profile.company_id as string;
-  const callerRole = (profile.role as string ?? '').toLowerCase();
-  const isAdmin = ['admin', 'administrator', 'administrador'].includes(callerRole);
+    const userClient = createClient(SUPABASE_URL, ANON_KEY, {
+      global: { headers: { Authorization: authHeader } },
+      auth: { persistSession: false },
+    });
 
-  if (!companyId) {
-    return fail('Usuário sem empresa vinculada', 403);
-  }
+    const { data: { user: caller }, error: callerErr } = await userClient.auth.getUser();
+    if (callerErr || !caller) {
+      return fail(`Token inválido: ${callerErr?.message ?? 'sem usuário'}`, 401);
+    }
 
-  // create / update / delete exigem admin
-  if (['create', 'update', 'delete'].includes(action) && !isAdmin) {
-    return fail('Apenas administradores podem gerenciar usuários', 403);
+    // 4. Buscar perfil do chamador em app_users (dados sempre frescos, nunca do JWT)
+    const { data: profile, error: profileErr } = await adminClient
+      .from('app_users')
+      .select('company_id, role, active')
+      .eq('auth_user_id', caller.id)
+      .single();
+
+    if (profileErr || !profile) {
+      return fail(`Perfil não encontrado (uid=${caller.id})`, 403);
+    }
+
+    if (!profile.active) {
+      return fail('Usuário inativo', 403);
+    }
+
+    companyId = profile.company_id as string;
+    callerRole = (profile.role as string ?? '').toLowerCase();
+    isAdmin = ['admin', 'administrator', 'administrador'].includes(callerRole);
+
+    if (!companyId) {
+      return fail('Usuário sem empresa vinculada', 403);
+    }
+
+    // create / update / delete exigem admin
+    if (['create', 'update', 'delete'].includes(action) && !isAdmin) {
+      return fail('Apenas administradores podem gerenciar usuários', 403);
+    }
   }
 
   // 5. Executar a ação solicitada
@@ -260,6 +268,99 @@ serve(async (req: Request) => {
       // Deletar do Auth — CASCADE remove automaticamente de app_users
       const { error: authErr } = await adminClient.auth.admin.deleteUser(userId);
       if (authErr) return fail(`Erro ao excluir: ${authErr.message}`);
+
+      return respond({ success: true });
+    }
+
+    // ────────────────────────────────────────────────── VALIDATE RECOVERY TOKEN ───
+    if (action === 'validate-recovery-token') {
+      const { token } = body as any;
+      if (!token) return fail('Token é obrigatório');
+
+      const { data, error } = await adminClient
+        .from('app_users')
+        .select('auth_user_id, first_name, last_name, cpf, email, phone, role, active, permissions, allow_recovery')
+        .eq('recovery_token', token)
+        .maybeSingle();
+
+      if (error || !data) {
+        return fail('Token inválido ou não encontrado.');
+      }
+
+      if (!data.active) {
+        return fail('Este usuário está inativo no sistema.');
+      }
+
+      if (!data.allow_recovery) {
+        return fail('A recuperação de senha não está habilitada para este usuário.');
+      }
+
+      return respond({
+        success: true,
+        user: {
+          id:            data.auth_user_id,
+          firstName:     data.first_name  ?? '',
+          lastName:      data.last_name   ?? '',
+          cpf:           data.cpf         ?? '',
+          email:         data.email       ?? '',
+          phone:         data.phone       ?? '',
+          role:          data.role        ?? 'user',
+          active:        data.active      !== false,
+          permissions:   Array.isArray(data.permissions) ? data.permissions : [],
+          allowRecovery: data.allow_recovery !== false,
+        }
+      });
+    }
+
+    // ────────────────────────────────────────────────── RESET PASSWORD BY TOKEN ───
+    if (action === 'reset-password-by-token') {
+      const { token, password } = body as any;
+      if (!token || !password) return fail('Token e senha são obrigatórios');
+      if (password.length < 6) return fail('A senha deve ter no mínimo 6 caracteres');
+
+      // Encontrar usuário associado ao token
+      const { data: userRow, error: fetchErr } = await adminClient
+        .from('app_users')
+        .select('auth_user_id, active, allow_recovery')
+        .eq('recovery_token', token)
+        .maybeSingle();
+
+      if (fetchErr || !userRow) {
+        return fail('Token inválido ou expirado.');
+      }
+
+      if (!userRow.active) {
+        return fail('Este usuário está inativo no sistema.');
+      }
+
+      if (!userRow.allow_recovery) {
+        return fail('A recuperação de senha não está habilitada para este usuário.');
+      }
+
+      const userId = userRow.auth_user_id;
+
+      // a) Atualizar a senha no Auth do Supabase e limpar a flag must_change_password
+      const { error: authErr } = await adminClient.auth.admin.updateUserById(userId, {
+        password: password,
+        user_metadata: { must_change_password: false }
+      });
+
+      if (authErr) {
+        return fail(`Erro ao atualizar a senha no Auth: ${authErr.message}`);
+      }
+
+      // b) Limpar o token no banco de dados e setar must_change_password no app_users
+      const { error: dbErr } = await adminClient
+        .from('app_users')
+        .update({
+          recovery_token: null,
+          must_change_password: false
+        })
+        .eq('auth_user_id', userId);
+
+      if (dbErr) {
+        console.error('[reset-password-by-token] Erro ao limpar token no banco:', dbErr);
+      }
 
       return respond({ success: true });
     }

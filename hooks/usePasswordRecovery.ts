@@ -37,14 +37,14 @@ export function usePasswordRecovery(
     setError('');
   }, []);
 
-  const handleValidateToken = useCallback((e: React.FormEvent) => {
+  const handleValidateToken = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!recoveryToken || isLoading) return;
     setError('');
     setIsLoading(true);
 
-    setTimeout(() => {
-      const user = (userService as any).getByRecoveryToken(recoveryToken);
+    try {
+      const user = await userService.getByRecoveryToken(recoveryToken);
       if (user) {
         setRecoveryUser(user);
         setRecoveryStep('reset');
@@ -52,11 +52,15 @@ export function usePasswordRecovery(
       } else {
         setError('Token inválido ou não encontrado.');
       }
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || 'Erro ao validar o token.');
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   }, [recoveryToken, isLoading]);
 
-  const handleResetPassword = useCallback((e: React.FormEvent) => {
+  const handleResetPassword = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!recoveryUser || !recoveryToken || isLoading) return;
 
@@ -69,10 +73,11 @@ export function usePasswordRecovery(
       return;
     }
 
+    setError('');
     setIsLoading(true);
 
-    setTimeout(() => {
-      const success = (userService as any).resetPasswordWithToken(recoveryToken, newPassword);
+    try {
+      const success = await userService.resetPasswordWithToken(recoveryToken, newPassword);
       if (success) {
         addToast('success', 'Senha Redefinida', 'Sua senha foi atualizada com sucesso. Faça login agora.');
         cancelRecovery();
@@ -80,8 +85,12 @@ export function usePasswordRecovery(
       } else {
         setError('Falha ao redefinir. Token pode ter expirado.');
       }
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || 'Erro ao redefinir a senha.');
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   }, [recoveryUser, recoveryToken, newPassword, confirmNewPassword, isLoading, addToast, cancelRecovery, setLoginEmail]);
 
   return {
