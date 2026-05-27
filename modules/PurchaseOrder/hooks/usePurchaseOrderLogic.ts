@@ -153,7 +153,7 @@ export const usePurchaseOrderLogic = (initialOrder: PurchaseOrder, onFinalizeCal
   useEffect(() => {
     if (!shouldCheckCompletion || isFinalizePromptOpen || isProcessing) return;
 
-    const isActuallyPaid = stats.balancePartner <= 0.05 && stats.totalSettled > 0;
+    const isActuallyPaid = stats.balancePartner <= 0.05 && stats.totalPurchaseVal > 0;
     const isNotFinalized = order.status !== 'completed';
     
     // Agora o critério é: Foi solicitada a checagem (após um pagamento) 

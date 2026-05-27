@@ -595,17 +595,22 @@ const PdfDocument: React.FC<Props> = ({ order, loadings, variant, company, water
             {statsProducer.payments.length === 0 ? (
               <Text style={stylesProducer.financialEmpty}>Sem registros de pagamento.</Text>
             ) : (
-              statsProducer.payments.map((p, i) => (
-                <View key={i} style={stylesProducer.financialItem}>
-                  <View>
-                    <Text style={stylesProducer.financialMeta}>{dateStr(p.date)}</Text>
-                    <Text style={stylesProducer.financialNote}>Ref: {p.notes || p.accountName || '-'}</Text>
+              statsProducer.payments.map((p, i) => {
+                const cleanAccount = p.accountName ? p.accountName.split(' - ')[0] : '';
+                return (
+                  <View key={i} style={stylesProducer.financialItem}>
+                    <View>
+                      <Text style={stylesProducer.financialMeta}>
+                        {dateStr(p.date)}{cleanAccount ? ` | ${cleanAccount}` : ''}
+                      </Text>
+                      <Text style={stylesProducer.financialNote}>Ref: {p.notes || '-'}</Text>
+                    </View>
+                    <Text style={[stylesProducer.financialValue, { color: '#047857' }]}>
+                      {currency((Number(p.value) || 0) + (Number(p.discountValue) || 0))}
+                    </Text>
                   </View>
-                  <Text style={[stylesProducer.financialValue, { color: '#047857' }]}>
-                    {currency((Number(p.value) || 0) + (Number(p.discountValue) || 0))}
-                  </Text>
-                </View>
-              ))
+                );
+              })
             )}
           </View>
 
@@ -614,15 +619,20 @@ const PdfDocument: React.FC<Props> = ({ order, loadings, variant, company, water
             {statsProducer.debitedExpenses.length === 0 ? (
               <Text style={stylesProducer.financialEmpty}>Nenhuma retencao aplicada.</Text>
             ) : (
-              statsProducer.debitedExpenses.map((e, i) => (
-                <View key={i} style={stylesProducer.financialItem}>
-                  <View>
-                    <Text style={stylesProducer.financialMeta}>{dateStr(e.date)}</Text>
-                    <Text style={stylesProducer.financialNote}>Motivo: {e.notes || 'Taxa Diversa'}</Text>
+              statsProducer.debitedExpenses.map((e, i) => {
+                const cleanAccount = e.accountName ? e.accountName.split(' - ')[0] : '';
+                return (
+                  <View key={i} style={stylesProducer.financialItem}>
+                    <View>
+                      <Text style={stylesProducer.financialMeta}>
+                        {dateStr(e.date)}{cleanAccount ? ` | ${cleanAccount}` : ''}
+                      </Text>
+                      <Text style={stylesProducer.financialNote}>Motivo: {e.notes || 'Taxa Diversa'}</Text>
+                    </View>
+                    <Text style={[stylesProducer.financialValue, { color: '#be123c' }]}>-{currency(e.value)}</Text>
                   </View>
-                  <Text style={[stylesProducer.financialValue, { color: '#be123c' }]}>-{currency(e.value)}</Text>
-                </View>
-              ))
+                );
+              })
             )}
           </View>
         </View>

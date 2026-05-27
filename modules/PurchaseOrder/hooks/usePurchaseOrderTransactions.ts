@@ -46,7 +46,10 @@ export function usePurchaseOrderTransactions(purchaseOrderId: string) {
                     transaction_id,
                     link_type,
                     metadata,
-                    transaction:financial_transactions(*)
+                    transaction:financial_transactions(
+                        *,
+                        account:accounts(account_name, owner)
+                    )
                 `)
                 .eq('purchase_order_id', resolvedOrderId)
                 .order('created_at', { ascending: false });
@@ -78,8 +81,8 @@ export function usePurchaseOrderTransactions(purchaseOrderId: string) {
                         value: Number(tx.amount),
                         discountValue: Number(tx.metadata?.discount_amount || metadata.discount || 0),
                         accountId: tx.account_id,
-                        accountName: tx.description?.split(' [')[0] || 'Caixa',
-                        notes: tx.description,
+                        accountName: tx.account ? `${tx.account.account_name}${tx.account.owner ? ` - ${tx.account.owner}` : ''}` : (tx.description?.split(' [')[0] || 'Caixa'),
+                        notes: metadata.notes || (getType() === 'expense' || getType() === 'commission' ? tx.description : ''),
                         status: 'active',
                         deductFromPartner: metadata.deductFromPartner ?? false
                     };

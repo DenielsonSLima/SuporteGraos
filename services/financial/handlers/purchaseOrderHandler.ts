@@ -71,7 +71,7 @@ export const handlePurchaseOrderPayment = async (
     p_discount: data.discount || 0,
     p_description: description,
     p_transaction_date: data.date,
-    p_metadata: { source: 'purchaseOrderHandler', tx_id: txId }
+    p_metadata: { source: 'purchaseOrderHandler', tx_id: txId, notes: data.notes }
   });
 
   if (rpcError || (result && !result.success)) {

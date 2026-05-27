@@ -328,7 +328,7 @@ const OrderDetails: React.FC<Props> = ({ order, onBack, onEdit, onDelete, onFina
       />
 
       <NoteModal isOpen={isNoteModalOpen} onClose={() => setIsNoteModalOpen(false)} onSave={onNoteSave} consultantName={currentOrder.consultantName} />
-      <PdfPreviewModal isOpen={isPdfOpen} onClose={() => setIsPdfOpen(false)} order={currentOrder} variant={pdfVariant} />
+      <PdfPreviewModal isOpen={isPdfOpen} onClose={() => setIsPdfOpen(false)} order={{ ...currentOrder, transactions: mergedTransactions }} variant={pdfVariant} />
       {showLoadingForm && <LoadingForm purchaseOrder={currentOrder} onSave={onLoadingSave} onClose={() => setShowLoadingForm(false)} />}
       {/* Fixed: onUpdate should wrap refreshLoadings in a lambda to avoid passing unexpected arguments */}
       {selectedLoading && <LoadingManagement loading={selectedLoading} onClose={() => setSelectedLoading(null)} onUpdate={() => actions.refreshLoadings()} originContext="purchase" />}

@@ -138,16 +138,34 @@ const OrderCard: React.FC<Props> = React.memo(({ order, onClick, onFinalize, onD
               </>
           ) : (
               <>
-                 <span className="text-[9px] font-black text-rose-600 uppercase tracking-widest">Saldo Aberto</span>
-                 <span className={`text-lg font-black tracking-tighter ${stats.pendingValue > 0.05 ? 'text-rose-700' : 'text-emerald-700'}`}>
-                    {stats.pendingValue > 0.05 ? currency(stats.pendingValue) : <span className="flex items-center gap-1.5"><CheckCircle size={16}/> QUITADO</span>}
-                 </span>
+                  <span className="text-[9px] font-black text-rose-600 uppercase tracking-widest">Saldo Aberto</span>
+                  <span className={`text-lg font-black tracking-tighter ${stats.pendingValue > 0.05 ? 'text-rose-700' : 'text-emerald-700'}`}>
+                     {stats.pendingValue > 0.05 ? (
+                       currency(stats.pendingValue)
+                     ) : stats.totalLoadedValue > 0 ? (
+                       <span className="flex items-center gap-1.5"><CheckCircle size={16}/> QUITADO</span>
+                     ) : (
+                       currency(0)
+                     )}
+                  </span>
               </>
           )}
         </div>
       </div>
 
       <div className="absolute top-4 right-4 z-20 flex gap-2 opacity-0 group-hover:opacity-100 transition-all translate-y-[-10px] group-hover:translate-y-0">
+        {onFinalize && stats.totalLoadedValue > 0 && stats.pendingValue <= 0.05 && order.status !== 'completed' && (
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              onFinalize(order);
+            }}
+            className="p-2.5 rounded-xl bg-emerald-600 text-white shadow-xl hover:bg-emerald-700 transition-all border border-emerald-500 active:scale-90" 
+            title="Finalizar Pedido"
+          >
+            <CheckCircle size={20} />
+          </button>
+        )}
         <button 
           onClick={handleDelete}
           className="p-2.5 rounded-xl bg-white text-rose-600 shadow-xl hover:bg-rose-600 hover:text-white transition-all border border-rose-100 active:scale-90" 
