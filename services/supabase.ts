@@ -1,5 +1,5 @@
 
-import { createClient, AuthError, Session, User as SupabaseUser } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
+import { createClient, AuthError, Session, User as SupabaseUser } from '@supabase/supabase-js';
 
 // ✅ CREDENCIAIS SUPABASE - Projeto: Suporte Grãos ERP
 export const supabaseUrl = 'https://vqhjbsiwzgxaozcedqcn.supabase.co';

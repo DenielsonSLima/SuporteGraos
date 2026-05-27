@@ -21,6 +21,8 @@ interface NetWorthData {
   aReceber: number;
   pago: number;
   aPagar: number;
+  emTransito: number;
+  saldoDisponivel: number;
   monthlyChange: number;
 }
 
@@ -78,26 +80,36 @@ const NetWorthChart: React.FC<Props> = React.memo(({ data, growthPercent }) => {
             <div className="flex gap-4 mb-2 pb-2 border-b border-slate-200">
               <div className="flex-1">
                 <p className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-emerald-600"></span>
-                  <span className="text-slate-600 text-xs">Recebido:</span>
-                  <span className="font-bold text-emerald-800 text-xs">{formatMoney(d.recebido)}</span>
+                  <span className="w-3 h-3 rounded-full bg-blue-600"></span>
+                  <span className="text-slate-600 text-xs">Disponível:</span>
+                  <span className="font-bold text-blue-800 text-xs">{formatMoney(d.saldoDisponivel)}</span>
+                </p>
+                <p className="flex items-center gap-2 mt-1">
+                  <span className="w-3 h-3 rounded-full bg-sky-400"></span>
+                  <span className="text-slate-600 text-xs">Em Trânsito:</span>
+                  <span className="font-bold text-sky-600 text-xs">{formatMoney(d.emTransito)}</span>
                 </p>
                 <p className="flex items-center gap-2 mt-1">
                   <span className="w-3 h-3 rounded-full bg-emerald-300"></span>
                   <span className="text-slate-600 text-xs">A Receber:</span>
                   <span className="font-bold text-emerald-600 text-xs">{formatMoney(d.aReceber)}</span>
                 </p>
+                <p className="flex items-center gap-2 mt-1 pt-1 border-t border-slate-100">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 opacity-60"></span>
+                  <span className="text-slate-500 text-[10px]">Recebido no Mês:</span>
+                  <span className="font-semibold text-emerald-700 text-[10px]">{formatMoney(d.recebido)}</span>
+                </p>
               </div>
               <div className="flex-1">
                 <p className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-rose-600"></span>
-                  <span className="text-slate-600 text-xs">Pago:</span>
-                  <span className="font-bold text-rose-800 text-xs">{formatMoney(d.pago)}</span>
-                </p>
-                <p className="flex items-center gap-2 mt-1">
                   <span className="w-3 h-3 rounded-full bg-rose-300"></span>
                   <span className="text-slate-600 text-xs">A Pagar:</span>
                   <span className="font-bold text-rose-600 text-xs">{formatMoney(d.aPagar)}</span>
+                </p>
+                <p className="flex items-center gap-2 mt-1 pt-1 border-t border-slate-100">
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-600 opacity-60"></span>
+                  <span className="text-slate-500 text-[10px]">Pago no Mês:</span>
+                  <span className="font-semibold text-rose-700 text-[10px]">{formatMoney(d.pago)}</span>
                 </p>
               </div>
             </div>
@@ -181,11 +193,11 @@ const NetWorthChart: React.FC<Props> = React.memo(({ data, growthPercent }) => {
             />
 
             {/* Barras: Entrada Empilhada (a) */}
-            <Bar yAxisId="left" stackId="a" dataKey="recebido" name="Recebido no Mês" fill="#059669" barSize={20} />
+            <Bar yAxisId="left" stackId="a" dataKey="saldoDisponivel" name="Saldo Disponível" fill="#0284c7" barSize={20} />
+            <Bar yAxisId="left" stackId="a" dataKey="emTransito" name="Em Trânsito" fill="#38bdf8" barSize={20} />
             <Bar yAxisId="left" stackId="a" dataKey="aReceber" name="A Receber (Fim do Mês)" fill="#6ee7b7" radius={[4, 4, 0, 0]} barSize={20} />
             
             {/* Barras: Saída Empilhada (b) */}
-            <Bar yAxisId="left" stackId="b" dataKey="pago" name="Pago no Mês" fill="#e11d48" barSize={20} />
             <Bar yAxisId="left" stackId="b" dataKey="aPagar" name="A Pagar (Fim do Mês)" fill="#fda4af" radius={[4, 4, 0, 0]} barSize={20} />
 
             {/* Linha: Net Worth */}
