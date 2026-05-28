@@ -34,7 +34,7 @@ export const usePurchaseOrderLogic = (initialOrder: PurchaseOrder, onFinalizeCal
   const { data: loadings = [] } = useLoadingsByPurchaseOrder(order.id);
   const [isFinalizePromptOpen, setIsFinalizePromptOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [shouldCheckCompletion, setShouldCheckCompletion] = useState(false);
+
 
   const { data: liveTransactions = [] } = usePurchaseOrderTransactions(order.id);
   const queryClient = useQueryClient();
@@ -141,38 +141,23 @@ export const usePurchaseOrderLogic = (initialOrder: PurchaseOrder, onFinalizeCal
   }, [mergedTransactions, order, loadings]);
 
   // 🔄 RESTORE: Abrir prompt de finalização apenas quando o saldo TRANSITAR para zero (SKIL: UX Manual Control)
-  const initialBalanceRef = useRef<number | null>(null);
+  const prevBalanceRef = useRef<number | null>(null);
 
   useEffect(() => {
-    // Registra o saldo inicial assim que os stats estiverem disponíveis
-    if (initialBalanceRef.current === null && stats.balancePartner !== undefined) {
-      initialBalanceRef.current = stats.balancePartner;
-    }
-  }, [stats.balancePartner]);
-
-  useEffect(() => {
-    if (!shouldCheckCompletion || isFinalizePromptOpen || isProcessing) return;
-
-    const isActuallyPaid = stats.balancePartner <= 0.05 && stats.totalPurchaseVal > 0;
-    const isNotFinalized = order.status !== 'completed';
-    
-    // Agora o critério é: Foi solicitada a checagem (após um pagamento) 
-    // E o saldo realmente está zerado agora.
-    if (isActuallyPaid && isNotFinalized) {
-      // Pequeno timeout para garantir que o toast de sucesso do pagamento apareça primeiro
-      const timer = setTimeout(() => {
-        setIsFinalizePromptOpen(true);
-      }, 1000);
+    if (stats.balancePartner !== undefined) {
+      const prevBalance = prevBalanceRef.current;
+      const currentBalance = stats.balancePartner;
       
-      // Reseta a flag para não repetir se o usuário fechar o modal
-      setShouldCheckCompletion(false);
-      return () => clearTimeout(timer);
+      const hasTransitionedToZero = prevBalance !== null && prevBalance > 0.05 && currentBalance <= 0.05;
+      const isNotFinalized = order.status !== 'completed';
+      
+      if (hasTransitionedToZero && isNotFinalized && !isFinalizePromptOpen && !isProcessing) {
+        setIsFinalizePromptOpen(true);
+      }
+      
+      prevBalanceRef.current = currentBalance;
     }
-
-    // Se checou e não era pra finalizar (ex: pagamento parcial), também reseta a flag
-    setShouldCheckCompletion(false);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shouldCheckCompletion, stats.balancePartner, order.status, isFinalizePromptOpen, isProcessing]);
+  }, [stats.balancePartner, order.status, isFinalizePromptOpen, isProcessing]);
 
   const actions = {
     refreshLoadings: refreshData,
@@ -189,8 +174,7 @@ export const usePurchaseOrderLogic = (initialOrder: PurchaseOrder, onFinalizeCal
         // Refresh TanStack Query para carregar os novos valores calculados pelo Banco
         await refreshData();
 
-        // Agenda a checagem de finalização após o refresh do banco
-        setTimeout(() => setShouldCheckCompletion(true), 1500);
+
       } catch (err: any) {
         console.error('[PO-PAYMENT] Erro completo:', err);
         addToast('error', `Erro ao confirmar pagamento: ${err?.message || 'Erro desconhecido'}`);

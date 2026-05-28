@@ -101,7 +101,31 @@ export function usePurchaseOrderModule({ addToast }: UsePurchaseOrderModuleOptio
 
   // ─── Finalizar pedido ──────────────────────────────────
   const finalizeOrder = useCallback(async (orderId: string): Promise<PurchaseOrder | null> => {
-    const freshOrder = purchaseService.getById(orderId);
+    let freshOrder = purchaseService.getById(orderId);
+    
+    if (!freshOrder) {
+      try {
+        const { supabase } = await import('../../../services/supabase');
+        const { isSqlCanonicalOpsEnabled } = await import('../../../services/sqlCanonicalOps');
+        const { mapOrderFromOpsRow, mapOrderFromDb } = await import('../../../services/purchase/mappers');
+        
+        const isCanonical = isSqlCanonicalOpsEnabled();
+        const tableName = isCanonical ? 'vw_purchase_orders_enriched' : 'ops_purchase_orders';
+        
+        const { data, error } = await supabase
+          .from(tableName)
+          .select('*')
+          .eq('id', orderId)
+          .maybeSingle();
+          
+        if (data && !error) {
+          freshOrder = isCanonical ? mapOrderFromOpsRow(data) : mapOrderFromDb(data);
+        }
+      } catch (dbErr) {
+        console.error('Erro ao buscar pedido do banco:', dbErr);
+      }
+    }
+
     if (freshOrder) {
       const updated = { ...freshOrder, status: 'completed' as const };
       await purchaseService.update(updated);
