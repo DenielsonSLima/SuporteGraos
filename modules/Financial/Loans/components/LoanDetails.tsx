@@ -35,6 +35,7 @@ const LoanDetails: React.FC<Props> = ({ loan, onBack, onUpdate }) => {
     editingTx, setEditingTx,
     deletingTxRecord, setDeletingTxRecord,
     financialHistory,
+    isLoadingHistory,
     handleAddTx, handleEditTx, handleDeleteTx,
     confirmDeleteTx, handleDeleteContract,
   } = useLoanDetails({ loan, onUpdate, onBack, addToast });
@@ -83,6 +84,8 @@ const LoanDetails: React.FC<Props> = ({ loan, onBack, onUpdate }) => {
       await loansService.update(loan.id, {
         principal_amount: updatedLoan.contractValue,
         start_date: updatedLoan.date,
+        type: updatedLoan.type,
+        accountId: updatedLoan.accountId,
       });
       
       const { data: entries } = await supabase
@@ -135,6 +138,7 @@ const LoanDetails: React.FC<Props> = ({ loan, onBack, onUpdate }) => {
 
         <LoanHistoryTable 
           history={financialHistory}
+          isLoading={isLoadingHistory}
           currency={currency}
           dateStr={dateStr}
           getBankAccountName={getBankAccountName}

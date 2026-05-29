@@ -26,6 +26,7 @@ export const statusFromDb = (status?: string): OrderStatus => {
     case 'approved':
       return 'approved';
     case 'received':
+    case 'completed':
       return 'completed';
     case 'cancelled':
     case 'canceled':

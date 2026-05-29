@@ -5,6 +5,7 @@ import { LoanTransaction } from '../../types';
 
 interface Props {
   history: any[];
+  isLoading?: boolean;
   currency: (val: number) => string;
   dateStr: (val: string) => string;
   getBankAccountName: (id?: string, desc?: string) => string;
@@ -13,7 +14,7 @@ interface Props {
 }
 
 const LoanHistoryTable: React.FC<Props> = ({ 
-  history, currency, dateStr, getBankAccountName, onEdit, onDelete 
+  history, isLoading = false, currency, dateStr, getBankAccountName, onEdit, onDelete 
 }) => {
   return (
     <div className="lg:col-span-2 bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
@@ -33,7 +34,28 @@ const LoanHistoryTable: React.FC<Props> = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
-            {history.map((record) => {
+            {isLoading && (
+              <tr>
+                <td colSpan={5} className="px-6 py-12 text-center text-slate-400">
+                   <div className="flex flex-col items-center justify-center gap-3">
+                      <div className="animate-spin h-6 w-6 text-blue-500 border-2 border-slate-200 border-t-blue-500 rounded-full" />
+                      <p className="text-xs font-black uppercase tracking-widest text-slate-500">Carregando extrato...</p>
+                   </div>
+                </td>
+              </tr>
+            )}
+            {!isLoading && history.length === 0 && (
+              <tr>
+                <td colSpan={5} className="px-6 py-12 text-center text-slate-400">
+                   <div className="flex flex-col items-center gap-2">
+                      <History size={40} className="opacity-20" />
+                      <p className="text-xs font-black uppercase tracking-widest">Nenhuma movimentação registrada</p>
+                      <p className="text-[10px] opacity-60">Os registros aparecerão aqui conforme as parcelas forem pagas ou reforços forem feitos.</p>
+                   </div>
+                </td>
+              </tr>
+            )}
+            {!isLoading && history.map((record) => {
               const isCredit = record.subType === 'receipt';
               return (
                 <tr key={record.id} className="hover:bg-slate-50 transition-colors">
@@ -72,17 +94,6 @@ const LoanHistoryTable: React.FC<Props> = ({
                 </tr>
               );
             })}
-            {history.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-6 py-12 text-center text-slate-400">
-                   <div className="flex flex-col items-center gap-2">
-                      <History size={40} className="opacity-20" />
-                      <p className="text-xs font-black uppercase tracking-widest">Nenhuma movimentação registrada</p>
-                      <p className="text-[10px] opacity-60">Os registros aparecerão aqui conforme as parcelas forem pagas ou reforços forem feitos.</p>
-                   </div>
-                </td>
-              </tr>
-            )}
           </tbody>
         </table>
       </div>

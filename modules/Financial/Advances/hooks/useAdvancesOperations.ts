@@ -20,7 +20,10 @@ export function useAdvancesOperations({ addToast }: UseAdvancesOperationsOptions
 
   const refreshData = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ADVANCES });
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ADVANCES_ACTIVE_TOTALS });
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS });
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_ENTRIES });
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_TRANSACTIONS });
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT });
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_SUMMARY });
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD });
@@ -88,6 +91,8 @@ export function useAdvancesOperations({ addToast }: UseAdvancesOperationsOptions
         accountId: data.accountId,
         description: data.description,
         advanceDate: data.date,
+        recipientType: data.type === 'given' ? 'supplier' : 'client',
+        recipientId: data.partnerId,
       });
       refreshData();
       addToast('success', 'Adiantamento atualizado com sucesso');

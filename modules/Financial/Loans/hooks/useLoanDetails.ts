@@ -49,30 +49,31 @@ export function useLoanDetails({ loan, onUpdate, onBack, addToast }: UseLoanDeta
         entryIds = entries.map(e => e.id);
       }
 
-      // Busca transações pela descrição (legado/fallback)
-      const { data: keywordData } = await supabase
-        .from('financial_transactions')
-        .select(`id, transaction_date, description, amount, account_id, type, metadata`)
-        .ilike('description', `%${loan.id}%`);
-
-      // Busca transações via metadata loan_id
-      const { data: metadataData } = await supabase
-        .from('financial_transactions')
-        .select(`id, transaction_date, description, amount, account_id, type, metadata`)
-        .eq('metadata->>loan_id', loan.id);
-
-      // Busca transações das entries (canônico)
-      let entryData: any[] = [];
-      if (entryIds.length > 0) {
-        const { data } = await supabase
+      // Executar buscas em paralelo para evitar gargalo de waterfall
+      const [keywordRes, metadataRes, entryRes, legacyRecords] = await Promise.all([
+        supabase
           .from('financial_transactions')
           .select(`id, transaction_date, description, amount, account_id, type, metadata`)
-          .in('entry_id', entryIds);
-        entryData = data || [];
-      }
+          .ilike('description', `%${loan.id}%`),
+        supabase
+          .from('financial_transactions')
+          .select(`id, transaction_date, description, amount, account_id, type, metadata`)
+          .eq('metadata->>loan_id', loan.id),
+        entryIds.length > 0
+          ? supabase
+              .from('financial_transactions')
+              .select(`id, transaction_date, description, amount, account_id, type, metadata`)
+              .in('entry_id', entryIds)
+          : Promise.resolve({ data: [] as any[], error: null }),
+        financialActionService.getStandaloneRecords()
+      ]);
+
+      const keywordData = keywordRes.data || [];
+      const metadataData = metadataRes.data || [];
+      const entryData = entryRes.data || [];
 
       // Unificar sem duplicados (por ID)
-      const allData = [...entryData, ...(keywordData || []), ...(metadataData || [])];
+      const allData = [...entryData, ...keywordData, ...metadataData];
       const uniqueData = Array.from(new Map(allData.map(item => [item.id, item])).values());
 
       setCanonicalTransactions(uniqueData.map(t => ({
@@ -89,8 +90,7 @@ export function useLoanDetails({ loan, onUpdate, onBack, addToast }: UseLoanDeta
       })));
 
       // 2. BUSCA LEGADO (admin_expenses)
-      const legacyRecords = await financialActionService.getStandaloneRecords();
-      const filteredLegacy = legacyRecords.filter((r: any) => {
+      const filteredLegacy = (legacyRecords || []).filter((r: any) => {
         const hasLoanRef = r.id?.startsWith(loan.id) || r.notes?.includes(`[ORIGIN:${loan.id}]`);
         return hasLoanRef &&
           ['receipt', 'admin', 'loan_taken', 'loan_granted'].includes(r.subType || '') &&
@@ -278,6 +278,7 @@ export function useLoanDetails({ loan, onUpdate, onBack, addToast }: UseLoanDeta
     setDeletingTxRecord,
     // Data
     financialHistory,
+    isLoadingHistory,
     // Actions
     handleAddTx,
     handleEditTx,

@@ -604,6 +604,11 @@ const PdfDocument: React.FC<Props> = ({ order, loadings, variant, company, water
                         {dateStr(p.date)}{cleanAccount ? ` | ${cleanAccount}` : ''}
                       </Text>
                       <Text style={stylesProducer.financialNote}>Ref: {p.notes || '-'}</Text>
+                      {Number(p.discountValue) > 0 && (
+                        <Text style={[stylesProducer.financialNote, { color: '#d97706', fontSize: 7, marginTop: 2 }]}>
+                          Pago: {currency(p.value)} | Desconto: {currency(p.discountValue)}
+                        </Text>
+                      )}
                     </View>
                     <Text style={[stylesProducer.financialValue, { color: '#047857' }]}>
                       {currency((Number(p.value) || 0) + (Number(p.discountValue) || 0))}

@@ -32,6 +32,8 @@ export const advancesActions = {
     accountId: string;
     description: string;
     advanceDate: string;
+    recipientType?: 'supplier' | 'client' | 'shareholder';
+    recipientId?: string;
   }): Promise<void> => {
     const { error } = await supabase.rpc('rpc_update_advance', {
       p_advance_id: params.id,
@@ -39,6 +41,8 @@ export const advancesActions = {
       p_account_id: params.accountId,
       p_description: params.description,
       p_advance_date: params.advanceDate,
+      p_recipient_type: params.recipientType || null,
+      p_recipient_id: params.recipientId || null,
     });
     if (error) throw new Error(error.message);
   },

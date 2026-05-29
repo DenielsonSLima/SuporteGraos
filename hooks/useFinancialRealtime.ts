@@ -46,6 +46,21 @@ const FINANCIAL_QUERY_KEYS = [
   QUERY_KEYS.CREDITS,
   QUERY_KEYS.ADMIN_EXPENSES,
   QUERY_KEYS.STANDALONE_RECORDS,
+
+  // Prefixos de chaves dinâmicas / parametrizadas (funções em QUERY_KEYS) que necessitam de invalidação:
+  ['account_transactions'],
+  ['entry_transactions'],
+  ['account_summary'],
+  ['account'],
+  ['bank_accounts'],
+  ['shareholder'],
+  ['shareholder_totals'],
+  ['shareholder_operations'],
+  ['payable'],
+  ['receivable'],
+  ['entry'],
+  ['totals'],
+  ['cashier_modular_stats'],
 ] as const;
 
 export function useFinancialRealtime(): void {

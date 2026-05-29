@@ -233,7 +233,7 @@ const AdvanceTracebackView: React.FC<Props> = ({
 
             <div className="flex-1 overflow-y-auto">
               {children.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-center p-8 bg-slate-50/50 rounded-2xl border-2 border-dashed border-slate-200">
+                <div className="py-12 px-6 flex flex-col items-center justify-center text-center bg-slate-50/50 rounded-2xl border-2 border-dashed border-slate-200">
                   <div className="p-4 bg-slate-100 rounded-full text-slate-400 mb-3">
                     <HelpCircle size={28} />
                   </div>

@@ -79,7 +79,8 @@ const PartnersPage: React.FC = () => {
     return {
       totalReceivable: statsData?.totalReceivable ?? 0,
       totalPayable: statsData?.totalPayable ?? 0,
-      netBalance: statsData?.netBalance ?? 0
+      netBalance: statsData?.netBalance ?? 0,
+      totalTransit: statsData?.totalTransit ?? 0
     };
   }, [statsData]);
 
@@ -263,6 +264,7 @@ const PartnersPage: React.FC = () => {
         totalReceivable={totals.totalReceivable}
         totalPayable={totals.totalPayable}
         netBalance={totals.netBalance}
+        totalTransit={totals.totalTransit}
       />
 
       <PartnerFilters

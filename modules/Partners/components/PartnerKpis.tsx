@@ -1,16 +1,17 @@
 import React from 'react';
-import { ArrowUpRight, ArrowDownRight, Scale } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, Scale, Truck } from 'lucide-react';
 import { formatMoney } from '../../../utils/formatters';
 
 interface Props {
   totalReceivable: number;
   totalPayable: number;
   netBalance: number;
+  totalTransit: number;
 }
 
-const PartnerKpis: React.FC<Props> = ({ totalReceivable, totalPayable, netBalance }) => {
+const PartnerKpis: React.FC<Props> = ({ totalReceivable, totalPayable, netBalance, totalTransit }) => {
   return (
-    <div className="grid gap-6 md:grid-cols-3 mb-6 animate-in fade-in duration-300">
+    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-6 animate-in fade-in duration-300">
       {/* Total Geral a Receber */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between hover:shadow-md transition-all">
         <div>
@@ -30,6 +31,17 @@ const PartnerKpis: React.FC<Props> = ({ totalReceivable, totalPayable, netBalanc
         </div>
         <div className="p-3 bg-rose-50 rounded-xl text-rose-600 shadow-sm shadow-rose-100">
           <ArrowDownRight size={20} className="stroke-[3]" />
+        </div>
+      </div>
+
+      {/* Mercadoria em Trânsito */}
+      <div className="bg-white p-6 rounded-2xl border border-amber-200 shadow-sm flex items-center justify-between hover:shadow-md transition-all">
+        <div>
+          <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Mercadoria em Trânsito</p>
+          <h3 className="text-2xl font-black text-amber-600 mt-1">{formatMoney(totalTransit)}</h3>
+        </div>
+        <div className="p-3 bg-amber-50 rounded-xl text-amber-600 shadow-sm shadow-amber-100">
+          <Truck size={20} className="stroke-[2.5]" />
         </div>
       </div>
 

@@ -107,7 +107,10 @@ const LoansTab: React.FC = () => {
           queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOAN_INSTALLMENTS });
           queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOANS_ACTIVE_TOTALS });
           queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_ENTRIES });
+          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_TRANSACTIONS });
           queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS });
+          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT });
+          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD });
         }}
       />
     );

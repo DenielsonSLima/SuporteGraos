@@ -29,6 +29,10 @@ const rpcToMonthlyReport = (rpc: any, year: number, month: number): MonthlyRepor
   const monthKey = rpc.monthKey ?? `${year}-${String(month).padStart(2, '0')}`;
   const endOfMonth = rpc.referenceDate ?? new Date(year, month, 0).toISOString().split('T')[0];
 
+  const dateObj = new Date(year, month - 1, 15);
+  const localMonthLabel = dateObj.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  const capitalizedMonthLabel = localMonthLabel.charAt(0).toUpperCase() + localMonthLabel.slice(1);
+
     // ═══════════════════════════════════════════════════════════════════
   // REGRA DE OURO: CONTAS VIRTUAIS/INTERNAS NUNCA DEVEM IR PARA O CAIXA
   // ═══════════════════════════════════════════════════════════════════
@@ -82,7 +86,7 @@ const rpcToMonthlyReport = (rpc: any, year: number, month: number): MonthlyRepor
   return {
     id: monthKey,
     monthKey,
-    monthLabel: rpc.monthLabel ?? '',
+    monthLabel: capitalizedMonthLabel,
     referenceDate: endOfMonth + 'T23:59:59Z',
     isClosed: false,
     isSnapshot: false,
@@ -100,19 +104,19 @@ const rpcToMonthlyReport = (rpc: any, year: number, month: number): MonthlyRepor
 
     pendingSalesReceipts: Number(rpc.pendingSalesReceipts) || 0,
     merchandiseInTransitValue: Number(rpc.merchandiseInTransitValue) || 0,
-    loansGranted: Number(rpc.loansGranted) || 0,
-    advancesGiven: Number(rpc.advancesGiven) || 0,
+    loanCredits: Number(rpc.loansGranted) || 0,
+    advancesCredits: Number(rpc.advancesGiven) || 0,
     totalFixedAssetsValue: Number(rpc.totalFixedAssetsValue) || 0,
-    pendingAssetSalesReceipts: 0,
-    shareholderReceivables: Number(rpc.shareholderReceivables) || 0,
+    assetSalesReceivable: Number(rpc.assetSalesReceivable) || 0,
+    shareholderCredits: Number(rpc.shareholderReceivables) || 0,
     totalAssets,
 
     pendingPurchasePayments: Number(rpc.pendingPurchasePayments) || 0,
     pendingFreightPayments: Number(rpc.pendingFreightPayments) || 0,
-    loansTaken: Number(rpc.loansTaken) || 0,
+    loanDebts: Number(rpc.loansTaken) || 0,
     commissionsToPay: Number(rpc.commissionsToPay) || 0,
-    advancesTaken: Number(rpc.advancesTaken) || 0,
-    shareholderPayables: Number(rpc.shareholderPayables) || 0,
+    clientAdvances: Number(rpc.advancesTaken) || 0,
+    shareholderDebts: Number(rpc.shareholderPayables) || 0,
     totalLiabilities,
 
     netBalance,
@@ -160,7 +164,7 @@ export const calculateMonthlyReport = async (
 };
 
 /**
- * Conta movimentações de um mês via SQL (count de financial_transactions + transfers)
+ * Conta movimentações e registros ativos de um mês via SQL (transactions, transfers, assets, loans, advances)
  */
 const getMonthlyMovementCount = async (
   companyId: string,
@@ -170,7 +174,7 @@ const getMonthlyMovementCount = async (
   const startOfMonth = `${year}-${String(month).padStart(2, '0')}-01`;
   const endOfMonth = new Date(year, month, 0).toISOString().split('T')[0];
 
-  const [txRes, trRes] = await Promise.all([
+  const [txRes, trRes, astRes, lnRes, advRes] = await Promise.all([
     supabase
       .from('financial_transactions')
       .select('id', { count: 'exact', head: true })
@@ -183,13 +187,31 @@ const getMonthlyMovementCount = async (
       .eq('company_id', companyId)
       .gte('transfer_date', startOfMonth)
       .lte('transfer_date', endOfMonth),
+    supabase
+      .from('assets')
+      .select('id', { count: 'exact', head: true })
+      .eq('company_id', companyId)
+      .gte('acquisition_date', startOfMonth)
+      .lte('acquisition_date', endOfMonth),
+    supabase
+      .from('loans')
+      .select('id', { count: 'exact', head: true })
+      .eq('company_id', companyId)
+      .gte('start_date', startOfMonth)
+      .lte('start_date', endOfMonth),
+    supabase
+      .from('advances')
+      .select('id', { count: 'exact', head: true })
+      .eq('company_id', companyId)
+      .gte('advance_date', startOfMonth)
+      .lte('advance_date', endOfMonth),
   ]);
 
-  return (txRes.count ?? 0) + (trRes.count ?? 0);
+  return (txRes.count ?? 0) + (trRes.count ?? 0) + (astRes.count ?? 0) + (lnRes.count ?? 0) + (advRes.count ?? 0);
 };
 
 /**
- * Lista todos os meses com histórico disponível (últimos 12 meses)
+ * Lista todos os meses com histórico disponível (últimos 24 meses)
  * @returns Array de HistoryListItem ordenados por data (mais recentes primeiro)
  */
 export const getMonthlyHistory = async (): Promise<HistoryListItem[]> => {
@@ -199,7 +221,7 @@ export const getMonthlyHistory = async (): Promise<HistoryListItem[]> => {
   const today = new Date();
   const months: { year: number; month: number }[] = [];
 
-  for (let i = 1; i <= 12; i++) {
+  for (let i = 1; i <= 24; i++) {
     const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
     months.push({ year: d.getFullYear(), month: d.getMonth() + 1 });
   }

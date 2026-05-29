@@ -374,6 +374,19 @@ export const update = async (id: string, updates: Partial<FinancialRecord>): Pro
         return null;
       }
 
+      if (updates.bankAccount !== undefined) {
+        await supabase
+          .from('financial_transactions')
+          .update({ account_id: updates.bankAccount })
+          .eq('entry_id', id);
+
+        await supabase
+          .from('financial_transactions')
+          .update({ account_id: updates.bankAccount })
+          .eq('source_table', 'loans')
+          .eq('source_id', id);
+      }
+
       const mapped = fromFinancialEntry(data);
       const records = db.getAll();
       db.setAll(records.map(r => r.id === id ? mapped : r));
@@ -433,6 +446,22 @@ export const update = async (id: string, updates: Partial<FinancialRecord>): Pro
         due_date: mapped.dueDate
       }).eq('origin_id', id).eq('origin_type', 'loan');
     } catch (err) {
+    }
+
+    if (updates.bankAccount !== undefined) {
+      try {
+        await supabase
+          .from('financial_transactions')
+          .update({ account_id: updates.bankAccount })
+          .eq('entry_id', id);
+
+        await supabase
+          .from('financial_transactions')
+          .update({ account_id: updates.bankAccount })
+          .eq('source_table', 'loans')
+          .eq('source_id', id);
+      } catch (err) {
+      }
     }
 
     return mapped as Credit;

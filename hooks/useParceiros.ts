@@ -282,6 +282,7 @@ export function usePartnerStats(params?: {
                 totalReceivable: Number(stats.total_receivable || 0),
                 totalPayable: Number(stats.total_payable || 0),
                 netBalance: Number(stats.net_balance || 0),
+                totalTransit: Number(stats.total_transit || 0),
             };
         },
         staleTime: STALE_5_MIN,

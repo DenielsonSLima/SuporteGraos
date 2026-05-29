@@ -40,7 +40,13 @@ export function useCreateLoan() {
     }) => loansService.create(params),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOANS });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOANS_ACTIVE_TOTALS });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOAN_INSTALLMENTS });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_ENTRIES });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_TRANSACTIONS });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD });
     },
   });
 }
@@ -53,7 +59,13 @@ export function useUpdateLoan() {
       loansService.update(id, updates),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOANS });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOANS_ACTIVE_TOTALS });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOAN_INSTALLMENTS });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_ENTRIES });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_TRANSACTIONS });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD });
     },
   });
 }
@@ -65,8 +77,13 @@ export function useDeleteLoan() {
     mutationFn: (loanId: string) => loansService.delete(loanId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOANS });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOANS_ACTIVE_TOTALS });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOAN_INSTALLMENTS });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_ENTRIES });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_TRANSACTIONS });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD });
     },
   });
 }

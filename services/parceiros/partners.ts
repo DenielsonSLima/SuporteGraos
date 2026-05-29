@@ -231,6 +231,6 @@ export const partnersActions = {
     });
 
     if (error) throw error;
-    return data?.[0] || { total_receivable: 0, total_payable: 0, net_balance: 0 };
+    return data?.[0] || { total_receivable: 0, total_payable: 0, net_balance: 0, total_transit: 0 };
   }
 };

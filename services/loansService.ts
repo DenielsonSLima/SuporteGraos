@@ -97,12 +97,11 @@ export const loansService = {
       .eq('origin_type', 'loan');
 
     // Tentativa B: Via metadata da transação (desembolso inicial)
-    // ... (mesmo código de antes para disbursementTxs)
     const { data: disbursementTxs } = await supabase
       .from('financial_transactions')
       .select('account_id, metadata')
       .eq('company_id', loans[0].company_id)
-      .not('metadata', 'is', null);
+      .not('metadata->>loan_id', 'is', null);
 
     const disbursementMap = new Map<string, string>();
     disbursementTxs?.forEach(tx => {
@@ -175,27 +174,57 @@ export const loansService = {
     return data as string;
   },
 
-  update: async (loanId: string, updates: Partial<Omit<Loan, 'id' | 'company_id' | 'created_at' | 'updated_at'>>): Promise<void> => {
+  update: async (loanId: string, updates: Partial<Omit<Loan, 'id' | 'company_id' | 'created_at' | 'updated_at'>> & { type?: 'taken' | 'granted', accountId?: string }): Promise<void> => {
+    const loanUpdates: any = {
+      lender_id: updates.lender_id,
+      principal_amount: updates.principal_amount,
+      interest_rate: updates.interest_rate,
+      start_date: updates.start_date,
+      end_date: updates.end_date,
+      paid_amount: updates.paid_amount,
+      remaining_amount: updates.remaining_amount,
+      status: updates.status,
+    };
+    if (updates.type !== undefined) {
+      loanUpdates.type = updates.type;
+    }
+
     const { error } = await supabase
       .from('loans')
-      .update({
-        lender_id: updates.lender_id,
-        principal_amount: updates.principal_amount,
-        interest_rate: updates.interest_rate,
-        start_date: updates.start_date,
-        end_date: updates.end_date,
-        paid_amount: updates.paid_amount,
-        remaining_amount: updates.remaining_amount,
-        status: updates.status,
-      })
+      .update(loanUpdates)
       .eq('id', loanId);
     if (error) throw new Error(`Erro ao atualizar empréstimo: ${error.message}`);
 
-    // Se alterou valor principal ou data de início, sincroniza a transação de desembolso correspondente
-    if (updates.principal_amount !== undefined || updates.start_date !== undefined) {
+    // Update associated entry type and description
+    if (updates.type !== undefined || updates.principal_amount !== undefined || updates.start_date !== undefined) {
+      const entryUpdates: any = {};
+      if (updates.type !== undefined) {
+        entryUpdates.type = updates.type === 'taken' ? 'payable' : 'receivable';
+      }
+      if (updates.principal_amount !== undefined) {
+        entryUpdates.total_amount = updates.principal_amount;
+        entryUpdates.remaining_amount = updates.principal_amount; // Reset or calculate remaining based on paid_amount
+      }
+      if (updates.start_date !== undefined) {
+        entryUpdates.created_date = updates.start_date;
+      }
+
+      await supabase
+        .from('financial_entries')
+        .update(entryUpdates)
+        .eq('origin_id', loanId)
+        .eq('origin_type', 'loan');
+    }
+
+    // Se alterou valor principal, data de início, conta ou tipo, sincroniza a transação de desembolso correspondente
+    if (updates.principal_amount !== undefined || updates.start_date !== undefined || updates.accountId !== undefined || updates.type !== undefined) {
       const txUpdates: any = {};
       if (updates.principal_amount !== undefined) txUpdates.amount = updates.principal_amount;
       if (updates.start_date !== undefined) txUpdates.transaction_date = updates.start_date;
+      if (updates.accountId !== undefined) txUpdates.account_id = updates.accountId;
+      if (updates.type !== undefined) {
+        txUpdates.type = updates.type === 'taken' ? 'credit' : 'debit';
+      }
 
       await supabase
         .from('financial_transactions')

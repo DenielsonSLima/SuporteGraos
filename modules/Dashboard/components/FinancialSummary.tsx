@@ -20,7 +20,7 @@ const FinancialSummary: React.FC<Props> = React.memo(({ data }) => {
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
       
       {/* Saldo Geral */}
-      <div className="relative overflow-hidden rounded-2xl bg-slate-900 p-6 text-white shadow-lg group">
+      <div className="relative overflow-hidden rounded-2xl bg-slate-900 p-5 lg:p-4 xl:p-5 text-white shadow-lg group">
         <div className="absolute right-0 top-0 h-32 w-32 -mr-8 -mt-8 rounded-full bg-emerald-500/20 blur-2xl group-hover:bg-emerald-500/30 transition-all"></div>
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-4">
@@ -31,7 +31,7 @@ const FinancialSummary: React.FC<Props> = React.memo(({ data }) => {
           </div>
           <div className="flex items-end justify-between">
             <div>
-              <h3 className="text-xl font-bold text-white mb-1">{formatMoney(data.totalBankBalance)}</h3>
+              <h3 className="text-lg xl:text-xl font-black tracking-tighter text-white mb-1 whitespace-nowrap">{formatMoney(data.totalBankBalance)}</h3>
               <p className="text-[10px] text-slate-400 uppercase font-black">Disponibilidade Imediata</p>
             </div>
           </div>
@@ -39,43 +39,43 @@ const FinancialSummary: React.FC<Props> = React.memo(({ data }) => {
       </div>
 
       {/* Contas a Pagar */}
-      <div className="relative overflow-hidden rounded-2xl bg-white border border-slate-200 p-6 shadow-sm hover:shadow-md transition-shadow">
+      <div className="relative overflow-hidden rounded-2xl bg-white border border-slate-200 p-5 lg:p-4 xl:p-5 shadow-sm hover:shadow-md transition-shadow">
         <div className="flex items-center gap-3 mb-4">
           <div className="rounded-lg bg-rose-100 p-2 text-rose-600">
             <ArrowDownCircle size={24} />
           </div>
           <span className="text-sm font-bold text-slate-500 uppercase tracking-wide">Contas a Pagar</span>
         </div>
-        <h3 className="text-xl font-bold text-slate-800 mb-1">{formatMoney(data.totalLiabilities)}</h3>
+        <h3 className="text-lg xl:text-xl font-black tracking-tighter text-slate-800 mb-1 whitespace-nowrap">{formatMoney(data.totalLiabilities)}</h3>
         <p className="mt-2 text-[10px] text-slate-400 uppercase font-black tracking-widest">Obrigações Operacionais</p>
       </div>
 
       {/* Contas a Receber */}
-      <div className="relative overflow-hidden rounded-2xl bg-white border border-slate-200 p-6 shadow-sm hover:shadow-md transition-shadow">
+      <div className="relative overflow-hidden rounded-2xl bg-white border border-slate-200 p-5 lg:p-4 xl:p-5 shadow-sm hover:shadow-md transition-shadow">
         <div className="flex items-center gap-3 mb-4">
           <div className="rounded-lg bg-emerald-100 p-2 text-emerald-600">
             <ArrowUpCircle size={24} />
           </div>
           <span className="text-sm font-bold text-slate-500 uppercase tracking-wide">Contas a Receber</span>
         </div>
-        <h3 className="text-xl font-bold text-slate-800 mb-1">{formatMoney(data.pendingSalesReceipts)}</h3>
+        <h3 className="text-lg xl:text-xl font-black tracking-tighter text-slate-800 mb-1 whitespace-nowrap">{formatMoney(data.pendingSalesReceipts)}</h3>
         <p className="mt-2 text-[10px] text-slate-400 uppercase font-black tracking-widest">Vendas Faturadas</p>
       </div>
 
       {/* Mercadorias em Trânsito (Novo KPI) */}
-      <div className="relative overflow-hidden rounded-2xl bg-white border border-slate-200 p-6 shadow-sm hover:shadow-md transition-shadow group">
+      <div className="relative overflow-hidden rounded-2xl bg-white border border-slate-200 p-5 lg:p-4 xl:p-5 shadow-sm hover:shadow-md transition-shadow group">
         <div className="flex items-center gap-3 mb-4">
           <div className="rounded-lg bg-blue-100 p-2 text-blue-600 group-hover:scale-110 transition-transform">
             <Truck size={24} />
           </div>
           <span className="text-sm font-bold text-slate-500 uppercase tracking-wide">Em Trânsito</span>
         </div>
-        <h3 className="text-xl font-bold text-blue-700 mb-1">{formatMoney(data.merchandiseInTransitValue)}</h3>
+        <h3 className="text-lg xl:text-xl font-black tracking-tighter text-blue-700 mb-1 whitespace-nowrap">{formatMoney(data.merchandiseInTransitValue)}</h3>
         <p className="mt-2 text-[10px] text-slate-400 uppercase font-black tracking-widest">Valor de Carga na Estrada</p>
       </div>
 
       {/* Patrimônio Líquido (Novo KPI) */}
-      <div className="relative overflow-hidden rounded-2xl bg-slate-900 p-6 text-white shadow-lg group">
+      <div className="relative overflow-hidden rounded-2xl bg-slate-900 p-5 lg:p-4 xl:p-5 text-white shadow-lg group">
         <div className="absolute right-0 top-0 h-32 w-32 -mr-8 -mt-8 rounded-full bg-emerald-500/20 blur-2xl group-hover:bg-emerald-500/30 transition-all"></div>
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-4">
@@ -86,7 +86,7 @@ const FinancialSummary: React.FC<Props> = React.memo(({ data }) => {
           </div>
           <div className="flex items-end justify-between">
             <div>
-              <h3 className="text-xl font-bold text-white mb-1">{formatMoney(netWorth)}</h3>
+              <h3 className="text-lg xl:text-xl font-black tracking-tighter text-white mb-1 whitespace-nowrap">{formatMoney(netWorth)}</h3>
               <p className="text-[10px] text-slate-400 uppercase font-black">Ativos - Passivos</p>
             </div>
           </div>

@@ -56,9 +56,9 @@ const OpenFreights: React.FC<Props> = ({ freights, onFreightClick }) => {
     const payable = filteredData.reduce((acc, f) => acc + f.balanceValue, 0);
     const count = filteredData.length;
     // Valor em Risco: apenas cargas que NÃO foram descarregadas (ainda em trânsito)
-    // Cargas já completadas (descarregadas) não têm mercadoria "em risco" no transporte
+    // Cargas já descarregadas (com peso de destino) não têm mercadoria "em risco" no transporte
     const mercVal = filteredData
-      .filter(f => f.status !== 'completed')
+      .filter(f => !f.unloadWeightKg || f.unloadWeightKg <= 0)
       .reduce((acc, f) => acc + (f.merchandiseValue || 0), 0);
     const volumeTon = filteredData.reduce((acc, f) => acc + (f.weight / 1000), 0);
 
@@ -180,8 +180,35 @@ const OpenFreights: React.FC<Props> = ({ freights, onFreightClick }) => {
                       <td className="px-4 py-3 text-right font-bold text-blue-700">
                         {f.unloadWeightKg !== undefined ? number(f.unloadWeightKg) : <span className="text-slate-300 font-normal italic">Pendente</span>}
                       </td>
-                      <td className={`px-4 py-3 text-right font-black ${f.breakageKg && f.breakageKg > 0 ? 'text-rose-600' : 'text-slate-300'}`}>
-                        {f.breakageKg !== undefined ? number(f.breakageKg) : '-'}
+                      <td className="px-4 py-3 text-right font-black">
+                        {(() => {
+                          if (f.unloadWeightKg === undefined || f.unloadWeightKg <= 0) {
+                            return <span className="text-slate-300">-</span>;
+                          }
+                          const breakage = f.breakageKg ?? 0;
+                          if (Math.abs(breakage) < 0.01) {
+                            return <span className="text-emerald-600 font-bold">✔ OK</span>;
+                          }
+                          const absBreakage = Math.abs(breakage);
+                          const scValue = (absBreakage / 60).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                          const kgValue = number(absBreakage);
+                          
+                          if (breakage > 0) {
+                            // Carga descarregou a menos (Quebra/Perda) -> Vermelho com sinal de menos
+                            return (
+                              <span className="text-rose-600">
+                                -{kgValue} kg (-{scValue} sc)
+                              </span>
+                            );
+                          } else {
+                            // Carga descarregou a mais (Sobra) -> Verde com sinal de mais
+                            return (
+                              <span className="text-emerald-600">
+                                +{kgValue} kg (+{scValue} sc)
+                              </span>
+                            );
+                          }
+                        })()}
                       </td>
                     <td className="px-4 py-3 text-right font-bold text-slate-700">{currency(f.pricePerUnit)}</td>
                     <td className="px-4 py-3 text-right font-black text-slate-900">{currency(f.totalFreight)}</td>

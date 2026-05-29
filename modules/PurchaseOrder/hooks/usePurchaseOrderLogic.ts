@@ -36,7 +36,7 @@ export const usePurchaseOrderLogic = (initialOrder: PurchaseOrder, onFinalizeCal
   const [isProcessing, setIsProcessing] = useState(false);
 
 
-  const { data: liveTransactions = [] } = usePurchaseOrderTransactions(order.id);
+  const { data: liveTransactions = [], isSuccess: isLiveTxsLoaded } = usePurchaseOrderTransactions(order.id);
   const queryClient = useQueryClient();
 
   // Function to refresh manual invalidations if needed
@@ -80,9 +80,17 @@ export const usePurchaseOrderLogic = (initialOrder: PurchaseOrder, onFinalizeCal
   // Merge transactions from metadata and live financial module
   const mergedTransactions = useMemo(() => {
     const txMap = new Map<string, OrderTransaction>();
+    const isUUID = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
     // 1. Start with metadata transactions (legacy/manual)
-    (order.transactions || []).forEach(tx => txMap.set(tx.id, tx));
+    const filteredOrderTxs = (order.transactions || []).filter(tx => {
+      if (isLiveTxsLoaded && isUUID(tx.id)) {
+        return liveTransactions.some(lt => lt.id === tx.id);
+      }
+      return true;
+    });
+
+    filteredOrderTxs.forEach(tx => txMap.set(tx.id, tx));
 
     // 2. Overwrite/Add with live transactions from financial module (SINGLE SOURCE OF TRUTH)
     liveTransactions.forEach(tx => {
