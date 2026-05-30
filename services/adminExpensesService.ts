@@ -22,6 +22,7 @@ export interface AdminExpense {
   status: 'open' | 'paid' | 'cancelled';
   created_at: string;
   updated_at: string;
+  sub_type?: string;
 }
 
 function mapRow(row: any): AdminExpense {
@@ -40,6 +41,7 @@ function mapRow(row: any): AdminExpense {
     status: row.status ?? 'open',
     created_at: row.created_at,
     updated_at: row.updated_at,
+    sub_type: row.sub_type,
   };
 }
 

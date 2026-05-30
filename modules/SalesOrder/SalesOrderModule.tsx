@@ -38,7 +38,7 @@ const SalesOrderModule: React.FC = () => {
     }
     return 'active';
   });
-  const [groupBy, setGroupBy] = useState<SalesGroupByOption>('none'); // Default none p/ respeitar ordem alfabética global
+  const [groupBy, setGroupBy] = useState<SalesGroupByOption>('month'); // Default to month like purchase order
   const [viewMode, setViewMode] = useState<'list' | 'form' | 'details'>('list');
   const [selectedOrder, setSelectedOrder] = useState<SalesOrder | undefined>(undefined);
 
@@ -343,11 +343,13 @@ const SalesOrderModule: React.FC = () => {
       let key = 'Outros';
       if (groupBy === 'month') {
         const date = parseStringToLocalDate(order.date);
-        key = date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+        const monthYear = date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
         // Sorting hack: YYYY-MM|Title
-        key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}|${key}`;
+        key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}|${monthYear}`;
       } else if (groupBy === 'partner') {
-        key = order.customerName || 'Sem Cliente';
+        const nicknameInfo = order.customerNickname ? ` (${order.customerNickname})` : '';
+        const docInfo = order.customerDocument && order.customerDocument !== 'NÃO INFORMADO' ? ` - ${order.customerDocument}` : ' - Sem Documento';
+        key = `${order.customerId}|${order.customerName}${nicknameInfo}${docInfo}`;
       }
       if (!groups[key]) groups[key] = [];
       groups[key].push(order);
@@ -357,7 +359,7 @@ const SalesOrderModule: React.FC = () => {
       if (groupBy === 'month') return b[0].localeCompare(a[0]);
       return a[0].localeCompare(b[0]);
     }).map(([key, orders]) => ({
-      title: groupBy === 'month' ? key.split('|')[1] : key,
+      title: (groupBy === 'month' || groupBy === 'partner') ? key.split('|')[1] : key,
       orders
     }));
   }, [sales, groupBy]);
@@ -488,9 +490,9 @@ const SalesOrderModule: React.FC = () => {
                   onChange={(e) => setGroupBy(e.target.value as SalesGroupByOption)}
                   className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-10 pr-8 text-sm font-bold text-slate-700 focus:border-blue-500 focus:outline-none appearance-none"
                 >
-                  <option value="none">Por Nome (A-Z)</option>
                   <option value="month">Por Mês</option>
                   <option value="partner">Por Cliente</option>
+                  <option value="none">Sem Agrupamento</option>
                 </select>
               </div>
             </div>

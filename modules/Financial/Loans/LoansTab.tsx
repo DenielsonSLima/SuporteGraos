@@ -28,6 +28,7 @@ function toLoanRecord(loan: Loan): LoanRecord {
     totalValue: loan.principal_amount,
     interestRate: loan.interest_rate ?? 0,
     installments: 1,
+    paidValue: (loan as any).paidValue ?? loan.paid_amount ?? 0,
     remainingValue: loan.remaining_amount,
     nextDueDate: loan.end_date || loan.start_date,
     status: loan.status === 'paid' ? 'settled' : loan.status === 'cancelled' ? 'settled' : 'active',

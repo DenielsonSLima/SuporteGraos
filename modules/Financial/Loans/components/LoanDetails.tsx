@@ -98,7 +98,7 @@ const LoanDetails: React.FC<Props> = ({ loan, onBack, onUpdate }) => {
         await supabase
           .from('financial_entries')
           .update({ 
-            description: `${loan.type === 'taken' ? 'Empréstimo Tomado' : 'Empréstimo Cedido'}: ${updatedLoan.description}`,
+            description: updatedLoan.description,
             total_amount: updatedLoan.contractValue,
             created_date: updatedLoan.date
           })

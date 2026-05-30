@@ -204,6 +204,15 @@ export function useLoanDetails({ loan, onUpdate, onBack, addToast }: UseLoanDeta
           bankAccount: undefined,
           notes: `[ORIGIN:${loan.id}]`
         });
+
+        // 🟢 ALSO update the totals (principal_amount/paid_amount/status) in public.loans table
+        await loansService.addTransaction(loan.id, {
+          type: tx.type,
+          value: tx.value,
+          description: tx.description || 'Abatimento / Desconto',
+          accountId: undefined,
+          date: tx.date
+        });
       }
 
       setEditingTx(null);

@@ -84,17 +84,18 @@ export const loansService = {
 
     // 2. Busca o account_id e a descrição vinculada
     // Tentativa A: Via financial_entries (parcelas pagas ou liquidação)
-    const { data: entries } = await supabase
+    const { data: entries, error: entriesError } = await supabase
       .from('financial_entries')
       .select(`
         origin_id,
         description,
-        financial_transactions!entry_id (
+        financial_transactions (
           account_id
         )
       `)
       .in('origin_id', loanIds)
       .eq('origin_type', 'loan');
+    if (entriesError) console.error('Error fetching loan entries:', entriesError);
 
     // Tentativa B: Via metadata da transação (desembolso inicial)
     const { data: disbursementTxs } = await supabase
@@ -304,11 +305,19 @@ export const loansService = {
 
       // 2. Calcular novos totais
       const updates: any = {};
+      let principal = Number(loan.principal_amount);
+      let paid = Number(loan.paid_amount);
+
       if (tx.type === 'increase') {
-        updates.principal_amount = Number(loan.principal_amount) + tx.value;
+        principal = principal + tx.value;
+        updates.principal_amount = principal;
       } else {
-        updates.paid_amount = Number(loan.paid_amount) + tx.value;
+        paid = paid + tx.value;
+        updates.paid_amount = paid;
       }
+
+      // Automatically determine status based on remaining balance
+      updates.status = (principal - paid) <= 0 ? 'paid' : 'open';
 
       // 3. Atualizar tabela loans
       const { error: updateError } = await supabase
@@ -415,7 +424,8 @@ export const loansService = {
           .from('loans')
           .update({
             principal_amount: principal,
-            paid_amount: paid
+            paid_amount: paid,
+            status: (principal - paid) <= 0 ? 'paid' : 'open'
           })
           .eq('id', loanId);
 
@@ -485,7 +495,8 @@ export const loansService = {
           .from('loans')
           .update({
             principal_amount: principal,
-            paid_amount: paid
+            paid_amount: paid,
+            status: (principal - paid) <= 0 ? 'paid' : 'open'
           })
           .eq('id', loanId);
 
@@ -547,12 +558,20 @@ export const loansService = {
         const isReinforcement = !!canonicalTx.metadata?.is_reinforcement;
 
         // 3. Reverter totais no empréstimo
-        const updates: any = {};
+        let principal = Number(loan.principal_amount);
+        let paid = Number(loan.paid_amount);
+
         if (isReinforcement) {
-          updates.principal_amount = Math.max(0, Number(loan.principal_amount) - value);
+          principal = Math.max(0, principal - value);
         } else {
-          updates.paid_amount = Math.max(0, Number(loan.paid_amount) - value);
+          paid = Math.max(0, paid - value);
         }
+
+        const updates = {
+          principal_amount: principal,
+          paid_amount: paid,
+          status: (principal - paid) <= 0 ? 'paid' : 'open'
+        };
 
         await supabase.from('loans').update(updates).eq('id', loanId);
 
@@ -574,14 +593,28 @@ export const loansService = {
           const description = adminTx.description || '';
           const isReinforcement = description.includes('Reforço');
 
-          const updates: any = {};
+          let principal = Number(loan.principal_amount);
+          let paid = Number(loan.paid_amount);
+
           if (isReinforcement) {
-            updates.principal_amount = Math.max(0, Number(loan.principal_amount) - value);
+            principal = Math.max(0, principal - value);
           } else {
-            updates.paid_amount = Math.max(0, Number(loan.paid_amount) - value);
+            paid = Math.max(0, paid - value);
           }
 
+          const updates = {
+            principal_amount: principal,
+            paid_amount: paid,
+            status: (principal - paid) <= 0 ? 'paid' : 'open'
+          };
+
           await supabase.from('loans').update(updates).eq('id', loanId);
+
+          // ALSO delete from admin_expenses table
+          await supabase
+            .from('admin_expenses')
+            .delete()
+            .eq('id', txId);
         }
       }
 

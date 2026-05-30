@@ -29,7 +29,7 @@ const LoanDetailsHeader: React.FC<Props> = ({
             {loan.entityName}
           </h2>
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">
-            Contrato {loan.type === 'taken' ? 'Tomado' : 'Concedido'} • {loan.status === 'active' ? 'Em Aberto' : 'Liquidado'}
+            Contrato {loan.type === 'taken' ? 'Tomado' : 'Concedido'} • <span className={loan.status === 'active' ? 'text-slate-400' : 'text-emerald-600 font-black'}>{loan.status === 'active' ? 'Em Aberto' : 'Liquidado'}</span>
           </p>
         </div>
       </div>

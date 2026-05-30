@@ -29,6 +29,7 @@ Para mantermos o ERP Grãos livre de erros de saldo, siga estritamente este flux
 3. **Logística**: Despesas de motorista (extras/abatimentos) devem ser enviadas via `rpc_ops_loading_manage_expense`.
 4. **Sincronização de Histórico**: O frontend deve injetar apenas o histórico leve via `registerFinancialRecords`, marcando a transação como canônica para evitar duplicidade no ledger bancário.
 5. **Estado Global**: Após qualquer operação financeira, invalide os caches do TanStack Query (`LOADINGS`, `FINANCIAL_TRANSACTIONS`, `ACCOUNTS`).
+6. **Isolamento de Módulos (Despesas vs Empréstimos)**: O submódulo de Despesas (AdminExpensesTab) deve listar apenas despesas administrativas reais (`sub_type = 'admin'` ou `sub_type = null`). Lançamentos históricos de empréstimos, adiantamentos ou créditos inseridos em `admin_expenses` devem usar `sub_type = 'receipt'` ou outros sub-types correspondentes para serem filtrados e excluídos do módulo de Despesas.
 
 ---
 

@@ -34,6 +34,7 @@ const FINANCIAL_TABLES = [
   'shareholders',
   'admin_expenses',
   'ops_loadings',
+  'initial_balances',
 ] as const;
 
 const listeners = new Set<() => void>();

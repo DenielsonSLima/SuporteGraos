@@ -217,7 +217,7 @@ const AdvanceDetailsModal: React.FC<Props> = ({
               </div>
 
               {/* Rastro de Volta Section */}
-              <div className="flex-1 bg-white rounded-3xl border border-slate-200 shadow-sm p-8 flex flex-col gap-6 overflow-hidden">
+              <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8 flex flex-col gap-6">
                 <div className="flex justify-between items-center pb-4 border-b border-slate-100">
                   <div>
                     <h3 className="font-black text-slate-800 text-base uppercase tracking-tighter italic">Rastro Contábil ("Rastro de Volta")</h3>
@@ -228,9 +228,9 @@ const AdvanceDetailsModal: React.FC<Props> = ({
                   )}
                 </div>
 
-                <div className="flex-1 overflow-y-auto">
+                <div className="">
                   {children.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center text-center p-8 bg-slate-50/50 rounded-2xl border-2 border-dashed border-slate-200">
+                    <div className="flex flex-col items-center justify-center text-center py-12 px-8 bg-slate-50/50 rounded-2xl border-2 border-dashed border-slate-200">
                       <div className="p-4 bg-slate-100 rounded-full text-slate-400 mb-3">
                         <HelpCircle size={28} />
                       </div>

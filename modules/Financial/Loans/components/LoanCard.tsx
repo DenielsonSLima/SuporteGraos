@@ -33,7 +33,9 @@ const LoanCard: React.FC<Props> = ({ loan, onSelect }) => {
           <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase border shadow-sm ${
             loan.status === 'active' 
               ? 'bg-blue-50 text-blue-700 border-blue-100' 
-              : 'bg-slate-100 text-slate-500 border-slate-200'
+              : loan.status === 'settled'
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                : 'bg-slate-100 text-slate-500 border-slate-200'
           }`}>
             {loan.status === 'active' ? 'Ativo' : 'Liquidado'}
           </span>

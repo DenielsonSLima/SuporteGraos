@@ -47,6 +47,11 @@ export function useAddInitialBalance() {
     mutationFn: (data: InitialBalanceInput) => initialBalanceService.add(data),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.INITIAL_BALANCES });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_HISTORY });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.TOTAL_BALANCE });
     },
   });
 }
@@ -58,6 +63,11 @@ export function useDeleteInitialBalance() {
     mutationFn: (id: string) => initialBalanceService.delete(id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.INITIAL_BALANCES });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ACCOUNTS });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_HISTORY });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DASHBOARD });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.TOTAL_BALANCE });
     },
   });
 }

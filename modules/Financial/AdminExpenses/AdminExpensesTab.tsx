@@ -1,6 +1,6 @@
 
-import React, { useState, useMemo } from 'react';
-import { Plus, Search, Filter, Calendar, Tag, Layers } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Plus, Search, Filter, Calendar, Tag, Layers, ChevronLeft, ChevronRight } from 'lucide-react';
 import AdminExpenseCardList from './components/AdminExpenseCardList';
 import AdminExpenseQuickView from './components/AdminExpenseQuickView';
 import InstallmentExpenseForm from './components/InstallmentExpenseForm';
@@ -66,11 +66,26 @@ function toFinancialRecord(
     paidValue: exp.status === 'paid' ? exp.amount : 0,
     remainingValue: exp.status === 'paid' ? 0 : exp.amount,
     status: exp.status === 'open' ? 'pending' : exp.status === 'paid' ? 'paid' : 'pending',
-    subType: 'admin',
+    subType: (exp.sub_type as any) || 'admin',
     bankAccount: exp.account_id ? bankMap.get(exp.account_id) : undefined,
     notes: '',
   };
 }
+
+// Helper to format date string to "Month Name de Year" in Portuguese
+const getMonthYearLabel = (dateStr?: string) => {
+  if (!dateStr) return 'Sem Data';
+  const [year, month] = dateStr.split('-');
+  const months = [
+    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+  ];
+  const monthIdx = parseInt(month, 10) - 1;
+  if (monthIdx >= 0 && monthIdx < 12) {
+    return `${months[monthIdx]} de ${year}`;
+  }
+  return 'Sem Data';
+};
 
 const AdminExpensesTab: React.FC = () => {
   const { addToast } = useToast();
@@ -109,6 +124,27 @@ const AdminExpensesTab: React.FC = () => {
   const [typeFilter, setTypeFilter] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(12);
+
+  // Grouping State
+  const [groupBy, setGroupBy] = useState<'type' | 'month'>('type');
+
+  // Reset page on filter/tab changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, categoryFilter, typeFilter, startDate, endDate, activeTab]);
+
+  // Set groupBy to month automatically when selecting "Histórico Consolidado", and type otherwise
+  useEffect(() => {
+    if (activeTab === 'all') {
+      setGroupBy('month');
+    } else {
+      setGroupBy('type');
+    }
+  }, [activeTab]);
 
   const handleAddExpenses = async (newRecords: any[]) => {
     try {
@@ -298,27 +334,83 @@ const AdminExpensesTab: React.FC = () => {
     return { total, paid, pending, fixed, administrative, variable };
   }, [filteredRecords, categoryTypeMap]);
 
-  const groupedRecords = useMemo(() => {
-    const groups: Record<string, { title: string; type: string; total: number; records: FinancialRecord[] }> = {
-      fixed: { title: 'Despesas Fixas', type: 'fixed', total: 0, records: [] },
-      administrative: { title: 'Despesas Administrativas', type: 'administrative', total: 0, records: [] },
-      variable: { title: 'Despesas Variáveis', type: 'variable', total: 0, records: [] },
-      custom: { title: 'Outras Despesas', type: 'custom', total: 0, records: [] }
-    };
+  const paginatedRecords = useMemo(() => {
+    if (activeTab !== 'all') return filteredRecords;
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredRecords.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredRecords, currentPage, itemsPerPage, activeTab]);
 
+  const totalPages = useMemo(() => {
+    return Math.ceil(filteredRecords.length / itemsPerPage);
+  }, [filteredRecords, itemsPerPage]);
+
+  const fullGroupTotals = useMemo(() => {
+    const totals: Record<string, number> = {};
     filteredRecords.forEach(r => {
-      const type = categoryTypeMap.get(r.category) || 'custom';
-      if (groups[type]) {
-        groups[type].records.push(r);
-        groups[type].total += r.originalValue;
+      if (groupBy === 'month') {
+        const monthKey = r.dueDate ? r.dueDate.substring(0, 7) : '0000-00';
+        totals[monthKey] = (totals[monthKey] || 0) + r.originalValue;
       } else {
-        groups['custom'].records.push(r);
-        groups['custom'].total += r.originalValue;
+        const type = categoryTypeMap.get(r.category) || 'custom';
+        totals[type] = (totals[type] || 0) + r.originalValue;
       }
     });
+    return totals;
+  }, [filteredRecords, groupBy, categoryTypeMap]);
 
-    return Object.values(groups).filter(g => g.records.length > 0);
-  }, [filteredRecords, categoryTypeMap]);
+  const groupedRecords = useMemo(() => {
+    const recordsToGroup = paginatedRecords;
+
+    if (groupBy === 'month') {
+      const groups: Record<string, { title: string; type: string; total: number; records: FinancialRecord[] }> = {};
+      
+      recordsToGroup.forEach(r => {
+        const monthKey = r.dueDate ? r.dueDate.substring(0, 7) : '0000-00';
+        if (!groups[monthKey]) {
+          groups[monthKey] = {
+            title: getMonthYearLabel(r.dueDate),
+            type: monthKey,
+            total: 0,
+            records: []
+          };
+        }
+        groups[monthKey].records.push(r);
+      });
+      
+      // Assign the full group totals
+      Object.keys(groups).forEach(key => {
+        groups[key].total = fullGroupTotals[key] || 0;
+      });
+
+      // Sort keys descending (most recent month first)
+      return Object.keys(groups)
+        .sort((a, b) => b.localeCompare(a))
+        .map(key => groups[key]);
+    } else {
+      const groups: Record<string, { title: string; type: string; total: number; records: FinancialRecord[] }> = {
+        fixed: { title: 'Despesas Fixas', type: 'fixed', total: 0, records: [] },
+        administrative: { title: 'Despesas Administrativas', type: 'administrative', total: 0, records: [] },
+        variable: { title: 'Despesas Variáveis', type: 'variable', total: 0, records: [] },
+        custom: { title: 'Outras Despesas', type: 'custom', total: 0, records: [] }
+      };
+
+      recordsToGroup.forEach(r => {
+        const type = categoryTypeMap.get(r.category) || 'custom';
+        if (groups[type]) {
+          groups[type].records.push(r);
+        } else {
+          groups['custom'].records.push(r);
+        }
+      });
+
+      // Assign the full group totals
+      Object.keys(groups).forEach(type => {
+        groups[type].total = fullGroupTotals[type] || 0;
+      });
+
+      return Object.values(groups).filter(g => g.records.length > 0);
+    }
+  }, [paginatedRecords, groupBy, fullGroupTotals, categoryTypeMap]);
 
   const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
 
@@ -403,8 +495,8 @@ const AdminExpensesTab: React.FC = () => {
       </div>
 
       {/* TABS */}
-      <div className="border-b border-slate-200">
-        <nav className="-mb-px flex space-x-8">
+      <div className="border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <nav className="-mb-px flex space-x-8 overflow-x-auto scrollbar-none">
           <button
             onClick={() => setActiveTab('open')}
             className={`
@@ -436,6 +528,36 @@ const AdminExpensesTab: React.FC = () => {
             Histórico Consolidado
           </button>
         </nav>
+
+        {activeTab === 'all' && (
+          <div className="flex items-center gap-3 pb-3 md:pb-0">
+            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Agrupar por:</span>
+            <div className="inline-flex bg-slate-100 p-1 rounded-xl">
+              <button
+                type="button"
+                onClick={() => setGroupBy('month')}
+                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
+                  groupBy === 'month' 
+                    ? 'bg-white text-slate-900 shadow-sm' 
+                    : 'text-slate-500 hover:text-slate-900'
+                }`}
+              >
+                Mês
+              </button>
+              <button
+                type="button"
+                onClick={() => setGroupBy('type')}
+                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
+                  groupBy === 'type' 
+                    ? 'bg-white text-slate-900 shadow-sm' 
+                    : 'text-slate-500 hover:text-slate-900'
+                }`}
+              >
+                Tipo
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* CONTENT AREA */}
@@ -444,13 +566,16 @@ const AdminExpensesTab: React.FC = () => {
           <div key={group.type} className="space-y-6">
             <div className="flex items-center gap-4">
               <div className={`h-8 w-1.5 rounded-full ${
+                groupBy === 'month' ? 'bg-slate-900' :
                 group.type === 'fixed' ? 'bg-blue-600' : 
                 group.type === 'administrative' ? 'bg-slate-600' : 
                 group.type === 'variable' ? 'bg-amber-600' : 'bg-slate-400'
               }`} />
-              <div className="flex flex-col">
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                 <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">{group.title}</h2>
-                <span className="text-sm font-bold text-slate-500">Total desta categoria: {currency(group.total)}</span>
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-lg bg-slate-100 text-slate-600 text-xs font-bold">
+                  {groupBy === 'month' ? `Subtotal: ${currency(group.total)}` : `Total: ${currency(group.total)}`}
+                </span>
               </div>
             </div>
             
@@ -471,6 +596,100 @@ const AdminExpensesTab: React.FC = () => {
             </div>
             <h3 className="text-lg font-bold text-slate-800">Nenhuma despesa encontrada</h3>
             <p className="text-slate-500 text-sm">Tente ajustar seus filtros para encontrar o que procura.</p>
+          </div>
+        )}
+
+        {/* PAGINATION CONTROLS */}
+        {activeTab === 'all' && totalPages > 1 && (
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm mt-6">
+            {/* Info */}
+            <div className="text-xs font-bold text-slate-500">
+              Exibindo <span className="text-slate-800 font-black">
+                {Math.min((currentPage - 1) * itemsPerPage + 1, filteredRecords.length)}
+              </span> a <span className="text-slate-800 font-black">
+                {Math.min(currentPage * itemsPerPage, filteredRecords.length)}
+              </span> de <span className="text-slate-800 font-black">
+                {filteredRecords.length}
+              </span> despesas
+            </div>
+
+            {/* Navigation & Page Size */}
+            <div className="flex flex-wrap items-center gap-4">
+              {/* Page Size Selector */}
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Exibir:</span>
+                <select
+                  value={itemsPerPage}
+                  onChange={(e) => {
+                    setItemsPerPage(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  className="text-xs font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 focus:border-slate-800 outline-none cursor-pointer"
+                >
+                  <option value={12}>12 por página</option>
+                  <option value={24}>24 por página</option>
+                  <option value={48}>48 por página</option>
+                </select>
+              </div>
+
+              {/* Page Buttons */}
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-50 disabled:hover:bg-transparent text-slate-600 transition-colors"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+
+                {/* Render dynamic page numbers */}
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => {
+                  if (
+                    page === 1 ||
+                    page === totalPages ||
+                    Math.abs(page - currentPage) <= 1
+                  ) {
+                    return (
+                      <button
+                        key={page}
+                        type="button"
+                        onClick={() => setCurrentPage(page)}
+                        className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                          currentPage === page
+                            ? 'bg-slate-900 text-white font-black'
+                            : 'border border-slate-200 hover:bg-slate-50 text-slate-600'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    );
+                  }
+                  
+                  if (
+                    page === 2 ||
+                    page === totalPages - 1
+                  ) {
+                    return (
+                      <span key={page} className="px-1 text-slate-400 text-xs select-none">
+                        ...
+                      </span>
+                    );
+                  }
+
+                  return null;
+                })}
+
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-50 disabled:hover:bg-transparent text-slate-600 transition-colors"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

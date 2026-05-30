@@ -31,7 +31,9 @@ const ActiveOrders: React.FC<Props> = ({ orders, onOrderClick, onFinalize, onDel
         const fallbackHarvest = fallbackUf ? `SAFRA/${fallbackUf} ${fallbackYear}` : 'Safra Não Informada';
         key = (order.harvest && order.harvest !== '-') ? order.harvest : fallbackHarvest;
       } else if (groupBy === 'partner') {
-        key = order.partnerName || 'Fornecedor Desconhecido';
+        const nicknameInfo = order.partnerNickname ? ` (${order.partnerNickname})` : '';
+        const docInfo = order.partnerDocument && order.partnerDocument !== 'NÃO INFORMADO' ? ` - ${order.partnerDocument}` : ' - Sem Documento';
+        key = `${order.partnerId}|${order.partnerName}${nicknameInfo}${docInfo}`;
       }
       return { key, order };
     });
@@ -47,7 +49,7 @@ const ActiveOrders: React.FC<Props> = ({ orders, onOrderClick, onFinalize, onDel
     return Object.entries(grouped)
       .sort((a, b) => groupBy === 'month' ? b[0].localeCompare(a[0]) : a[0].localeCompare(b[0]))
       .map(([key, value]) => ({
-        title: groupBy === 'month' ? key.split('|')[1] : key,
+        title: (groupBy === 'month' || groupBy === 'partner') ? key.split('|')[1] : key,
         orders: value
       }));
 
