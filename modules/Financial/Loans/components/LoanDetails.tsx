@@ -161,7 +161,7 @@ const LoanDetails: React.FC<Props> = ({ loan, onBack, onUpdate }) => {
           setEditingTx(null);
         }}
         onSave={onSaveTx}
-        loanType={loan.type}
+        loan={loan}
         initialTx={editingTx || undefined}
       />
       

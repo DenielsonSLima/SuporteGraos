@@ -1,90 +1,88 @@
 -- ============================================================================
--- Migration: Cashier Retroactive Calculations and Loan Sync Fixes
--- Date: 2026-05-29
+-- Migration: Fix Consultant Names and Retroactive Cashier Loan Calculations
+-- Date: 2026-06-01
 -- ============================================================================
 
 SET search_path = public;
 
--- 1. Correct Trigger Function: fn_update_account_balance
--- Recalculates both OLD and NEW account balances when a transaction changes accounts
-CREATE OR REPLACE FUNCTION public.fn_update_account_balance()
-RETURNS TRIGGER AS $$
-DECLARE
-  v_company_id UUID;
-BEGIN
-  v_company_id := COALESCE(NEW.company_id, OLD.company_id);
+-- 1. Normalise "Ronaldo Silva" to "Ronaldo Silva de Oliveira" in column and JSON metadata
+UPDATE public.ops_sales_orders
+SET consultant_name = 'Ronaldo Silva de Oliveira',
+    metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), '{consultantName}', '"Ronaldo Silva de Oliveira"'),
+    raw_payload = jsonb_set(COALESCE(raw_payload, '{}'::jsonb), '{consultantName}', '"Ronaldo Silva de Oliveira"')
+WHERE consultant_name = 'Ronaldo Silva' OR metadata->>'consultantName' = 'Ronaldo Silva';
 
-  -- Update NEW account
-  IF NEW.account_id IS NOT NULL THEN
-    UPDATE public.accounts a
-    SET balance = (
-      COALESCE((
-        SELECT ib.value
-        FROM public.initial_balances ib
-        WHERE ib.account_id = a.id AND ib.company_id = a.company_id
-        LIMIT 1
-      ), 0)
-      +
-      COALESCE((
-        SELECT SUM(
-          CASE
-            WHEN lower(ft.type) IN ('credit', 'in') THEN ft.amount
-            WHEN lower(ft.type) IN ('debit', 'out') THEN -ft.amount
-            ELSE 0
-          END
-        )
-        FROM public.financial_transactions ft
-        WHERE ft.account_id = a.id
-          AND ft.company_id = a.company_id
-      ), 0)
-    ),
-    updated_at = now()
-    WHERE a.id = NEW.account_id AND a.company_id = v_company_id;
-  END IF;
+-- 2. Resolve "NEW" abbreviation in order numbers to "Newton Porto"
+UPDATE public.ops_sales_orders
+SET consultant_name = 'Newton Porto',
+    metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), '{consultantName}', '"Newton Porto"'),
+    raw_payload = jsonb_set(COALESCE(raw_payload, '{}'::jsonb), '{consultantName}', '"Newton Porto"')
+WHERE number LIKE '%NEW%' AND (consultant_name IS NULL OR metadata->>'consultantName' IS NULL);
 
-  -- Update OLD account if it changed
-  IF OLD.account_id IS NOT NULL AND (NEW.account_id IS NULL OR NEW.account_id <> OLD.account_id) THEN
-    UPDATE public.accounts a
-    SET balance = (
-      COALESCE((
-        SELECT ib.value
-        FROM public.initial_balances ib
-        WHERE ib.account_id = a.id AND ib.company_id = a.company_id
-        LIMIT 1
-      ), 0)
-      +
-      COALESCE((
-        SELECT SUM(
-          CASE
-            WHEN lower(ft.type) IN ('credit', 'in') THEN ft.amount
-            WHEN lower(ft.type) IN ('debit', 'out') THEN -ft.amount
-            ELSE 0
-          END
-        )
-        FROM public.financial_transactions ft
-        WHERE ft.account_id = a.id
-          AND ft.company_id = a.company_id
-      ), 0)
-    ),
-    updated_at = now()
-    WHERE a.id = OLD.account_id AND a.company_id = v_company_id;
-  END IF;
+-- 3. Sync consultant_name column from metadata if it was only set in metadata
+UPDATE public.ops_sales_orders
+SET consultant_name = metadata->>'consultantName'
+WHERE consultant_name IS NULL AND metadata->>'consultantName' IS NOT NULL AND metadata->>'consultantName' <> '';
 
-  RETURN NULL;
-END;
-$$ LANGUAGE plpgsql;
+-- 4. Sync metadata->>'consultantName' from consultant_name column if metadata was missing it
+UPDATE public.ops_sales_orders
+SET metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), '{consultantName}', to_jsonb(consultant_name)),
+    raw_payload = jsonb_set(COALESCE(raw_payload, '{}'::jsonb), '{consultantName}', to_jsonb(consultant_name))
+WHERE consultant_name IS NOT NULL AND (metadata->>'consultantName' IS NULL OR metadata->>'consultantName' = '');
 
--- 2. Update rpc_create_loan to set disbursement metadata and uppercase formatters
-CREATE OR REPLACE FUNCTION public.rpc_create_loan(
-  p_type              TEXT DEFAULT 'taken',
-  p_account_id        UUID DEFAULT NULL,
-  p_lender_id         UUID DEFAULT NULL,
-  p_principal_amount  DECIMAL DEFAULT 0,
-  p_interest_rate     DECIMAL DEFAULT 0,
-  p_start_date        DATE DEFAULT CURRENT_DATE,
-  p_end_date          DATE DEFAULT NULL,
-  p_num_installments  INT DEFAULT 1,
-  p_description       TEXT DEFAULT NULL
+-- 5. Recreate View vw_sales_orders_enriched to select consultant_name
+CREATE OR REPLACE VIEW public.vw_sales_orders_enriched AS
+ SELECT so.id,
+    so.company_id,
+    so.legacy_id,
+    so.number,
+    so.order_date,
+    so.status,
+    so.customer_id,
+    so.customer_name,
+    so.consultant_name, -- selected explicitly
+    so.total_value,
+    (COALESCE(fin.total_paid, (0)::numeric))::numeric(15,2) AS received_value,
+    (COALESCE(fin.total_discount, (0)::numeric))::numeric(15,2) AS discount_value,
+    (GREATEST((0)::numeric, ((COALESCE(delivered.delivered_value, (0)::numeric) - COALESCE(fin.total_paid, (0)::numeric)) - COALESCE(fin.total_discount, (0)::numeric))))::numeric(15,2) AS balance_value,
+    so.metadata,
+    so.raw_payload,
+    so.created_at,
+    so.updated_at,
+    COALESCE(delivered.delivered_qty_sc, (0)::numeric) AS delivered_qty_sc,
+    COALESCE(delivered.delivered_value, (0)::numeric) AS delivered_value,
+    COALESCE(delivered.load_count, 0) AS load_count,
+    COALESCE(delivered.total_grain_cost, (0)::numeric) AS total_grain_cost,
+    COALESCE(delivered.total_freight_cost, (0)::numeric) AS total_freight_cost,
+    COALESCE(delivered.total_direct_investment, (0)::numeric) AS total_direct_investment,
+    COALESCE((delivered.delivered_value - delivered.total_direct_investment), (0)::numeric) AS gross_profit,
+        CASE
+            WHEN (COALESCE(delivered.delivered_value, (0)::numeric) > (0)::numeric) THEN (((COALESCE(delivered.delivered_value, (0)::numeric) - COALESCE(delivered.total_direct_investment, (0)::numeric)) / delivered.delivered_value) * (100)::numeric)
+            ELSE (0)::numeric
+        END AS margin_percent,
+    COALESCE(transit.transit_count, 0) AS transit_count,
+    COALESCE(transit.transit_value, (0)::numeric) AS transit_value
+   FROM (((ops_sales_orders so
+     LEFT JOIN LATERAL ( SELECT sum(fe.paid_amount) AS total_paid,
+            sum(fe.discount_amount) AS total_discount
+           FROM financial_entries fe
+          WHERE (((fe.origin_id = so.id) OR (fe.origin_id = so.legacy_id)) AND (fe.origin_type = 'sales_order'::text))) fin ON (true))
+     LEFT JOIN LATERAL ( SELECT (count(*))::integer AS load_count,
+            COALESCE(sum((ol.unload_weight_kg / 60.0)), (0)::numeric) AS delivered_qty_sc,
+            COALESCE(sum(((ol.unload_weight_kg / 60.0) * COALESCE(((ol.metadata ->> 'salesPrice'::text))::numeric, ((so.metadata ->> 'unitPrice'::text))::numeric, (0)::numeric))), (0)::numeric) AS delivered_value,
+            COALESCE(sum(((ol.unload_weight_kg / 60.0) * COALESCE(((ol.metadata ->> 'purchasePricePerSc'::text))::numeric, (0)::numeric))), (0)::numeric) AS total_grain_cost,
+            COALESCE(sum(((ol.unload_weight_kg / 1000.0) * COALESCE(((ol.metadata ->> 'freightPricePerTon'::text))::numeric, (0)::numeric))), (0)::numeric) AS total_freight_cost,
+            COALESCE(sum((((ol.unload_weight_kg / 60.0) * COALESCE(((ol.metadata ->> 'purchasePricePerSc'::text))::numeric, (0)::numeric)) + ((ol.unload_weight_kg / 1000.0) * COALESCE(((ol.metadata ->> 'freightPricePerTon'::text))::numeric, (0)::numeric)))), (0)::numeric) AS total_direct_investment
+           FROM ops_loadings ol
+          WHERE (((ol.sales_order_id = so.id) OR (ol.sales_order_id = so.legacy_id)) AND (COALESCE(ol.unload_weight_kg, (0)::numeric) > (0)::numeric) AND (ol.status <> 'canceled'::text))) delivered ON (true))
+     LEFT JOIN LATERAL ( SELECT (count(*))::integer AS transit_count,
+            COALESCE(sum(((ol.weight_kg / 60.0) * COALESCE(((ol.metadata ->> 'salesPrice'::text))::numeric, ((so.metadata ->> 'unitPrice'::text))::numeric, (0)::numeric))), (0)::numeric) AS transit_value
+           FROM ops_loadings ol
+          WHERE (((ol.sales_order_id = so.id) OR (ol.sales_order_id = so.legacy_id)) AND (COALESCE(ol.unload_weight_kg, (0)::numeric) = (0)::numeric) AND (ol.status = ANY (ARRAY['loaded'::text, 'in_transit'::text, 'redirected'::text, 'waiting_unload'::text])))) transit ON (true));
+
+-- 6. Update rpc_ops_sales_order_upsert_v2 to handle consultant_name column
+CREATE OR REPLACE FUNCTION public.rpc_ops_sales_order_upsert_v2(
+  p_payload JSONB
 )
 RETURNS UUID
 LANGUAGE plpgsql
@@ -92,103 +90,74 @@ SECURITY DEFINER
 AS $$
 DECLARE
   v_company_id UUID;
-  v_user_id UUID;
-  v_loan_id UUID;
-  v_entry_id UUID;
-  v_installment_amount DECIMAL;
-  v_due_date DATE;
-  v_tx_type TEXT;
-  v_tx_description TEXT;
-  i INT;
+  v_id UUID;
+  v_order_date DATE;
+  v_legacy_id UUID;
+  v_consultant_name TEXT;
 BEGIN
-  -- 1. Security check
-  SELECT company_id, id INTO v_company_id, v_user_id
-  FROM public.app_users
-  WHERE auth_user_id = auth.uid()
-  LIMIT 1;
-
+  v_company_id := public.fn_ops_my_company_id();
   IF v_company_id IS NULL THEN
     RAISE EXCEPTION 'Usuário sem empresa vinculada';
   END IF;
 
-  IF p_principal_amount <= 0 THEN
-    RAISE EXCEPTION 'Valor do empréstimo deve ser maior que zero';
+  v_legacy_id := NULLIF(p_payload->>'id', '')::UUID;
+  v_order_date := COALESCE(NULLIF(p_payload->>'date', '')::DATE, CURRENT_DATE);
+
+  -- Extract and normalize consultant name
+  v_consultant_name := NULLIF(p_payload->>'consultantName', '');
+  IF v_consultant_name = 'Ronaldo Silva' THEN
+    v_consultant_name := 'Ronaldo Silva de Oliveira';
   END IF;
 
-  -- 2. INSERT loan
-  INSERT INTO public.loans (
-    company_id, type, lender_id, principal_amount,
-    interest_rate, start_date, end_date, status
+  SELECT id INTO v_id
+  FROM public.ops_sales_orders
+  WHERE company_id = v_company_id
+    AND legacy_id = v_legacy_id
+  LIMIT 1;
+
+  IF v_id IS NULL THEN
+    v_id := COALESCE(v_legacy_id, gen_random_uuid());
+  END IF;
+
+  INSERT INTO public.ops_sales_orders (
+    id, company_id, legacy_id, number, order_date, status,
+    customer_id, customer_name, consultant_name, total_value, received_value, metadata, raw_payload
   ) VALUES (
-    v_company_id, p_type, p_lender_id, p_principal_amount,
-    p_interest_rate, p_start_date, p_end_date, 'open'
-  ) RETURNING id INTO v_loan_id;
+    v_id,
+    v_company_id,
+    v_legacy_id,
+    COALESCE(NULLIF(p_payload->>'number', ''), 'SEM-NUMERO'),
+    v_order_date,
+    COALESCE(NULLIF(p_payload->>'status', ''), 'pending'),
+    NULLIF(p_payload->>'customerId', '')::UUID,
+    NULLIF(p_payload->>'customerName', ''),
+    v_consultant_name,
+    COALESCE((p_payload->>'totalValue')::NUMERIC, 0),
+    COALESCE((p_payload->>'paidValue')::NUMERIC, 0),
+    COALESCE(p_payload, '{}'::jsonb),
+    COALESCE(p_payload, '{}'::jsonb)
+  )
+  ON CONFLICT (id) DO UPDATE
+  SET
+    number = EXCLUDED.number,
+    order_date = EXCLUDED.order_date,
+    status = EXCLUDED.status,
+    customer_id = EXCLUDED.customer_id,
+    customer_name = EXCLUDED.customer_name,
+    consultant_name = EXCLUDED.consultant_name,
+    total_value = EXCLUDED.total_value,
+    received_value = EXCLUDED.received_value,
+    metadata = EXCLUDED.metadata,
+    raw_payload = EXCLUDED.raw_payload,
+    updated_at = now();
 
-  -- 3. INSERT financial_entry (obligation) com a descrição formatada em CAIXA ALTA
-  INSERT INTO public.financial_entries (
-    company_id, 
-    type, 
-    origin_type, 
-    origin_id,
-    partner_id, 
-    total_amount, 
-    created_date, 
-    due_date,
-    description
-  ) VALUES (
-    v_company_id, 
-    CASE WHEN p_type = 'taken' THEN 'payable' ELSE 'receivable' END, 
-    'loan', 
-    v_loan_id,
-    p_lender_id, 
-    p_principal_amount, 
-    p_start_date, 
-    p_end_date,
-    CASE 
-      WHEN p_type = 'taken' THEN 'EMPRÉSTIMO TOMADO: ' 
-      ELSE 'EMPRÉSTIMO CEDIDO: ' 
-    END || UPPER(COALESCE(p_description, 'Empréstimo'))
-  ) RETURNING id INTO v_entry_id;
+  PERFORM public.rpc_ops_sales_rebuild_financial_v1(COALESCE(v_legacy_id, v_id));
 
-  -- 4. INSERT installments if requested
-  IF p_num_installments > 0 THEN
-    v_installment_amount := ROUND(p_principal_amount / p_num_installments, 2);
-    FOR i IN 1..p_num_installments LOOP
-      v_due_date := p_start_date + (i * 30); -- approx monthly
-      INSERT INTO public.loan_installments (
-        company_id, loan_id, installment_number,
-        amount, due_date, status
-      ) VALUES (
-        v_company_id, v_loan_id, i,
-        v_installment_amount, v_due_date, 'open'
-      );
-    END LOOP;
-  END IF;
-
-  -- 5. Bank Sync (if account provided) com descrição em CAIXA ALTA
-  IF p_account_id IS NOT NULL THEN
-     v_tx_type := CASE WHEN p_type = 'taken' THEN 'credit' ELSE 'debit' END;
-     v_tx_description := CASE 
-        WHEN p_type = 'taken' THEN 'ENTRADA DE CAPITAL (EMPRÉSTIMO): ' 
-        ELSE 'SAÍDA DE CAPITAL (EMPRÉSTIMO): ' 
-     END || UPPER(COALESCE(p_description, 'Empréstimo'));
-
-     INSERT INTO public.financial_transactions (
-       company_id, account_id, type, amount,
-       transaction_date, created_by, description,
-       metadata
-     ) VALUES (
-       v_company_id, p_account_id, v_tx_type, p_principal_amount,
-       p_start_date, v_user_id, v_tx_description,
-       jsonb_build_object('loan_id', v_loan_id, 'is_disbursement', true, 'origin_type', 'loan')
-     );
-  END IF;
-
-  RETURN v_loan_id;
-END;
+  RETURN v_id;
+End;
 $$;
 
--- 3. Update rpc_monthly_balance_sheet with robust date boundaries and missing fields
+-- 7. Update rpc_monthly_balance_sheet with dynamic loan calculations (retroactively adjusting for future reinforcements)
 CREATE OR REPLACE FUNCTION public.rpc_monthly_balance_sheet(p_company_id uuid, p_year integer, p_month integer)
  RETURNS json
  LANGUAGE plpgsql
@@ -411,8 +380,15 @@ BEGIN
   FROM shareholder_balances_at;
 
   -- Empréstimos Concedidos (Principal - Pagamentos recebidos até v_end_of_month)
+  -- NOTA: O principal_amount é dinamicamente ajustado excluindo reforços futuros (> v_end_of_month)
   SELECT COALESCE(SUM(
-    l.principal_amount - COALESCE((
+    (l.principal_amount - COALESCE((
+      SELECT SUM(ft.amount)
+      FROM public.financial_transactions ft
+      WHERE (ft.metadata->>'loan_id')::uuid = l.id
+        AND (ft.metadata->>'is_reinforcement')::boolean = true
+        AND ft.transaction_date > v_end_of_month
+    ), 0)) - COALESCE((
       SELECT SUM(ft.amount)
       FROM public.financial_transactions ft
       WHERE (ft.metadata->>'loan_id')::uuid = l.id
@@ -426,7 +402,15 @@ BEGIN
     AND l.type = 'granted'
     AND l.status <> 'cancelled'
     AND l.start_date <= v_end_of_month
-    AND l.principal_amount > COALESCE((
+    AND (
+      l.principal_amount - COALESCE((
+        SELECT SUM(ft.amount)
+        FROM public.financial_transactions ft
+        WHERE (ft.metadata->>'loan_id')::uuid = l.id
+          AND (ft.metadata->>'is_reinforcement')::boolean = true
+          AND ft.transaction_date > v_end_of_month
+      ), 0)
+    ) > COALESCE((
       SELECT SUM(ft.amount)
       FROM public.financial_transactions ft
       WHERE (ft.metadata->>'loan_id')::uuid = l.id
@@ -534,8 +518,15 @@ BEGIN
     ), 0);
 
   -- Empréstimos Tomados (Principal - Pagamentos efetuados até v_end_of_month)
+  -- NOTA: O principal_amount é dinamicamente ajustado excluindo reforços futuros (> v_end_of_month)
   SELECT COALESCE(SUM(
-    l.principal_amount - COALESCE((
+    (l.principal_amount - COALESCE((
+      SELECT SUM(ft.amount)
+      FROM public.financial_transactions ft
+      WHERE (ft.metadata->>'loan_id')::uuid = l.id
+        AND (ft.metadata->>'is_reinforcement')::boolean = true
+        AND ft.transaction_date > v_end_of_month
+    ), 0)) - COALESCE((
       SELECT SUM(ft.amount)
       FROM public.financial_transactions ft
       WHERE (ft.metadata->>'loan_id')::uuid = l.id
@@ -549,7 +540,15 @@ BEGIN
     AND l.type = 'taken'
     AND l.status <> 'cancelled'
     AND l.start_date <= v_end_of_month
-    AND l.principal_amount > COALESCE((
+    AND (
+      l.principal_amount - COALESCE((
+        SELECT SUM(ft.amount)
+        FROM public.financial_transactions ft
+        WHERE (ft.metadata->>'loan_id')::uuid = l.id
+          AND (ft.metadata->>'is_reinforcement')::boolean = true
+          AND ft.transaction_date > v_end_of_month
+      ), 0)
+    ) > COALESCE((
       SELECT SUM(ft.amount)
       FROM public.financial_transactions ft
       WHERE (ft.metadata->>'loan_id')::uuid = l.id
@@ -620,4 +619,3 @@ BEGIN
   RETURN result;
 END;
 $$;
-

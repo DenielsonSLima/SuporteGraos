@@ -6,6 +6,7 @@ import { Partner } from '../../../Partners/types';
 import { PARTNER_CATEGORY_IDS } from '../../../../constants';
 import { locationService } from '../../../../services/locationService';
 import QuickPartnerModal from '../../../Partners/components/QuickPartnerModal';
+import { normalizeText } from '../../../../utils/stringUtils';
 
 const UF_LIST = locationService.ALL_STATES_LIST;
 
@@ -68,10 +69,10 @@ const OrderPartnerSection: React.FC<Props> = ({ data, partners, onChange }) => {
     .sort((a, b) => a.name.localeCompare(b.name));
 
   const filteredPartners = validPartners.filter(p => {
-    const searchLower = partnerSearchTerm.toLowerCase();
-    return p.name.toLowerCase().includes(searchLower) ||
-           (p.document || '').toLowerCase().includes(searchLower) ||
-           (p.nickname && p.nickname.toLowerCase().includes(searchLower));
+    const searchNormalized = normalizeText(partnerSearchTerm);
+    return normalizeText(p.name).includes(searchNormalized) ||
+           normalizeText(p.document).includes(searchNormalized) ||
+           normalizeText(p.nickname).includes(searchNormalized);
   });
 
   const filteredCities = (Array.isArray(availableLocations) ? availableLocations : []).filter(loc => 

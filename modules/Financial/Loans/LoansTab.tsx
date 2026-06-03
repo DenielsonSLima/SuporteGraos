@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Plus, Search, History, Landmark, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
 import { LoanRecord } from '../types';
 import LoanKPIs from './components/LoanKPIs';
@@ -7,6 +7,7 @@ import LoanList from './components/LoanList';
 import LoanDetails from './components/LoanDetails';
 import LoanFormModal from './components/LoanFormModal';
 import LoanListPdfModal from './components/LoanListPdfModal';
+import { Pagination } from '../../../components/ui/Pagination';
 import type { Loan } from '../../../services/loansService';
 import { useLoans, useCreateLoan } from '../../../hooks/useLoans';
 import { useToast } from '../../../contexts/ToastContext';
@@ -47,6 +48,12 @@ const LoansTab: React.FC = () => {
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeSubTab, setActiveSubTab] = useState<TabType>('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, activeSubTab]);
 
   // TanStack Query: dados + realtime automático
   const { data: rawLoans = [] } = useLoans();
@@ -60,7 +67,7 @@ const LoansTab: React.FC = () => {
   const filteredLoans = useMemo(() => {
     return loans.filter(l => {
       const matchesSearch = l.entityName.toLowerCase().includes(searchTerm.toLowerCase());
-      if (activeSubTab === 'history') return matchesSearch;
+      if (activeSubTab === 'history') return matchesSearch && l.status === 'settled';
       const isActive = l.status === 'active';
       if (!isActive) return false;
       if (activeSubTab === 'taken') return matchesSearch && l.type === 'taken';
@@ -68,6 +75,10 @@ const LoansTab: React.FC = () => {
       return matchesSearch;
     }).sort((a, b) => new Date(b.contractDate).getTime() - new Date(a.contractDate).getTime());
   }, [loans, searchTerm, activeSubTab]);
+
+  const paginatedLoans = useMemo(() => {
+    return filteredLoans.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  }, [filteredLoans, currentPage]);
 
   const handleCreateLoan = async (data: any) => {
     createLoanMutation.mutate(
@@ -135,7 +146,7 @@ const LoansTab: React.FC = () => {
           </button>
           <div className="w-px h-4 bg-slate-300 mx-1 self-center"></div>
           <button onClick={() => setActiveSubTab('history')} className={`flex-1 px-5 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all flex items-center justify-center gap-2 ${activeSubTab === 'history' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-400'}`}>
-            <History size={14} /> Histórico
+            <History size={14} /> Finalizados
           </button>
         </div>
 
@@ -165,12 +176,19 @@ const LoansTab: React.FC = () => {
       </div>
 
       <LoanList
-        loans={filteredLoans}
+        loans={paginatedLoans}
         onSelect={(id) => {
           setSelectedLoanId(id);
           const found = loans.find(l => l.id === id) || filteredLoans.find(l => l.id === id) || null;
           setSelectedLoanSnapshot(found);
         }}
+      />
+
+      <Pagination
+        currentPage={currentPage}
+        totalCount={filteredLoans.length}
+        pageSize={pageSize}
+        onPageChange={setCurrentPage}
       />
 
       <LoanFormModal

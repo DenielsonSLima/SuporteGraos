@@ -16,6 +16,7 @@ export interface SalesOrderDbRow {
   metadata?: SalesOrder;
   company_id?: string;
   created_at?: string;
+  consultant_name?: string;
 }
 
 /** Shape de uma row da VIEW vw_sales_orders_enriched (canônico) */
@@ -27,6 +28,7 @@ export interface SalesOrderOpsRow {
   status?: string;
   customer_id?: string;
   customer_name?: string;
+  consultant_name?: string;
   customer_nickname?: string;
   total_value?: number;
   received_value?: number;
@@ -94,8 +96,12 @@ export const mapOrderToDb = (order: SalesOrder) => ({
   status: statusToDb(order.status),
   total_value: order.totalValue ?? 0,
   customer_name: order.customerName,
+  consultant_name: order.consultantName || null,
   notes: order.notes || null,
-  metadata: order,
+  metadata: {
+    ...order,
+    consultantName: order.consultantName === 'Ronaldo Silva' ? 'Ronaldo Silva de Oliveira' : order.consultantName
+  },
   company_id: authService.getCurrentUser()?.companyId || null
 });
 
@@ -106,7 +112,7 @@ export const mapOrderFromDb = (row: SalesOrderDbRow): SalesOrder => {
     number: row.number,
     date: row.order_date || getTodayBR(),
     status: statusFromDb(row?.status),
-    consultantName: '',
+    consultantName: row.consultant_name || meta?.consultantName || '',
     customerId: row?.customer_id || '',
     productName: '',
     quantity: undefined,
@@ -128,7 +134,8 @@ export const mapOrderFromDb = (row: SalesOrderDbRow): SalesOrder => {
     customerName: row?.customer_name ?? meta?.customerName ?? base.customerName ?? 'Cliente Não Informado',
     status: statusFromDb(row.status),
     totalValue: row.total_value ?? base.totalValue,
-    notes: row.notes || base.notes
+    notes: row.notes || base.notes,
+    consultantName: (row.consultant_name || meta?.consultantName || '') === 'Ronaldo Silva' ? 'Ronaldo Silva de Oliveira' : (row.consultant_name || meta?.consultantName || '')
   };
 };
 
@@ -145,6 +152,7 @@ export const mapOrderFromOpsRow = (row: SalesOrderOpsRow): SalesOrder => {
     customerId: row.customer_id || meta?.customerId || '',
     customerName: row.customer_name || meta?.customerName || 'Cliente',
     customerNickname: row.customer_nickname || meta?.customerNickname || '',
+    consultantName: (row.consultant_name || meta?.consultantName || '') === 'Ronaldo Silva' ? 'Ronaldo Silva de Oliveira' : (row.consultant_name || meta?.consultantName || ''),
     totalValue: Number(row.total_value ?? meta?.totalValue ?? 0),
     paidValue: Number(row.received_value ?? meta?.paidValue ?? 0),
     notes: row.notes || meta?.notes || '',

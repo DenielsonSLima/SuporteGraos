@@ -2,6 +2,7 @@ import { supabase } from '../supabase';
 import { authService } from '../authService';
 import { Partner } from './types';
 import { addressesActions } from './addresses';
+import { normalizeText } from '../../utils/stringUtils';
 
 /**
  * PARTNERS ACTIONS
@@ -61,8 +62,9 @@ export const partnersActions = {
       }
 
       if (searchTerm) {
-        const search = `%${searchTerm.trim()}%`;
-        query = query.or(`name.ilike."${search}",trade_name.ilike."${search}",nickname.ilike."${search}",document.ilike."${search}"`);
+        const searchNormal = `%${normalizeText(searchTerm.trim())}%`;
+        const documentSearch = `%${searchTerm.trim()}%`;
+        query = query.or(`name_unaccented.ilike."${searchNormal}",trade_name_unaccented.ilike."${searchNormal}",nickname_unaccented.ilike."${searchNormal}",document.ilike."${documentSearch}"`);
       }
 
       return query.order('name', { ascending: true }).range(from, to);
@@ -73,7 +75,7 @@ export const partnersActions = {
       : 'parceiros_categorias(partner_type_id)';
 
     let primaryQuery = supabase
-      .from('parceiros_parceiros')
+      .from('vw_parceiros_unaccented')
       .select(`
         *,
         ${categoriasJoin},
@@ -94,7 +96,7 @@ export const partnersActions = {
     if (error) {
       console.warn('[partnersActions] Junction indisponível, aplicando fallback legacy:', error.message);
       let fallbackQuery = supabase
-        .from('parceiros_parceiros')
+        .from('vw_parceiros_unaccented')
         .select(`
           *,
           address:parceiros_enderecos(

@@ -48,6 +48,8 @@ export function useLoadingsByPurchaseOrder(purchaseOrderId: string | undefined) 
       const all = await loadingService.loadFromSupabase();
       return all.filter(l => 
         l.purchaseOrderId === purchaseOrderId ||
+        (l as any).purchaseOrderDbId === purchaseOrderId ||
+        (l as any).purchaseOrderLegacyId === purchaseOrderId ||
         (l.purchaseOrderNumber && l.purchaseOrderNumber === purchaseOrderId)
       );
     },
@@ -64,6 +66,8 @@ export function useLoadingsBySalesOrder(salesOrderId: string | undefined) {
       const all = await loadingService.loadFromSupabase();
       return all.filter(l =>
         l.salesOrderId === salesOrderId ||
+        (l as any).salesOrderDbId === salesOrderId ||
+        (l as any).salesOrderLegacyId === salesOrderId ||
         (l.salesOrderNumber && l.salesOrderNumber === salesOrderId)
       );
     },

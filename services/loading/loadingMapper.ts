@@ -119,13 +119,29 @@ export const mapLoadingFromDb = (row: any): Loading => {
     transactions: []
   } as Loading;
 
-  return {
+  // Enrich customerName from joined sales_order relation if available
+  const customerName = row?.sales_order?.customer_name || row?.customer_name || base.customerName || '';
+
+  const mapped = {
     ...base,
     id: row?.id ?? base.id,
     date: row?.date ?? base.date,
     status: row?.status ?? base.status,
     companyId: row?.company_id || undefined,
+    customerName,
     freightPaid: row?.freight_paid !== undefined ? Number(row.freight_paid) : base.freightPaid,
     totalFreightValue: row?.total_freight_value !== undefined ? Number(row.total_freight_value) : base.totalFreightValue
   };
+
+  // Add robust DB/Legacy IDs mapping for cross-referencing
+  if (row?.purchase_order) {
+    (mapped as any).purchaseOrderDbId = row.purchase_order.id;
+    (mapped as any).purchaseOrderLegacyId = row.purchase_order.legacy_id;
+  }
+  if (row?.sales_order) {
+    (mapped as any).salesOrderDbId = row.sales_order.id;
+    (mapped as any).salesOrderLegacyId = row.sales_order.legacy_id;
+  }
+
+  return mapped;
 };

@@ -17,7 +17,8 @@ export const loadingPersistence = {
         .from('ops_loadings')
         .select(`
           *,
-          purchase_order:ops_purchase_orders(id, legacy_id, number, partner_id, partner_name)
+          purchase_order:ops_purchase_orders(id, legacy_id, number, partner_id, partner_name),
+          sales_order:ops_sales_orders(id, legacy_id, number, customer_id, customer_name)
         `);
 
       if (companyId) {

@@ -52,7 +52,7 @@ const LoanFormModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialType =
         setType(initialLoan.type);
         setFormData({
           date: initialLoan.contractDate || new Date().toISOString().split('T')[0],
-          description: initialLoan.entityName || '',
+          description: (initialLoan.entityName || '').toUpperCase(),
           contractValue: initialLoan.originalValue?.toString() || '',
           remainingValue: initialLoan.remainingValue?.toString() || '',
           accountId: initialLoan.accountId || ''
@@ -86,6 +86,31 @@ const LoanFormModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialType =
     setDisplayRemainingValue(formatBRL(num));
   };
 
+  const handleTypeChange = (newType: 'taken' | 'granted') => {
+    setType(newType);
+    
+    let desc = formData.description.trim().toUpperCase();
+    if (desc) {
+      const prefixes = [
+        'EMPRÉSTIMO TOMADO: ',
+        'EMPRÉSTIMO CEDIDO: ',
+        'ENTRADA DE CAPITAL (EMPRÉSTIMO): ',
+        'SAÍDA DE CAPITAL (EMPRÉSTIMO): '
+      ];
+      
+      let baseName = desc;
+      for (const prefix of prefixes) {
+        if (baseName.startsWith(prefix)) {
+          baseName = baseName.substring(prefix.length);
+          break;
+        }
+      }
+      
+      const newPrefix = newType === 'taken' ? 'EMPRÉSTIMO TOMADO: ' : 'EMPRÉSTIMO CEDIDO: ';
+      setFormData(prev => ({ ...prev, description: newPrefix + baseName }));
+    }
+  };
+
   const selectedAccountData = bankAccounts.find(a => a.id === formData.accountId);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -94,7 +119,8 @@ const LoanFormModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialType =
     const contractValue = parseFloat(formData.contractValue);
     const remainingValue = parseFloat(formData.remainingValue);
 
-    if (!formData.description.trim()) return addToast('warning', 'Descrição é obrigatória');
+    const cleanDescription = formData.description.trim().toUpperCase();
+    if (!cleanDescription) return addToast('warning', 'Descrição é obrigatória');
     if (contractValue <= 0) return addToast('warning', 'Valor do contrato deve ser maior que zero');
     if (remainingValue <= 0) return addToast('warning', 'Valor a pagar deve ser maior que zero');
     if (remainingValue > contractValue) return addToast('warning', 'Valor a pagar não pode ser maior que o valor do contrato');
@@ -104,7 +130,7 @@ const LoanFormModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialType =
 
     onSave({
       date: formData.date,
-      description: formData.description,
+      description: cleanDescription,
       contractValue,
       remainingValue,
       type,
@@ -145,14 +171,14 @@ const LoanFormModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialType =
             <div className="flex bg-slate-200 p-1 rounded-2xl shadow-inner">
               <button 
                 type="button" 
-                onClick={() => setType('taken')} 
+                onClick={() => handleTypeChange('taken')} 
                 className={`flex-1 py-3 text-xs font-black uppercase rounded-xl transition-all flex items-center justify-center gap-2 ${type === 'taken' ? 'bg-white shadow text-rose-600' : 'text-slate-500 hover:text-slate-700'}`}
               >
                 <ArrowDownLeft size={16} /> Tomado
               </button>
               <button 
                 type="button" 
-                onClick={() => setType('granted')} 
+                onClick={() => handleTypeChange('granted')} 
                 className={`flex-1 py-3 text-xs font-black uppercase rounded-xl transition-all flex items-center justify-center gap-2 ${type === 'granted' ? 'bg-white shadow text-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}
               >
                 <ArrowUpRight size={16} /> Cedido
@@ -188,7 +214,7 @@ const LoanFormModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialType =
                     className={`${inputClass} pl-12 uppercase`}
                     placeholder="Ex: BANCO DO BRASIL, EMPRÉSTIMO PESSOAL..."
                     value={formData.description}
-                    onChange={e => setFormData({...formData, description: e.target.value})}
+                    onChange={e => setFormData({...formData, description: e.target.value.toUpperCase()})}
                   />
                 </div>
               </div>

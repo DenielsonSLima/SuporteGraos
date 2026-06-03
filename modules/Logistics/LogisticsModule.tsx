@@ -12,6 +12,7 @@ import { useFreights } from '../../hooks/useFreights';
 import { useCarriers } from '../../hooks/useCarriers';
 import { useQueryClient } from '@tanstack/react-query';
 import { QUERY_KEYS } from '../../hooks/queryKeys';
+import { normalizeText } from '../../utils/stringUtils';
 
 import { ModuleSkeleton } from '../../components/ui/LoadingSkeleton';
 
@@ -50,12 +51,12 @@ const LogisticsModule: React.FC = () => {
   // Freights filtrados SEM filtro de aba — usado pelos KPIs superiores
   const kpiFreights = useMemo(() => {
     return freights.filter(f => {
-      const search = searchTerm.toLowerCase();
+      const search = normalizeText(searchTerm);
       const matchesSearch = !searchTerm || 
-        (f.carrierName || '').toLowerCase().includes(search) || 
-        (f.driverName || '').toLowerCase().includes(search) || 
-        (f.vehiclePlate || '').toLowerCase().includes(search) || 
-        (f.orderNumber || '').toLowerCase().includes(search);
+        normalizeText(f.carrierName).includes(search) || 
+        normalizeText(f.driverName).includes(search) || 
+        normalizeText(f.vehiclePlate).includes(search) || 
+        normalizeText(f.orderNumber).includes(search);
       const matchesCarrier = !carrierFilter || f.carrierName === carrierFilter;
       const matchesDate = (!startDate || f.date >= startDate) && (!endDate || f.date <= endDate);
       return matchesSearch && matchesCarrier && matchesDate;

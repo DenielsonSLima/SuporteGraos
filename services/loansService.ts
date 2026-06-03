@@ -176,19 +176,24 @@ export const loansService = {
   },
 
   update: async (loanId: string, updates: Partial<Omit<Loan, 'id' | 'company_id' | 'created_at' | 'updated_at'>> & { type?: 'taken' | 'granted', accountId?: string }): Promise<void> => {
-    const loanUpdates: any = {
+    const rawUpdates: any = {
       lender_id: updates.lender_id,
       principal_amount: updates.principal_amount,
       interest_rate: updates.interest_rate,
       start_date: updates.start_date,
       end_date: updates.end_date,
       paid_amount: updates.paid_amount,
-      remaining_amount: updates.remaining_amount,
+      // remaining_amount é coluna GENERATED na tabela financial_entries — nunca atualizar diretamente
       status: updates.status,
     };
     if (updates.type !== undefined) {
-      loanUpdates.type = updates.type;
+      rawUpdates.type = updates.type;
     }
+
+    // Filter out undefined properties to avoid Postgrest anomalies
+    const loanUpdates = Object.fromEntries(
+      Object.entries(rawUpdates).filter(([_, v]) => v !== undefined)
+    );
 
     const { error } = await supabase
       .from('loans')
@@ -201,20 +206,43 @@ export const loansService = {
       const entryUpdates: any = {};
       if (updates.type !== undefined) {
         entryUpdates.type = updates.type === 'taken' ? 'payable' : 'receivable';
+        
+        // Atualizar também o prefixo da descrição da entry caso o tipo mude
+        const { data: entries } = await supabase
+          .from('financial_entries')
+          .select('description')
+          .eq('origin_id', loanId)
+          .eq('origin_type', 'loan');
+        
+        if (entries && entries.length > 0) {
+          let newDesc = entries[0].description;
+          const oldPrefix = updates.type === 'taken' ? 'EMPRÉSTIMO CEDIDO: ' : 'EMPRÉSTIMO TOMADO: ';
+          const newPrefix = updates.type === 'taken' ? 'EMPRÉSTIMO TOMADO: ' : 'EMPRÉSTIMO CEDIDO: ';
+          if (newDesc.toUpperCase().startsWith(oldPrefix)) {
+            newDesc = newPrefix + newDesc.substring(oldPrefix.length);
+          } else if (newDesc.toUpperCase().startsWith('EMPRÉSTIMO TOMADO: ')) {
+            newDesc = newPrefix + newDesc.substring('EMPRÉSTIMO TOMADO: '.length);
+          } else if (newDesc.toUpperCase().startsWith('EMPRÉSTIMO CEDIDO: ')) {
+            newDesc = newPrefix + newDesc.substring('EMPRÉSTIMO CEDIDO: '.length);
+          }
+          entryUpdates.description = newDesc;
+        }
       }
       if (updates.principal_amount !== undefined) {
         entryUpdates.total_amount = updates.principal_amount;
-        entryUpdates.remaining_amount = updates.principal_amount; // Reset or calculate remaining based on paid_amount
+        // NÃO atualizar remaining_amount: é GENERATED ALWAYS em financial_entries
+        // calculado automaticamente como (total_amount - discount_amount - paid_amount)
       }
       if (updates.start_date !== undefined) {
         entryUpdates.created_date = updates.start_date;
       }
 
-      await supabase
+      const { error: entryError } = await supabase
         .from('financial_entries')
         .update(entryUpdates)
         .eq('origin_id', loanId)
         .eq('origin_type', 'loan');
+      if (entryError) throw new Error(`Erro ao atualizar lançamento financeiro: ${entryError.message}`);
     }
 
     // Se alterou valor principal, data de início, conta ou tipo, sincroniza a transação de desembolso correspondente
@@ -225,13 +253,35 @@ export const loansService = {
       if (updates.accountId !== undefined) txUpdates.account_id = updates.accountId;
       if (updates.type !== undefined) {
         txUpdates.type = updates.type === 'taken' ? 'credit' : 'debit';
+        
+        // Atualizar o prefixo da descrição da transação de desembolso correspondente
+        const { data: txs } = await supabase
+          .from('financial_transactions')
+          .select('description')
+          .eq('metadata->>loan_id', loanId)
+          .eq('metadata->>is_disbursement', 'true');
+        
+        if (txs && txs.length > 0) {
+          let newDesc = txs[0].description;
+          const oldPrefix = updates.type === 'taken' ? 'SAÍDA DE CAPITAL (EMPRÉSTIMO): ' : 'ENTRADA DE CAPITAL (EMPRÉSTIMO): ';
+          const newPrefix = updates.type === 'taken' ? 'ENTRADA DE CAPITAL (EMPRÉSTIMO): ' : 'SAÍDA DE CAPITAL (EMPRÉSTIMO): ';
+          if (newDesc.toUpperCase().startsWith(oldPrefix)) {
+            newDesc = newPrefix + newDesc.substring(oldPrefix.length);
+          } else if (newDesc.toUpperCase().startsWith('ENTRADA DE CAPITAL (EMPRÉSTIMO): ')) {
+            newDesc = newPrefix + newDesc.substring('ENTRADA DE CAPITAL (EMPRÉSTIMO): '.length);
+          } else if (newDesc.toUpperCase().startsWith('SAÍDA DE CAPITAL (EMPRÉSTIMO): ')) {
+            newDesc = newPrefix + newDesc.substring('SAÍDA DE CAPITAL (EMPRÉSTIMO): '.length);
+          }
+          txUpdates.description = newDesc;
+        }
       }
 
-      await supabase
+      const { error: txError } = await supabase
         .from('financial_transactions')
         .update(txUpdates)
         .eq('metadata->>loan_id', loanId)
         .eq('metadata->>is_disbursement', 'true');
+      if (txError) throw new Error(`Erro ao atualizar transação bancária: ${txError.message}`);
     }
   },
 

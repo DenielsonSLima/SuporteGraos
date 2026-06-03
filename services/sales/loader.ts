@@ -4,6 +4,7 @@ import { isSqlCanonicalOpsEnabled, sqlCanonicalOpsLog } from '../sqlCanonicalOps
 import { SalesOrder } from '../../modules/SalesOrder/types';
 import { mapOrderFromOpsRow, mapOrderFromDb } from './mappers';
 import { salesStore } from './store';
+import { normalizeText } from '../../utils/stringUtils';
 
 /**
  * SALES LOADER
@@ -63,7 +64,8 @@ export const salesLoader = {
 
         // --- Filtros Adicionais (Server-side) ---
         if (searchTerm) {
-          query = query.or(`number.ilike.%${searchTerm}%,customer_name.ilike.%${searchTerm}%`);
+          const searchNormal = `%${normalizeText(searchTerm.trim())}%`;
+          query = query.or(`number.ilike.%${searchTerm}%,customer_name_unaccented.ilike.${searchNormal}`);
         }
 
         if (startDate) {

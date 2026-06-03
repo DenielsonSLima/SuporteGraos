@@ -3,6 +3,7 @@ import { isSqlCanonicalOpsEnabled } from '../sqlCanonicalOps';
 import { authService } from '../authService';
 import { mapOrderFromDb, mapOrderFromOpsRow } from './mappers';
 import { PurchaseOrder } from '../../modules/PurchaseOrder/types';
+import { normalizeText } from '../../utils/stringUtils';
 
 export interface PurchaseLoadParams {
   page?: number;
@@ -55,7 +56,8 @@ export const loadFromSupabase = async (params: PurchaseLoadParams = {}): Promise
     }
 
     if (searchTerm) {
-      query = query.or(`number.ilike.%${searchTerm}%,partner_name.ilike.%${searchTerm}%`);
+      const searchNormal = `%${normalizeText(searchTerm.trim())}%`;
+      query = query.or(`number.ilike.%${searchTerm}%,partner_name_unaccented.ilike.${searchNormal}`);
     }
 
     if (startDate) query = query.gte('order_date', startDate);

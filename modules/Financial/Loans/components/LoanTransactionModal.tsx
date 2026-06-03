@@ -11,12 +11,13 @@ import { formatAccountLabel } from '../../../../utils/formatters';
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-   onSave: (tx: Omit<LoanTransaction, 'id'> & { id?: string }) => void;
-  loanType: 'taken' | 'granted';
-   initialTx?: (Omit<LoanTransaction, 'id'> & { id?: string });
+  onSave: (tx: Omit<LoanTransaction, 'id'> & { id?: string }) => void;
+  loan: any;
+  initialTx?: (Omit<LoanTransaction, 'id'> & { id?: string });
 }
 
-const LoanTransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, loanType, initialTx }) => {
+const LoanTransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, loan, initialTx }) => {
+   const loanType = loan.type;
    const { data: bankAccounts = [] } = useAccounts();
    const { addToast } = useToast();
   const [type, setType] = useState<'increase' | 'decrease'>('decrease');
@@ -42,31 +43,40 @@ const LoanTransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, loanTy
       return Number.isNaN(num) ? 0 : num;
    };
 
-   useEffect(() => {
-      if (isOpen) {
-         if (initialTx) {
-            setType(initialTx.type);
-            setIsAdjustment(!!initialTx.isHistorical);
-            setValue(
-              typeof initialTx.value === 'number' && initialTx.value > 0
-                ? initialTx.value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                : ''
-            );
-            setDescription(initialTx.description || '');
-            setAccountId(initialTx.accountId || '');
-            setIsHistorical(!!initialTx.isHistorical);
-            setDate(initialTx.date || new Date().toISOString().split('T')[0]);
-         } else {
-            setType('decrease');
-            setIsAdjustment(false);
-            setValue('');
-            setDescription('');
-            setAccountId('');
-            setIsHistorical(false);
-            setDate(new Date().toISOString().split('T')[0]);
-         }
-      }
-   }, [isOpen, initialTx]);
+    useEffect(() => {
+       if (isOpen) {
+          if (initialTx) {
+             setType(initialTx.type);
+             setIsAdjustment(!!initialTx.isHistorical);
+             setValue(
+               typeof initialTx.value === 'number' && initialTx.value > 0
+                 ? initialTx.value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                 : ''
+             );
+             setDescription((initialTx.description || '').toUpperCase());
+             setAccountId(initialTx.accountId || '');
+             setIsHistorical(!!initialTx.isHistorical);
+             setDate(initialTx.date || new Date().toISOString().split('T')[0]);
+          } else {
+             if (loan && loan.remainingValue < 0) {
+                setType('increase');
+                setIsAdjustment(true);
+                setValue(Math.abs(loan.remainingValue).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+                setDescription('JUROS / RENDIMENTO (AJUSTE)');
+                setAccountId('');
+                setIsHistorical(true);
+             } else {
+                setType('decrease');
+                setIsAdjustment(false);
+                setValue('');
+                setDescription('');
+                setAccountId('');
+                setIsHistorical(false);
+             }
+             setDate(new Date().toISOString().split('T')[0]);
+          }
+       }
+    }, [isOpen, initialTx, loan]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -91,13 +101,15 @@ const LoanTransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, loanTy
     const account = bankAccounts.find(a => a.id === accountId);
 
     setIsSubmitting(true);
+    const finalDescription = (description.trim() || (isAdjustment ? (type === 'increase' ? 'Juros / Rendimento' : 'Ajuste / Abatimento de Saldo') : (type === 'increase' ? 'Reforço de Capital' : 'Pagamento de Parcela'))).toUpperCase();
+
     try {
       await onSave({
         id: initialTx?.id,
         date,
         type,
         value: val,
-        description: description || (isAdjustment ? 'Ajuste / Abatimento de Saldo' : (type === 'increase' ? 'Reforço de Capital' : 'Pagamento de Parcela')),
+        description: finalDescription,
         accountId: (isHistorical || isAdjustment) ? undefined : accountId,
         accountName: (isHistorical || isAdjustment) ? undefined : account?.account_name,
         isHistorical: isHistorical || isAdjustment // Ajustes funcionam como históricos (não geram caixa)
@@ -144,7 +156,7 @@ const LoanTransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, loanTy
                   className={`flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all ${isAdjustment ? 'border-amber-500 bg-amber-50 text-amber-600' : 'border-slate-100 text-slate-400'}`}
                >
                   <MinusCircle size={16} />
-                  <span className="text-[10px] font-black uppercase">Abatimento</span>
+                  <span className="text-[10px] font-black uppercase">{type === 'decrease' ? 'Abatimento' : 'Juros / Ajuste'}</span>
                </button>
             </div>
 
@@ -161,7 +173,7 @@ const LoanTransactionModal: React.FC<Props> = ({ isOpen, onClose, onSave, loanTy
 
             <div>
                <label className={labelClass}>Descrição do Lançamento</label>
-               <input type="text" className={inputClass} value={description} onChange={e => setDescription(e.target.value)} placeholder="Ex: Pagamento 03/12, Juros Mensais..." />
+               <input type="text" className={`${inputClass} uppercase`} value={description} onChange={e => setDescription(e.target.value.toUpperCase())} placeholder="Ex: Pagamento 03/12, Juros Mensais..." />
             </div>
 
             {!isAdjustment && (

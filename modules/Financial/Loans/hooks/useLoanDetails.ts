@@ -103,7 +103,7 @@ export function useLoanDetails({ loan, onUpdate, onBack, addToast }: UseLoanDeta
     } finally {
       setIsLoadingHistory(false);
     }
-  }, [loan.id]);
+  }, [loan.id, loan.contractDate, loan.totalValue, loan.type, loan.accountId, loan.entityName]);
 
   // Efeito para carregar dados
   useEffect(() => {

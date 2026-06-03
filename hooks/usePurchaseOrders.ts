@@ -137,11 +137,18 @@ export function usePurchaseOrder(orderId: string) {
     queryKey: [QUERY_KEYS.PURCHASE_ORDERS, 'detail', orderId],
     queryFn: async () => {
       if (!orderId) return null;
-      const { data, error } = await supabase
+      
+      const query = supabase
         .from(tableName)
-        .select('*')
-        .eq('id', orderId)
-        .maybeSingle();
+        .select('*');
+
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId)) {
+        query.or(`id.eq.${orderId},legacy_id.eq.${orderId}`);
+      } else {
+        query.eq('id', orderId);
+      }
+
+      const { data, error } = await query.maybeSingle();
 
       if (error || !data) return null;
       return isCanonical ? mapOrderFromOpsRow(data) : mapOrderFromDb(data);

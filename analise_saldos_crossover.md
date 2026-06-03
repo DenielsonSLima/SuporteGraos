@@ -275,3 +275,6 @@ Esta análise está concluída e salva no arquivo do sistema. Para prosseguir co
 1.  **Aprovação deste plano** e estratégia de CVA para os contratos crossover.
 2.  **Autorização para cadastrar os parceiros faltantes** identificados no Item 3.
 3.  **Desenvolvimento do script automatizado de importação** aplicando o CVA para validação de Dry-Run antes do commit final no Supabase.
+
+> [!NOTE]
+> **REVERSÃO DE IMPORTAÇÃO EXECUTADA:** O banco de dados do Supabase foi completamente limpo e revertido. Todos os 17 contratos crossover importados incorretamente na etapa anterior (com seus 84 carregamentos e 238 transações) foram completamente removidos da base de dados, restaurando o banco ao seu estado original antes de qualquer importação. A análise textual acima agora descreve puramente o plano conceitual de transição.
