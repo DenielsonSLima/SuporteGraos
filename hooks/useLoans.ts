@@ -105,13 +105,13 @@ export function useLoanInstallments(loanId: string | null) {
 }
 
 // Hook: Totais de empréstimos ativos via RPC — Zero cálculo no frontend
-export function useLoansActiveTotals() {
+export function useLoansActiveTotals(searchTerm: string = '', status: string = 'active') {
   // Canal único financeiro
   useFinancialRealtime();
 
   return useQuery({
-    queryKey: QUERY_KEYS.LOANS_ACTIVE_TOTALS,
-    queryFn: () => loansService.getActiveTotals(),
+    queryKey: [...QUERY_KEYS.LOANS_ACTIVE_TOTALS, searchTerm, status],
+    queryFn: () => loansService.getActiveTotals(searchTerm, status),
     staleTime: STALE_TIMES.MODERATE,
     placeholderData: keepPreviousData,
   });

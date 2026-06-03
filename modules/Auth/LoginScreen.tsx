@@ -199,7 +199,7 @@ const LoginScreen: React.FC<Props> = ({ onLoginSuccess }) => {
                           value={recovery.newPassword}
                           onChange={(e) => recovery.setNewPassword(e.target.value)}
                           className={inputClass}
-                          placeholder="Mínimo 6 caracteres"
+                          placeholder="Mínimo 8 caracteres"
                         />
                       </div>
                     </div>
@@ -253,8 +253,8 @@ const LoginScreen: React.FC<Props> = ({ onLoginSuccess }) => {
                       loginForm.setError('As senhas não conferem.');
                       return;
                     }
-                    if (newPwd.length < 6) {
-                      loginForm.setError('A senha deve ter no mínimo 6 caracteres.');
+                    if (newPwd.length < 8) {
+                      loginForm.setError('A senha deve ter no mínimo 8 caracteres.');
                       return;
                     }
 
@@ -299,7 +299,7 @@ const LoginScreen: React.FC<Props> = ({ onLoginSuccess }) => {
                           type="password"
                           required
                           className={inputClass}
-                          placeholder="Mínimo 6 caracteres"
+                          placeholder="Mínimo 8 caracteres"
                           autoComplete="new-password"
                         />
                       </div>

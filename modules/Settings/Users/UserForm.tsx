@@ -202,7 +202,7 @@ const UserForm: React.FC<UserFormProps> = ({
                     value={password}
                     onChange={e => setPassword(e.target.value)}
                     className="w-full rounded-lg border-2 border-slate-200 bg-white px-3 py-2 text-slate-900 focus:border-indigo-500 focus:outline-none transition-all"
-                    placeholder="Mínimo 6 caracteres..."
+                    placeholder="Mínimo 8 caracteres..."
                   />
 
                   {/* MEDIDOR DE FORÇA DE SENHA AVANÇADO */}

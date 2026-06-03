@@ -26,11 +26,12 @@ const InitialBalanceSettings: React.FC<Props> = ({ onBack }) => {
 
   const [viewMode, setViewMode] = useState<'list' | 'form'>('list');
   const [idToDelete, setIdToDelete] = useState<string | null>(null);
+  const [editingRecord, setEditingRecord] = useState<any | null>(null);
 
-  // Apenas contas ativas que ainda não têm saldo inicial
+  // Apenas contas ativas que ainda não têm saldo inicial (ou a que está sendo editada)
   const availableAccounts = useMemo(() =>
-    allAccounts.filter(a => a.active !== false && !balances.some(b => b.accountId === a.id)),
-    [allAccounts, balances]
+    allAccounts.filter(a => a.active !== false && (!balances.some(b => b.accountId === a.id) || (editingRecord && editingRecord.accountId === a.id))),
+    [allAccounts, balances, editingRecord]
   );
 
   const handleSave = async (data: { accountId: string; date: string; value: number }) => {
@@ -38,14 +39,15 @@ const InitialBalanceSettings: React.FC<Props> = ({ onBack }) => {
     if (!account) return;
     try {
       await addInitialBalance.mutateAsync({
-        id:          uuidv4(),
+        id:          editingRecord?.id || uuidv4(),
         accountId:   data.accountId,
         accountName: account.bankName,
         date:        data.date,
         value:       data.value,
       });
-      addToast('success', 'Saldo Salvo', 'Ponto de partida registrado com sucesso.');
+      addToast('success', editingRecord ? 'Saldo Atualizado' : 'Saldo Salvo', 'Ponto de partida registrado com sucesso.');
       setViewMode('list');
+      setEditingRecord(null);
     } catch (err: any) {
       addToast('error', 'Erro ao Salvar', err.message ?? 'Não foi possível salvar.');
     }
@@ -74,9 +76,9 @@ const InitialBalanceSettings: React.FC<Props> = ({ onBack }) => {
                 Os saldos de abertura são fundamentais para que a conciliação bancária do ERP reflita seu saldo real. Cada conta pode ter apenas um marco zero.
               </p>
             </div>
-            {availableAccounts.length > 0 && (
+            {(availableAccounts.length > 0 || editingRecord) && (
               <button
-                onClick={() => setViewMode('form')}
+                onClick={() => { setEditingRecord(null); setViewMode('form'); }}
                 className="flex items-center gap-2 rounded-2xl bg-amber-600 px-6 py-3.5 text-xs font-black uppercase text-white shadow-lg shadow-amber-200 hover:bg-amber-700 transition-all active:scale-95"
               >
                 <Plus size={18} /> Configurar Novo Saldo
@@ -86,12 +88,17 @@ const InitialBalanceSettings: React.FC<Props> = ({ onBack }) => {
         )}
 
         {viewMode === 'list' ? (
-          <InitialBalanceList balances={balances} onDelete={setIdToDelete} />
+          <InitialBalanceList 
+            balances={balances} 
+            onEdit={(record) => { setEditingRecord(record); setViewMode('form'); }}
+            onDelete={setIdToDelete} 
+          />
         ) : (
           <InitialBalanceForm
             accounts={availableAccounts}
+            initialData={editingRecord}
             onSave={handleSave}
-            onCancel={() => setViewMode('list')}
+            onCancel={() => { setViewMode('list'); setEditingRecord(null); }}
           />
         )}
       </div>

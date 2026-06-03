@@ -8,15 +8,19 @@ import { useLoansActiveTotals } from '../../../../hooks/useLoans';
 interface Props {
   loans: LoanRecord[];
   onSelect: (id: string) => void;
+  searchTerm: string;
+  activeSubTab: string;
 }
 
-const LoanList: React.FC<Props> = ({ loans, onSelect }) => {
+const LoanList: React.FC<Props> = ({ loans, onSelect, searchTerm, activeSubTab }) => {
   // Ordenar empréstimos alfabeticamente por nome da entidade
   const sortedLoans = [...loans].sort((a, b) => 
     a.entityName.localeCompare(b.entityName, 'pt-BR')
   );
 
-  const { data: totals } = useLoansActiveTotals();
+  const isHistory = activeSubTab === 'history';
+  const statusFilter = isHistory ? 'history' : 'active';
+  const { data: totals } = useLoansActiveTotals(searchTerm, statusFilter);
 
   const takenLoans = sortedLoans.filter(l => l.type === 'taken');
   const grantedLoans = sortedLoans.filter(l => l.type === 'granted');

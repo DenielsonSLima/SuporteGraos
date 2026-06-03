@@ -141,14 +141,36 @@ export const advancesLoader = {
     return enrichWithAccounts(mapped);
   },
 
-  getActiveTotals: async (): Promise<{ takenRemaining: number, givenRemaining: number, countActive: number, netBalance: number }> => {
-    const { data, error } = await supabase.rpc('rpc_get_advances_active_totals');
+  getActiveTotals: async (searchTerm: string = '', status: string = 'active'): Promise<{
+    takenOriginal: number;
+    takenSettled: number;
+    takenRemaining: number;
+    givenOriginal: number;
+    givenSettled: number;
+    givenRemaining: number;
+    countActive: number;
+    netBalance: number;
+  }> => {
+    const { data, error } = await supabase.rpc('rpc_get_advances_active_totals', { p_search: searchTerm, p_status: status });
     if (error) {
       console.error('Erro ao buscar totais de adiantamentos:', error);
-      return { takenRemaining: 0, givenRemaining: 0, countActive: 0, netBalance: 0 };
+      return {
+        takenOriginal: 0,
+        takenSettled: 0,
+        takenRemaining: 0,
+        givenOriginal: 0,
+        givenSettled: 0,
+        givenRemaining: 0,
+        countActive: 0,
+        netBalance: 0
+      };
     }
     return {
+      takenOriginal: data?.takenOriginal || 0,
+      takenSettled: data?.takenSettled || 0,
       takenRemaining: data?.takenRemaining || 0,
+      givenOriginal: data?.givenOriginal || 0,
+      givenSettled: data?.givenSettled || 0,
       givenRemaining: data?.givenRemaining || 0,
       countActive: data?.countActive || 0,
       netBalance: data?.netBalance || 0,

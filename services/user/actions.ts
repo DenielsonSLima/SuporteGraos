@@ -129,16 +129,16 @@ export const userActions = {
   /**
    * Reseta a senha usando o token de recuperação.
    */
-  resetPasswordWithToken: async (token: string, newPassword: string): Promise<boolean> => {
-    if (!token || !newPassword) return false;
+  resetPasswordWithToken: async (token: string, newPassword: string): Promise<{ success: boolean; error?: string }> => {
+    if (!token || !newPassword) return { success: false, error: 'Token e senha são obrigatórios.' };
 
     const { data, error } = await invokeEdgeFunction('reset-password-by-token', { token, password: newPassword }, true);
     if (error || !data || !data.success) {
       console.error('[resetPasswordWithToken] Erro ao redefinir:', error);
-      return false;
+      return { success: false, error: error || 'Falha ao redefinir.' };
     }
 
-    return true;
+    return { success: true };
   },
 
   // Alias legacy para compatibilidade

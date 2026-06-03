@@ -1,15 +1,16 @@
 
 import React from 'react';
-import { Landmark, Trash2, Calendar, Coins } from 'lucide-react';
+import { Landmark, Trash2, Calendar, Coins, Edit2 } from 'lucide-react';
 import type { InitialBalanceRecord } from '../../../../services/financialService';
 import { formatDateBR } from '../../../../utils/dateUtils';
 
 interface Props {
   balances: InitialBalanceRecord[];
+  onEdit: (record: InitialBalanceRecord) => void;
   onDelete: (id: string) => void;
 }
 
-const InitialBalanceList: React.FC<Props> = ({ balances, onDelete }) => {
+const InitialBalanceList: React.FC<Props> = ({ balances, onEdit, onDelete }) => {
   const currency = (val: number) => {
     const cleanValue = Math.abs(val) < 0.01 ? 0 : val;
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cleanValue);
@@ -65,13 +66,22 @@ const InitialBalanceList: React.FC<Props> = ({ balances, onDelete }) => {
                 </span>
               </td>
               <td className="px-6 py-4 text-center">
-                <button 
-                  onClick={() => onDelete(b.id)}
-                  className="p-2.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all active:scale-90"
-                  title="Excluir Registro"
-                >
-                  <Trash2 size={18} />
-                </button>
+                <div className="flex justify-center items-center gap-1">
+                  <button 
+                    onClick={() => onEdit(b)}
+                    className="p-2.5 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all active:scale-90"
+                    title="Editar Registro"
+                  >
+                    <Edit2 size={18} />
+                  </button>
+                  <button 
+                    onClick={() => onDelete(b.id)}
+                    className="p-2.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all active:scale-90"
+                    title="Excluir Registro"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
               </td>
             </tr>
           ))}

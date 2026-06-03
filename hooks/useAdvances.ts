@@ -25,13 +25,13 @@ export function useAdvances() {
 }
 
 // Hook: Totais de adiantamentos ativos via RPC — Zero cálculo no frontend
-export function useAdvancesActiveTotals() {
+export function useAdvancesActiveTotals(searchTerm: string = '', status: string = 'active') {
   // Canal único financeiro
   useFinancialRealtime();
 
   return useQuery({
-    queryKey: QUERY_KEYS.ADVANCES_ACTIVE_TOTALS,
-    queryFn: () => advancesService.getActiveTotals(),
+    queryKey: [...QUERY_KEYS.ADVANCES_ACTIVE_TOTALS, searchTerm, status],
+    queryFn: () => advancesService.getActiveTotals(searchTerm, status),
     staleTime: STALE_TIMES.DYNAMIC,
     placeholderData: keepPreviousData,
   });

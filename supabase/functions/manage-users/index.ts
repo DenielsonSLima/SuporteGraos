@@ -316,7 +316,7 @@ serve(async (req: Request) => {
     if (action === 'reset-password-by-token') {
       const { token, password } = body as any;
       if (!token || !password) return fail('Token e senha são obrigatórios');
-      if (password.length < 6) return fail('A senha deve ter no mínimo 6 caracteres');
+      if (password.length < 8) return fail('A senha deve ter no mínimo 8 caracteres');
 
       // Encontrar usuário associado ao token
       const { data: userRow, error: fetchErr } = await adminClient

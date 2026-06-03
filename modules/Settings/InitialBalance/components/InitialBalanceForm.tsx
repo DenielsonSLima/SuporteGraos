@@ -6,14 +6,15 @@ import { getLocalDateString } from '../../../../utils/dateUtils';
 
 interface Props {
   accounts: BankAccount[];
+  initialData?: any;
   onSave: (data: { accountId: string; date: string; value: number }) => void;
   onCancel: () => void;
 }
 
-const InitialBalanceForm: React.FC<Props> = ({ accounts, onSave, onCancel }) => {
+const InitialBalanceForm: React.FC<Props> = ({ accounts, initialData, onSave, onCancel }) => {
   const [formData, setFormData] = useState({ 
     accountId: '', 
-    date: getLocalDateString() // Usa utilitário local
+    date: getLocalDateString() 
   });
   const [displayValue, setDisplayValue] = useState('');
   const [numericValue, setNumericValue] = useState(0);
@@ -22,6 +23,24 @@ const InitialBalanceForm: React.FC<Props> = ({ accounts, onSave, onCancel }) => 
     const normalized = Math.abs(val) < 0.01 ? 0 : val;
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(normalized);
   };
+
+  useEffect(() => {
+    if (initialData) {
+      setFormData({ 
+        accountId: initialData.accountId, 
+        date: initialData.date 
+      });
+      setNumericValue(initialData.value);
+      setDisplayValue(formatBRL(initialData.value));
+    } else {
+      setFormData({ 
+        accountId: '', 
+        date: getLocalDateString() 
+      });
+      setNumericValue(0);
+      setDisplayValue('');
+    }
+  }, [initialData]);
 
   const handleValueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -54,9 +73,10 @@ const InitialBalanceForm: React.FC<Props> = ({ accounts, onSave, onCancel }) => 
                <Landmark className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-amber-500 transition-colors" size={18} />
                <select 
                   required 
+                  disabled={!!initialData}
                   value={formData.accountId} 
                   onChange={e => setFormData({...formData, accountId: e.target.value})} 
-                  className={`${inputClass} pl-12 appearance-none pr-10`}
+                  className={`${inputClass} pl-12 appearance-none pr-10 disabled:opacity-60`}
                >
                   <option value="">Selecione a conta...</option>
                   {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.bankName} - {acc.owner}</option>)}

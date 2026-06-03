@@ -1,16 +1,28 @@
-
 import React from 'react';
 import { Landmark, ArrowUpRight, ArrowDownLeft, Scale, FileText } from 'lucide-react';
 import { useLoansActiveTotals } from '../../../../hooks/useLoans';
 
-const LoanKPIs: React.FC = () => {
+interface LoanKPIsProps {
+  searchTerm: string;
+  activeSubTab: string;
+}
+
+const LoanKPIs: React.FC<LoanKPIsProps> = ({ searchTerm, activeSubTab }) => {
   const currency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
 
-  // ✅ ZERO CÁLCULO NO FRONTEND — totais via RPC server-side
-  const { data: totals } = useLoansActiveTotals();
+  const isHistory = activeSubTab === 'history';
+  const statusFilter = isHistory ? 'history' : 'active';
+
+  // ✅ ZERO CÁLCULO NO FRONTEND — todos os cálculos e filtros no Supabase via RPC
+  const { data: totals } = useLoansActiveTotals(searchTerm, statusFilter);
+
   const stats = {
-    takenTotal: totals?.takenRemaining ?? 0,
-    grantedTotal: totals?.grantedRemaining ?? 0,
+    takenPrincipal: totals?.takenPrincipal ?? 0,
+    takenPaid: totals?.takenPaid ?? 0,
+    takenRemaining: totals?.takenRemaining ?? 0,
+    grantedPrincipal: totals?.grantedPrincipal ?? 0,
+    grantedPaid: totals?.grantedPaid ?? 0,
+    grantedRemaining: totals?.grantedRemaining ?? 0,
     countActive: totals?.countActive ?? 0,
     netBalance: totals?.netBalance ?? 0,
   };
@@ -21,8 +33,13 @@ const LoanKPIs: React.FC = () => {
       <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between group hover:border-rose-300 transition-all">
         <div>
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 leading-none">Dívidas (Tomados)</p>
-          <h3 className="text-xl font-black text-rose-600 tracking-tighter">{currency(stats.takenTotal)}</h3>
-          <p className="text-[9px] text-slate-400 font-bold uppercase mt-1 italic leading-none">Saldo devedor</p>
+          <h3 className="text-xl font-black text-rose-600 tracking-tighter">{currency(stats.takenRemaining)}</h3>
+          <div className="text-[9px] text-slate-400 font-bold uppercase mt-1 flex flex-col gap-0.5 leading-none">
+            <div>{isHistory ? 'Saldo liquidado' : 'Saldo devedor'}</div>
+            <div className="text-slate-500 font-black">
+              Total: {currency(stats.takenPrincipal)} | Pago: {currency(stats.takenPaid)}
+            </div>
+          </div>
         </div>
         <div className="p-3 rounded-2xl bg-rose-50 text-rose-600 shadow-sm shadow-rose-200/50">
           <ArrowDownLeft size={20} />
@@ -33,8 +50,13 @@ const LoanKPIs: React.FC = () => {
       <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between group hover:border-emerald-300 transition-all">
         <div>
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 leading-none">Créditos (Concedidos)</p>
-          <h3 className="text-xl font-black text-emerald-600 tracking-tighter">{currency(stats.grantedTotal)}</h3>
-          <p className="text-[9px] text-slate-400 font-bold uppercase mt-1 italic leading-none">Saldo a receber</p>
+          <h3 className="text-xl font-black text-emerald-600 tracking-tighter">{currency(stats.grantedRemaining)}</h3>
+          <div className="text-[9px] text-slate-400 font-bold uppercase mt-1 flex flex-col gap-0.5 leading-none">
+            <div>{isHistory ? 'Saldo liquidado' : 'Saldo a receber'}</div>
+            <div className="text-slate-500 font-black">
+              Total: {currency(stats.grantedPrincipal)} | Recebido: {currency(stats.grantedPaid)}
+            </div>
+          </div>
         </div>
         <div className="p-3 rounded-2xl bg-emerald-50 text-emerald-600 shadow-sm shadow-emerald-200/50">
           <ArrowUpRight size={20} />
@@ -67,14 +89,18 @@ const LoanKPIs: React.FC = () => {
         </div>
       </div>
 
-      {/* Contratos Ativos */}
+      {/* Contratos Ativos / Finalizados */}
       <div className="bg-slate-900 p-5 rounded-3xl shadow-xl flex items-center justify-between text-white border border-slate-800 group">
         <div>
-           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 leading-none">Contratos Ativos</p>
+           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 leading-none">
+             {isHistory ? 'Contratos Finalizados' : 'Contratos Ativos'}
+           </p>
            <h3 className="text-xl font-black text-blue-400 tracking-tighter">
              {stats.countActive} <span className="text-xs text-slate-400 uppercase font-bold ml-1 tracking-normal">Unidades</span>
            </h3>
-           <p className="text-[9px] text-slate-500 font-bold uppercase mt-1 leading-none">Operações vigentes</p>
+           <p className="text-[9px] text-slate-500 font-bold uppercase mt-1 leading-none">
+             {isHistory ? 'Operações encerradas' : 'Operações vigentes'}
+           </p>
         </div>
         <div className="p-3 bg-slate-800 rounded-2xl text-blue-400 group-hover:scale-110 transition-transform shadow-lg shadow-black/40">
           <FileText size={20} />

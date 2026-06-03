@@ -683,7 +683,7 @@ export const loansService = {
    * Totais de empréstimos ativos via RPC server-side.
    * Zero cálculo no frontend.
    */
-  getActiveTotals: async (): Promise<{ 
+  getActiveTotals: async (searchTerm: string = '', status: string = 'active'): Promise<{ 
     takenPrincipal: number; 
     takenPaid: number; 
     takenRemaining: number; 
@@ -693,7 +693,7 @@ export const loansService = {
     countActive: number;
     netBalance: number;
   }> => {
-    const { data, error } = await supabase.rpc('rpc_loans_active_totals');
+    const { data, error } = await supabase.rpc('rpc_loans_active_totals', { p_search: searchTerm, p_status: status });
 
     if (error) {
       console.error('[loansService] getActiveTotals RPC error:', error.message);

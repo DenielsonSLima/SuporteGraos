@@ -68,8 +68,8 @@ export function usePasswordRecovery(
       setError('As senhas não conferem.');
       return;
     }
-    if (newPassword.length < 6) {
-      setError('A senha deve ter no mínimo 6 caracteres.');
+    if (newPassword.length < 8) {
+      setError('A senha deve ter no mínimo 8 caracteres.');
       return;
     }
 
@@ -77,13 +77,13 @@ export function usePasswordRecovery(
     setIsLoading(true);
 
     try {
-      const success = await userService.resetPasswordWithToken(recoveryToken, newPassword);
-      if (success) {
+      const result = await userService.resetPasswordWithToken(recoveryToken, newPassword);
+      if (result.success) {
         addToast('success', 'Senha Redefinida', 'Sua senha foi atualizada com sucesso. Faça login agora.');
         cancelRecovery();
         setLoginEmail(recoveryUser?.email || '');
       } else {
-        setError('Falha ao redefinir. Token pode ter expirado.');
+        setError(result.error || 'Falha ao redefinir. Token pode ter expirado.');
       }
     } catch (err: any) {
       console.error(err);

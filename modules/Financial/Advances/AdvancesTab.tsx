@@ -208,7 +208,7 @@ const AdvancesTab: React.FC = () => {
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
 
-      <AdvanceKPIs />
+      <AdvanceKPIs searchTerm={searchTerm} activeSubTab={activeSubTab} />
 
       <div className="flex flex-col xl:flex-row justify-between items-center gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
         <div className="flex bg-slate-100 p-1 rounded-xl w-full xl:w-auto shadow-inner">
