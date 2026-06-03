@@ -132,10 +132,10 @@ const InstallmentExpenseForm: React.FC<Props> = ({ isOpen, onClose, onSave, onUp
 
       const newItem = await addSubcategoryMut.mutateAsync({
         categoryId: parentCategory.id,
-        name: newName.trim()
+        name: newName.trim().toUpperCase()
       });
 
-      setCategoryName(newItem.name);
+      setCategoryName(newItem.name.toUpperCase());
       setIsAddingNew(false);
       setNewName('');
       addToast('success', 'Categoria cadastrada e selecionada!');
@@ -168,8 +168,8 @@ const InstallmentExpenseForm: React.FC<Props> = ({ isOpen, onClose, onSave, onUp
     if (initialData && onUpdate) {
       const updatedRecord: FinancialRecord = {
         ...initialData,
-        description,
-        category: categoryName,
+        description: description.trim().toUpperCase(),
+        category: categoryName.toUpperCase(),
         dueDate: firstDueDate,
         issueDate: issueDate,
         originalValue: value,
@@ -177,7 +177,7 @@ const InstallmentExpenseForm: React.FC<Props> = ({ isOpen, onClose, onSave, onUp
         status: isPaidNow ? 'paid' : 'pending',
         subType: 'admin',
         bankAccount: isPaidNow ? (accountId || initialData.bankAccount) : undefined,
-        notes
+        notes: notes.trim().toUpperCase()
       };
 
       onUpdate(updatedRecord);
@@ -189,9 +189,9 @@ const InstallmentExpenseForm: React.FC<Props> = ({ isOpen, onClose, onSave, onUp
     if (mode === 'single') {
       recordsToCreate.push({
         id: crypto.randomUUID(),
-        description,
+        description: description.trim().toUpperCase(),
         entityName: 'DESPESA DIRETA', 
-        category: categoryName,
+        category: categoryName.toUpperCase(),
         dueDate: firstDueDate,
         issueDate: issueDate,
         originalValue: value,
@@ -199,7 +199,7 @@ const InstallmentExpenseForm: React.FC<Props> = ({ isOpen, onClose, onSave, onUp
         status: isPaidNow ? 'paid' : 'pending',
         subType: 'admin',
         bankAccount: isPaidNow ? accountId : undefined,
-        notes: isPaidNow ? `[BAIXA IMEDIATA] ${notes}` : notes
+        notes: isPaidNow ? `[BAIXA IMEDIATA] ${notes.trim().toUpperCase()}` : notes.trim().toUpperCase()
       });
     } else {
       const installmentValue = value / installments;
@@ -211,16 +211,16 @@ const InstallmentExpenseForm: React.FC<Props> = ({ isOpen, onClose, onSave, onUp
         
         recordsToCreate.push({
           id: crypto.randomUUID(),
-          description: `${description} (${i + 1}/${installments})`,
+          description: `${description.trim().toUpperCase()} (${i + 1}/${installments})`,
           entityName: 'DESPESA PARCELADA',
-          category: categoryName,
+          category: categoryName.toUpperCase(),
           dueDate: nextDueDate.toISOString().split('T')[0],
           issueDate: issueDate,
           originalValue: parseFloat(installmentValue.toFixed(2)),
           paidValue: 0,
           status: 'pending',
           subType: 'admin',
-          notes: `${notes} - Parcela ${i + 1} de ${installments}`
+          notes: notes.trim() ? `${notes.trim().toUpperCase()} - Parcela ${i + 1} de ${installments}` : `Parcela ${i + 1} de ${installments}`
         });
       }
     }
@@ -333,7 +333,7 @@ const InstallmentExpenseForm: React.FC<Props> = ({ isOpen, onClose, onSave, onUp
                     placeholder="Nome da nova categoria..."
                     className="flex-1 px-4 py-2 rounded-xl border-2 border-emerald-200 bg-white text-sm font-bold focus:border-emerald-500 outline-none"
                     value={newName}
-                    onChange={e => setNewName(e.target.value)}
+                    onChange={e => setNewName(e.target.value.toUpperCase())}
                     onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleQuickAdd())}
                   />
                   <button
@@ -356,7 +356,7 @@ const InstallmentExpenseForm: React.FC<Props> = ({ isOpen, onClose, onSave, onUp
                     <input 
                       type="text" required className={`${inputClass} pl-10`} 
                       placeholder="Ex: Aluguel Unidade I, Conta Luz Jan..."
-                      value={description} onChange={e => setDescription(e.target.value)}
+                      value={description} onChange={e => setDescription(e.target.value.toUpperCase())}
                     />
                   </div>
                 </div>

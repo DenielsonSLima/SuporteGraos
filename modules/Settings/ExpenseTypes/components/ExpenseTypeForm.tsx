@@ -59,7 +59,7 @@ const ExpenseTypeForm: React.FC<ExpenseTypeFormProps> = ({
                 type="text"
                 required
                 value={formData.newCategoryName}
-                onChange={e => onChange({ ...formData, newCategoryName: e.target.value })}
+                onChange={e => onChange({ ...formData, newCategoryName: e.target.value.toUpperCase() })}
                 className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 focus:border-rose-500 focus:outline-none focus:ring-1 focus:ring-rose-500"
                 placeholder="Ex: Despesas Financeiras"
               />
@@ -72,7 +72,7 @@ const ExpenseTypeForm: React.FC<ExpenseTypeFormProps> = ({
               type="text"
               required
               value={formData.subtypeName}
-              onChange={e => onChange({ ...formData, subtypeName: e.target.value })}
+              onChange={e => onChange({ ...formData, subtypeName: e.target.value.toUpperCase() })}
               className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 focus:border-rose-500 focus:outline-none focus:ring-1 focus:ring-rose-500"
               placeholder="Ex: Manutenção de Ar-condicionado"
             />

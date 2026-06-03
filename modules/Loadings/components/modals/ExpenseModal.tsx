@@ -63,14 +63,14 @@ const ExpenseModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, vehiclePlat
     const accountName = selectedAccount?.account_name || 'Caixa';
 
     onConfirm({ 
-      description, 
+      description: description.trim().toUpperCase(), 
       date, 
       value: valAmount, 
       discountValue: valDiscount,
       type: expenseType,
       accountId,
       accountName,
-      notes 
+      notes: notes.trim().toUpperCase() 
     });
     onClose();
   };
@@ -99,7 +99,7 @@ const ExpenseModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, vehiclePlat
                 type="text" 
                 placeholder="Ex: Vale Diesel, Combustível, Pedágio" 
                 value={description}
-                onChange={e => setDescription(e.target.value)}
+                onChange={e => setDescription(e.target.value.toUpperCase())}
                 className={inputClass}
                 required
               />
@@ -190,7 +190,7 @@ const ExpenseModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, vehiclePlat
                 <textarea 
                   rows={2} 
                   value={notes} 
-                  onChange={e => setNotes(e.target.value)} 
+                  onChange={e => setNotes(e.target.value.toUpperCase())} 
                   className={`${inputClass} pl-10 text-xs font-medium`} 
                   placeholder="Notas adicionais..."
                 />

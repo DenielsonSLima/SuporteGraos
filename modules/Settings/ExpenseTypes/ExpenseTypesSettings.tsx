@@ -60,7 +60,7 @@ const ExpenseTypesSettings: React.FC<Props> = ({ onBack }) => {
     const newName = window.prompt('Novo nome para o item:', sub.name);
     if (newName && newName.trim() !== sub.name) {
       try {
-        await updateSubcategory.mutateAsync({ subcategoryId: sub.id, name: newName.trim() });
+        await updateSubcategory.mutateAsync({ subcategoryId: sub.id, name: newName.trim().toUpperCase() });
         addToast('success', 'Item atualizado');
       } catch (err: any) {
         addToast('error', 'Erro ao atualizar', err.message);
@@ -81,7 +81,7 @@ const ExpenseTypesSettings: React.FC<Props> = ({ onBack }) => {
     const newName = window.prompt('Novo nome para a categoria:', cat.name);
     if (newName && newName.trim() !== cat.name) {
       try {
-        await updateCategory.mutateAsync({ id: cat.id, input: { name: newName.trim() } });
+        await updateCategory.mutateAsync({ id: cat.id, input: { name: newName.trim().toUpperCase() } });
         addToast('success', 'Categoria atualizada');
       } catch (err: any) {
         addToast('error', 'Erro ao atualizar', err.message);

@@ -132,7 +132,7 @@ export const expenseCategoryService = {
       .insert({
         company_id: companyId,
         type: input.type ?? 'custom',
-        name: input.name.trim(),
+        name: input.name.trim().toUpperCase(),
         color: input.color,
         is_system: false,
       })
@@ -140,7 +140,7 @@ export const expenseCategoryService = {
       .single();
 
     if (error) {
-      if (error.code === '23505') throw new Error(`Já existe uma categoria com o nome "${input.name}".`);
+      if (error.code === '23505') throw new Error(`Já existe uma categoria com o nome "${input.name.toUpperCase()}".`);
       throw error;
     }
 
@@ -163,7 +163,7 @@ export const expenseCategoryService = {
       .insert({
         category_id: categoryId,
         company_id: companyId,
-        name: name.trim(),
+        name: name.trim().toUpperCase(),
         is_system: false,
       })
       .select('id, category_id, name, is_system')
@@ -179,7 +179,7 @@ export const expenseCategoryService = {
   updateSubcategory: async (subcategoryId: string, name: string): Promise<ExpenseSubtype> => {
     const { data, error } = await supabase
       .from('expense_subcategories')
-      .update({ name: name.trim() })
+      .update({ name: name.trim().toUpperCase() })
       .eq('id', subcategoryId)
       .select('id, category_id, name, is_system, active')
       .single();
@@ -212,7 +212,7 @@ export const expenseCategoryService = {
   /** Atualiza uma categoria (apenas as da empresa — is_system=false). */
   update: async (id: string, input: Partial<Omit<ExpenseCategory, 'id' | 'icon' | 'isSystem' | 'subtypes'> & { name?: string; color?: string; type?: string }>): Promise<ExpenseCategory> => {
     const payload: Record<string, unknown> = {};
-    if (input.name     !== undefined) payload.name     = input.name.trim();
+    if (input.name     !== undefined) payload.name     = input.name.trim().toUpperCase();
     if (input.type     !== undefined) payload.type     = input.type;
     if (input.color    !== undefined) payload.color    = input.color;
     const { data, error } = await supabase
