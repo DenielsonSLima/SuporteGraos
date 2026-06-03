@@ -23,7 +23,6 @@ export interface CashierReportPayload {
   netBalance?: number;
   totalInitialMonthBalance?: number;
   initialMonthBalances?: any[];
-  // NOVOS CAMPOS
   monthPurchasedTotal?: number;
   monthSoldTotal?: number;
   monthPurchasesPaidTotal?: number;
@@ -54,15 +53,19 @@ const getCompanyId = async (): Promise<string> => {
 export const cashierReportService = {
   /**
    * Busca o relatório consolidado do mês atual.
-   * IMPORTANTE: O cálculo é feito INTEGRALMENTE no banco (SQL/RPC).
-   * O frontend apenas recebe e exibe (Modo TV).
+   *
+   * ╔══════════════════════════════════════════════════════════╗
+   * ║  REGRA DE OURO: FRONTEND NÃO CALCULA — APENAS EXIBE     ║
+   * ║  Todo filtro, dedução e cálculo de totais ocorre         ║
+   * ║  exclusivamente na RPC rpc_get_caixa_consolidated_report ║
+   * ║  O frontend apenas mapeia os campos e os passa adiante.  ║
+   * ╚══════════════════════════════════════════════════════════╝
    */
   fetchCurrentMonthReport: async (): Promise<CashierReportPayload> => {
     const companyId = await getCompanyId();
 
-    // Chamada para a nova RPC Mestre Consolidadora (Ultra-Modular)
-    const { data: report, error } = await supabase.rpc('rpc_get_caixa_consolidated_report', { 
-      p_company_id: companyId 
+    const { data: report, error } = await supabase.rpc('rpc_get_caixa_consolidated_report', {
+      p_company_id: companyId,
     });
 
     if (error) {
@@ -70,103 +73,56 @@ export const cashierReportService = {
       throw error;
     }
 
-    // ═══════════════════════════════════════════════════════════════════
-    // REGRA DE OURO: CONTAS VIRTUAIS/INTERNAS NUNCA DEVEM IR PARA O CAIXA
-    // ═══════════════════════════════════════════════════════════════════
-    const VIRTUAL_ACCOUNT_ID = '97e8bd30-3ba1-4658-a51e-5df6ce184845';
-    
-    // Identifica se uma conta é virtual/uso interno (pelo ID fixo ou tags no nome/titular)
-    const isVirtualAccount = (acc: any): boolean => {
-      const accId = acc.id || acc.accountId;
-      const accName = (acc.bankName || acc.accountName || '').toLowerCase();
-      const accOwner = (acc.owner || '').toLowerCase();
-      
-      return accId === VIRTUAL_ACCOUNT_ID || 
-             accName.includes('virtual') || 
-             accName.includes('virtuais') || 
-             accName.includes('ajuste') || 
-             accOwner.includes('virtual') || 
-             accOwner.includes('virtuais') || 
-             accOwner.includes('ajuste');
-    };
-
-    const rawBankBalances = report.bankBalances || [];
-    const rawInitialMonthBalances = report.initialMonthBalances || [];
-    const rawInitialBalances = report.initialBalances || [];
-
-    // Filtra as contas virtuais para ocultá-las da listagem de bancos e abertura
-    const bankBalances = rawBankBalances.filter((acc: any) => !isVirtualAccount(acc));
-    const initialMonthBalances = rawInitialMonthBalances.filter((acc: any) => !isVirtualAccount(acc));
-    const initialBalances = rawInitialBalances.filter((acc: any) => !isVirtualAccount(acc));
-
-    // Soma os saldos virtuais para deduzir dos totais consolidados e evitar divergências matemáticas visuais
-    const virtualBankBalanceSum = rawBankBalances
-      .filter(isVirtualAccount)
-      .reduce((sum: number, acc: any) => sum + (Number(acc.balance) || 0), 0);
-
-    const virtualInitialMonthSum = rawInitialMonthBalances
-      .filter(isVirtualAccount)
-      .reduce((sum: number, acc: any) => sum + (Number(acc.value || acc.balance) || 0), 0);
-
-    const virtualInitialSum = rawInitialBalances
-      .filter(isVirtualAccount)
-      .reduce((sum: number, acc: any) => sum + (Number(acc.value || acc.balance) || 0), 0);
-
-    // Ajusta os totais e recalcula o patrimônio líquido real (netBalance) sem as contas de uso interno (permite valores negativos)
-    const totalBankBalance = (Number(report.totalBankBalance) || 0) - virtualBankBalanceSum;
-    const totalInitialMonthBalance = (Number(report.totalInitialMonthBalance) || 0) - virtualInitialMonthSum;
-    const totalInitialBalance = (Number(report.totalInitialBalance) || 0) - virtualInitialSum;
-    
-    const totalAssets = (Number(report.totalAssets) || 0) - virtualBankBalanceSum;
-    const totalLiabilities = Number(report.totalLiabilities) || 0;
-    const netBalance = totalAssets - totalLiabilities;
-
+    // PASSTHROUGH PURO — nenhum cálculo aqui
     return {
-      // Totais Principais
-      totalBankBalance,
-      totalLiabilities,
-      totalAssets,
-      netBalance,
-      
-      pendingSalesReceipts: report.pendingSalesReceipts || 0,
-      merchandiseInTransitValue: report.merchandiseInTransitValue || 0,
-      pendingPurchasePayments: report.pendingPurchasePayments || 0,
-      pendingFreightPayments: report.pendingFreightPayments || 0,
+      // Saldos bancários
+      totalBankBalance:         Number(report.totalBankBalance)         || 0,
+      bankBalances:             report.bankBalances                     || [],
 
-      // Detalhamento Bancário e Saldos Iniciais (Filtrados)
-      bankBalances,
-      initialBalances,
-      totalInitialBalance,
-      totalInitialMonthBalance,
-      initialMonthBalances,
-      
-      // Ativos e Passivos (Calculados individualmente no SQL)
-      loanDebts: report.loansTaken || 0,
-      loanCredits: report.loansGranted || 0,
-      totalFixedAssetsValue: report.totalFixedAssetsValue || 0,
-      shareholderCredits: report.shareholderReceivables || 0,
-      shareholderDebts: report.shareholderPayables || 0,
-      advancesCredits: report.advancesGiven || 0,
-      clientAdvances: report.advancesTaken || 0,
-      pendingAssetSalesReceipts: report.pendingAssetSalesReceipts || 0,
-      commissionsToPay: report.commissionsToPay || 0,
-      
-      // Resumo Operacional do Mês
-      monthPurchasedTotal: report.monthPurchasedTotal || 0,
-      monthSoldTotal: report.monthSoldTotal || 0,
-      monthPaidTotal: report.monthPaidTotal || 0,
-      monthFreightPaidTotal: report.monthFreightPaidTotal || 0,
-      monthExpensesPaidTotal: report.monthExpensesPaidTotal || 0,
-      monthPurchasesPaidTotal: report.monthPurchasesPaidTotal || 0,
-      monthRefusedTotal: report.monthRefusedTotal || 0,
-      monthDirectDiff: report.monthDirectDiff || 0,
-      monthOperationalSpread: report.monthOperationalSpread || 0,
-      monthFreightPendingTotal: report.monthFreightPendingTotal || 0,
-      
-      // Distribuições e Detalhes
-      expenseDistribution: report.expenseDistribution || { purchases: 0, freight: 0, expenses: 0, others: 0 },
-      revenueDistribution: report.revenueDistribution || { opening_receivables: 0, future_receivables: 0 },
-      creditsReceivedDetails: report.creditsReceivedDetails || { sales_order: 0, loan: 0, others: 0 },
+      // Saldos de abertura do período
+      totalInitialBalance:      Number(report.totalInitialBalance)      || 0,
+      totalInitialMonthBalance: Number(report.totalInitialMonthBalance) || 0,
+      initialBalances:          report.initialBalances                  || [],
+      initialMonthBalances:     report.initialMonthBalances             || [],
+
+      // Ativos
+      totalAssets:              Number(report.totalAssets)              || 0,
+      pendingSalesReceipts:     Number(report.pendingSalesReceipts)     || 0,
+      merchandiseInTransitValue: Number(report.merchandiseInTransitValue) || 0,
+      totalFixedAssetsValue:    Number(report.totalFixedAssetsValue)    || 0,
+      pendingAssetSalesReceipts: Number(report.pendingAssetSalesReceipts) || 0,
+      shareholderCredits:       Number(report.shareholderReceivables)   || 0,
+      loanCredits:              Number(report.loansGranted)             || 0,
+      advancesCredits:          Number(report.advancesGiven)            || 0,
+
+      // Passivos
+      totalLiabilities:         Number(report.totalLiabilities)        || 0,
+      pendingPurchasePayments:  Number(report.pendingPurchasePayments)  || 0,
+      pendingFreightPayments:   Number(report.pendingFreightPayments)   || 0,
+      commissionsToPay:         Number(report.commissionsToPay)        || 0,
+      shareholderDebts:         Number(report.shareholderPayables)      || 0,
+      loanDebts:                Number(report.loansTaken)              || 0,
+      clientAdvances:           Number(report.advancesTaken)           || 0,
+
+      // Patrimônio líquido
+      netBalance:               Number(report.netBalance)              || 0,
+
+      // Resumo operacional do mês
+      monthPurchasedTotal:      Number(report.monthPurchasedTotal)     || 0,
+      monthSoldTotal:           Number(report.monthSoldTotal)          || 0,
+      monthPaidTotal:           Number(report.monthPaidTotal)          || 0,
+      monthFreightPaidTotal:    Number(report.monthFreightPaidTotal)   || 0,
+      monthExpensesPaidTotal:   Number(report.monthExpensesPaidTotal)  || 0,
+      monthPurchasesPaidTotal:  Number(report.monthPurchasesPaidTotal) || 0,
+      monthRefusedTotal:        Number(report.monthRefusedTotal)       || 0,
+      monthDirectDiff:          Number(report.monthDirectDiff)         || 0,
+      monthOperationalSpread:   Number(report.monthOperationalSpread)  || 0,
+      monthFreightPendingTotal: Number(report.monthFreightPendingTotal) || 0,
+
+      // Distribuições
+      expenseDistribution:      report.expenseDistribution    || { purchases: 0, freight: 0, expenses: 0, others: 0 },
+      revenueDistribution:      report.revenueDistribution    || { opening_receivables: 0, future_receivables: 0 },
+      creditsReceivedDetails:   report.creditsReceivedDetails || { sales_order: 0, loan: 0, others: 0 },
     } as CashierReportPayload;
-  }
+  },
 };
