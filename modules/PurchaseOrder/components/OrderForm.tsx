@@ -107,6 +107,20 @@ const OrderForm: React.FC<Props> = ({ initialData, onSave, onCancel }) => {
           <OrderPartnerSection data={formData} partners={partners} onChange={updateMultiple} />
           <OrderBrokerSection data={formData} partners={partners} onChange={updateMultiple} />
           <OrderItemsSection items={formData.items || []} onChange={(items, total) => updateMultiple({ items, totalValue: total })} />
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h3 className="mb-6 flex items-center gap-2 font-black text-slate-800 uppercase text-xs tracking-tighter">
+              <div className="w-1 h-4 bg-slate-600 rounded-full"></div>
+              Anotações / Observações
+            </h3>
+            <textarea
+              rows={3}
+              value={formData.notes || ''}
+              onChange={e => updateField('notes', e.target.value)}
+              placeholder="Alguma observação ou anotação importante sobre esta negociação..."
+              className="block w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-2.5 text-slate-900 font-bold focus:border-blue-600 focus:outline-none transition-all placeholder:text-slate-400"
+            />
+          </div>
         </div>
 
         <div className="sticky bottom-0 z-10 flex flex-col sm:flex-row items-center justify-between border-t border-slate-200 bg-white px-8 py-6 gap-4">

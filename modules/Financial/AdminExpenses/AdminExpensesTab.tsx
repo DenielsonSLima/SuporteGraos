@@ -268,7 +268,13 @@ const AdminExpensesTab: React.FC = () => {
 
   const categoryTypeMap = useMemo(() => {
     const map = new Map<string, string>();
-    expenseCategories.forEach(d => (d.subtypes || []).forEach(s => map.set(s.name, d.type)));
+    // Mapeia nomes de subcategorias para o tipo (fixed/variable/administrative)
+    expenseCategories.forEach(d => {
+      // Também mapeia o nome da categoria mãe, para suportar registros cujo
+      // category_id aponta para expense_categories (não subcategory)
+      map.set(d.name, d.type);
+      (d.subtypes || []).forEach(s => map.set(s.name, d.type));
+    });
     return map;
   }, [expenseCategories]);
 

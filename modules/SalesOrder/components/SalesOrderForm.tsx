@@ -231,7 +231,7 @@ const SalesOrderForm: React.FC<Props> = ({ initialData, onSave, onCancel }) => {
                             className={`${inputClass} pl-12 appearance-none`}
                          >
                              <option value="">Selecione a mercadoria...</option>
-                             {products.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+                             {products.map(p => <option key={p.id} value={p.name}>{p.name?.toUpperCase()}</option>)}
                          </select>
                          <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" size={18} />
                       </div>

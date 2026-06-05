@@ -40,7 +40,7 @@ sql_lines.append("-- START MIGRATION --")
 sql_lines.append("BEGIN;")
 sql_lines.append("")
 
-# Step 1: Subcategories inserts (with ON CONFLICT)
+# Step 1: Subcategories inserts (with ON CONFLICT matching partial index)
 new_subcategories = {
     "LIQUIDAÇÃO PARCELA SICREDI": {"category_id": CAT_FIXAS},
     "IOF PJ CHEQUE ESPECIAL": {"category_id": CAT_ADMINISTRATIVAS}
@@ -51,7 +51,7 @@ for name, info in new_subcategories.items():
     sql_lines.append(f"""
 INSERT INTO public.expense_subcategories (category_id, company_id, name, is_system, active)
 VALUES ('{info['category_id']}', '{company_id}', '{name}', false, true)
-ON CONFLICT (category_id, name, company_id) DO NOTHING;
+ON CONFLICT (category_id, name, company_id) WHERE (company_id IS NOT NULL) DO NOTHING;
 """)
 
 sql_lines.append("")
@@ -133,7 +133,7 @@ INSERT INTO public.admin_expenses (
     '{exp_id}', 
     '{company_id}', 
     '{acc_id}', 
-    {subcat_id_sql}, 
+    '{cat_id}', 
     '{desc}', 
     {val}, 
     NULL, 
@@ -142,11 +142,11 @@ INSERT INTO public.admin_expenses (
     '{date_str}', 
     'paid', 
     '{desc}', 
-    '{category_label}', 
+    '{subcat_name}', 
     {val}, 
     {val}, 
     0.0, 
-    'expense', 
+    'admin', 
     '{acc_name_excel}', 
     '{notes_with_ref}'
 );
@@ -155,7 +155,7 @@ INSERT INTO public.admin_expenses (
 INSERT INTO public.financial_entries (
     id, company_id, type, origin_type, origin_id, partner_id, total_amount, 
     paid_amount, status, created_date, due_date, paid_date, description, 
-    deductions_amount, discount_amount, remaining_amount
+    deductions_amount, discount_amount
 ) VALUES (
     '{ent_id}', 
     '{company_id}', 
@@ -170,7 +170,6 @@ INSERT INTO public.financial_entries (
     '{date_str}', 
     '{date_str}', 
     '{desc}', 
-    0.0, 
     0.0, 
     0.0
 );

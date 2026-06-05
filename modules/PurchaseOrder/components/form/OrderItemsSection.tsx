@@ -85,7 +85,7 @@ const OrderItemsSection: React.FC<Props> = ({ items, onChange }) => {
               onChange={e => setNewItem({...newItem, productName: e.target.value})}
             >
               <option value="">Selecione um produto</option>
-              {products.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+              {products.map(p => <option key={p.id} value={p.name}>{p.name?.toUpperCase()}</option>)}
             </select>
             <button 
               type="button"

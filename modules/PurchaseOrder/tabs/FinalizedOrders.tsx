@@ -4,6 +4,7 @@ import { PurchaseOrder } from '../types';
 import OrderCard from '../components/OrderCard';
 import { GroupByOption } from '../PurchaseOrderModule';
 import { Calendar, User, Wheat, Layers } from 'lucide-react';
+import { parseStringToLocalDate } from '../../../utils/dateUtils';
 
 interface Props {
   orders: PurchaseOrder[];
@@ -22,12 +23,12 @@ const FinalizedOrders: React.FC<Props> = ({ orders, onOrderClick, onDelete, grou
       let key = 'Outros';
       
       if (groupBy === 'month') {
-        const date = new Date(order.date);
+        const date = parseStringToLocalDate(order.date);
         const display = date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
         key = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2, '0')}|${display}`;
       } else if (groupBy === 'harvest') {
         const fallbackUf = order.loadingState || order.partnerState;
-        const fallbackYear = order.date ? new Date(order.date).getFullYear() : new Date().getFullYear();
+        const fallbackYear = order.date ? parseStringToLocalDate(order.date).getFullYear() : new Date().getFullYear();
         const fallbackHarvest = fallbackUf ? `SAFRA/${fallbackUf} ${fallbackYear}` : 'Safra Não Informada';
         key = (order.harvest && order.harvest !== '-') ? order.harvest : fallbackHarvest;
       } else if (groupBy === 'partner') {

@@ -5,12 +5,12 @@ BEGIN;
 
 INSERT INTO public.expense_subcategories (category_id, company_id, name, is_system, active)
 VALUES ('00000000-0000-0000-0000-000000000001', '5834ff22-a8ce-4c1c-852e-d5522e6f0736', 'LIQUIDAÇÃO PARCELA SICREDI', false, true)
-ON CONFLICT (category_id, name, company_id) DO NOTHING;
+ON CONFLICT (category_id, name, company_id) WHERE (company_id IS NOT NULL) DO NOTHING;
 
 
 INSERT INTO public.expense_subcategories (category_id, company_id, name, is_system, active)
 VALUES ('00000000-0000-0000-0000-000000000003', '5834ff22-a8ce-4c1c-852e-d5522e6f0736', 'IOF PJ CHEQUE ESPECIAL', false, true)
-ON CONFLICT (category_id, name, company_id) DO NOTHING;
+ON CONFLICT (category_id, name, company_id) WHERE (company_id IS NOT NULL) DO NOTHING;
 
 
 -- 2. Insert admin expenses, financial entries, and financial transactions
@@ -22,10 +22,10 @@ INSERT INTO public.admin_expenses (
     expense_date, due_date, paid_date, status, entity_name, category, 
     original_value, paid_value, discount_value, sub_type, bank_account, notes
 ) VALUES (
-    '741ecf0b-6d12-456f-82f1-5cc7cc77f209', 
+    'f0cd3fbd-29bc-41b9-bd51-02f940b6cf20', 
     '5834ff22-a8ce-4c1c-852e-d5522e6f0736', 
     '9aaf4fa5-0622-4220-a013-b5632d78b51a', 
-    (SELECT id FROM public.expense_subcategories WHERE name = 'TARIFAS BANCÁRIAS' AND (company_id IS NULL OR company_id = '5834ff22-a8ce-4c1c-852e-d5522e6f0736') LIMIT 1), 
+    '00000000-0000-0000-0000-000000000003', 
     'Tarifas', 
     25.0, 
     NULL, 
@@ -34,7 +34,7 @@ INSERT INTO public.admin_expenses (
     '2026-06-01', 
     'paid', 
     'Tarifas', 
-    'DESPESAS ADMINISTRATIVAS', 
+    'TARIFAS BANCÁRIAS', 
     25.0, 
     25.0, 
     0.0, 
@@ -47,13 +47,13 @@ INSERT INTO public.admin_expenses (
 INSERT INTO public.financial_entries (
     id, company_id, type, origin_type, origin_id, partner_id, total_amount, 
     paid_amount, status, created_date, due_date, paid_date, description, 
-    deductions_amount, discount_amount, remaining_amount
+    deductions_amount, discount_amount
 ) VALUES (
-    '058242f4-bb9d-447c-9b58-9a09f76f99da', 
+    'c470f3c3-9e8c-4a6c-ad07-5ea14a4966d5', 
     '5834ff22-a8ce-4c1c-852e-d5522e6f0736', 
     'payable', 
     'standalone_expense', 
-    '741ecf0b-6d12-456f-82f1-5cc7cc77f209', 
+    'f0cd3fbd-29bc-41b9-bd51-02f940b6cf20', 
     NULL, 
     25.0, 
     25.0, 
@@ -63,7 +63,6 @@ INSERT INTO public.financial_entries (
     '2026-06-01', 
     'Tarifas', 
     0.0, 
-    0.0, 
     0.0
 );
 
@@ -72,16 +71,16 @@ INSERT INTO public.financial_transactions (
     id, company_id, entry_id, account_id, type, amount, transaction_date, 
     created_by, description, metadata
 ) VALUES (
-    'a5ebcaac-165c-4f62-9d80-58cb60778a4a', 
+    '89444eb1-92cf-4b82-b772-6217035fd242', 
     '5834ff22-a8ce-4c1c-852e-d5522e6f0736', 
-    '058242f4-bb9d-447c-9b58-9a09f76f99da', 
+    'c470f3c3-9e8c-4a6c-ad07-5ea14a4966d5', 
     '9aaf4fa5-0622-4220-a013-b5632d78b51a', 
     'debit', 
     25.0, 
     '2026-06-01', 
     'd2b3229f-a324-4a11-829c-4c546897833f', 
     'Tarifas', 
-    '{"expenseId": "741ecf0b-6d12-456f-82f1-5cc7cc77f209"}'::jsonb
+    '{"expenseId": "f0cd3fbd-29bc-41b9-bd51-02f940b6cf20"}'::jsonb
 );
 
 
@@ -92,10 +91,10 @@ INSERT INTO public.admin_expenses (
     expense_date, due_date, paid_date, status, entity_name, category, 
     original_value, paid_value, discount_value, sub_type, bank_account, notes
 ) VALUES (
-    '7d61ff64-2ed7-420c-b4d6-a985f315fcdc', 
+    'c34321db-d899-4da1-8976-b73396f11b24', 
     '5834ff22-a8ce-4c1c-852e-d5522e6f0736', 
     '9aaf4fa5-0622-4220-a013-b5632d78b51a', 
-    (SELECT id FROM public.expense_subcategories WHERE name = 'LIQUIDAÇÃO PARCELA SICREDI' AND company_id = '5834ff22-a8ce-4c1c-852e-d5522e6f0736' LIMIT 1), 
+    '00000000-0000-0000-0000-000000000001', 
     'Liquidação Parcela SICREDI', 
     2023.11, 
     NULL, 
@@ -104,7 +103,7 @@ INSERT INTO public.admin_expenses (
     '2026-06-01', 
     'paid', 
     'Liquidação Parcela SICREDI', 
-    'DESPESAS FIXAS', 
+    'LIQUIDAÇÃO PARCELA SICREDI', 
     2023.11, 
     2023.11, 
     0.0, 
@@ -117,13 +116,13 @@ INSERT INTO public.admin_expenses (
 INSERT INTO public.financial_entries (
     id, company_id, type, origin_type, origin_id, partner_id, total_amount, 
     paid_amount, status, created_date, due_date, paid_date, description, 
-    deductions_amount, discount_amount, remaining_amount
+    deductions_amount, discount_amount
 ) VALUES (
-    'f7aa90b9-3f56-4724-81ad-6aeb26884158', 
+    '5878bb5c-e88f-443e-ae65-b0f1447f1a2b', 
     '5834ff22-a8ce-4c1c-852e-d5522e6f0736', 
     'payable', 
     'standalone_expense', 
-    '7d61ff64-2ed7-420c-b4d6-a985f315fcdc', 
+    'c34321db-d899-4da1-8976-b73396f11b24', 
     NULL, 
     2023.11, 
     2023.11, 
@@ -133,7 +132,6 @@ INSERT INTO public.financial_entries (
     '2026-06-01', 
     'Liquidação Parcela SICREDI', 
     0.0, 
-    0.0, 
     0.0
 );
 
@@ -142,16 +140,16 @@ INSERT INTO public.financial_transactions (
     id, company_id, entry_id, account_id, type, amount, transaction_date, 
     created_by, description, metadata
 ) VALUES (
-    'b7d18f30-d9d9-498c-93bc-db061e7db5e3', 
+    '7a4a8f78-8759-4828-9b90-161ecff8d899', 
     '5834ff22-a8ce-4c1c-852e-d5522e6f0736', 
-    'f7aa90b9-3f56-4724-81ad-6aeb26884158', 
+    '5878bb5c-e88f-443e-ae65-b0f1447f1a2b', 
     '9aaf4fa5-0622-4220-a013-b5632d78b51a', 
     'debit', 
     2023.11, 
     '2026-06-01', 
     'd2b3229f-a324-4a11-829c-4c546897833f', 
     'Liquidação Parcela SICREDI', 
-    '{"expenseId": "7d61ff64-2ed7-420c-b4d6-a985f315fcdc"}'::jsonb
+    '{"expenseId": "c34321db-d899-4da1-8976-b73396f11b24"}'::jsonb
 );
 
 
@@ -162,10 +160,10 @@ INSERT INTO public.admin_expenses (
     expense_date, due_date, paid_date, status, entity_name, category, 
     original_value, paid_value, discount_value, sub_type, bank_account, notes
 ) VALUES (
-    '43e859fa-4175-4947-bf84-348000c76839', 
+    '3ff670e4-70a2-42e7-b06c-dab26ceab6a7', 
     '5834ff22-a8ce-4c1c-852e-d5522e6f0736', 
     '9aaf4fa5-0622-4220-a013-b5632d78b51a', 
-    (SELECT id FROM public.expense_subcategories WHERE name = 'CONTABILIDADE' AND (company_id IS NULL OR company_id = '5834ff22-a8ce-4c1c-852e-d5522e6f0736') LIMIT 1), 
+    '00000000-0000-0000-0000-000000000003', 
     'Contabilidade', 
     2431.0, 
     NULL, 
@@ -174,7 +172,7 @@ INSERT INTO public.admin_expenses (
     '2026-06-01', 
     'paid', 
     'Contabilidade', 
-    'DESPESAS ADMINISTRATIVAS', 
+    'CONTABILIDADE', 
     2431.0, 
     2431.0, 
     0.0, 
@@ -187,13 +185,13 @@ INSERT INTO public.admin_expenses (
 INSERT INTO public.financial_entries (
     id, company_id, type, origin_type, origin_id, partner_id, total_amount, 
     paid_amount, status, created_date, due_date, paid_date, description, 
-    deductions_amount, discount_amount, remaining_amount
+    deductions_amount, discount_amount
 ) VALUES (
-    'c3f319bf-03b6-4223-b882-457ee434f88c', 
+    '6d1424aa-0f41-49e3-bf55-abdd0592b522', 
     '5834ff22-a8ce-4c1c-852e-d5522e6f0736', 
     'payable', 
     'standalone_expense', 
-    '43e859fa-4175-4947-bf84-348000c76839', 
+    '3ff670e4-70a2-42e7-b06c-dab26ceab6a7', 
     NULL, 
     2431.0, 
     2431.0, 
@@ -203,7 +201,6 @@ INSERT INTO public.financial_entries (
     '2026-06-01', 
     'Contabilidade', 
     0.0, 
-    0.0, 
     0.0
 );
 
@@ -212,16 +209,16 @@ INSERT INTO public.financial_transactions (
     id, company_id, entry_id, account_id, type, amount, transaction_date, 
     created_by, description, metadata
 ) VALUES (
-    'f9d1f535-64bc-4bda-b35a-cc246c456687', 
+    '5bd8fbf4-8105-4ac6-a5af-49db69814209', 
     '5834ff22-a8ce-4c1c-852e-d5522e6f0736', 
-    'c3f319bf-03b6-4223-b882-457ee434f88c', 
+    '6d1424aa-0f41-49e3-bf55-abdd0592b522', 
     '9aaf4fa5-0622-4220-a013-b5632d78b51a', 
     'debit', 
     2431.0, 
     '2026-06-01', 
     'd2b3229f-a324-4a11-829c-4c546897833f', 
     'Contabilidade', 
-    '{"expenseId": "43e859fa-4175-4947-bf84-348000c76839"}'::jsonb
+    '{"expenseId": "3ff670e4-70a2-42e7-b06c-dab26ceab6a7"}'::jsonb
 );
 
 
@@ -232,10 +229,10 @@ INSERT INTO public.admin_expenses (
     expense_date, due_date, paid_date, status, entity_name, category, 
     original_value, paid_value, discount_value, sub_type, bank_account, notes
 ) VALUES (
-    'f4233d6a-1757-4b6b-b1f0-02fb277510a5', 
+    '51969912-e9b4-40e6-80bb-e56517030931', 
     '5834ff22-a8ce-4c1c-852e-d5522e6f0736', 
     '9aaf4fa5-0622-4220-a013-b5632d78b51a', 
-    (SELECT id FROM public.expense_subcategories WHERE name = 'CONTABILIDADE' AND (company_id IS NULL OR company_id = '5834ff22-a8ce-4c1c-852e-d5522e6f0736') LIMIT 1), 
+    '00000000-0000-0000-0000-000000000003', 
     'Contabilidade', 
     810.0, 
     NULL, 
@@ -244,7 +241,7 @@ INSERT INTO public.admin_expenses (
     '2026-06-01', 
     'paid', 
     'Contabilidade', 
-    'DESPESAS ADMINISTRATIVAS', 
+    'CONTABILIDADE', 
     810.0, 
     810.0, 
     0.0, 
@@ -257,13 +254,13 @@ INSERT INTO public.admin_expenses (
 INSERT INTO public.financial_entries (
     id, company_id, type, origin_type, origin_id, partner_id, total_amount, 
     paid_amount, status, created_date, due_date, paid_date, description, 
-    deductions_amount, discount_amount, remaining_amount
+    deductions_amount, discount_amount
 ) VALUES (
-    '10dd7163-acbc-4f72-8029-6dcc4e71bc73', 
+    '428a4b90-3b91-4d7c-b45c-9730af09f34f', 
     '5834ff22-a8ce-4c1c-852e-d5522e6f0736', 
     'payable', 
     'standalone_expense', 
-    'f4233d6a-1757-4b6b-b1f0-02fb277510a5', 
+    '51969912-e9b4-40e6-80bb-e56517030931', 
     NULL, 
     810.0, 
     810.0, 
@@ -273,7 +270,6 @@ INSERT INTO public.financial_entries (
     '2026-06-01', 
     'Contabilidade', 
     0.0, 
-    0.0, 
     0.0
 );
 
@@ -282,16 +278,16 @@ INSERT INTO public.financial_transactions (
     id, company_id, entry_id, account_id, type, amount, transaction_date, 
     created_by, description, metadata
 ) VALUES (
-    'b3ba193c-6d5d-4065-afd7-574f902f3b97', 
+    'e97e494d-fd55-40ad-9aa1-5cd2183bd052', 
     '5834ff22-a8ce-4c1c-852e-d5522e6f0736', 
-    '10dd7163-acbc-4f72-8029-6dcc4e71bc73', 
+    '428a4b90-3b91-4d7c-b45c-9730af09f34f', 
     '9aaf4fa5-0622-4220-a013-b5632d78b51a', 
     'debit', 
     810.0, 
     '2026-06-01', 
     'd2b3229f-a324-4a11-829c-4c546897833f', 
     'Contabilidade', 
-    '{"expenseId": "f4233d6a-1757-4b6b-b1f0-02fb277510a5"}'::jsonb
+    '{"expenseId": "51969912-e9b4-40e6-80bb-e56517030931"}'::jsonb
 );
 
 
@@ -302,10 +298,10 @@ INSERT INTO public.admin_expenses (
     expense_date, due_date, paid_date, status, entity_name, category, 
     original_value, paid_value, discount_value, sub_type, bank_account, notes
 ) VALUES (
-    '008ec04f-8563-4543-8201-c774e8f15f32', 
+    '16bca05e-6be2-4733-8ae4-b2ac5431175b', 
     '5834ff22-a8ce-4c1c-852e-d5522e6f0736', 
     '9aaf4fa5-0622-4220-a013-b5632d78b51a', 
-    (SELECT id FROM public.expense_subcategories WHERE name = 'SEGURO' AND (company_id IS NULL OR company_id = '5834ff22-a8ce-4c1c-852e-d5522e6f0736') LIMIT 1), 
+    '00000000-0000-0000-0000-000000000001', 
     'Seguro Alianz', 
     1610.7, 
     NULL, 
@@ -314,7 +310,7 @@ INSERT INTO public.admin_expenses (
     '2026-06-01', 
     'paid', 
     'Seguro Alianz', 
-    'DESPESAS FIXAS', 
+    'SEGURO', 
     1610.7, 
     1610.7, 
     0.0, 
@@ -327,13 +323,13 @@ INSERT INTO public.admin_expenses (
 INSERT INTO public.financial_entries (
     id, company_id, type, origin_type, origin_id, partner_id, total_amount, 
     paid_amount, status, created_date, due_date, paid_date, description, 
-    deductions_amount, discount_amount, remaining_amount
+    deductions_amount, discount_amount
 ) VALUES (
-    '5f6ed339-0b72-4b59-a428-e296e0cbde8f', 
+    'af344a50-a1d8-4adc-a691-8e82506e644b', 
     '5834ff22-a8ce-4c1c-852e-d5522e6f0736', 
     'payable', 
     'standalone_expense', 
-    '008ec04f-8563-4543-8201-c774e8f15f32', 
+    '16bca05e-6be2-4733-8ae4-b2ac5431175b', 
     NULL, 
     1610.7, 
     1610.7, 
@@ -343,7 +339,6 @@ INSERT INTO public.financial_entries (
     '2026-06-01', 
     'Seguro Alianz', 
     0.0, 
-    0.0, 
     0.0
 );
 
@@ -352,16 +347,16 @@ INSERT INTO public.financial_transactions (
     id, company_id, entry_id, account_id, type, amount, transaction_date, 
     created_by, description, metadata
 ) VALUES (
-    '15536ebe-99a1-4304-99ee-081717305b1a', 
+    '68d3b5bd-ad84-464b-9537-991ce5bd9878', 
     '5834ff22-a8ce-4c1c-852e-d5522e6f0736', 
-    '5f6ed339-0b72-4b59-a428-e296e0cbde8f', 
+    'af344a50-a1d8-4adc-a691-8e82506e644b', 
     '9aaf4fa5-0622-4220-a013-b5632d78b51a', 
     'debit', 
     1610.7, 
     '2026-06-01', 
     'd2b3229f-a324-4a11-829c-4c546897833f', 
     'Seguro Alianz', 
-    '{"expenseId": "008ec04f-8563-4543-8201-c774e8f15f32"}'::jsonb
+    '{"expenseId": "16bca05e-6be2-4733-8ae4-b2ac5431175b"}'::jsonb
 );
 
 
@@ -372,10 +367,10 @@ INSERT INTO public.admin_expenses (
     expense_date, due_date, paid_date, status, entity_name, category, 
     original_value, paid_value, discount_value, sub_type, bank_account, notes
 ) VALUES (
-    '256949fd-e785-4a57-8170-872caf34edc5', 
+    '381079f4-2256-4e7f-b892-4bae7f77f5e4', 
     '5834ff22-a8ce-4c1c-852e-d5522e6f0736', 
     '9aaf4fa5-0622-4220-a013-b5632d78b51a', 
-    (SELECT id FROM public.expense_subcategories WHERE name = 'DIVERSOS' AND (company_id IS NULL OR company_id = '5834ff22-a8ce-4c1c-852e-d5522e6f0736') LIMIT 1), 
+    '00000000-0000-0000-0000-000000000002', 
     'Passaro Flomil', 
     200.0, 
     NULL, 
@@ -384,7 +379,7 @@ INSERT INTO public.admin_expenses (
     '2026-06-01', 
     'paid', 
     'Passaro Flomil', 
-    'DESPESAS VARIÁVEIS', 
+    'DIVERSOS', 
     200.0, 
     200.0, 
     0.0, 
@@ -397,13 +392,13 @@ INSERT INTO public.admin_expenses (
 INSERT INTO public.financial_entries (
     id, company_id, type, origin_type, origin_id, partner_id, total_amount, 
     paid_amount, status, created_date, due_date, paid_date, description, 
-    deductions_amount, discount_amount, remaining_amount
+    deductions_amount, discount_amount
 ) VALUES (
-    'dc4d1e69-2158-405d-8ebe-6dfee62a9a85', 
+    'd5b2bdfd-01e8-410e-a037-b412ae93bd75', 
     '5834ff22-a8ce-4c1c-852e-d5522e6f0736', 
     'payable', 
     'standalone_expense', 
-    '256949fd-e785-4a57-8170-872caf34edc5', 
+    '381079f4-2256-4e7f-b892-4bae7f77f5e4', 
     NULL, 
     200.0, 
     200.0, 
@@ -413,7 +408,6 @@ INSERT INTO public.financial_entries (
     '2026-06-01', 
     'Passaro Flomil', 
     0.0, 
-    0.0, 
     0.0
 );
 
@@ -422,16 +416,16 @@ INSERT INTO public.financial_transactions (
     id, company_id, entry_id, account_id, type, amount, transaction_date, 
     created_by, description, metadata
 ) VALUES (
-    '370a03d5-6be8-478b-9d80-c9d9f082e6c7', 
+    '91d149fe-1839-4bee-9237-92c8327bf4fd', 
     '5834ff22-a8ce-4c1c-852e-d5522e6f0736', 
-    'dc4d1e69-2158-405d-8ebe-6dfee62a9a85', 
+    'd5b2bdfd-01e8-410e-a037-b412ae93bd75', 
     '9aaf4fa5-0622-4220-a013-b5632d78b51a', 
     'debit', 
     200.0, 
     '2026-06-01', 
     'd2b3229f-a324-4a11-829c-4c546897833f', 
     'Passaro Flomil', 
-    '{"expenseId": "256949fd-e785-4a57-8170-872caf34edc5"}'::jsonb
+    '{"expenseId": "381079f4-2256-4e7f-b892-4bae7f77f5e4"}'::jsonb
 );
 
 
@@ -442,10 +436,10 @@ INSERT INTO public.admin_expenses (
     expense_date, due_date, paid_date, status, entity_name, category, 
     original_value, paid_value, discount_value, sub_type, bank_account, notes
 ) VALUES (
-    '118355d3-087c-44c8-82ab-a9dbb36add80', 
+    '86d39f5d-9493-49cc-be36-c7e0680aa37a', 
     '5834ff22-a8ce-4c1c-852e-d5522e6f0736', 
     '9aaf4fa5-0622-4220-a013-b5632d78b51a', 
-    (SELECT id FROM public.expense_subcategories WHERE name = 'BALANÇA' AND (company_id IS NULL OR company_id = '5834ff22-a8ce-4c1c-852e-d5522e6f0736') LIMIT 1), 
+    '00000000-0000-0000-0000-000000000002', 
     'Balança', 
     700.0, 
     NULL, 
@@ -454,7 +448,7 @@ INSERT INTO public.admin_expenses (
     '2026-06-01', 
     'paid', 
     'Balança', 
-    'DESPESAS VARIÁVEIS', 
+    'BALANÇA', 
     700.0, 
     700.0, 
     0.0, 
@@ -467,13 +461,13 @@ INSERT INTO public.admin_expenses (
 INSERT INTO public.financial_entries (
     id, company_id, type, origin_type, origin_id, partner_id, total_amount, 
     paid_amount, status, created_date, due_date, paid_date, description, 
-    deductions_amount, discount_amount, remaining_amount
+    deductions_amount, discount_amount
 ) VALUES (
-    'f8f281e5-322d-43bf-8ab7-70d135a504b2', 
+    '97d4ff8b-4f26-4c01-a25c-501e63187458', 
     '5834ff22-a8ce-4c1c-852e-d5522e6f0736', 
     'payable', 
     'standalone_expense', 
-    '118355d3-087c-44c8-82ab-a9dbb36add80', 
+    '86d39f5d-9493-49cc-be36-c7e0680aa37a', 
     NULL, 
     700.0, 
     700.0, 
@@ -483,7 +477,6 @@ INSERT INTO public.financial_entries (
     '2026-06-01', 
     'Balança', 
     0.0, 
-    0.0, 
     0.0
 );
 
@@ -492,16 +485,16 @@ INSERT INTO public.financial_transactions (
     id, company_id, entry_id, account_id, type, amount, transaction_date, 
     created_by, description, metadata
 ) VALUES (
-    '03d99c1e-beca-4051-81e3-bfc1d6cb4a47', 
+    '8f7ce046-a563-4303-af70-f60ceca57f21', 
     '5834ff22-a8ce-4c1c-852e-d5522e6f0736', 
-    'f8f281e5-322d-43bf-8ab7-70d135a504b2', 
+    '97d4ff8b-4f26-4c01-a25c-501e63187458', 
     '9aaf4fa5-0622-4220-a013-b5632d78b51a', 
     'debit', 
     700.0, 
     '2026-06-01', 
     'd2b3229f-a324-4a11-829c-4c546897833f', 
     'Balança', 
-    '{"expenseId": "118355d3-087c-44c8-82ab-a9dbb36add80"}'::jsonb
+    '{"expenseId": "86d39f5d-9493-49cc-be36-c7e0680aa37a"}'::jsonb
 );
 
 
@@ -512,10 +505,10 @@ INSERT INTO public.admin_expenses (
     expense_date, due_date, paid_date, status, entity_name, category, 
     original_value, paid_value, discount_value, sub_type, bank_account, notes
 ) VALUES (
-    'b7a087d3-6702-4515-bcc7-7bcb81b13236', 
+    'ebea053d-15ff-4fe3-84fa-3a77204a4116', 
     '5834ff22-a8ce-4c1c-852e-d5522e6f0736', 
     '9aaf4fa5-0622-4220-a013-b5632d78b51a', 
-    (SELECT id FROM public.expense_subcategories WHERE name = 'DIVERSOS' AND (company_id IS NULL OR company_id = '5834ff22-a8ce-4c1c-852e-d5522e6f0736') LIMIT 1), 
+    '00000000-0000-0000-0000-000000000002', 
     'Multa Posto Fiscal', 
     504.9, 
     NULL, 
@@ -524,7 +517,7 @@ INSERT INTO public.admin_expenses (
     '2026-06-01', 
     'paid', 
     'Multa Posto Fiscal', 
-    'DESPESAS VARIÁVEIS', 
+    'DIVERSOS', 
     504.9, 
     504.9, 
     0.0, 
@@ -537,13 +530,13 @@ INSERT INTO public.admin_expenses (
 INSERT INTO public.financial_entries (
     id, company_id, type, origin_type, origin_id, partner_id, total_amount, 
     paid_amount, status, created_date, due_date, paid_date, description, 
-    deductions_amount, discount_amount, remaining_amount
+    deductions_amount, discount_amount
 ) VALUES (
-    '911444bc-0e43-4b93-9cea-106c2d35d7d8', 
+    '1bac6c07-cbc6-4538-b123-e4d953bd6500', 
     '5834ff22-a8ce-4c1c-852e-d5522e6f0736', 
     'payable', 
     'standalone_expense', 
-    'b7a087d3-6702-4515-bcc7-7bcb81b13236', 
+    'ebea053d-15ff-4fe3-84fa-3a77204a4116', 
     NULL, 
     504.9, 
     504.9, 
@@ -553,7 +546,6 @@ INSERT INTO public.financial_entries (
     '2026-06-01', 
     'Multa Posto Fiscal', 
     0.0, 
-    0.0, 
     0.0
 );
 
@@ -562,16 +554,16 @@ INSERT INTO public.financial_transactions (
     id, company_id, entry_id, account_id, type, amount, transaction_date, 
     created_by, description, metadata
 ) VALUES (
-    '90576f31-35d4-4d6f-9615-eca5b44771af', 
+    '6f587bff-6295-486c-a29a-3f1ff04456eb', 
     '5834ff22-a8ce-4c1c-852e-d5522e6f0736', 
-    '911444bc-0e43-4b93-9cea-106c2d35d7d8', 
+    '1bac6c07-cbc6-4538-b123-e4d953bd6500', 
     '9aaf4fa5-0622-4220-a013-b5632d78b51a', 
     'debit', 
     504.9, 
     '2026-06-01', 
     'd2b3229f-a324-4a11-829c-4c546897833f', 
     'Multa Posto Fiscal', 
-    '{"expenseId": "b7a087d3-6702-4515-bcc7-7bcb81b13236"}'::jsonb
+    '{"expenseId": "ebea053d-15ff-4fe3-84fa-3a77204a4116"}'::jsonb
 );
 
 
@@ -582,10 +574,10 @@ INSERT INTO public.admin_expenses (
     expense_date, due_date, paid_date, status, entity_name, category, 
     original_value, paid_value, discount_value, sub_type, bank_account, notes
 ) VALUES (
-    '1881811d-6628-4aed-a452-11a6c7d7f9d5', 
+    '7abb13a1-2f0b-4cd8-acc7-7054e9be68e7', 
     '5834ff22-a8ce-4c1c-852e-d5522e6f0736', 
     '9aaf4fa5-0622-4220-a013-b5632d78b51a', 
-    (SELECT id FROM public.expense_subcategories WHERE name = 'DAE' AND (company_id IS NULL OR company_id = '5834ff22-a8ce-4c1c-852e-d5522e6f0736') LIMIT 1), 
+    '00000000-0000-0000-0000-000000000002', 
     'DAE', 
     1471.22, 
     NULL, 
@@ -594,7 +586,7 @@ INSERT INTO public.admin_expenses (
     '2026-06-01', 
     'paid', 
     'DAE', 
-    'DESPESAS VARIÁVEIS', 
+    'DAE', 
     1471.22, 
     1471.22, 
     0.0, 
@@ -607,13 +599,13 @@ INSERT INTO public.admin_expenses (
 INSERT INTO public.financial_entries (
     id, company_id, type, origin_type, origin_id, partner_id, total_amount, 
     paid_amount, status, created_date, due_date, paid_date, description, 
-    deductions_amount, discount_amount, remaining_amount
+    deductions_amount, discount_amount
 ) VALUES (
-    '223567dd-cb51-4018-a106-dff1874db065', 
+    '0b038080-0e1c-4af4-ab82-e78950727d8b', 
     '5834ff22-a8ce-4c1c-852e-d5522e6f0736', 
     'payable', 
     'standalone_expense', 
-    '1881811d-6628-4aed-a452-11a6c7d7f9d5', 
+    '7abb13a1-2f0b-4cd8-acc7-7054e9be68e7', 
     NULL, 
     1471.22, 
     1471.22, 
@@ -623,7 +615,6 @@ INSERT INTO public.financial_entries (
     '2026-06-01', 
     'DAE', 
     0.0, 
-    0.0, 
     0.0
 );
 
@@ -632,16 +623,16 @@ INSERT INTO public.financial_transactions (
     id, company_id, entry_id, account_id, type, amount, transaction_date, 
     created_by, description, metadata
 ) VALUES (
-    'a4329ca5-da44-4558-b9c7-d7acccf6bf82', 
+    'b439a596-fce0-48e9-92cf-41884a2cdb4b', 
     '5834ff22-a8ce-4c1c-852e-d5522e6f0736', 
-    '223567dd-cb51-4018-a106-dff1874db065', 
+    '0b038080-0e1c-4af4-ab82-e78950727d8b', 
     '9aaf4fa5-0622-4220-a013-b5632d78b51a', 
     'debit', 
     1471.22, 
     '2026-06-01', 
     'd2b3229f-a324-4a11-829c-4c546897833f', 
     'DAE', 
-    '{"expenseId": "1881811d-6628-4aed-a452-11a6c7d7f9d5"}'::jsonb
+    '{"expenseId": "7abb13a1-2f0b-4cd8-acc7-7054e9be68e7"}'::jsonb
 );
 
 
@@ -652,10 +643,10 @@ INSERT INTO public.admin_expenses (
     expense_date, due_date, paid_date, status, entity_name, category, 
     original_value, paid_value, discount_value, sub_type, bank_account, notes
 ) VALUES (
-    '0cdc935a-089d-4881-bfa1-25f1e396958c', 
+    'de7c5b93-d33f-478b-b443-921e8f6eeed4', 
     '5834ff22-a8ce-4c1c-852e-d5522e6f0736', 
     '9aaf4fa5-0622-4220-a013-b5632d78b51a', 
-    (SELECT id FROM public.expense_subcategories WHERE name = 'IOF PJ CHEQUE ESPECIAL' AND company_id = '5834ff22-a8ce-4c1c-852e-d5522e6f0736' LIMIT 1), 
+    '00000000-0000-0000-0000-000000000003', 
     'IOF PJ CHEQUE ESPECIAL', 
     779.74, 
     NULL, 
@@ -664,7 +655,7 @@ INSERT INTO public.admin_expenses (
     '2026-06-01', 
     'paid', 
     'IOF PJ CHEQUE ESPECIAL', 
-    'DESPESAS ADMINISTRATIVAS', 
+    'IOF PJ CHEQUE ESPECIAL', 
     779.74, 
     779.74, 
     0.0, 
@@ -677,13 +668,13 @@ INSERT INTO public.admin_expenses (
 INSERT INTO public.financial_entries (
     id, company_id, type, origin_type, origin_id, partner_id, total_amount, 
     paid_amount, status, created_date, due_date, paid_date, description, 
-    deductions_amount, discount_amount, remaining_amount
+    deductions_amount, discount_amount
 ) VALUES (
-    'b8ad1943-ccb0-4826-afcb-2df6e21932a8', 
+    '51dc9cd2-08f9-4016-b57d-83dd37a76786', 
     '5834ff22-a8ce-4c1c-852e-d5522e6f0736', 
     'payable', 
     'standalone_expense', 
-    '0cdc935a-089d-4881-bfa1-25f1e396958c', 
+    'de7c5b93-d33f-478b-b443-921e8f6eeed4', 
     NULL, 
     779.74, 
     779.74, 
@@ -693,7 +684,6 @@ INSERT INTO public.financial_entries (
     '2026-06-01', 
     'IOF PJ CHEQUE ESPECIAL', 
     0.0, 
-    0.0, 
     0.0
 );
 
@@ -702,16 +692,16 @@ INSERT INTO public.financial_transactions (
     id, company_id, entry_id, account_id, type, amount, transaction_date, 
     created_by, description, metadata
 ) VALUES (
-    'acc911d5-df38-4f24-9ed4-fb6efee7a8ae', 
+    '5ba32a93-f6a9-4486-b284-929de947e4df', 
     '5834ff22-a8ce-4c1c-852e-d5522e6f0736', 
-    'b8ad1943-ccb0-4826-afcb-2df6e21932a8', 
+    '51dc9cd2-08f9-4016-b57d-83dd37a76786', 
     '9aaf4fa5-0622-4220-a013-b5632d78b51a', 
     'debit', 
     779.74, 
     '2026-06-01', 
     'd2b3229f-a324-4a11-829c-4c546897833f', 
     'IOF PJ CHEQUE ESPECIAL', 
-    '{"expenseId": "0cdc935a-089d-4881-bfa1-25f1e396958c"}'::jsonb
+    '{"expenseId": "de7c5b93-d33f-478b-b443-921e8f6eeed4"}'::jsonb
 );
 
 
@@ -722,10 +712,10 @@ INSERT INTO public.admin_expenses (
     expense_date, due_date, paid_date, status, entity_name, category, 
     original_value, paid_value, discount_value, sub_type, bank_account, notes
 ) VALUES (
-    'ebc0560b-3dc0-4963-9dd6-4ed7afac79aa', 
+    'bd0351a5-d383-432a-a489-aa73f5e6bc83', 
     '5834ff22-a8ce-4c1c-852e-d5522e6f0736', 
     '9aaf4fa5-0622-4220-a013-b5632d78b51a', 
-    (SELECT id FROM public.expense_subcategories WHERE name = 'IOF PJ CHEQUE ESPECIAL' AND company_id = '5834ff22-a8ce-4c1c-852e-d5522e6f0736' LIMIT 1), 
+    '00000000-0000-0000-0000-000000000003', 
     'IOF PJ CHEQUE ESPECIAL', 
     93.14, 
     NULL, 
@@ -734,7 +724,7 @@ INSERT INTO public.admin_expenses (
     '2026-06-01', 
     'paid', 
     'IOF PJ CHEQUE ESPECIAL', 
-    'DESPESAS ADMINISTRATIVAS', 
+    'IOF PJ CHEQUE ESPECIAL', 
     93.14, 
     93.14, 
     0.0, 
@@ -747,13 +737,13 @@ INSERT INTO public.admin_expenses (
 INSERT INTO public.financial_entries (
     id, company_id, type, origin_type, origin_id, partner_id, total_amount, 
     paid_amount, status, created_date, due_date, paid_date, description, 
-    deductions_amount, discount_amount, remaining_amount
+    deductions_amount, discount_amount
 ) VALUES (
-    '606e1ff4-0aca-4949-beec-f2b66ff8df0a', 
+    'e4bd8490-83cb-4395-9e82-12ee773d5138', 
     '5834ff22-a8ce-4c1c-852e-d5522e6f0736', 
     'payable', 
     'standalone_expense', 
-    'ebc0560b-3dc0-4963-9dd6-4ed7afac79aa', 
+    'bd0351a5-d383-432a-a489-aa73f5e6bc83', 
     NULL, 
     93.14, 
     93.14, 
@@ -763,7 +753,6 @@ INSERT INTO public.financial_entries (
     '2026-06-01', 
     'IOF PJ CHEQUE ESPECIAL', 
     0.0, 
-    0.0, 
     0.0
 );
 
@@ -772,16 +761,16 @@ INSERT INTO public.financial_transactions (
     id, company_id, entry_id, account_id, type, amount, transaction_date, 
     created_by, description, metadata
 ) VALUES (
-    '7070a9a5-ee5e-4c89-9b81-14cb69e236db', 
+    'c760325f-f7ca-44df-97c9-a335798d74f9', 
     '5834ff22-a8ce-4c1c-852e-d5522e6f0736', 
-    '606e1ff4-0aca-4949-beec-f2b66ff8df0a', 
+    'e4bd8490-83cb-4395-9e82-12ee773d5138', 
     '9aaf4fa5-0622-4220-a013-b5632d78b51a', 
     'debit', 
     93.14, 
     '2026-06-01', 
     'd2b3229f-a324-4a11-829c-4c546897833f', 
     'IOF PJ CHEQUE ESPECIAL', 
-    '{"expenseId": "ebc0560b-3dc0-4963-9dd6-4ed7afac79aa"}'::jsonb
+    '{"expenseId": "bd0351a5-d383-432a-a489-aa73f5e6bc83"}'::jsonb
 );
 
 
@@ -792,10 +781,10 @@ INSERT INTO public.admin_expenses (
     expense_date, due_date, paid_date, status, entity_name, category, 
     original_value, paid_value, discount_value, sub_type, bank_account, notes
 ) VALUES (
-    '86da5398-cb75-48cf-a368-35039406226e', 
+    'a70c58fc-a82f-4e79-8c1c-8223c30c990d', 
     '5834ff22-a8ce-4c1c-852e-d5522e6f0736', 
     '9aaf4fa5-0622-4220-a013-b5632d78b51a', 
-    (SELECT id FROM public.expense_subcategories WHERE name = 'SALÁRIOS' AND (company_id IS NULL OR company_id = '5834ff22-a8ce-4c1c-852e-d5522e6f0736') LIMIT 1), 
+    '00000000-0000-0000-0000-000000000001', 
     'Johnatha', 
     3500.0, 
     NULL, 
@@ -804,7 +793,7 @@ INSERT INTO public.admin_expenses (
     '2026-06-02', 
     'paid', 
     'Johnatha', 
-    'DESPESAS FIXAS', 
+    'SALÁRIOS', 
     3500.0, 
     3500.0, 
     0.0, 
@@ -817,13 +806,13 @@ INSERT INTO public.admin_expenses (
 INSERT INTO public.financial_entries (
     id, company_id, type, origin_type, origin_id, partner_id, total_amount, 
     paid_amount, status, created_date, due_date, paid_date, description, 
-    deductions_amount, discount_amount, remaining_amount
+    deductions_amount, discount_amount
 ) VALUES (
-    '6832b69e-5648-48b4-a96f-d107c7450ee2', 
+    'c75e80fd-933b-42ea-92fb-7029ea3cf84e', 
     '5834ff22-a8ce-4c1c-852e-d5522e6f0736', 
     'payable', 
     'standalone_expense', 
-    '86da5398-cb75-48cf-a368-35039406226e', 
+    'a70c58fc-a82f-4e79-8c1c-8223c30c990d', 
     NULL, 
     3500.0, 
     3500.0, 
@@ -833,7 +822,6 @@ INSERT INTO public.financial_entries (
     '2026-06-02', 
     'Johnatha', 
     0.0, 
-    0.0, 
     0.0
 );
 
@@ -842,16 +830,16 @@ INSERT INTO public.financial_transactions (
     id, company_id, entry_id, account_id, type, amount, transaction_date, 
     created_by, description, metadata
 ) VALUES (
-    '1409ca4d-00a0-457c-ab73-13ac3b3934fe', 
+    '7223c94d-f59c-49f5-9d29-97b6aeeedcb3', 
     '5834ff22-a8ce-4c1c-852e-d5522e6f0736', 
-    '6832b69e-5648-48b4-a96f-d107c7450ee2', 
+    'c75e80fd-933b-42ea-92fb-7029ea3cf84e', 
     '9aaf4fa5-0622-4220-a013-b5632d78b51a', 
     'debit', 
     3500.0, 
     '2026-06-02', 
     'd2b3229f-a324-4a11-829c-4c546897833f', 
     'Johnatha', 
-    '{"expenseId": "86da5398-cb75-48cf-a368-35039406226e"}'::jsonb
+    '{"expenseId": "a70c58fc-a82f-4e79-8c1c-8223c30c990d"}'::jsonb
 );
 
 
@@ -862,10 +850,10 @@ INSERT INTO public.admin_expenses (
     expense_date, due_date, paid_date, status, entity_name, category, 
     original_value, paid_value, discount_value, sub_type, bank_account, notes
 ) VALUES (
-    '94ca5790-a6ef-4ccc-a53e-adfabed5264b', 
+    'e552ca8e-962a-4462-827d-ac151919380c', 
     '5834ff22-a8ce-4c1c-852e-d5522e6f0736', 
     '6ff9f7ad-b836-4ecd-aef6-08768406dae8', 
-    (SELECT id FROM public.expense_subcategories WHERE name = 'TARIFAS BANCÁRIAS' AND (company_id IS NULL OR company_id = '5834ff22-a8ce-4c1c-852e-d5522e6f0736') LIMIT 1), 
+    '00000000-0000-0000-0000-000000000003', 
     'Tarifas', 
     39.6, 
     NULL, 
@@ -874,7 +862,7 @@ INSERT INTO public.admin_expenses (
     '2026-06-01', 
     'paid', 
     'Tarifas', 
-    'DESPESAS ADMINISTRATIVAS', 
+    'TARIFAS BANCÁRIAS', 
     39.6, 
     39.6, 
     0.0, 
@@ -887,13 +875,13 @@ INSERT INTO public.admin_expenses (
 INSERT INTO public.financial_entries (
     id, company_id, type, origin_type, origin_id, partner_id, total_amount, 
     paid_amount, status, created_date, due_date, paid_date, description, 
-    deductions_amount, discount_amount, remaining_amount
+    deductions_amount, discount_amount
 ) VALUES (
-    '4ef1bae1-827a-49a3-a4ad-72fb6c2777bd', 
+    'e53a5001-219a-4448-a2c2-82cb6f623bb0', 
     '5834ff22-a8ce-4c1c-852e-d5522e6f0736', 
     'payable', 
     'standalone_expense', 
-    '94ca5790-a6ef-4ccc-a53e-adfabed5264b', 
+    'e552ca8e-962a-4462-827d-ac151919380c', 
     NULL, 
     39.6, 
     39.6, 
@@ -903,7 +891,6 @@ INSERT INTO public.financial_entries (
     '2026-06-01', 
     'Tarifas', 
     0.0, 
-    0.0, 
     0.0
 );
 
@@ -912,16 +899,16 @@ INSERT INTO public.financial_transactions (
     id, company_id, entry_id, account_id, type, amount, transaction_date, 
     created_by, description, metadata
 ) VALUES (
-    '7ebd50cd-900b-436d-bced-66c5382894cc', 
+    '12a24a08-57c3-439d-926d-bc19105cbe83', 
     '5834ff22-a8ce-4c1c-852e-d5522e6f0736', 
-    '4ef1bae1-827a-49a3-a4ad-72fb6c2777bd', 
+    'e53a5001-219a-4448-a2c2-82cb6f623bb0', 
     '6ff9f7ad-b836-4ecd-aef6-08768406dae8', 
     'debit', 
     39.6, 
     '2026-06-01', 
     'd2b3229f-a324-4a11-829c-4c546897833f', 
     'Tarifas', 
-    '{"expenseId": "94ca5790-a6ef-4ccc-a53e-adfabed5264b"}'::jsonb
+    '{"expenseId": "e552ca8e-962a-4462-827d-ac151919380c"}'::jsonb
 );
 
 
@@ -932,10 +919,10 @@ INSERT INTO public.admin_expenses (
     expense_date, due_date, paid_date, status, entity_name, category, 
     original_value, paid_value, discount_value, sub_type, bank_account, notes
 ) VALUES (
-    'b88c855b-7c5c-4bdb-bc6e-a677eaaae585', 
+    'bd1b85a8-3953-4928-a600-7aba026f2875', 
     '5834ff22-a8ce-4c1c-852e-d5522e6f0736', 
     '6ff9f7ad-b836-4ecd-aef6-08768406dae8', 
-    (SELECT id FROM public.expense_subcategories WHERE name = 'SALÁRIOS' AND (company_id IS NULL OR company_id = '5834ff22-a8ce-4c1c-852e-d5522e6f0736') LIMIT 1), 
+    '00000000-0000-0000-0000-000000000001', 
     'Newton Porto', 
     25000.0, 
     NULL, 
@@ -944,7 +931,7 @@ INSERT INTO public.admin_expenses (
     '2026-06-02', 
     'paid', 
     'Newton Porto', 
-    'DESPESAS FIXAS', 
+    'SALÁRIOS', 
     25000.0, 
     25000.0, 
     0.0, 
@@ -957,13 +944,13 @@ INSERT INTO public.admin_expenses (
 INSERT INTO public.financial_entries (
     id, company_id, type, origin_type, origin_id, partner_id, total_amount, 
     paid_amount, status, created_date, due_date, paid_date, description, 
-    deductions_amount, discount_amount, remaining_amount
+    deductions_amount, discount_amount
 ) VALUES (
-    'a855a8af-343d-43ef-8e92-08d1d1b97566', 
+    '0e8232ae-77d1-4073-b9b2-553d097a0597', 
     '5834ff22-a8ce-4c1c-852e-d5522e6f0736', 
     'payable', 
     'standalone_expense', 
-    'b88c855b-7c5c-4bdb-bc6e-a677eaaae585', 
+    'bd1b85a8-3953-4928-a600-7aba026f2875', 
     NULL, 
     25000.0, 
     25000.0, 
@@ -973,7 +960,6 @@ INSERT INTO public.financial_entries (
     '2026-06-02', 
     'Newton Porto', 
     0.0, 
-    0.0, 
     0.0
 );
 
@@ -982,16 +968,16 @@ INSERT INTO public.financial_transactions (
     id, company_id, entry_id, account_id, type, amount, transaction_date, 
     created_by, description, metadata
 ) VALUES (
-    '52a40149-f640-4c90-b61b-03a0830bc40c', 
+    '39659412-0127-407b-9f8d-28f7ce5c5fa2', 
     '5834ff22-a8ce-4c1c-852e-d5522e6f0736', 
-    'a855a8af-343d-43ef-8e92-08d1d1b97566', 
+    '0e8232ae-77d1-4073-b9b2-553d097a0597', 
     '6ff9f7ad-b836-4ecd-aef6-08768406dae8', 
     'debit', 
     25000.0, 
     '2026-06-02', 
     'd2b3229f-a324-4a11-829c-4c546897833f', 
     'Newton Porto', 
-    '{"expenseId": "b88c855b-7c5c-4bdb-bc6e-a677eaaae585"}'::jsonb
+    '{"expenseId": "bd1b85a8-3953-4928-a600-7aba026f2875"}'::jsonb
 );
 
 COMMIT;
