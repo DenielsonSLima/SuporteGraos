@@ -62,13 +62,20 @@ const PurchaseOrderHeader: React.FC<Props> = ({ order }) => {
                 </p>
                 <p className="text-sm font-bold text-slate-700 uppercase">
                   {(() => {
-                    const city = order.useRegisteredLocation 
-                      ? (order.partnerCity || '...')
-                      : (order.loadingCity || order.partnerCity || '...');
-                    const state = order.useRegisteredLocation 
-                      ? (order.partnerState || '...')
-                      : (order.loadingState || order.partnerState || '...');
-                    return `${city} / ${state}`;
+                    const city = (order.useRegisteredLocation 
+                      ? (order.partnerCity || order.loadingCity || '')
+                      : (order.loadingCity || order.partnerCity || '')).trim();
+                    const state = (order.useRegisteredLocation 
+                      ? (order.partnerState || order.loadingState || '')
+                      : (order.loadingState || order.partnerState || '')).trim();
+                    
+                    if (city && city !== '...') {
+                      return state ? `${city} / ${state}` : city;
+                    }
+                    if (state && state !== '...') {
+                      return state;
+                    }
+                    return '...';
                   })()}
                 </p>
                 {!order.useRegisteredLocation && order.loadingComplement && (

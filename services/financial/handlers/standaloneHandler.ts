@@ -62,16 +62,25 @@ export const handleStandalonePayment = async (
   const entry = entries?.[0];
 
   if (entry && data.accountId) {
-    // Via RPC Modular (Atômico) - SQL-First
-    await supabase.rpc('rpc_ops_financial_process_action', {
+    const { data: result, error: rpcError } = await supabase.rpc('rpc_ops_financial_process_action', {
       p_entry_id: entry.id,
       p_account_id: data.accountId,
       p_amount: transactionValue,
       p_discount: discountValue,
-      p_date: data.date,
       p_description: description,
-      p_tx_id: txId
+      p_transaction_date: data.date,
+      p_metadata: {
+        source: 'standaloneHandler',
+        tx_id: txId,
+        notes: data.notes,
+        subType: standalone?.subType
+      }
     });
+
+    if (rpcError || (result && !result.success)) {
+      console.error('[standaloneHandler] Erro no processamento SQL de pagamento:', rpcError || result?.error);
+      throw new Error(`Erro no processamento SQL de pagamento: ${rpcError?.message || result?.error}`);
+    }
 
     const txType = standalone?.category === 'income' ? 'receipt' : 'payment';
 

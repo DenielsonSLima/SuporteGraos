@@ -30,6 +30,7 @@ import { formatMoney as formatCurrency } from '../utils/formatters';
 import {
   handleFreightPayment,
   handlePurchaseOrderPayment,
+  handlePurchaseOrderAdvance,
   handleSalesOrderReceipt,
   handleCommissionPayment,
   handleStandalonePayment,
@@ -148,6 +149,8 @@ export const financialActionService = {
       result = await handleFreightPayment(recordId, paymentData);
     } else if (subType === 'purchase_order') {
       result = await handlePurchaseOrderPayment(recordId, paymentData);
+    } else if (subType === 'purchase_order_advance') {
+      result = await handlePurchaseOrderAdvance(recordId, paymentData);
     } else if (subType === 'purchase_order_extra') {
       // Despesas Extras do Pedido de Compra (não possuem entry_id, mas precisam baixar saldo)
       // Passamos null para standalone e serviceToUpdate pois é uma movimentação avulsa vinculada ao Pedido

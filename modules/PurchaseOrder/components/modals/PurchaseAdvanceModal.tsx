@@ -20,7 +20,8 @@ const PurchaseAdvanceModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, par
   const { addToast } = useToast();
   
   const [date, setDate] = useState(getLocalDateString());
-  const [amount, setAmount] = useState('');
+  const [displayAmount, setDisplayAmount] = useState('');
+  const [numericAmount, setNumericAmount] = useState(0);
   const [accountId, setAccountId] = useState('');
   const [notes, setNotes] = useState('');
 
@@ -35,9 +36,17 @@ const PurchaseAdvanceModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, par
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(normalized);
   };
 
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value.replace(/\D/g, '');
+    const num = Number(raw) / 100;
+    setNumericAmount(num);
+    setDisplayAmount(formatBRL(num));
+  };
+
   useEffect(() => {
     if (isOpen) {
-      setAmount('');
+      setDisplayAmount('');
+      setNumericAmount(0);
       setAccountId('');
       setNotes('');
       setDate(getLocalDateString());
@@ -48,7 +57,7 @@ const PurchaseAdvanceModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, par
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const valAmount = parseFloat(amount);
+    const valAmount = numericAmount;
     if (!valAmount || valAmount <= 0) return addToast('warning', 'Valor Inválido');
     if (!accountId) return addToast('warning', 'Conta Obrigatória');
 
@@ -70,7 +79,7 @@ const PurchaseAdvanceModal: React.FC<Props> = ({ isOpen, onClose, onConfirm, par
           <form onSubmit={handleSubmit} className="p-8 space-y-5 bg-white">
             <div className="grid grid-cols-2 gap-4">
               <div><label className={labelClass}>Data</label><input type="date" required value={date} onChange={e => setDate(e.target.value)} className={inputClass} /></div>
-              <div><label className={labelClass}>Valor (R$)</label><div className="relative"><DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} /><input type="number" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} className={`${inputClass} pl-10 text-amber-600`} placeholder="0,00" required /></div></div>
+              <div><label className={labelClass}>Valor (R$)</label><div className="relative"><DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} /><input type="text" value={displayAmount} onChange={handleAmountChange} className={`${inputClass} pl-10 text-amber-600`} placeholder="R$ 0,00" required /></div></div>
             </div>
             <div>
               <label className={labelClass}>Conta de Saída (Saldo em Tempo Real)</label>

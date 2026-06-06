@@ -51,7 +51,9 @@ export const usePurchaseOrderLogic = (initialOrder: PurchaseOrder, onFinalizeCal
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SALES_ORDERS }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.FINANCIAL_TRANSACTIONS }),
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.LOADINGS }),
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT })
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CASHIER_CURRENT }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ADVANCES }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ADVANCES_ACTIVE_TOTALS })
       ]);
     } catch (refreshErr) {
       console.warn('⚠️ refreshData failed:', refreshErr);
@@ -189,34 +191,29 @@ export const usePurchaseOrderLogic = (initialOrder: PurchaseOrder, onFinalizeCal
       }
     },
     handleRegisterAdvance: async (data: any) => {
-      const tx: OrderTransaction = {
-        id: crypto.randomUUID(),
-        type: 'advance',
-        date: data.date,
-        value: data.value,
-        accountId: data.accountId,
-        accountName: data.accountName,
-        notes: data.description || 'Adiantamento'
-      };
-      const updated = { ...order, transactions: [tx, ...(order.transactions || [])], paidValue: (order.paidValue || 0) + data.value };
-      await purchaseService.update(updated);
+      try {
+        const paymentData = {
+          date: data.date,
+          amount: data.value,
+          discount: 0,
+          accountId: data.accountId,
+          accountName: data.accountName,
+          notes: data.notes || 'Adiantamento de Compra',
+          isAsset: false,
+          partnerId: order.partnerId,
+          entityName: order.partnerName
+        };
 
-      financialActionService.addAdminExpense({
-        id: `adv-po-${tx.id}`,
-        description: `Adiantamento Pedido ${order.number}`,
-        entityName: order.partnerName,
-        category: 'Adiantamentos',
-        dueDate: data.date,
-        issueDate: data.date,
-        originalValue: data.value,
-        paidValue: data.value,
-        status: 'paid',
-        subType: 'admin'
-      });
-      SettingsCache.refreshBalances();
-      ledgerService.onTransactionChange('add', tx);
-      await refreshData();
-      addToast('success', 'Adiantamento Concedido');
+        // Enviar para o Orquestrador Financeiro (Igual ao pagamento, mas identificando como adiantamento)
+        await financialActionService.processRecord(`po-grain-${order.id}`, paymentData, 'purchase_order_advance');
+
+        SettingsCache.refreshBalances();
+        addToast('success', 'Adiantamento Concedido');
+        await refreshData();
+      } catch (err: any) {
+        console.error('[PO-ADVANCE] Erro ao registrar adiantamento:', err);
+        addToast('error', `Erro ao registrar adiantamento: ${err?.message || 'Erro desconhecido'}`);
+      }
     },
     handleAddExpense: async (data: any) => {
       try {

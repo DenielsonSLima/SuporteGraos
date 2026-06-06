@@ -64,13 +64,21 @@ const OrderCard: React.FC<Props> = React.memo(({ order, onClick, onFinalize, onD
             <MapPin size={14} className="text-primary-500 shrink-0" /> 
             <span className="truncate">
               {(() => {
-                const city = order.useRegisteredLocation 
-                  ? (order.partnerCity || '...')
-                  : (order.loadingCity || order.partnerCity || '...');
-                const state = order.useRegisteredLocation 
-                  ? (order.partnerState || '...')
-                  : (order.loadingState || order.partnerState || '...');
-                const base = `${city} - ${state}`;
+                const city = (order.useRegisteredLocation 
+                  ? (order.partnerCity || order.loadingCity || '')
+                  : (order.loadingCity || order.partnerCity || '')).trim();
+                const state = (order.useRegisteredLocation 
+                  ? (order.partnerState || order.loadingState || '')
+                  : (order.loadingState || order.partnerState || '')).trim();
+                
+                let base = '';
+                if (city && city !== '...') {
+                  base = state ? `${city} - ${state}` : city;
+                } else if (state && state !== '...') {
+                  base = state;
+                } else {
+                  base = '...';
+                }
                 const complement = (!order.useRegisteredLocation && order.loadingComplement) ? ` (${order.loadingComplement})` : '';
                 return base + complement;
               })()}

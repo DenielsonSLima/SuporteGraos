@@ -356,15 +356,16 @@ export const update = async (id: string, updates: Partial<FinancialRecord>): Pro
 
   if (canonicalMode) {
     try {
+      const entryUpdates: any = {};
+      if (updates.description !== undefined) entryUpdates.description = updates.description;
+      if (updates.originalValue !== undefined) entryUpdates.total_amount = updates.originalValue;
+      if (updates.dueDate !== undefined) entryUpdates.due_date = updates.dueDate;
+      if (updates.status !== undefined) entryUpdates.status = updates.status;
+      if (updates.paidValue !== undefined) entryUpdates.paid_amount = updates.paidValue;
+
       const { data, error } = await supabase
         .from('financial_entries')
-        .update({
-          description: updates.description,
-          total_amount: updates.originalValue,
-          due_date: updates.dueDate,
-          status: updates.status,
-          paid_amount: updates.paidValue,
-        })
+        .update(entryUpdates)
         .eq('id', id)
         .select()
         .single();
@@ -374,15 +375,22 @@ export const update = async (id: string, updates: Partial<FinancialRecord>): Pro
         return null;
       }
 
-      if (updates.bankAccount !== undefined) {
+      // Propagar as atualizações também para financial_transactions (essencial para créditos pois o saldo e a conta dependem disso)
+      const txUpdates: any = {};
+      if (updates.bankAccount !== undefined) txUpdates.account_id = updates.bankAccount;
+      if (updates.originalValue !== undefined) txUpdates.amount = updates.originalValue;
+      if (updates.description !== undefined) txUpdates.description = updates.description;
+      if (updates.dueDate !== undefined) txUpdates.transaction_date = updates.dueDate;
+
+      if (Object.keys(txUpdates).length > 0) {
         await supabase
           .from('financial_transactions')
-          .update({ account_id: updates.bankAccount })
+          .update(txUpdates)
           .eq('entry_id', id);
 
         await supabase
           .from('financial_transactions')
-          .update({ account_id: updates.bankAccount })
+          .update(txUpdates)
           .eq('source_table', 'loans')
           .eq('source_id', id);
       }

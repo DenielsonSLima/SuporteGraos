@@ -67,10 +67,12 @@ export function usePurchaseOrderTransactions(purchaseOrderId: string) {
                     const isExpense = l.link_type === 'expense' || metadata.expenseId || 
                                      (tx.description && (tx.description.includes('Despesa Extra') || tx.description.includes('Taxa')));
                     const isCommission = metadata.subType === 'commission';
+                    const isAdvance = metadata.subType === 'advance' || (tx.description && tx.description.toLowerCase().includes('adiantamento'));
                     
                     const getType = () => {
                         if (isCommission) return 'commission';
                         if (isExpense) return 'expense';
+                        if (isAdvance) return 'advance';
                         return tx.type === 'IN' ? 'receipt' : 'payment';
                     };
 

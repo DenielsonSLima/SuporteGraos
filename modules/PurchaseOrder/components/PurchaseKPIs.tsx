@@ -1,5 +1,5 @@
 import React from 'react';
-import { DollarSign, Truck, Clock, CheckCircle2 } from 'lucide-react';
+import { DollarSign, Truck, Clock, CheckCircle2, Wallet } from 'lucide-react';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { supabase } from '../../../services/supabase';
 import { formatMoney } from '../../../utils/formatters';
@@ -68,15 +68,21 @@ const PurchaseKPIs: React.FC<Props> = React.memo(({ params }) => {
         subtext="Liquidado aos Fornecedores"
         loading={isLoading}
       />
-      <StatCard 
-        label="Valor Pendente (Dívida)" 
-        value={stats?.totalDebt || 0} 
-        icon={Clock} 
-        color="bg-rose-600"
-        subtext="Sobre Carga Retirada"
-        bgClass="bg-white border-rose-100"
-        loading={isLoading}
-      />
+      {(() => {
+        const debtValue = stats?.totalDebt || 0;
+        const isAdvance = debtValue < 0;
+        return (
+          <StatCard 
+            label={isAdvance ? "Saldo de Adiantamentos" : "Valor Pendente (Dívida)"} 
+            value={isAdvance ? Math.abs(debtValue) : debtValue} 
+            icon={isAdvance ? Wallet : Clock} 
+            color={isAdvance ? "bg-amber-500" : "bg-rose-600"}
+            subtext={isAdvance ? "Adiantamentos Feitos" : "Sobre Carga Retirada"}
+            bgClass={isAdvance ? "bg-amber-50/50 border-amber-100" : "bg-white border-rose-100"}
+            loading={isLoading}
+          />
+        );
+      })()}
       <StatCard 
         label="Mercadoria em Trânsito" 
         value={stats?.totalTransit || 0} 

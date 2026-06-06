@@ -26,7 +26,7 @@
 export type { PaymentData, PaymentResult, CleanupParams, RegisterFinancialParams } from './handlers/orchestratorTypes';
 export { resolveAccountId, resolveAccountLabel, registerFinancialRecords } from './handlers/orchestratorHelpers';
 export { handleFreightPayment } from './handlers/freightHandler';
-export { handlePurchaseOrderPayment } from './handlers/purchaseOrderHandler';
+export { handlePurchaseOrderPayment, handlePurchaseOrderAdvance } from './handlers/purchaseOrderHandler';
 export { handleSalesOrderReceipt } from './handlers/salesOrderHandler';
 export { handleCommissionPayment } from './handlers/commissionHandler';
 export { handleStandalonePayment } from './handlers/standaloneHandler';
@@ -39,7 +39,7 @@ export { handleTransactionVoid as removeFinancialTransaction } from './handlers/
 // Import para montar o export consolidado
 import { resolveAccountId, resolveAccountLabel } from './handlers/orchestratorHelpers';
 import { handleFreightPayment } from './handlers/freightHandler';
-import { handlePurchaseOrderPayment } from './handlers/purchaseOrderHandler';
+import { handlePurchaseOrderPayment, handlePurchaseOrderAdvance } from './handlers/purchaseOrderHandler';
 import { handleSalesOrderReceipt } from './handlers/salesOrderHandler';
 import { handleCommissionPayment } from './handlers/commissionHandler';
 import { handleStandalonePayment } from './handlers/standaloneHandler';
@@ -55,6 +55,7 @@ const removeFinancialTransaction = handleTransactionVoid;
 export const paymentOrchestrator = {
   handleFreightPayment,
   handlePurchaseOrderPayment,
+  handlePurchaseOrderAdvance,
   handleSalesOrderReceipt,
   handleCommissionPayment,
   handleStandalonePayment,
@@ -64,3 +65,4 @@ export const paymentOrchestrator = {
   resolveAccountId,
   resolveAccountLabel
 };
+

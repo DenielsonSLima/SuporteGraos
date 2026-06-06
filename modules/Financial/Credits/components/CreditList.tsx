@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calendar, Edit2, Trash2 } from 'lucide-react';
+import { Calendar, Edit2, Trash2, Landmark } from 'lucide-react';
 import { FinancialRecord } from '../../types';
 import { useAccounts } from '../../../../hooks/useAccounts';
 
@@ -64,49 +64,50 @@ const CreditList: React.FC<CreditListProps> = ({ credits, onEdit, onDelete }) =>
 
   const renderTable = (rows: FinancialRecord[]) => (
     <div className="overflow-x-auto">
-      <table className="w-full text-left text-sm text-slate-600">
-        <thead className="bg-slate-50 text-xs uppercase text-slate-400 font-medium">
+      <table className="w-full text-left text-[11px] text-slate-600 whitespace-nowrap border-collapse">
+        <thead className="bg-slate-900 text-white font-black uppercase tracking-tighter">
           <tr>
-            <th className="px-5 py-2 w-36">Data</th>
-            <th className="px-5 py-2">Descrição</th>
-            <th className="px-5 py-2 w-52">Conta</th>
-            <th className="px-5 py-2 text-right w-36">Valor</th>
-            <th className="px-5 py-2 text-center w-32">Ações</th>
+            <th className="px-4 py-3 border-r border-slate-800 w-36">Data</th>
+            <th className="px-4 py-3 border-r border-slate-800">Descrição</th>
+            <th className="px-4 py-3 border-r border-slate-800 w-52">Conta Bancária</th>
+            <th className="px-4 py-3 text-right border-r border-slate-800 w-36">Valor</th>
+            <th className="px-4 py-3 text-center w-32">Ações</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-50">
+        <tbody className="divide-y divide-slate-100">
           {rows.map(credit => (
             <tr
               key={credit.id}
-              className="hover:bg-blue-50/30 transition-colors group"
+              className="hover:bg-slate-50 transition-colors group"
             >
-              <td className="px-5 py-3">
+              <td className="px-4 py-4 font-black text-slate-900">
                 <div className="flex items-center gap-2">
                   <Calendar size={14} className="text-slate-400 group-hover:text-blue-500 transition-colors" />
-                  <span className="text-slate-700 font-medium">
+                  <span>
                     {formatDate(credit.issueDate || credit.dueDate)}
                   </span>
                 </div>
               </td>
-              <td className="px-5 py-3">
-                <div className="font-medium text-slate-800">{credit.description || '-'}</div>
+              <td className="px-4 py-4">
+                <div className="font-bold text-blue-600 uppercase">{credit.description || '-'}</div>
               </td>
-              <td className="px-5 py-3 text-xs">
-                <span className="bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-lg font-bold">
+              <td className="px-4 py-4">
+                <div className="flex items-center gap-1.5 font-bold text-indigo-600">
+                  <Landmark size={12} className="text-slate-400" />
                   {getAccountLabel(credit.bankAccount)}
-                </span>
+                </div>
               </td>
-              <td className="px-5 py-3 text-right font-bold text-emerald-600">
+              <td className="px-4 py-4 text-right font-black text-emerald-600">
                 {currency(credit.originalValue || 0)}
               </td>
-              <td className="px-5 py-3">
+              <td className="px-4 py-4 text-center">
                 <div className="flex items-center justify-center gap-2">
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       onEdit(credit);
                     }}
-                    className="p-2 hover:bg-blue-100 rounded-lg text-blue-600 transition-colors"
+                    className="rounded-lg p-2 text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition-all active:scale-95"
                     title="Editar"
                   >
                     <Edit2 size={16} />
@@ -116,7 +117,7 @@ const CreditList: React.FC<CreditListProps> = ({ credits, onEdit, onDelete }) =>
                       e.stopPropagation();
                       onDelete(credit);
                     }}
-                    className="p-2 hover:bg-red-100 rounded-lg text-red-600 transition-colors"
+                    className="rounded-lg p-2 text-slate-400 hover:bg-slate-200 hover:text-rose-600 transition-all active:scale-95"
                     title="Excluir"
                   >
                     <Trash2 size={16} />

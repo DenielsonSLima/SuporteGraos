@@ -42,7 +42,7 @@ export const financialTransactionService = {
         // Normalização robusta: Créditos/Inflows (IN, CREDIT, RECEIPT, etc) -> Reversão de SAÍDA (OUT)
         // Débitos/Outflows (OUT, DEBIT, PAYMENT, etc) -> Reversão de ENTRADA (IN)
         const isInflow = ['IN', 'CREDIT', 'RECEIPT', 'RECEBIMENTO', 'ENTRADA'].includes(rawType);
-        const reversalType = isInflow ? 'OUT' : 'IN';
+        const reversalType = isInflow ? 'debit' : 'credit';
 
         const authModule = await import('../authService');
         const user = authModule.authService.getCurrentUser();
@@ -114,8 +114,8 @@ export const financialTransactionService = {
         try {
             const normalizedType = (() => {
                 const rawType = String(transaction.type || '').toLowerCase();
-                if (rawType === 'receipt' || rawType === 'credit' || rawType === 'in') return 'IN';
-                if (rawType === 'payment' || rawType === 'debit' || rawType === 'transfer' || rawType === 'out') return 'OUT';
+                if (rawType === 'receipt' || rawType === 'credit' || rawType === 'in') return 'credit';
+                if (rawType === 'payment' || rawType === 'debit' || rawType === 'transfer' || rawType === 'out') return 'debit';
                 return transaction.type;
             })();
 
