@@ -175,5 +175,29 @@ export const advancesLoader = {
       countActive: data?.countActive || 0,
       netBalance: data?.netBalance || 0,
     };
+  },
+
+  /**
+   * Busca as fontes de consumo de um adiantamento (carregamentos vinculados via pedido de compra)
+   */
+  getConsumptionSources: async (advanceId: string): Promise<{
+    source_type: string;
+    source_id: string;
+    source_label: string;
+    amount: number;
+    source_date: string;
+  }[]> => {
+    const { data, error } = await supabase.rpc('rpc_get_advance_consumption_sources', { p_advance_id: advanceId });
+    if (error) {
+      console.error('Erro ao buscar fontes de consumo do adiantamento:', error);
+      return [];
+    }
+    return (data || []).map((row: any) => ({
+      source_type: row.source_type,
+      source_id: row.source_id,
+      source_label: row.source_label,
+      amount: parseFloat(row.amount ?? '0'),
+      source_date: row.source_date,
+    }));
   }
 };

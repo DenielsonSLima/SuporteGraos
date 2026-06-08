@@ -187,6 +187,7 @@ const AdvancesTab: React.FC = () => {
             setTxForDetails(null);
           }}
           onDeleteChild={handleDeleteChild}
+          onSettle={handleOpenSettle}
         />
 
         <AdvanceForm

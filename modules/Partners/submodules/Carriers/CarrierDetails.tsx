@@ -103,10 +103,10 @@ const CarrierDetails: React.FC<Props> = ({ carrier, onBack }) => {
         await updateDriverMutation.mutateAsync({
           id: editingId,
           driver: {
-            name: driverForm.name!,
+            name: driverForm.name!.toUpperCase().trim(),
             cpf: driverForm.cpf,
             cnhNumber: driverForm.cnhNumber,
-            cnhCategory: driverForm.cnhCategory,
+            cnhCategory: driverForm.cnhCategory?.toUpperCase() || 'E',
             phone: driverForm.phone,
             active: driverForm.active
           }
@@ -114,11 +114,11 @@ const CarrierDetails: React.FC<Props> = ({ carrier, onBack }) => {
         addToast('success', 'Motorista Atualizado');
       } else {
         await createDriverMutation.mutateAsync({
-          name: driverForm.name!,
+          name: driverForm.name!.toUpperCase().trim(),
           partnerId: carrier.id,
           cpf: driverForm.cpf,
           cnhNumber: driverForm.cnhNumber,
-          cnhCategory: driverForm.cnhCategory,
+          cnhCategory: driverForm.cnhCategory?.toUpperCase() || 'E',
           phone: driverForm.phone,
           active: true
         });
@@ -196,7 +196,7 @@ const CarrierDetails: React.FC<Props> = ({ carrier, onBack }) => {
   const activeSets = [];
 
   // Common Input Class
-  const inputClass = 'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 placeholder:text-slate-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500';
+  const inputClass = 'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 placeholder:text-slate-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 uppercase';
   const labelClass = 'block text-sm font-medium text-slate-700 mb-1';
 
   return (
@@ -506,7 +506,7 @@ const CarrierDetails: React.FC<Props> = ({ carrier, onBack }) => {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="col-span-2">
                       <label className={labelClass}>Placa</label>
-                      <input required className={`${inputClass} uppercase`} value={vehicleForm.plate || ''} onChange={e => setVehicleForm({ ...vehicleForm, plate: e.target.value })} />
+                      <input required className={inputClass} value={vehicleForm.plate || ''} onChange={e => setVehicleForm({ ...vehicleForm, plate: e.target.value })} />
                     </div>
                   </div>
                   <div>

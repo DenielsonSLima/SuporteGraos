@@ -89,3 +89,23 @@ export function useAdvanceChildren(parentId: string | null) {
     placeholderData: keepPreviousData,
   });
 }
+
+/**
+ * Hook para buscar as fontes de consumo de um adiantamento
+ * (carregamentos vinculados via pedido de compra)
+ */
+export function useAdvanceConsumptionSources(advanceId: string | null) {
+  useFinancialRealtime();
+
+  return useQuery({
+    queryKey: [...QUERY_KEYS.ADVANCES, 'consumption-sources', advanceId],
+    queryFn: () => {
+      if (!advanceId) return [];
+      return advancesService.getConsumptionSources(advanceId);
+    },
+    enabled: !!advanceId,
+    staleTime: STALE_TIMES.DYNAMIC,
+    placeholderData: keepPreviousData,
+  });
+}
+

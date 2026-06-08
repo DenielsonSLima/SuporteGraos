@@ -5,7 +5,7 @@ import {
   HelpCircle, ChevronRight, AlertTriangle, RefreshCw
 } from 'lucide-react';
 import ModalPortal from '../../../../components/ui/ModalPortal';
-import { useAdvanceChildren } from '../../../../hooks/useAdvances';
+import { useAdvanceChildren, useAdvanceConsumptionSources } from '../../../../hooks/useAdvances';
 
 interface Props {
   isOpen: boolean;
@@ -49,6 +49,42 @@ const AdvanceDetailsModal: React.FC<Props> = ({
 
   // Carrega os consumos (filhos) do adiantamento atual em tempo real
   const { data: children = [], isLoading: isLoadingChildren } = useAdvanceChildren(currentAdvance?.id || null);
+  const { data: consumptionSources = [], isLoading: isLoadingConsumption } = useAdvanceConsumptionSources(currentAdvance?.id || null);
+
+  const mergedItems = useMemo(() => {
+    const list: any[] = [];
+    
+    // Mapeia os filhos do adiantamento (baixas manuais)
+    (children || []).forEach((child: any) => {
+      list.push({
+        id: child.id,
+        date: child.advance_date,
+        type: 'manual',
+        label: 'Baixa Manual Realizada',
+        description: child.description,
+        amount: child.amount,
+        accountName: child.account_name,
+        canDelete: true,
+      });
+    });
+
+    // Mapeia as fontes de consumo (carregamentos do pedido)
+    (consumptionSources || []).forEach((source: any) => {
+      list.push({
+        id: source.source_id,
+        date: source.source_date,
+        type: source.source_type,
+        label: source.source_label || 'Consumo por Carregamento',
+        description: 'Carregamento automático vinculado ao Pedido de Compra',
+        amount: source.amount,
+        accountName: null,
+        canDelete: false,
+      });
+    });
+
+    // Ordena por data decrescente (mais recentes primeiro)
+    return list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [children, consumptionSources]);
 
   const currency = (val: number) => 
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.abs(val) < 0.005 ? 0 : val);
@@ -161,11 +197,13 @@ const AdvanceDetailsModal: React.FC<Props> = ({
                 <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex flex-col justify-between">
                   <div>
                     <span className="text-[9px] font-black text-amber-500 uppercase tracking-widest block mb-1">Descontado / Consumido</span>
-                    <span className="text-2xl font-black text-amber-600 tracking-tighter">- {currency(currentAdvance.settledAmount ?? 0)}</span>
+                    <span className="text-2xl font-black text-amber-600 tracking-tighter">
+                      {(currentAdvance.settledAmount ?? 0) > 0 ? '- ' : ''}{currency(currentAdvance.settledAmount ?? 0)}
+                    </span>
                   </div>
                   <div className="mt-4 flex items-center gap-2 text-xs text-amber-600 font-bold">
                     <ArrowUpRight size={14} />
-                    <span>{children.length} baixa(s) efetuada(s)</span>
+                    <span>{mergedItems.length} baixa(s) efetuada(s)</span>
                   </div>
                 </div>
 
@@ -223,66 +261,86 @@ const AdvanceDetailsModal: React.FC<Props> = ({
                     <h3 className="font-black text-slate-800 text-base uppercase tracking-tighter italic">Rastro Contábil ("Rastro de Volta")</h3>
                     <p className="text-xs text-slate-400 font-bold mt-0.5">Histórico completo de baixas, amortizações e desonerações deste saldo</p>
                   </div>
-                  {isLoadingChildren && (
+                  {(isLoadingChildren || isLoadingConsumption) && (
                     <RefreshCw className="animate-spin text-slate-400" size={18} />
                   )}
                 </div>
 
-                <div className="">
-                  {children.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center text-center py-12 px-8 bg-slate-50/50 rounded-2xl border-2 border-dashed border-slate-200">
-                      <div className="p-4 bg-slate-100 rounded-full text-slate-400 mb-3">
-                        <HelpCircle size={28} />
-                      </div>
-                      <h4 className="font-black text-slate-800 text-sm uppercase tracking-tighter">Nenhum desconto efetuado</h4>
-                      <p className="text-xs text-slate-400 max-w-sm font-bold mt-1">
-                        Este adiantamento ainda está com saldo de <span className="text-emerald-600 font-black">{currency(currentAdvance.value)}</span> integralmente livre para ser consumido em fretes futuros.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {children.map((child: any) => (
-                        <div 
-                          key={child.id}
-                          className="flex items-center justify-between p-5 rounded-2xl border border-slate-100 bg-slate-50/20 hover:bg-slate-50 transition-all group shadow-sm"
-                        >
-                          <div className="flex items-center gap-4">
-                            <div className="p-3 rounded-xl bg-amber-50 text-amber-600 border border-amber-100">
-                              <ArrowDownLeft size={18} />
-                            </div>
-                            <div>
-                              <div className="flex items-center gap-2.5">
-                                <span className="text-xs font-black text-slate-800 uppercase tracking-tight">Desconto Contábil Realizado</span>
-                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                                  <Calendar size={10} /> {dateStr(child.advance_date)}
-                                </span>
-                              </div>
-                              <p className="text-xs text-slate-500 font-bold mt-1">{child.description}</p>
-                              {child.account_name && (
-                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">
-                                  CONTA ENVOLVIDA: {child.account_name}
-                                </p>
-                              )}
-                            </div>
-                          </div>
+                 <div className="">
+                   {mergedItems.length === 0 ? (
+                     <div className="flex flex-col items-center justify-center text-center py-12 px-8 bg-slate-50/50 rounded-2xl border-2 border-dashed border-slate-200">
+                       <div className="p-4 bg-slate-100 rounded-full text-slate-400 mb-3">
+                         <HelpCircle size={28} />
+                       </div>
+                       <h4 className="font-black text-slate-800 text-sm uppercase tracking-tighter">Nenhum desconto efetuado</h4>
+                       <p className="text-xs text-slate-400 max-w-sm font-bold mt-1">
+                         Este adiantamento ainda está com saldo de <span className="text-emerald-600 font-black">{currency(currentAdvance.value)}</span> integralmente livre para ser consumido em fretes futuros.
+                       </p>
+                     </div>
+                   ) : (
+                     <div className="space-y-4">
+                       {mergedItems.map((item: any) => (
+                         <div 
+                           key={item.id}
+                           className="flex items-center justify-between p-5 rounded-2xl border border-slate-100 bg-slate-50/20 hover:bg-slate-50 transition-all group shadow-sm"
+                         >
+                           <div className="flex items-center gap-4">
+                             <div className={`p-3 rounded-xl border ${
+                               item.type === 'manual' 
+                                 ? 'bg-amber-50 text-amber-600 border-amber-100' 
+                                 : 'bg-indigo-50 text-indigo-600 border-indigo-100'
+                             }`}>
+                               {item.type === 'manual' ? <ArrowDownLeft size={18} /> : <Wallet size={18} />}
+                             </div>
+                             <div>
+                               <div className="flex items-center gap-2.5">
+                                 <span className={`text-xs font-black uppercase tracking-tight ${
+                                   item.type === 'manual' ? 'text-emerald-600' : 'text-indigo-600'
+                                 }`}>
+                                   {item.label}
+                                 </span>
+                                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                                   <Calendar size={10} /> {dateStr(item.date)}
+                                 </span>
+                               </div>
+                               <p className="text-xs text-slate-500 font-bold mt-1">{item.description}</p>
+                               {item.accountName && !item.accountName.toLowerCase().includes('virtu') ? (
+                                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">
+                                   CONTA ENVOLVIDA: {item.accountName}
+                                 </p>
+                               ) : item.type === 'manual' ? (
+                                 <p className="text-[9px] font-black text-indigo-500 uppercase tracking-widest mt-1">
+                                   DEDUZIDO DIRETAMENTE DO SALDO DO ADIANTAMENTO
+                                 </p>
+                               ) : (
+                                 <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mt-1">
+                                   BAIXA AUTOMÁTICA VIA CARREGAMENTO DO PEDIDO
+                                 </p>
+                               )}
+                             </div>
+                           </div>
 
-                          <div className="flex items-center gap-4">
-                            <span className="text-base font-black text-amber-600 tracking-tight">
-                              - {currency(child.amount)}
-                            </span>
-                            <button
-                              onClick={() => onDeleteChild(child.id)}
-                              className="p-2.5 rounded-lg bg-rose-50 text-rose-600 opacity-0 group-hover:opacity-100 hover:bg-rose-600 hover:text-white transition-all shadow-sm"
-                              title="Estornar este desconto específico"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                           <div className="flex items-center gap-4">
+                             <span className="text-base font-black text-amber-600 tracking-tight">
+                               - {currency(item.amount)}
+                             </span>
+                             {item.canDelete ? (
+                               <button
+                                 onClick={() => onDeleteChild(item.id)}
+                                 className="p-2.5 rounded-lg bg-rose-50 text-rose-600 opacity-0 group-hover:opacity-100 hover:bg-rose-600 hover:text-white transition-all shadow-sm"
+                                 title="Estornar este desconto específico"
+                               >
+                                 <Trash2 size={16} />
+                               </button>
+                             ) : (
+                               <div className="w-10" />
+                             )}
+                           </div>
+                         </div>
+                       ))}
+                     </div>
+                   )}
+                 </div>
 
               </div>
 

@@ -106,12 +106,12 @@ const QuickPartnerModal: React.FC<QuickPartnerModalProps> = ({
       if (data) {
         setFormData(prev => ({
           ...prev,
-          name: data.nome,
-          tradeName: data.fantasia,
-          nickname: data.fantasia || data.nome,
+          name: data.nome?.toUpperCase() || '',
+          tradeName: data.fantasia?.toUpperCase() || '',
+          nickname: (data.fantasia || data.nome)?.toUpperCase() || '',
           phone: data.telefone,
-          city: data.municipio,
-          state: data.uf
+          city: data.municipio?.toUpperCase() || '',
+          state: data.uf?.toUpperCase() || ''
         }));
         if (data.municipio && data.uf) {
           setAddressNotInformed(false);
@@ -187,9 +187,9 @@ const QuickPartnerModal: React.FC<QuickPartnerModalProps> = ({
         partnerData: {
           type,
           document: finalDocument || 'NÃO INFORMADO',
-          name: formData.name,
-          nickname: formData.nickname || null,
-          tradeName: formData.tradeName || null,
+          name: formData.name.toUpperCase().trim(),
+          nickname: formData.nickname ? formData.nickname.toUpperCase().trim() : null,
+          tradeName: formData.tradeName ? formData.tradeName.toUpperCase().trim() : null,
           phone: formData.phone || null,
           email: null,
           notes: null,
@@ -200,8 +200,8 @@ const QuickPartnerModal: React.FC<QuickPartnerModalProps> = ({
           street: '',
           number: '',
           neighborhood: '',
-          cityName: formData.city,
-          stateUf: formData.state.toUpperCase(),
+          cityName: formData.city ? formData.city.toUpperCase().trim() : '',
+          stateUf: formData.state ? formData.state.toUpperCase().trim() : '',
           isPrimary: true
         } : null,
         categories: formData.categories
@@ -210,7 +210,7 @@ const QuickPartnerModal: React.FC<QuickPartnerModalProps> = ({
       // Invalida queries para atualizar listas
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.PARTNERS });
 
-      addToast('success', 'Parceiro Cadastrado', `${formData.name} foi adicionado com sucesso.`);
+      addToast('success', 'Parceiro Cadastrado', `${formData.name.toUpperCase().trim()} foi adicionado com sucesso.`);
 
       // Monta um Partner mínimo para callback
       if (onSuccess) {
@@ -220,9 +220,9 @@ const QuickPartnerModal: React.FC<QuickPartnerModalProps> = ({
           type,
           categories: formData.categories,
           document: finalDocument || 'NÃO INFORMADO',
-          name: formData.name,
-          nickname: formData.nickname || undefined,
-          tradeName: formData.tradeName || undefined,
+          name: formData.name.toUpperCase().trim(),
+          nickname: formData.nickname ? formData.nickname.toUpperCase().trim() : undefined,
+          tradeName: formData.tradeName ? formData.tradeName.toUpperCase().trim() : undefined,
           phone: formData.phone || undefined,
           active: true,
           createdAt: new Date().toISOString(),
@@ -236,8 +236,8 @@ const QuickPartnerModal: React.FC<QuickPartnerModalProps> = ({
             number: '',
             neighborhood: '',
             isPrimary: true,
-            cityName: formData.city,
-            stateUf: formData.state.toUpperCase()
+            cityName: formData.city ? formData.city.toUpperCase().trim() : '',
+            stateUf: formData.state ? formData.state.toUpperCase().trim() : ''
           } : undefined
         };
         onSuccess(newPartner);
@@ -252,7 +252,7 @@ const QuickPartnerModal: React.FC<QuickPartnerModalProps> = ({
     }
   };
 
-  const inputClass = 'w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-2.5 text-slate-900 font-bold focus:border-emerald-500 focus:ring-0 outline-none transition-all placeholder:text-slate-300 text-sm';
+  const inputClass = 'w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-2.5 text-slate-900 font-bold focus:border-emerald-500 focus:ring-0 outline-none transition-all placeholder:text-slate-300 text-sm uppercase';
   const labelClass = 'block text-[10px] font-black text-slate-400 mb-1.5 uppercase tracking-widest ml-1';
 
   const modalContent = (
@@ -455,7 +455,7 @@ const QuickPartnerModal: React.FC<QuickPartnerModalProps> = ({
               </div>
               <div>
                 <input
-                  className={`${inputClass} uppercase text-center`}
+                  className={`${inputClass} text-center`}
                   maxLength={2}
                   value={formData.state}
                   onChange={e => setFormData(prev => ({ ...prev, state: e.target.value }))}

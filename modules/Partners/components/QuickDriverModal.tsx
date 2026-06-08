@@ -44,16 +44,16 @@ const QuickDriverModal: React.FC<QuickDriverModalProps> = ({
         setIsSubmitting(true);
         try {
             const newDriver = await createDriverMutation.mutateAsync({
-                name: formData.name!,
+                name: formData.name!.toUpperCase().trim(),
                 partnerId,
                 cpf: formData.cpf,
                 phone: formData.phone,
                 cnhNumber: formData.cnhNumber,
-                cnhCategory: formData.cnhCategory,
+                cnhCategory: formData.cnhCategory?.toUpperCase() || 'E',
                 active: true
             });
 
-            addToast('success', 'Motorista Cadastrado', `${formData.name} foi adicionado com sucesso.`);
+            addToast('success', 'Motorista Cadastrado', `${formData.name!.toUpperCase().trim()} foi adicionado com sucesso.`);
 
             if (onSuccess) {
                 onSuccess(newDriver as unknown as Driver);
@@ -67,7 +67,7 @@ const QuickDriverModal: React.FC<QuickDriverModalProps> = ({
         }
     };
 
-    const inputClass = 'w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-2.5 text-slate-900 font-bold focus:border-primary-500 focus:ring-0 outline-none transition-all placeholder:text-slate-300 text-sm';
+    const inputClass = 'w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-2.5 text-slate-900 font-bold focus:border-primary-500 focus:ring-0 outline-none transition-all placeholder:text-slate-300 text-sm uppercase';
     const labelClass = 'block text-[10px] font-black text-slate-400 mb-1.5 uppercase tracking-widest ml-1';
 
     return (

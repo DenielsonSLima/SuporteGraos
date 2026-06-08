@@ -128,18 +128,18 @@ const PartnerForm: React.FC<Props> = ({ initialData, categories, onSave, onCance
       if (data) {
         setFormData(prev => ({
           ...prev,
-          name: data.nome,
-          tradeName: data.fantasia,
-          nickname: data.fantasia || data.nome,
+          name: data.nome?.toUpperCase() || '',
+          tradeName: data.fantasia?.toUpperCase() || '',
+          nickname: (data.fantasia || data.nome)?.toUpperCase() || '',
           email: data.email,
           phone: data.telefone,
           address: addressNotInformed ? prev.address : {
             ...prev.address,
-            street: data.logradouro,
-            number: data.numero,
-            neighborhood: data.bairro,
-            city: data.municipio,
-            state: data.uf,
+            street: data.logradouro?.toUpperCase() || '',
+            number: data.numero?.toUpperCase() || '',
+            neighborhood: data.bairro?.toUpperCase() || '',
+            city: data.municipio?.toUpperCase() || '',
+            state: data.uf?.toUpperCase() || '',
             zip: data.cep.replace('.', '')
           }
         }));
@@ -205,9 +205,9 @@ const PartnerForm: React.FC<Props> = ({ initialData, categories, onSave, onCance
     onSave({
       categories: formData.categories,
       document: finalDocument,
-      name: formData.name,
-      nickname: formData.nickname,
-      tradeName: formData.tradeName,
+      name: formData.name.toUpperCase().trim(),
+      nickname: formData.nickname ? formData.nickname.toUpperCase().trim() : '',
+      tradeName: formData.tradeName ? formData.tradeName.toUpperCase().trim() : '',
       email: formData.email,
       phone: formData.phone,
       type,
@@ -215,11 +215,11 @@ const PartnerForm: React.FC<Props> = ({ initialData, categories, onSave, onCance
         partnerId: initialData?.id,
         companyId: initialData?.companyId,
         cep: formData.address.zip,
-        street: formData.address.street,
-        number: formData.address.number,
-        neighborhood: formData.address.neighborhood,
-        cityName: formData.address.city,
-        stateUf: formData.address.state,
+        street: formData.address.street ? formData.address.street.toUpperCase().trim() : '',
+        number: formData.address.number ? formData.address.number.toUpperCase().trim() : '',
+        neighborhood: formData.address.neighborhood ? formData.address.neighborhood.toUpperCase().trim() : '',
+        cityName: formData.address.city ? formData.address.city.toUpperCase().trim() : '',
+        stateUf: formData.address.state ? formData.address.state.toUpperCase().trim() : '',
         isPrimary: true
       },
       active: true,
@@ -234,7 +234,7 @@ const PartnerForm: React.FC<Props> = ({ initialData, categories, onSave, onCance
     }));
   };
 
-  const addressInputClass = 'block w-full rounded-lg border border-slate-300 bg-white p-2.5 text-slate-900 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500';
+  const addressInputClass = 'block w-full rounded-lg border border-slate-300 bg-white p-2.5 text-slate-900 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 uppercase';
 
   return (
     <div className="mx-auto max-w-4xl rounded-xl border border-slate-200 bg-white shadow-sm animate-in slide-in-from-bottom-4">
@@ -356,7 +356,7 @@ const PartnerForm: React.FC<Props> = ({ initialData, categories, onSave, onCance
               required
               value={formData.name}
               onChange={e => setFormData({ ...formData, name: e.target.value })}
-              className="block w-full rounded-lg border border-slate-300 bg-white p-2.5 text-slate-900 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+              className="block w-full rounded-lg border border-slate-300 bg-white p-2.5 text-slate-900 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 uppercase"
             />
           </div>
 
@@ -371,7 +371,7 @@ const PartnerForm: React.FC<Props> = ({ initialData, categories, onSave, onCance
                 value={formData.nickname}
                 onChange={e => setFormData({ ...formData, nickname: e.target.value })}
                 placeholder="Como ele é conhecido?"
-                className="block w-full rounded-lg border border-slate-300 bg-white pl-10 pr-3 py-2.5 text-slate-900 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                className="block w-full rounded-lg border border-slate-300 bg-white pl-10 pr-3 py-2.5 text-slate-900 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 uppercase"
               />
             </div>
             <p className="text-[10px] text-slate-400 mt-1">Facilita a busca no lançamento de pedidos.</p>
@@ -384,7 +384,7 @@ const PartnerForm: React.FC<Props> = ({ initialData, categories, onSave, onCance
                 type="text"
                 value={formData.tradeName}
                 onChange={e => setFormData({ ...formData, tradeName: e.target.value })}
-                className="block w-full rounded-lg border border-slate-300 bg-white p-2.5 text-slate-900 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                className="block w-full rounded-lg border border-slate-300 bg-white p-2.5 text-slate-900 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 uppercase"
               />
             </div>
           )}
@@ -490,7 +490,7 @@ const PartnerForm: React.FC<Props> = ({ initialData, categories, onSave, onCance
                 maxLength={2}
                 value={formData.address.state}
                 onChange={e => updateAddress('state', e.target.value)}
-                className={`${addressInputClass} uppercase`}
+                className={addressInputClass}
                 disabled={addressNotInformed}
               />
             </div>
