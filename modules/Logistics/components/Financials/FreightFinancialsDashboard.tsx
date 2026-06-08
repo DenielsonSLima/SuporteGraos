@@ -4,6 +4,7 @@ import { Freight } from '../../types';
 import { DollarSign } from 'lucide-react';
 import CarrierCard from './CarrierCard';
 import { useAdvanceSummaries } from '../../../../hooks/useAdvances';
+import { useCarriers } from '../../../../hooks/useCarriers';
 
 interface Props {
   freights: Freight[];
@@ -22,6 +23,7 @@ interface CarrierGroup {
 const FreightFinancialsDashboard: React.FC<Props> = ({ freights, carrierFilter, onSelectCarrier }) => {
   
   const { data: advanceSummaries = [] } = useAdvanceSummaries();
+  const { data: carriers = [] } = useCarriers();
   
   const carrierGroups = useMemo(() => {
     const groups: Record<string, CarrierGroup> = {};
@@ -50,13 +52,11 @@ const FreightFinancialsDashboard: React.FC<Props> = ({ freights, carrierFilter, 
     // 2. Adicionar parceiros que têm adiantamento (crédito) mas NÃO têm fretes ativos na lista
     advanceSummaries.forEach(a => {
       // Se tiver saldo positivo e (não tem filtro ou bate no filtro) e não está no grupo ainda
+      // E o parceiro é de fato uma transportadora
       const matchesFilter = !carrierFilter || a.partnerName === carrierFilter;
+      const isCarrier = carriers.includes(a.partnerName);
       
-      if (a.netBalance > 0 && matchesFilter && !groups[a.partnerName]) {
-        // Como o dashboard é focado em fretes, só incluímos se houver indício de ser transportadora
-        // No caso, se bater no filtro de transportadora ou se já tiver histórico de frete (mas aqui freights é filtrado)
-        // Por segurança, se o usuário filtrou especificamente por ela, mostramos.
-        // Se não filtrou, mostramos todas que têm crédito (adiantamento dado).
+      if (a.netBalance > 0 && matchesFilter && !groups[a.partnerName] && isCarrier) {
         groups[a.partnerName] = {
           name: a.partnerName,
           totalBalance: 0,
@@ -68,7 +68,7 @@ const FreightFinancialsDashboard: React.FC<Props> = ({ freights, carrierFilter, 
     });
 
     return Object.values(groups).sort((a, b) => (b.totalBalance + b.globalCredit) - (a.totalBalance + a.globalCredit));
-  }, [freights, advanceSummaries, carrierFilter]);
+  }, [freights, advanceSummaries, carrierFilter, carriers]);
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
